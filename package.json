@@ -1,0 +1,1 @@
+{"name":"tembo-agent-studio","version":"0.1.0","description":"Tembo Agent Studio","main":"bin/tembo-agent-studio.js","bin":{"tembo-agent-studio":"./bin/tembo-agent-studio.js"},"scripts":{"onboard":"node bin/tembo-agent-studio.js onboard"},"license":"MIT"}
