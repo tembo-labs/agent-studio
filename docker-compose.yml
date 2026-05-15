@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  tas:
+    build: .
+    ports: ["3000:3000"]
+    volumes: [".:/app", "/app/node_modules"]
+    environment:
+      - NODE_ENV=production
+      - TEMBO_API_KEY=${TEMBO_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes: ["redis_data:/data"]
+volumes: {redis_data: {}}
