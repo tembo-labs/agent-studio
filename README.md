@@ -5,36 +5,43 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tembo](https://img.shields.io/badge/Powered%20by-Tembo.io-10b981)](https://tembo.io)
 
-Tembo Agent Studio (TAS) is an **open-source, self-hosted** chat-first platform for creating, running, and governing production-grade AI agents. It pairs beautifully with [tembo.io](https://tembo.io).
-
-Agents evolve biologically: they improve from every human correction and naturally **speciate into variants** when users diverge.
+Tembo Agent Studio (TAS) is an **open-source, self-hosted** chat-first platform for creating, running, and governing production-grade AI agents. It is the perfect companion to [tembo.io](https://tembo.io).
 
 ---
 
 ## ✨ Features
 
 ### Core Experience
-- **Chat-first creation & editing**
-- **One-click “Modify + Rerun”**
-- **Rich Human-in-the-Loop** forms (approvals, conditional fields, file uploads, previews)
-- Built-in runtime with scheduling and real-time updates
+- **Chat-first creation & editing** — Describe agents in plain English
+- **Run & Schedule** agents with one click
+- **Rich Human-in-the-Loop** — Dynamic web forms for approvals, data entry, file uploads, conditional fields, and rich previews (Paperclip.ing-style interface)
+- **One-click “Modify + Rerun”** — Give feedback and instantly retry with improvements applied
 
 ### Continuous Improvement
-- Automatic improvement PRs via Tembo coding agents on every correction
-- Full immutable **changelog** (who, when, why)
+- Every correction or explicit feedback is analyzed by Tembo’s coding agent
+- Automatically generates a **targeted PR** updating the agent’s source code (`agent.json`)
+- Full **immutable changelog** — who changed what, when, and exactly why (user feedback text + context)
 
-### Biological Evolution
-- Automatic **divergence detection** → **variants**
-- Beautiful **lineage tree**
-- Admin tools for reconciliation and speciation
+### Biological Evolution (Variants & Lineage)
+- **Automatic divergence detection** when different users give conflicting preferences
+- Creates **variants** (default: automatic, admin-configurable)
+- Variants start as “diverging” (still linked to parent) and can later be reconciled or fully speciated
+- Beautiful **lineage tree** showing parent → variants → speciated agents
+- Admin controls: reconcile, force speciation, merge, archive
 
 ### Tembo Mycelium (Shared Learning Network)
-Admins can optionally connect their TAS instance to **Tembo Mycelium** — a global, permissioned knowledge network for agents.
+Admins can connect their TAS instance to **Tembo Mycelium** — a global, permissioned knowledge network.
 
-- **Auto-share** successful agent patterns, templates, and learned behaviors (with full attribution and privacy controls)
-- **Discover & import** high-quality agents and variants from other organizations
-- Work completely **on an island** (air-gapped / fully private) **or** participate in the collective intelligence
-- Granular controls: share only templates, share anonymized lessons, share full variants, etc.
+- **Auto-share** successful patterns, templates, and learned behaviors (with attribution + privacy controls)
+- **Discover & import** high-quality agents and variants from the network
+- Fully optional — run completely **on an island** (air-gapped) or participate in collective intelligence
+- Granular controls per instance
+
+### Governance
+- Paperclip.ing-inspired clean dashboard
+- Org overview with divergence alerts
+- Per-agent changelog, feedback history, learning summary, and lineage view
+- All agents live in a Git repo (single source of truth)
 
 ---
 
@@ -46,29 +53,74 @@ cd agent-studio
 docker compose up -d
 ```
 
-Sign in with Tembo → connect a repo → start chatting.
+1. Sign in with Tembo (OAuth/SSO)
+2. Connect or create a GitHub repo
+3. Start chatting with your first agent
 
 ---
 
 ## Architecture
 
-- **Frontend**: Next.js  
-- **Backend**: Rust (Cargo AI runtime + HITL + Mycelium sync)  
-- **Coding Changes**: Tembo.io agents (PRs)  
-- **Source of Truth**: Your Git repo  
-- **Optional**: Tembo Mycelium sync (secure, opt-in)
+- **Frontend**: Next.js 15 + Tailwind + shadcn/ui
+- **Backend**: Rust (Cargo AI runtime, HITL state, Mycelium sync, variant management)
+- **Coding Changes**: Powered by Tembo.io coding agents (YOLO PRs or review-required)
+- **Runtime**: Native in TAS (with scheduling support)
+- **Agent Format**: Cargo AI JSON (declarative, LLM-friendly)
+
+---
+
+## Repo Structure
+
+```bash
+agents/
+  arr-guardian/
+    agent.json                    # Main definition + HITL forms
+    tools/                        # Optional custom Rust tools
+    _variant_metadata.json        # TAS lineage info
+  arr-guardian-marketing/         # Auto-created variant
+.tembo/
+  mycelium/                       # Local cache of shared knowledge
+  lineage/
+  skills/                         # Reusable patterns
+```
 
 ---
 
 ## Philosophy
 
-TAS treats agents like living organisms in an ecosystem:
-- They **adapt** through feedback
-- They **speciate** when groups diverge
-- They can **connect** through the Mycelium to share wisdom across organizations
+TAS treats agents like living organisms:
+- They **adapt** through human feedback
+- They **speciate** (create variants) when groups diverge
+- They can **connect** via Mycelium to share wisdom across organizations
+- Everything remains fully auditable and Git-backed
+
+---
+
+## Roadmap
+
+**v0.1 (MVP)**
+- Chat + Tembo coding agents
+- Run / schedule + rich HITL forms
+- Correction → auto PR + Modify+Rerun
+- Full changelog
+- Divergence detection + automatic variants
+- Lineage tree + admin tools
+- Basic Tembo Mycelium sync
+
+**Future**
+- Visual low-code editor
+- Multi-agent orchestration
+- Advanced Mycelium marketplace & reputation
+- Per-user private variants
 
 ---
 
 ## License
 
-MIT
+MIT © Tembo
+
+---
+
+**Made with ❤️ for teams that want agents that actually improve over time.**
+
+[GitHub](https://github.com/tembo/agent-studio) • [tembo.io](https://tembo.io)
