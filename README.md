@@ -9,16 +9,6 @@ Tembo Agent Studio (TAS) is an **open-source, self-hosted** chat-first platform 
 
 ---
 
-## Product Direction
-
-TAS ships in phased milestones so teams can adopt foundations first, then layer on advanced adaptive behavior.
-
-- **Authentication**: TAS uses **better-auth** so customers can connect internal identity systems (OIDC/SAML-compatible providers via their auth stack).
-- **Tembo integration (now)**: TAS integrates with Tembo using an **API access key**.
-- **Tembo integration (future)**: TAS can add an **MCP-based integration mode** once the Tembo platform exposes a public MCP server.
-
----
-
 ## Phased Rollout
 
 ### `v0.1` Foundation (Deploy, Authenticate, Connect, Run)
@@ -99,6 +89,8 @@ docker compose up -d
 
 - [USER_STORIES.md](./USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
 - [DEMO_SCRIPT_01.md](./DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
+- [MYCELIUM.md](./MYCELIUM.md): Tembo Mycelium model, operating modes, and governance
+- [FEATURE_DETAILS.md](./FEATURE_DETAILS.md): restored detailed feature context from earlier README
 
 ---
 
