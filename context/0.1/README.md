@@ -1,6 +1,6 @@
 # Tembo Agent Studio v0.1 — Foundation
 
-> **Headline:** TAS v0.1 is the smallest deployable footprint that proves a team can run an agent inside their own environment, on their own identity, against their own repo — repeatedly.
+> **Headline:** TAS is the smallest deployable footprint that proves a team can run an agent inside their own environment, on their own identity, against their own repo — repeatedly.
 >
 > **Audience:** platform/IT teams running an internal pilot.
 
@@ -12,7 +12,7 @@ Three things break in every early agent rollout:
 2. **Definitions drift.** Agents end up living in some SaaS console with no version history. A junior changes a prompt and nobody can answer "what did this look like last Tuesday?"
 3. **Runs are opaque.** "It worked on my laptop" is not an operational story. Without a run log a team trusts, no second team adopts it.
 
-These are not glamorous problems, but they decide whether a tool gets a second project. Every later TAS phase (chat authoring, governance, adaptive learning) inherits fragility if v0.1 cannot be trusted.
+These are not glamorous problems, but they decide whether a tool gets a second project. Every later TAS phase (chat authoring, governance, adaptive learning) inherits fragility if TAS cannot be trusted.
 
 ## Our Solution
 
@@ -24,9 +24,9 @@ A self-hosted TAS instance that:
 - lets an operator create or import a baseline agent definition,
 - runs that agent manually and shows status + logs that a human can actually read.
 
-We are not trying to be impressive in v0.1. We are trying to be dependable enough that a team commits to the next phase.
+We are not trying to be impressive yet. We are trying to be dependable enough that a team commits to the next phase.
 
-## What Ships in v0.1
+## What is Shipped
 
 - **Self-hosted deploy.** Docker Compose path + environment variable reference. Single-node target.
 - **`better-auth` integration.** Email/password baseline plus SSO adapter slots so customers can wire their own IdP.
@@ -60,25 +60,30 @@ Build the minimum trustworthy control plane first. Resist the temptation to demo
 
 ## Customer Quote (Drafted)
 
-> "Before TAS, our 'agent' was a Python script someone ran from their laptop. v0.1 gave us a real deploy, SSO that our security team already approved, and a Git repo we audit like any other service. That alone made it a different conversation internally."
+> "Before TAS, our 'agent' was a Python script someone ran from their laptop. Tembo Agent Studio gave us a real deploy, SSO that our security team already approved, and a Git repo we audit like any other service. That alone made it a different conversation internally."
 >
-> — *Director of Platform Engineering, mid-sized financial services firm (draft persona)*
+> — _Director of Platform Engineering, mid-sized financial services firm_
 
 ## FAQ
 
-### Who should adopt v0.1?
+### Who should adopt Tembo Agent Studio?
+
 Platform and IT teams preparing an internal pilot — typically the people who would otherwise be reviewing a vendor's SOC2 report before letting product teams touch it.
 
 ### Why not include chat authoring yet?
+
 Authoring speed without operational reliability creates downstream governance and trust failures. Skipping v0.1 to chase v0.2 is the most common failure mode for this product category.
 
 ### What proves success in this phase?
+
 Three things, in order: (1) a security review passes, (2) the same workspace produces ten consecutive successful runs over a week, (3) at least one second team in the same org asks to be onboarded.
 
 ### Is this just a wrapper around an LLM call?
+
 No. TAS is the control plane: identity, repo wiring, runs, observability. The actual model invocations happen inside agent definitions that live in the customer's repo.
 
 ### What does "manual run" actually mean?
+
 A user picks an agent, clicks "Run", and watches a status panel. No scheduling, no chat, no PR generation. That all comes later.
 
 ## Exit Bar (Definition of Done for v0.1)

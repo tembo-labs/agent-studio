@@ -1,6 +1,6 @@
 # v0.1 User Stories
 
-Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefit*) with explicit **Acceptance Criteria**.
+Format: Connextra (**As a** _role_, **I want** _capability_, **so that** _benefit_) with explicit **Acceptance Criteria**.
 
 ## Personas Referenced
 
@@ -16,6 +16,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 **As a** Platform Admin, **I want** to deploy TAS with Docker Compose, **so that** my team can run Agent Studio in our environment without depending on a vendor SaaS.
 
 **Acceptance Criteria**
+
 - A single `docker compose up` from the documented path brings TAS to a healthy state.
 - Required environment variables are documented in one place with safe defaults.
 - A failing health check produces a clear error pointing to the broken component (DB, API, frontend).
@@ -27,6 +28,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 **As a** Security Lead, **I want** TAS authentication to run through `better-auth` with adapter slots for our IdP, **so that** sign-in respects our existing identity policies (MFA, group-based access).
 
 **Acceptance Criteria**
+
 - `better-auth` is the only auth surface; no parallel admin backdoor.
 - A documented adapter exists for at least one common IdP (Okta or Azure AD).
 - A first-time user signing in via the IdP lands on the correct workspace selection screen.
@@ -38,6 +40,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 **As a** Workspace Admin, **I want** to configure a Tembo API access key on my workspace, **so that** TAS can invoke Tembo services on behalf of that workspace without sharing credentials across teams.
 
 **Acceptance Criteria**
+
 - API key is stored encrypted at rest.
 - Key is scoped to the workspace; deleting the workspace deletes the key.
 - The settings page never displays the full key after creation — only a masked preview and a "rotate" action.
@@ -49,6 +52,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 **As a** Workspace Admin, **I want** to connect a GitHub repository during workspace onboarding, **so that** agent definitions are version-controlled from day one.
 
 **Acceptance Criteria**
+
 - Onboarding flow includes a "connect repo" step that cannot be skipped silently.
 - The chosen repo is validated (TAS confirms it can read and write).
 - Disconnect/reconnect flow exists and is documented.
@@ -60,6 +64,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 **As an** Operator, **I want** to create an agent from a starter template or import an existing Cargo AI JSON definition, **so that** I can run a first production-relevant workflow without authoring code from scratch.
 
 **Acceptance Criteria**
+
 - At least one starter template is available out of the box.
 - Importing an existing definition surfaces validation errors clearly (no silent failure).
 - A created/imported agent shows up in the workspace agent list with a known status.
@@ -71,6 +76,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 **As an** Operator, **I want** to trigger an agent run manually and watch status + tailing logs, **so that** I can validate setup before any wider rollout.
 
 **Acceptance Criteria**
+
 - A "Run now" action exists on every agent.
 - Run status transitions are visible in real time: `queued → running → succeeded | failed`.
 - A failed run shows the last N lines of output and a clear failure reason, not a stack trace.
