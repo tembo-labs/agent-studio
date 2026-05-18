@@ -1,53 +1,95 @@
-# Tembo Agent Studio v0.1
+# Tembo Agent Studio v0.1 — Foundation
+
+> **Headline:** TAS v0.1 is the smallest deployable footprint that proves a team can run an agent inside their own environment, on their own identity, against their own repo — repeatedly.
+>
+> **Audience:** platform/IT teams running an internal pilot.
 
 ## Problem
-Teams want a non-technical way to run useful agents, but the setup is fragmented: identity, repo wiring, runtime setup, and execution visibility are usually spread across different tools.
 
-Without a stable foundation, later features like chat authoring, governance, and adaptive learning are unreliable.
+Three things break in every early agent rollout:
+
+1. **Identity is bolted on.** Most agent tools assume their own login or expect SSO to be added later. Security teams stall pilots while this gets sorted.
+2. **Definitions drift.** Agents end up living in some SaaS console with no version history. A junior changes a prompt and nobody can answer "what did this look like last Tuesday?"
+3. **Runs are opaque.** "It worked on my laptop" is not an operational story. Without a run log a team trusts, no second team adopts it.
+
+These are not glamorous problems, but they decide whether a tool gets a second project. Every later TAS phase (chat authoring, governance, adaptive learning) inherits fragility if v0.1 cannot be trusted.
 
 ## Our Solution
-v0.1 delivers a deployable foundation for TAS:
-- self-hosted deployment,
-- enterprise-friendly authentication,
-- workspace connection to Git and Tembo,
-- first agent import/create and run workflow.
 
-This phase intentionally prioritizes infrastructure confidence over advanced behavior.
+A self-hosted TAS instance that:
+
+- deploys with a documented Docker path,
+- authenticates users through `better-auth` (so existing IdPs plug in),
+- pairs each workspace with a Git repo and a Tembo API key at onboarding,
+- lets an operator create or import a baseline agent definition,
+- runs that agent manually and shows status + logs that a human can actually read.
+
+We are not trying to be impressive in v0.1. We are trying to be dependable enough that a team commits to the next phase.
 
 ## What Ships in v0.1
-- Docker-first self-hosted deployment path.
-- `better-auth` integration for internal identity alignment.
-- Workspace onboarding with Git repository + Tembo API access key.
-- Baseline agent creation/import.
-- Manual run with basic run status and logs.
+
+- **Self-hosted deploy.** Docker Compose path + environment variable reference. Single-node target.
+- **`better-auth` integration.** Email/password baseline plus SSO adapter slots so customers can wire their own IdP.
+- **Workspace onboarding.** Connect one Git repository and store one Tembo API key per workspace.
+- **Baseline agent definition.** Create from a starter template or import an existing Cargo AI JSON file.
+- **Manual run + logs.** "Run now" button, status (queued/running/succeeded/failed), tail of run output.
 
 ## Out of Scope for v0.1
-- Chat-driven authoring loops.
-- Rich governance dashboards.
-- Correction-to-code automation.
-- Variant/lineage lifecycle.
-- Mycelium shared learning mode.
+
+- Chat-driven authoring (v0.2).
+- PR-output workflows (v0.2).
+- Immutable `who/when/why` audit (v0.3).
+- Rich HITL forms (v0.3).
+- Correction-to-code and variant lifecycle (v0.4).
+- Mycelium shared learning (v0.4).
+
+If a user asks for any of the above during v0.1 evaluation, the answer is "on the roadmap" with a link to the relevant phase doc — never "soon."
 
 ## Strategy
-Build the minimum trustworthy control plane first. If deploy/auth/connect/run is weak, every later phase inherits fragility.
+
+Build the minimum trustworthy control plane first. Resist the temptation to demo authoring before runs are reliable; the rest of the product depends on that floor.
 
 ## Technical Details
-- Frontend: Next.js 15 + Tailwind + shadcn/ui.
-- Backend: Rust API runtime/orchestration.
-- Auth: `better-auth` adapters.
-- Tembo integration: API key mode.
-- Agent format: Cargo AI JSON (technical implementation detail).
+
+- **Frontend:** Next.js 15 + Tailwind + shadcn/ui.
+- **Backend:** Rust API for runtime and orchestration.
+- **Auth:** `better-auth` with adapter slots for SAML/OIDC.
+- **Tembo integration:** API-key mode (a future phase may add MCP-based auth when public MCP is stable).
+- **Agent format:** Cargo AI JSON. Treated as an implementation detail in v0.1 — users do not need to learn it to import a starter template.
+- **Storage:** workspace-local Postgres for run metadata; Git for agent source.
+
+## Customer Quote (Drafted)
+
+> "Before TAS, our 'agent' was a Python script someone ran from their laptop. v0.1 gave us a real deploy, SSO that our security team already approved, and a Git repo we audit like any other service. That alone made it a different conversation internally."
+>
+> — *Director of Platform Engineering, mid-sized financial services firm (draft persona)*
 
 ## FAQ
+
 ### Who should adopt v0.1?
-Platform and IT teams preparing an internal pilot.
+Platform and IT teams preparing an internal pilot — typically the people who would otherwise be reviewing a vendor's SOC2 report before letting product teams touch it.
 
 ### Why not include chat authoring yet?
-Because authoring speed without operational reliability creates downstream governance and trust failures.
+Authoring speed without operational reliability creates downstream governance and trust failures. Skipping v0.1 to chase v0.2 is the most common failure mode for this product category.
 
 ### What proves success in this phase?
-A team can deploy TAS, authenticate users, wire Git + Tembo, and execute real agent runs repeatedly.
+Three things, in order: (1) a security review passes, (2) the same workspace produces ten consecutive successful runs over a week, (3) at least one second team in the same org asks to be onboarded.
+
+### Is this just a wrapper around an LLM call?
+No. TAS is the control plane: identity, repo wiring, runs, observability. The actual model invocations happen inside agent definitions that live in the customer's repo.
+
+### What does "manual run" actually mean?
+A user picks an agent, clicks "Run", and watches a status panel. No scheduling, no chat, no PR generation. That all comes later.
+
+## Exit Bar (Definition of Done for v0.1)
+
+- [ ] A new team can complete the deploy → auth → connect → run flow in under 30 minutes with the published docs.
+- [ ] At least one external pilot customer has run an agent in their own environment.
+- [ ] Failure modes (bad API key, repo wiring issue, run crash) produce actionable error messages, not stack traces.
+- [ ] Auth integrates with at least one non-trivial IdP (e.g. Okta, Azure AD) in a documented way.
 
 ## Open Questions Before v0.2
-- Which default PR policy should be preselected at onboarding?
-- What minimum run metadata must be visible before teams trust automation?
+
+- Which default PR policy should be preselected at workspace onboarding when v0.2 ships?
+- What minimum run metadata must already be visible in v0.1 so that v0.3's audit feature feels like an extension, not a rewrite?
+- Should we ship a "starter agent library" in v0.1, or hold those until chat authoring exists?

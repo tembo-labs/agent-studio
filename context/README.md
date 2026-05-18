@@ -1,16 +1,44 @@
 # Context
 
-Versioned planning and launch artifacts for Tembo Agent Studio.
+Versioned planning artifacts for Tembo Agent Studio (TAS). Each phase folder is a complete launch package.
 
-## Phase Folders
+## Why Phases, Not a Single v1
 
-- `0.1/` Foundation launch artifacts
-- `0.2/` Authoring flow launch artifacts
-- `0.3/` Governance launch artifacts
-- `0.4/` Adaptive intelligence launch artifacts
+Agent platforms typically fail in one of two ways:
+
+1. They ship a flashy authoring experience on top of an unreliable runtime, then collapse the first time governance is needed.
+2. They ship a "platform" with no concrete user value, hoping enterprise checklists translate into adoption.
+
+TAS rejects both. Each phase delivers an independently useful product:
+
+- **v0.1 (Foundation)** is the smallest deployable surface that proves identity, repo wiring, and a real run. A team can stop here and still get value.
+- **v0.2 (Authoring)** adds the productivity story — chat-to-PR — on top of that proven foundation.
+- **v0.3 (Governance)** layers in the controls organizations need to scale usage from one team to many.
+- **v0.4 (Adaptive)** closes the loop from user corrections back into source, with variants to manage divergence.
+
+Each phase has an exit bar and a set of open questions the next phase must answer.
+
+## Phase Index
+
+| Phase | Folder | Theme |
+| ----- | ------ | ----- |
+| 0.1 | [`0.1/`](./0.1/) | Foundation |
+| 0.2 | [`0.2/`](./0.2/) | Authoring velocity |
+| 0.3 | [`0.3/`](./0.3/) | Governance depth |
+| 0.4 | [`0.4/`](./0.4/) | Adaptive intelligence |
+
+## Folder Conventions
 
 Each phase contains:
-- `README.md` (PRFAQ-style launch README)
-- `BLOG_POST.md`
-- `USER_STORIES.md`
-- `DEMO_SCRIPT.md`
+
+- `README.md` — PRFAQ-style launch doc: problem, solution, customer quote, FAQ, exit bar.
+- `BLOG_POST.md` — draft of the public announcement.
+- `USER_STORIES.md` — Connextra-format stories with acceptance criteria.
+- `DEMO_SCRIPT.md` — minute-by-minute demo flow with narration cues.
+
+## How to Use These Docs
+
+- **Product reviews:** read the phase `README.md` first, then `USER_STORIES.md`.
+- **Engineering planning:** stories + open questions in the phase `README.md` drive backlog grooming.
+- **Sales/marketing:** start from `BLOG_POST.md`, then borrow scenarios from `DEMO_SCRIPT.md`.
+- **Internal alignment:** the operating principles in the root `README.md` are the tiebreakers when scope debate breaks out.
