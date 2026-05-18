@@ -7,15 +7,18 @@
 
 Tembo Agent Studio (TAS) is an **open-source, self-hosted** chat-first platform for creating, running, and governing production-grade AI agents. It is the non-technical companion to [tembo.io](https://tembo.io).
 
+TAS is intentionally designed as a clean, governance-oriented web control plane in the spirit of Paperclip-style operational UX, while remaining its own product and architecture.
+
 ---
 
-## Product Direction
+## Core Product Notes
 
-TAS ships in phased milestones so teams can adopt foundations first, then layer on advanced adaptive behavior.
-
-- **Authentication**: TAS uses **better-auth** so customers can connect internal identity systems (OIDC/SAML-compatible providers via their auth stack).
-- **Tembo integration (now)**: TAS integrates with Tembo using an **API access key**.
-- **Tembo integration (future)**: TAS can add an **MCP-based integration mode** once the Tembo platform exposes a public MCP server.
+- **Chat-first workflow**: users describe agents and changes in plain language.
+- **Tembo-powered coding changes**: TAS routes implementation work to Tembo coding agents through PRs.
+- **PR policy control**: teams can choose review-required or YOLO auto-merge on green.
+- **Built-in HITL**: agents can pause and request human input using rich web forms.
+- **Continuous learning**: user corrections can trigger targeted source-code updates.
+- **Biological model**: agents can diverge into variants, then be reconciled or speciated.
 
 ---
 
@@ -37,7 +40,7 @@ TAS ships in phased milestones so teams can adopt foundations first, then layer 
 
 ### `v0.3` Governance and Collaboration (Control at Scale)
 - Immutable changelog (who/when/why)
-- Rich HITL forms (approvals, inputs, files, conditional fields)
+- Rich HITL forms (approvals, inputs, files, conditional fields, previews)
 - Agent-level dashboard views (history, runs, active forms, policies)
 - Admin controls for multi-team operation and audit readiness
 
@@ -45,6 +48,7 @@ TAS ships in phased milestones so teams can adopt foundations first, then layer 
 - Correction-to-code loop: feedback creates targeted PRs
 - Explicit Modify + Rerun flow
 - Divergence detection with variant creation + lineage view
+- Admin controls: reconcile variants, force speciation, archive, manual variant creation
 - Optional Tembo Mycelium sharing/import with privacy controls
 - Optional Tembo MCP integration mode (when publicly available)
 
@@ -53,14 +57,14 @@ TAS ships in phased milestones so teams can adopt foundations first, then layer 
 ## Architecture
 
 - **Frontend**: Next.js 15 + Tailwind + shadcn/ui
-- **Backend**: Rust API server (agent execution, HITL orchestration, policy controls)
+- **Backend**: Rust API server (agent execution, HITL orchestration, lineage/variant policy controls)
 - **Auth layer**: `better-auth` adapters for enterprise identity integration
 - **Tembo bridge**:
   - Primary: Tembo API access key
   - Future: Tembo MCP connection mode
-- **Coding changes**: Agent creation/edits flow through Tembo coding agents via PRs
-- **Agent format**: Cargo AI JSON (inputs, agent_schema, actions, HITL schemas)
-- **Deployment**: Self-hosted per organization
+- **Coding changes**: agent creation/edits/learning updates flow through Tembo coding agents via PRs
+- **Agent format**: Cargo AI JSON (inputs, agent_schema, actions, HITL schemas) as internal technical representation
+- **Deployment**: self-hosted per organization
 
 ---
 
@@ -76,6 +80,13 @@ agents/
   mycelium/                       # Optional shared knowledge cache (v0.4+)
   lineage/                        # Lineage metadata (v0.4+)
   skills/                         # Reusable patterns
+context/
+  README.md
+  USER_STORIES.md
+  DEMO_SCRIPT_01.md
+  FEATURE_DETAILS.md
+  MYCELIUM.md
+  PROJECT_NOTES_FULL_CONTEXT.md
 ```
 
 ---
@@ -97,18 +108,22 @@ docker compose up -d
 
 ## Documentation
 
-- [USER_STORIES.md](./USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
-- [DEMO_SCRIPT_01.md](./DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
+- [context/README.md](./context/README.md): index of product concept docs
+- [context/USER_STORIES.md](./context/USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
+- [context/DEMO_SCRIPT_01.md](./context/DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
+- [context/MYCELIUM.md](./context/MYCELIUM.md): Tembo Mycelium model, operating modes, and governance
+- [context/FEATURE_DETAILS.md](./context/FEATURE_DETAILS.md): detailed feature context and implementation notes
+- [context/PROJECT_NOTES_FULL_CONTEXT.md](./context/PROJECT_NOTES_FULL_CONTEXT.md): full historical notes and decisions from planning
 
 ---
 
 ## Philosophy
 
 TAS treats agents like living systems:
-- They **start from a stable operational foundation**
-- They **improve through governed iteration**
-- They **adapt through human feedback over time**
-- Everything is auditable, version-controlled, and human-governed
+- They **adapt** through human feedback and corrections
+- They **speciate** into variants when user groups diverge
+- They can optionally **connect** via Mycelium to share learning across organizations
+- Everything stays auditable, version-controlled, and human-governed
 
 ---
 
