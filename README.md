@@ -24,27 +24,38 @@ That belief shapes every part of the product:
 2. **Every change is reviewable.** Whether the author was an engineer in their editor, a PM in chat, or an end user clicking "correct this" — the artifact is a PR.
 3. **Adaptation is allowed; drift is governed.** Agents are allowed to evolve. They are not allowed to evolve in ways you can't explain.
 4. **Self-hostable first.** Identity, data, and runtime stay inside your environment.
-5. **Ship value in every phase.** Each release stands on its own. None of them are checkpoints toward a distant launch.
 
-## How we get there: four phases
+## What gives it superpowers: the Tembo Coding Agent Platform
 
-TAS ships in four phases. Each one is a complete product on its own — a team could stop at any of them and still be better off than they were before. Later phases compound the earlier ones; they don't replace them.
+TAS is the control plane — identity, repos, runs, audits, policy. But the *magic* — reading an agent definition, understanding what someone wants changed in plain English, and writing a clean diff for it — that's the [Tembo Coding Agent Platform](https://tembo.io). TAS calls out to Tembo coding agents the way a CI system calls out to compilers.
 
-### [Phase 0.1 — Foundation](./context/0.1/) · *Run an agent you trust*
+The dependency is light in Phase 0.1 (you plug in a Tembo API key and runs work). It becomes the engine of the product as we go:
 
-The minimum trustworthy floor. Deploy TAS, sign in with your identity provider, connect a Git repo and a Tembo API key, import or scaffold an agent, click "Run," watch the logs. Nothing flashy — just an agent running inside your environment, on your identity, against your repo, **dependably**. This is the floor every later phase stands on.
+- **Phase 0.2 — chat to PR.** A Tembo coding agent reads the existing definition, the chat context, and the change request, then opens a targeted pull request.
+- **Phase 0.4 — corrections to PR.** A Tembo coding agent turns end-user corrections into candidate PRs.
+- **Phase 0.4 — variant proposals.** A Tembo coding agent helps detect divergence and propose a variant rather than silently averaging incompatible behaviors.
 
-### [Phase 0.2 — Authoring velocity](./context/0.2/) · *Change agents from chat — without giving up review*
+TAS keeps the work governed; Tembo makes the work possible. The two are designed together.
 
-Now the bottleneck moves. Deploy is solved; the new wait is "who has time to edit the prompt?" v0.2 lets a non-engineer describe a change in chat. A Tembo coding agent reads the existing definition, produces a targeted diff, and opens a pull request. Your team reviews the diff. On merge, the new behavior is live. For low-stakes internal automations, you can opt into auto-merge on green CI. The PR is the contract — even when the author wasn't human.
+## How we're building it: four phases
 
-### [Phase 0.3 — Governance depth](./context/0.3/) · *Explain every change, every run, every human action*
+TAS reaches users as one product. Internally, we're building it in four phases — a construction plan, not a release train. Each phase is a coherent slab of capability that the next one builds on; sequencing them this way is how we keep the floor trustworthy before we add the floors above it.
 
-Once changes are flowing in minutes instead of weeks, the audit surface has to catch up. v0.3 adds an immutable `who/when/why` changelog, rich human-in-the-loop forms (uploads, conditional fields, validation), per-agent operational dashboards, and role-based access with org-level policy templates. When the auditor asks "who changed this, when, and why?" — you answer in one screen, not four days of spelunking.
+### [Phase 0.1 — Foundation](./context/0.1/) · *The trustworthy floor*
 
-### [Phase 0.4 — Adaptive intelligence](./context/0.4/) · *Agents that learn — and stay accountable*
+Build the floor first: a self-hosted deploy, identity through your IdP, a Git repo wired to a workspace, and a baseline agent that runs reliably with readable logs. Nothing flashy. Everything that follows depends on this layer being dependable, so this is where we resist the urge to demo authoring before runs are solid.
 
-The agent you ship is not the agent you'll run six months later. v0.4 closes the loop: when an end user corrects an output, TAS bundles the original, the correction, and the run context, and a coding agent proposes a targeted PR. When two teams want incompatible behaviors, TAS proposes a **variant** rather than silently averaging. And — optionally — Tembo Mycelium lets TAS deployments learn from each other, with attribution, provenance, and the right to stay in island mode forever. Every adaptive change is still a PR. Adaptation is allowed; drift is governed.
+### [Phase 0.2 — Authoring velocity](./context/0.2/) · *Chat to PR*
+
+Build the loop that lets a non-engineer change an agent without an engineering queue. They describe the change in chat; a Tembo coding agent reads the existing definition, produces a targeted diff, and opens a pull request. Reviewers approve or comment. On merge, the new behavior is live. The PR is the contract — even when the author wasn't human.
+
+### [Phase 0.3 — Governance depth](./context/0.3/) · *Explain everything*
+
+Build the audit and operational surface that fast authoring demands: an immutable `who/when/why` changelog, rich human-in-the-loop forms (uploads, conditional fields, validation), per-agent operational dashboards, and role-based access with org-level policy templates. The bar is one screen, not four days of spelunking, to answer "who changed this, when, and why?"
+
+### [Phase 0.4 — Adaptive intelligence](./context/0.4/) · *Corrections, variants, optional sharing*
+
+Build the closed loop. When an end user corrects an output, TAS bundles the original, the correction, and the run context, and a coding agent proposes a targeted PR. When two teams want incompatible behaviors, TAS proposes a **variant** rather than silently averaging. And — optionally — Tembo Mycelium lets TAS deployments learn from each other, with attribution, provenance, and the right to stay in island mode forever. Every adaptive change is still a PR. Adaptation is allowed; drift is governed.
 
 ## Where to read more
 
