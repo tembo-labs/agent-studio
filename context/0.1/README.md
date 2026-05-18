@@ -1,4 +1,4 @@
-# Tembo Agent Studio v0.1 — Foundation
+# Tembo Agent Studio
 
 > **Headline:** TAS is the smallest deployable footprint that proves a team can run an agent inside their own environment, on their own identity, against their own repo — repeatedly.
 >
