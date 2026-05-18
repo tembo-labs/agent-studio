@@ -82,11 +82,14 @@ agents/
   skills/                         # Reusable patterns
 context/
   README.md
-  USER_STORIES.md
-  DEMO_SCRIPT_01.md
-  FEATURE_DETAILS.md
-  MYCELIUM.md
-  PROJECT_NOTES_FULL_CONTEXT.md
+  planning/
+    USER_STORIES.md
+    PROJECT_NOTES_FULL_CONTEXT.md
+  strategy/
+    FEATURE_DETAILS.md
+    MYCELIUM.md
+  demos/
+    DEMO_SCRIPT_01.md
 ```
 
 ---
@@ -108,12 +111,12 @@ docker compose up -d
 
 ## Documentation
 
-- [context/README.md](./context/README.md): index of product concept docs
-- [context/USER_STORIES.md](./context/USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
-- [context/DEMO_SCRIPT_01.md](./context/DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
-- [context/MYCELIUM.md](./context/MYCELIUM.md): Tembo Mycelium model, operating modes, and governance
-- [context/FEATURE_DETAILS.md](./context/FEATURE_DETAILS.md): detailed feature context and implementation notes
-- [context/PROJECT_NOTES_FULL_CONTEXT.md](./context/PROJECT_NOTES_FULL_CONTEXT.md): full historical notes and decisions from planning
+- [context/README.md](./context/README.md): index of product context docs
+- [context/planning/USER_STORIES.md](./context/planning/USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
+- [context/planning/PROJECT_NOTES_FULL_CONTEXT.md](./context/planning/PROJECT_NOTES_FULL_CONTEXT.md): full historical notes and decisions from planning
+- [context/strategy/FEATURE_DETAILS.md](./context/strategy/FEATURE_DETAILS.md): detailed feature context and implementation notes
+- [context/strategy/MYCELIUM.md](./context/strategy/MYCELIUM.md): Tembo Mycelium model, operating modes, and governance
+- [context/demos/DEMO_SCRIPT_01.md](./context/demos/DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
 
 ---
 
