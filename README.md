@@ -80,7 +80,7 @@ agents/
   mycelium/                       # Optional shared knowledge cache (v0.4+)
   lineage/                        # Lineage metadata (v0.4+)
   skills/                         # Reusable patterns
-concepts/
+context/
   README.md
   USER_STORIES.md
   DEMO_SCRIPT_01.md
@@ -108,12 +108,12 @@ docker compose up -d
 
 ## Documentation
 
-- [concepts/README.md](./concepts/README.md): index of product concept docs
-- [concepts/USER_STORIES.md](./concepts/USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
-- [concepts/DEMO_SCRIPT_01.md](./concepts/DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
-- [concepts/MYCELIUM.md](./concepts/MYCELIUM.md): Tembo Mycelium model, operating modes, and governance
-- [concepts/FEATURE_DETAILS.md](./concepts/FEATURE_DETAILS.md): detailed feature context and implementation notes
-- [concepts/PROJECT_NOTES_FULL_CONTEXT.md](./concepts/PROJECT_NOTES_FULL_CONTEXT.md): full historical notes and decisions from planning
+- [context/README.md](./context/README.md): index of product concept docs
+- [context/USER_STORIES.md](./context/USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
+- [context/DEMO_SCRIPT_01.md](./context/DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
+- [context/MYCELIUM.md](./context/MYCELIUM.md): Tembo Mycelium model, operating modes, and governance
+- [context/FEATURE_DETAILS.md](./context/FEATURE_DETAILS.md): detailed feature context and implementation notes
+- [context/PROJECT_NOTES_FULL_CONTEXT.md](./context/PROJECT_NOTES_FULL_CONTEXT.md): full historical notes and decisions from planning
 
 ---
 
