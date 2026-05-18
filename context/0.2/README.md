@@ -1,34 +1,46 @@
-# Tembo Agent Studio v0.2 README
+# Tembo Agent Studio v0.2
 
-## Press Release (PRFAQ Style)
+## Problem
+After foundational setup, teams still face a gap: translating plain-language requests into maintainable source changes is slow and dependent on engineering bandwidth.
 
-Today we are launching **Tembo Agent Studio v0.2**, adding chat-driven agent creation and editing with Tembo coding-agent PR workflows. Teams can move from basic runtime setup to day-to-day authoring and operations.
+Users need authoring velocity, but organizations still need auditable, reviewable change control.
 
-v0.2 introduces a practical balance between speed and control: teams can require review or allow YOLO auto-merge on green checks.
+## Our Solution
+v0.2 introduces chat-driven authoring through Tembo coding-agent PR workflows.
+
+Users can request new agents and behavior changes in chat; TAS turns that intent into PRs, while teams choose between review-required and YOLO auto-merge on green.
+
+## What Ships in v0.2
+- Chat-to-create agent flow with PR output.
+- Chat-to-edit existing agent flow with PR output.
+- PR policy control (require review vs YOLO auto-merge on green).
+- Basic recurring scheduling.
+- Basic HITL pause/resume flow.
+
+## Out of Scope for v0.2
+- Full immutable governance timeline.
+- Advanced HITL form depth.
+- Automated correction-to-code learning loops.
+- Divergence/variant lifecycle.
+
+## Strategy
+Convert conversational intent into governed source updates without requiring users to author code directly.
+
+## Technical Details
+- Tembo coding agents handle diff generation and PR creation.
+- TAS orchestrates scheduling, run triggers, and pause/resume lifecycle.
+- Git remains system of record for agent definitions.
 
 ## FAQ
+### Why keep PRs instead of direct writes?
+PRs preserve reviewability, rollback paths, and organizational trust.
 
-### What is new vs v0.1?
-- Chat-to-create agents via PR
-- Chat-to-edit agents via PR
-- PR policy control (review vs YOLO)
-- Basic scheduling
-- Basic HITL pause/resume
+### Is YOLO merge mandatory?
+No. It is policy-controlled and optional.
 
-### Why this phase?
-v0.1 proved infrastructure. v0.2 proves iterative authoring velocity.
+### What does success look like?
+Teams iterate on agents in hours instead of days while keeping auditable source control.
 
-## Strategy, Features, Technical Details
-
-### Strategy
-Convert product intent in chat into auditable source changes.
-
-### Features
-- Natural-language authoring loops
-- Controlled PR merge policy
-- Basic schedule and pause/resume operation
-
-### Technical Details
-- Tembo coding agents generate diffs and PRs
-- TAS orchestrates run/schedule and minimal HITL state
-- Git remains source of truth
+## Open Questions Before v0.3
+- Which policy guardrails should be global vs per-agent?
+- What additional review signals are needed for high-impact automations?

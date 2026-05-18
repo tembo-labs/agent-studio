@@ -1,33 +1,42 @@
-# Tembo Agent Studio v0.3 README
+# Tembo Agent Studio v0.3
 
-## Press Release (PRFAQ Style)
+## Problem
+Authoring speed alone is insufficient for real organizational use. Teams need immutable accountability, strong human checkpoints, and operational visibility when workflows fail or diverge.
 
-Today we are launching **Tembo Agent Studio v0.3**, the governance release. TAS now emphasizes operational clarity with immutable changelog, richer HITL forms, and dashboard surfaces for multi-team operation.
+Without governance depth, scale introduces risk faster than value.
 
-v0.3 makes TAS suitable for organizations that need auditability, safety controls, and reliable human oversight.
+## Our Solution
+v0.3 is the governance release. TAS adds explicit traceability and richer human control surfaces so multi-team operation is auditable and manageable.
+
+## What Ships in v0.3
+- Immutable changelog semantics (`who`, `when`, `why`).
+- Rich HITL forms (including conditional fields, uploads, and previews).
+- Per-agent operational dashboard surfaces.
+- Stronger admin and policy controls.
+
+## Out of Scope for v0.3
+- Automated correction-to-code adaptation.
+- Variant lifecycle and lineage governance.
+- Mycelium network participation.
+
+## Strategy
+Increase trust and operational safety before introducing autonomous adaptation patterns.
+
+## Technical Details
+- Enriched run and changelog metadata model.
+- Form schema rendering + response persistence lifecycle.
+- Policy-controlled operations at workspace and agent scope.
 
 ## FAQ
+### Why emphasize `who/when/why` now?
+Because organizations need accountable change history before they can accept higher autonomy.
 
-### What is new vs v0.2?
-- Immutable changelog (`who`, `when`, `why`)
-- Rich HITL forms (conditional fields, uploads, previews)
-- Per-agent operational dashboard surfaces
-- Stronger admin controls and policy governance
+### Who benefits most from v0.3?
+Platform admins, compliance stakeholders, and support/operations teams.
 
-### Why this phase?
-Before autonomous adaptation, organizations need robust governance primitives.
+### What proves success in this phase?
+Teams can explain how and why an agent changed, who approved actions, and how human interventions affected runs.
 
-## Strategy, Features, Technical Details
-
-### Strategy
-Create trust through auditability and controlled collaboration.
-
-### Features
-- Governance-first dashboards
-- Rich human control points
-- Explicit change accountability
-
-### Technical Details
-- Enriched run/changelog metadata model
-- HITL form schema rendering and response lifecycle
-- Policy-controlled operations at workspace/agent scope
+## Open Questions Before v0.4
+- What thresholds should trigger divergence alerts?
+- Which controls should be mandatory before adaptive changes auto-proceed?
