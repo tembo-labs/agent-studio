@@ -4,98 +4,87 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 
 ## Personas Referenced
 
-- **Enterprise Admin** — sets org-wide policy on shared learning.
-- **Workspace Admin** — owns a team's agents; inherits or tightens (never loosens) the org Mycelium policy.
-- **Compliance Reviewer** — verifies that cross-deployment exchange matches the org's regulatory posture.
-- **Operator** — reviews and merges Mycelium-sourced PRs alongside normal corrections.
-- **End User** — interacts with an agent's output, sometimes shaped by an imported pattern.
+- **End User** — interacts with an agent's output; not a TAS operator.
+- **Operator** — runs agents day-to-day.
+- **Workspace Admin** — owns a team's agents.
+- **Team Lead** — owns a multi-team agent footprint.
+- **Platform Architect** — long-term integration owner (e.g., MCP).
+
+Cross-deployment learning personas (Enterprise Admin setting org-wide sharing policy) live in [v0.6 (Mycelium)](../0.6/).
 
 ---
 
-## US-0.5-01 — Mycelium policy controls
+## US-0.5-01 — Correction-to-code PR
 
-**As an** Enterprise Admin, **I want** to set Mycelium participation policy at org scope (island / share patterns only / share + receive / receive only), **so that** we can match shared-learning behavior to our regulatory posture without surprises.
+**As an** End User, **I want** to mark an output wrong and provide a correction, and have TAS turn that correction into a targeted PR against the agent, **so that** the system improves from real usage feedback without an engineering escalation.
 
 **Acceptance Criteria**
-- Default is island. Opting in requires an explicit org-admin action and creates a v0.3 changelog event.
-- A workspace cannot exceed the org-level Mycelium policy (e.g., if org policy is "share patterns only", a workspace cannot select "share + receive").
-- A workspace *can* select a stricter policy than its org (e.g., org allows "share + receive", workspace stays at island).
-- All policy changes — org-level or workspace-level — appear in the v0.3 changelog with the acting identity.
+- The correction UI captures: original output, corrected output, optional rationale, and references to the run.
+- The correction event lands in the v0.4 changelog with the actor and timestamp.
+- The system classifies the correction (style / fact / scope / policy) and either opens a PR, proposes a variant, or flags for review.
+- The end user is told what happened to their correction (PR opened, variant proposed, queued for review), not silently dropped.
 
 ---
 
-## US-0.5-02 — Pattern export with attribution
+## US-0.5-02 — Modify + Rerun
 
-**As a** Workspace Admin in a "share patterns only" or "share + receive" workspace, **I want** outbound patterns to carry signed attribution and provenance, **so that** receiving deployments know where each pattern originated and our org's contribution is verifiable.
+**As an** Operator, **I want** a one-click "Modify + Rerun" action on a queued correction PR, **so that** I can apply the change, refresh the agent, and rerun the previous input with the new behavior — all from one place.
 
 **Acceptance Criteria**
-- Every exported pattern includes signed attribution metadata (org identity, deployment identity, policy under which exported, timestamp).
-- Patterns contain no raw prompts, user content, or PII.
-- Each export creates a v0.3 changelog event on the *exporting* side.
-- A workspace admin can list all patterns ever exported, with filter by recipient.
+- The action is gated by the agent's PR policy (review-required vs auto-merge) and the operator's RBAC role.
+- After merge, the rerun uses the same inputs that produced the corrected output.
+- The rerun result is shown side-by-side with the original output for direct comparison.
+- The action records a single composite event in the v0.4 changelog: `correction → merge → rerun`, with links to each constituent event.
 
 ---
 
-## US-0.5-03 — Imports land as PRs
+## US-0.5-03 — Divergence detection
 
-**As an** Operator, **I want** an imported Mycelium pattern to land as a normal PR on my deployment — never as a direct write — **so that** the receiving deployment's review surface and audit trail behave identically to internal changes.
+**As a** Workspace Admin, **I want** TAS to detect when conflicting corrections accumulate along a clear axis (region, team, brand), **so that** user groups can evolve separate variants instead of silently overwriting each other.
 
 **Acceptance Criteria**
-- An import never modifies an agent definition directly.
-- The resulting PR is labeled as Mycelium-sourced with the originating attribution visible.
-- The PR flows through the same review policy as a v0.2 chat-to-PR or a v0.4 correction-to-PR.
-- The v0.3 changelog records the import with originating attribution, receiving policy, and the resulting PR number.
+- A divergence proposal is created when configured thresholds (correction volume, conflict ratio) are met.
+- The proposal includes the suggested variant scope, the evidence (linked corrections), and the recommended parent agent.
+- Accepting a proposal creates a variant; rejecting it records the rejection rationale.
+- An admin can manually create a variant without waiting for divergence detection.
 
 ---
 
-## US-0.5-04 — Compliance verification
+## US-0.5-04 — Variant lineage visualization
 
-**As a** Compliance Reviewer, **I want** to answer "what crossed our boundary, in either direction, in the last quarter?" from a single audit surface, **so that** I do not have to assemble cross-deployment activity from separate logs.
+**As a** Team Lead, **I want** to see a lineage view of parent agents and their variants, **so that** I can understand evolution history before recommending a merge (reconciliation) or commit (speciation).
 
 **Acceptance Criteria**
-- The v0.3 changelog filter supports `source=mycelium-export` and `source=mycelium-import`.
-- Each entry resolves to the originating identity, the policy under which it occurred, and (for imports) the resulting PR.
-- Export of the filtered timeline to SIEM follows the same path as any other changelog export.
+- Lineage view shows parent → variant relationships with scope labels.
+- Hovering or clicking a variant surfaces: creation reason, current scope, recent corrections, divergence/conflict counters with the parent.
+- Reconciliation and speciation are explicit actions with their own audit events.
 
 ---
 
-## US-0.5-05 — Bilateral and group relationships
+## US-0.5-05 — Per-agent correction capture toggle
 
-**As an** Enterprise Admin, **I want** to define explicit peer relationships (one-to-one or named group) for Mycelium exchange, **so that** patterns only flow with deployments we have explicitly partnered with.
+**As a** Workspace Admin, **I want** to disable correction capture entirely on specific agents (e.g., regulated drafting), **so that** sensitive workflows do not accept user-driven adaptation.
 
 **Acceptance Criteria**
-- A peer relationship requires both sides to accept; revocation by either side immediately stops further exchange.
-- A workspace cannot send to or receive from a peer that the org has not approved.
-- There is no central Tembo-hosted registry of peers; discovery is out-of-band or via an optional Tembo-hosted directory service that performs *no* content relay.
+- The toggle is per-agent and audited on change.
+- Disabling capture hides the end-user correction UI for that agent.
+- Existing corrections remain in the changelog but no new ones are accepted.
 
 ---
 
-## US-0.5-06 — Pattern revocation
+## US-0.5-06 — Future MCP integration option
 
-**As a** Workspace Admin who exported a pattern that turned out to be wrong or misleading, **I want** to mark that pattern as revoked, **so that** peer deployments are notified and can choose to roll back the resulting change.
-
-**Acceptance Criteria**
-- A revocation creates a v0.3 changelog event on the exporting side.
-- Peer deployments that imported the pattern receive a notification surfaced to a workspace admin.
-- The peer's audit trail records the revocation event linked to the original import.
-- Revocation does not auto-revert merged changes on the peer — rollback is an explicit operator action.
-
----
-
-## US-0.5-07 — End-user disclosure of imported influence (per-agent)
-
-**As a** Workspace Admin, **I want** to toggle per agent whether an output discloses to end users that the agent's behavior was influenced by an imported pattern, **so that** transparency-sensitive workflows can disclose, and others can stay quiet.
+**As a** Platform Architect, **I want** a documented MCP integration option for Tembo authentication and tool connectivity, **so that** TAS can adopt standardized tool-server protocols when our internal MCP rollout matures.
 
 **Acceptance Criteria**
-- The toggle is per-agent and audited.
-- When enabled, agent outputs include a non-intrusive disclosure (e.g., a footer or tooltip).
-- The toggle defaults to **off** — disclosure is opt-in.
+- An MCP-mode flag exists on the workspace's Tembo integration alongside the v0.1 API-key mode.
+- The integration mode is auditable.
+- API-key mode remains supported throughout v0.5 — MCP is additive, not a forced migration.
 
 ---
 
 ## Stretch (Considered, Deferred)
 
-- A public Mycelium "marketplace" or registry of agents — explicitly not in scope.
-- Federated agent execution across deployments — separate, later phase.
-- Sharing raw run data, user content, or PII — explicitly forbidden by the pattern abstraction.
-- "Quarantine" mode for newly imported patterns (extra review on first N runs) — promising; gathering signal from v0.5 pilots before promoting.
+- Behavioral A/B testing routing inside a single agent — separate, later phase.
+- Auto-apply low-risk corrections without a PR — explicitly out of scope; violates operating principle.
+- Cross-deployment pattern exchange — explicitly moved to [v0.6 (Mycelium)](../0.6/).

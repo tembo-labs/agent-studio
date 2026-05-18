@@ -13,9 +13,10 @@ TAS rejects both. Each phase delivers an independently useful product:
 
 - **v0.1 (Foundation)** is the smallest deployable surface that proves identity, repo wiring, and a real run. A team can stop here and still get value.
 - **v0.2 (Authoring)** adds the productivity story — chat-to-PR — on top of that proven foundation.
-- **v0.3 (Governance)** layers in the controls organizations need to scale usage from one team to many.
-- **v0.4 (Adaptive)** closes the loop from user corrections back into source, with variants to manage divergence — inside a single TAS deployment.
-- **v0.5 (Mycelium)** extends the loop across deployments: optional, policy-governed pattern exchange between TAS instances, with attribution and provenance preserved.
+- **v0.3 (Operational surface)** adds the day-to-day operator experience: rich HITL forms and per-agent dashboards so reviewing work and triaging failures are first-class flows.
+- **v0.4 (Governance depth)** layers in the controls organizations need to scale usage from one team to many: an immutable audit log of every change, run, and human action, plus RBAC and org-level policy templates. Governance lands *before* adaptive loops so the loop can't outrun the audit trail.
+- **v0.5 (Adaptive)** closes the loop from user corrections back into source, with variants to manage divergence — inside a single TAS deployment.
+- **v0.6 (Mycelium)** extends the loop across deployments: optional, policy-governed pattern exchange between TAS instances, with attribution and provenance preserved.
 
 Each phase has an exit bar and a set of open questions the next phase must answer.
 
@@ -25,9 +26,10 @@ Each phase has an exit bar and a set of open questions the next phase must answe
 | ----- | ------ | ----- |
 | 0.1 | [`0.1/`](./0.1/) | Foundation |
 | 0.2 | [`0.2/`](./0.2/) | Authoring velocity |
-| 0.3 | [`0.3/`](./0.3/) | Governance depth |
-| 0.4 | [`0.4/`](./0.4/) | Adaptive intelligence |
-| 0.5 | [`0.5/`](./0.5/) | Mycelium (cross-deployment learning) |
+| 0.3 | [`0.3/`](./0.3/) | Operational surface (HITL, dashboards) |
+| 0.4 | [`0.4/`](./0.4/) | Governance depth (audit log, RBAC) |
+| 0.5 | [`0.5/`](./0.5/) | Adaptive intelligence |
+| 0.6 | [`0.6/`](./0.6/) | Mycelium (cross-deployment learning) |
 
 ## Folder Conventions
 

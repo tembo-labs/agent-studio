@@ -1,55 +1,49 @@
-# Tembo Agent Studio v0.4: From Usage to Evolution
+# Tembo Agent Studio v0.4: Governance as a First-Class Feature
 
 *Draft — internal review*
 
-Every agent starts smart and gets dumber.
+By v0.4, our pilot customers have three things: fast authoring (v0.2), a real operator surface (v0.3), and a backlog of compliance questions they couldn't answer cleanly with either. They're no longer asking whether the platform can move fast — they're asking whether it can move fast *and* survive an auditor.
 
-Not because the model regresses, but because the world moves: new vendor names, new tone preferences, new edge cases, new regulations. The first version captures what was true on launch day. Day 90, you're patching it manually. Day 180, you're not patching it at all and your team has stopped clicking "thumbs down" because nothing happens when they do.
+That's the audience v0.4 is for.
 
-TAS v0.4 is the release that fixes this — within a single TAS deployment — without sacrificing the audit trail we built in v0.3. (Sharing what you've learned with *other* TAS deployments is its own conversation: [v0.5 Mycelium](../0.5/).)
+## What v0.4 Adds
 
-## The Loop, Closed
+- **Immutable `who/when/why` changelog.** Every agent change, run, human intervention, and policy switch is recorded with the actor, the time, and the originating intent.
+- **Role-based access control.** Org admin → workspace admin → operator → viewer, enforced at the API layer.
+- **Org-level policy templates.** Defaults inherited by workspaces, with explicit override events.
 
-In v0.4, a correction is not just a thumbs-down. It's a structured event:
+## The Compliance Conversation v0.4 Closes Out
 
-1. A user marks an output wrong and provides a correction.
-2. TAS captures the original, the correction, and the surrounding run context.
-3. A Tembo coding agent classifies the correction (style / fact / scope / policy) and either:
-   - opens a targeted PR against the agent definition,
-   - recommends a variant if the correction conflicts with established behavior, or
-   - flags the correction for human review.
-4. The PR flows through the same review policy as any other change. The same `who/when/why` audit timeline records it.
+> "When auditors ask who approved the change that altered our customer-reply tone last quarter, we want to show them one screen — not start a four-day spelunking exercise."
 
-Operators get a one-click **Modify + Rerun**: merge the queued PR (subject to policy), reload the agent, and rerun the previous input — diffed against the original output side-by-side.
+v0.4 makes that one screen real. And it makes it the *same* screen — whether the change came from a chat-authored PR, an operator's hand edit, or (in v0.5) an end-user correction.
 
-## When Preferences Conflict
+## Why Governance Before Adaptive
 
-Adaptive agents usually fail in one of two ways:
+We could have gone to v0.5's adaptive intelligence next. The demo would have been flashier. We didn't, and the order is the strategy.
 
-1. They average conflicting feedback into a mush nobody asked for.
-2. They overfit to whoever clicked most recently.
-
-v0.4 introduces **variants** for this exact problem. When TAS detects that incoming corrections conflict with the agent's established direction along a clear axis (region, team, brand, tier), it proposes a variant instead of merging the change into the base.
-
-Variants have parents, scopes, and audit history. Admins can later **reconcile** (merge a variant back) or **speciate** (commit a variant as its own line) — both explicit, both audited.
-
-The operating principle: **adaptation is allowed, drift is governed.**
+Adaptive systems rewrite source. The first time something goes wrong on a rewrite — and at scale, something will — the question is "who or what changed this, and why?" If the answer is "we don't fully know yet, audit is coming in v0.6," the customer doesn't come back. So governance lands first, *deliberately*, before the loop that needs it.
 
 ## What v0.4 Is Not
 
-- Not autonomous self-modification. Every change is a PR.
-- Not a behavioral A/B testing framework — that's a separate, later conversation.
-- Not a way to bypass v0.3 governance. Every correction and variant lands in the same changelog.
-- Not cross-deployment shared learning. That's [v0.5 (Mycelium)](../0.5/) — a deliberately separate, opt-in capability.
+- Not the operator surface. HITL forms and per-agent dashboards shipped in [v0.3 (Operational surface)](../0.3/).
+- Not the learning release. Correction-to-code is [v0.5 (Adaptive intelligence)](../0.5/).
+- Not cross-deployment exchange. That's [v0.6 (Mycelium)](../0.6/), opt-in and off by default.
+- Not a place where governance becomes optional — v0.4 raises the floor for the platform.
 
-## Why This Order
+## Why Governance Is Its Own Phase
 
-We could have shipped correction-to-code as v0.1's headline feature. Several of our competitors did. None of them are still in production at the customers we talk to.
+Most platforms treat governance as a v2 add-on or a customer-success problem. We disagree. The first time a v0.2 customer ships ten chat-authored changes in a week, the second question they ask (after "this is great") is "how do we explain this?"
 
-The reason is simple: adaptive systems without audit substrate are how customers get burned, and a burned customer doesn't come back. v0.1 paid the deploy bill. v0.2 paid the velocity bill. v0.3 paid the audit bill. v0.4 collects on all three — inside a single deployment, where the boundaries are clearest.
+If the answer is "we'll add audit later," the third question is "we'll evaluate later." Phase ordering is product strategy.
+
+## Foundation for v0.5
+
+v0.5 introduces correction-to-code: real user corrections become targeted PRs. That's only safe if every input to the loop — the correction, the actor, the surrounding run, the resulting PR — is already audited. v0.4 builds exactly that substrate, on top of the structured events v0.3 already emits.
 
 ## What's Next
 
-v0.4 is the close of the intra-deployment arc. [v0.5 (Mycelium)](../0.5/) extends the same loop *across* deployments — optional, policy-governed pattern exchange between TAS instances. Beyond that, our roadmap shifts to depth in specific verticals (regulated industries, multilingual operations) and to platform extensibility, planned in their own phase documents when the time comes.
+- **v0.5 — Adaptive intelligence.** Corrections from end users become PRs. Variants manage divergence.
+- **v0.6 — Mycelium.** Optional cross-deployment pattern exchange, under explicit policy.
 
-If v0.1 proved TAS can run, v0.2 proved TAS can iterate, and v0.3 proved TAS can be trusted, v0.4 proves TAS can *grow* — under your team's control, on your audit trail.
+If v0.1 proved TAS can run, v0.2 proved TAS can iterate, and v0.3 proved TAS can be operated, v0.4 proves TAS can be trusted at scale — and earns the right to ship adaptive loops on top.

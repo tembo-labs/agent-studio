@@ -1,66 +1,55 @@
-# Tembo Agent Studio v0.5: Mycelium — Shared Learning, On Your Terms
+# Tembo Agent Studio v0.5: From Usage to Evolution
 
 *Draft — internal review*
 
-Two TAS deployments, in the same industry, solving the same problem in parallel.
+Every agent starts smart and gets dumber.
 
-Neither knows. Both pay the iteration cost. The pattern that hardened over three months at one customer is invisible to a peer customer who would have happily traded notes — if there had been a safe way to.
+Not because the model regresses, but because the world moves: new vendor names, new tone preferences, new edge cases, new regulations. The first version captures what was true on launch day. Day 90, you're patching it manually. Day 180, you're not patching it at all and your team has stopped clicking "thumbs down" because nothing happens when they do.
 
-TAS v0.5 introduces **Tembo Mycelium**, the optional substrate for that exchange. Everything we built through v0.4 — corrections-as-PRs, variants, the v0.3 audit timeline — was the closed loop *inside* a single deployment. Mycelium extends that loop *between* deployments. Optionally. Under explicit policy. Without ever turning trust into a default.
+TAS v0.5 is the release that fixes this — within a single TAS deployment — without sacrificing the audit trail and access discipline we built in v0.4. (Sharing what you've learned with *other* TAS deployments is its own conversation: [v0.6 Mycelium](../0.6/).)
 
-## Why Mycelium is its Own Phase
+## The Loop, Closed
 
-We considered shipping Mycelium inside v0.4. We decided not to, on purpose.
+In v0.5, a correction is not just a thumbs-down. It's a structured event:
 
-Mycelium is a fundamentally different trust conversation. v0.1–v0.4 ask: *can you trust this system to manage your agents inside your walls?* Mycelium asks: *under what conditions, if any, do you want this system to exchange behavior with another organization's deployment?*
+1. A user marks an output wrong and provides a correction.
+2. TAS captures the original, the correction, and the surrounding run context.
+3. A Tembo coding agent classifies the correction (style / fact / scope / policy) and either:
+   - opens a targeted PR against the agent definition,
+   - recommends a variant if the correction conflicts with established behavior, or
+   - flags the correction for human review.
+4. The PR flows through the same review policy as any other change. The same v0.4 `who/when/why` audit timeline records it, and the same RBAC governs who can merge it.
 
-Bundling those questions invites the wrong answer. Most enterprise customers will say "no" reflexively to any feature that smells like cross-tenant flow, and then dismiss the rest of the product because of it. By making Mycelium an explicit, separately-planned, off-by-default capability, we make "stay in island mode forever" a first-class choice — not a stepchild.
+Operators get a one-click **Modify + Rerun**: merge the queued PR (subject to policy), reload the agent, and rerun the previous input — diffed against the original output side-by-side.
 
-## Four Policy Levels
+## When Preferences Conflict
 
-Mycelium is governed by org-level policy. Workspaces inherit and can only select more conservative settings, never more permissive ones.
+Adaptive agents usually fail in one of two ways:
 
-- **Island.** Nothing leaves. Nothing enters. **Default.** Many customers will stay here indefinitely, and that's a supported outcome.
-- **Share patterns only.** Anonymized behavioral patterns flow outbound; nothing inbound. For organizations that want to contribute without absorbing external influence.
-- **Share + receive.** Two-way exchange with attribution required on both sides.
-- **Receive only.** Import patterns from a partner deployment without contributing.
+1. They average conflicting feedback into a mush nobody asked for.
+2. They overfit to whoever clicked most recently.
 
-There is no centralized "marketplace" of agents. Mycelium is bilateral or group-policy. Attribution and provenance travel with every pattern. Imports never bypass review — they land as PRs on the receiving deployment, scored and labeled as Mycelium-sourced.
+v0.5 introduces **variants** for this exact problem. When TAS detects that incoming corrections conflict with the agent's established direction along a clear axis (region, team, brand, tier), it proposes a variant instead of merging the change into the base.
 
-## What a Pattern Is (and Isn't)
+Variants have parents, scopes, and audit history. Admins can later **reconcile** (merge a variant back) or **speciate** (commit a variant as its own line) — both explicit, both audited.
 
-A **pattern** is a structured, anonymized behavioral signal — for example, the shape of a successful variant scope, or a classified correction pattern. No raw prompts. No user content. No PII.
-
-This is the boundary that makes Mycelium *not* a data-sharing feature. Patterns are about *what worked*, not *what was said*. The schema is versioned, designed with backward-compatible reads, and reviewed by regulated-customer compliance teams before v0.5 GA.
-
-## Audit, Inherited
-
-Mycelium imports land in the same v0.3 changelog as every other change. There is no separate "AI changes" surface or "Mycelium activity" tab. An auditor asking "where did this behavior come from?" gets the same answer for an internal correction, an engineer's PR, and a Mycelium-sourced import: the changelog, with attribution.
-
-This was a hard constraint, not an aesthetic one. The moment Mycelium gets its own audit surface, it stops being trustworthy.
+The operating principle: **adaptation is allowed, drift is governed.**
 
 ## What v0.5 Is Not
 
-- Not a public marketplace or registry of agents.
-- Not data sharing. Patterns are anonymized behavioral signals, full stop.
-- Not federated agent execution. v0.5 exchanges patterns between deployments; it does not execute agents across them.
-- Not on by default. Default is, and will remain, island.
-- Not a bypass for v0.4 review surfaces. Imports produce PRs.
+- Not autonomous self-modification. Every change is a PR.
+- Not a behavioral A/B testing framework — that's a separate, later conversation.
+- Not a way to bypass v0.4 governance. Every correction and variant lands in the same changelog, under the same RBAC.
+- Not cross-deployment shared learning. That's [v0.6 (Mycelium)](../0.6/) — a deliberately separate, opt-in capability.
 
 ## Why This Order
 
-We could have shipped Mycelium earlier. We chose not to because the trust ladder runs the other way:
+We could have shipped correction-to-code as v0.1's headline feature. Several of our competitors did. None of them are still in production at the customers we talk to.
 
-- v0.1 earns trust to **deploy**.
-- v0.2 earns trust to **iterate quickly**.
-- v0.3 earns trust to **explain every change**.
-- v0.4 earns trust to **adapt from end-user signal**.
-- v0.5 earns trust to **learn beyond your own walls** — and only because the four steps below it are solid.
-
-A customer who reaches v0.5 has already seen TAS adapt under their own audit trail for months. The question Mycelium asks them is qualitatively different at that point.
+The reason is simple: adaptive systems without audit substrate are how customers get burned, and a burned customer doesn't come back. v0.1 paid the deploy bill. v0.2 paid the velocity bill. v0.3 paid the operator bill. v0.4 paid the audit and access bill. v0.5 collects on all four — inside a single deployment, where the boundaries are clearest.
 
 ## What's Next
 
-Beyond v0.5, the roadmap shifts to depth in specific verticals (regulated industries, multilingual operations) and to platform extensibility. Those will get their own phase documents when planned.
+v0.5 is the close of the intra-deployment arc. [v0.6 (Mycelium)](../0.6/) extends the same loop *across* deployments — optional, policy-governed pattern exchange between TAS instances. Beyond that, our roadmap shifts to depth in specific verticals (regulated industries, multilingual operations) and to platform extensibility, planned in their own phase documents when the time comes.
 
-If v0.4 proved TAS can grow, v0.5 proves TAS can grow *together with peer deployments* — never by default, never without attribution, always under your audit trail.
+If v0.1 proved TAS can run, v0.2 proved TAS can iterate, v0.3 proved TAS can be operated, and v0.4 proved TAS can be trusted, v0.5 proves TAS can *grow* — under your team's control, on your audit trail.

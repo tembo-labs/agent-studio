@@ -1,107 +1,95 @@
 # v0.5 Demo Script
 
-**Target audience:** enterprise architect, compliance lead, and platform owner at a customer already operating TAS at v0.4. Mycelium is a *different conversation* than v0.1–v0.4; do not stack this demo with the adaptive-intelligence one.
-**Target duration:** 25–30 minutes.
-**Goal of the demo:** prove that Mycelium is a real choice — not a default surprise — and that "stay in island mode forever" is a first-class outcome.
+**Target audience:** prospective customer with a live agent in production at a v0.4 baseline — typically a product owner and an EM.
+**Target duration:** 25–35 minutes.
+**Goal of the demo:** prove that adaptation can be both fast and governed *inside a single TAS deployment*. Cross-deployment learning (Mycelium) has its own demo in [v0.6](../0.6/DEMO_SCRIPT.md).
 
 ## Pre-Demo Checklist (Off-Screen)
 
-- Two TAS deployments at v0.4 baseline (call them `acme` and `globex`) with a pre-negotiated bilateral peer relationship.
-- Both org-level Mycelium policies currently set to **island**.
-- Two pre-staged outbound patterns on `acme` (e.g., a hardened variant scope and a classified correction pattern). Realistic but anonymized.
-- One pre-staged revocation scenario (a previously-exported pattern that the exporter wants to retract).
-- A recorded video fallback of pattern exchange in case live transport fails.
-- Optional: a regulated-customer persona briefed to ask the "we will never turn this on" question, so the answer lands cleanly.
+- Workspace at v0.4 baseline, with at least one `customer-reply` agent in heavy use.
+- Pre-staged corrections from "end users":
+  - Two corrections aligned on tone (informal → more formal). Used in the correction-to-PR segment.
+  - Four corrections that conflict on tone across two scopes (`team-eu`: formal, `team-us`: informal). Used for divergence.
+- A `regulatory-drafting` agent with correction capture disabled (for the toggle demo).
 
 ## Flow (with rough timings)
 
-### 1. Frame the conversation (0:00 – 3:00)
+### 1. 90-second recap of v0.4 (0:00 – 1:30)
 **Say:**
-> "Everything you've seen through v0.4 keeps your agents' evolution inside your walls. v0.5 — Mycelium — is the optional substrate for two TAS deployments to learn from each other. Three things to know up front. One: this is off by default. Two: it never moves data, only anonymized behavioral patterns. Three: imports land as PRs, on your audit trail, just like everything else. If by the end of this demo you decide you want to stay in island mode, that is a supported outcome, not a missed sale."
+> "Three weeks since v0.4 governance landed, this customer is shipping changes via chat, every change is in the audit timeline under explicit RBAC, and ops engineers triage from the per-agent dashboard we shipped in v0.3. Today is v0.5 — what happens when *end users* drive change, not just operators."
 
-### 2. The default — island (3:00 – 5:00)
-**Show:** the Mycelium settings panel on `acme`, with org policy set to **island**.
-**Say:**
-> "Default is island. Nothing leaves. Nothing enters. Many of our customers will stay here, and the rest of TAS is identical for them. Mycelium is opt-in; it is not a deferred default."
-
-### 3. Establish a peer relationship (5:00 – 9:00)
-**Show:** the peer-relationship UI. Walk through:
-- `acme` proposes a bilateral relationship with `globex`.
-- `globex`-side admin accepts.
-- Show the resulting changelog entry on both sides.
-
-**Say:**
-> "Mycelium is bilateral or group-policy. There is no Tembo-hosted marketplace, no public registry. If we ever do a directory service, it's for discovering peers — never for relaying content. Both sides must accept. Either side can revoke. The acceptance itself is in the audit trail."
-
-### 4. Flip policy to 'share patterns only' (9:00 – 12:00)
-**Show:** org policy change on `acme` from island → share patterns only.
+### 2. End-user correction → PR (1:30 – 9:00)
+**Show:** an end-user view of a customer-reply output that's slightly off.
 **Do:**
-- Show the changelog entry naming the acting admin and the policy delta.
-- Show a workspace under `acme` that has chosen to *remain* in island despite org permission.
+- Click "this isn't right" → fill the correction form with the desired tone fix and a one-line rationale.
+- Submit.
+- Switch to the operator view → show the correction event in the v0.4 changelog.
+- Show the queued PR (chat session-style description + targeted diff).
 
 **Say:**
-> "Workspaces inherit the org policy and can be stricter, never more permissive. Even when the org turns on sharing, a workspace can opt out. Both choices are audited."
+> "Three things to notice. One: the end user's intent is preserved verbatim on the PR. Two: this lands in the same changelog every other change lands in — there is no separate 'AI changes' surface to audit. Three: the system told the end user a PR was opened, so they don't think their feedback disappeared."
 
-### 5. Export a pattern (12:00 – 16:00)
-**Show:** the patterns surface on `acme`. Pick a hardened variant scope.
+### 3. Modify + Rerun (9:00 – 14:00)
 **Do:**
-- Show the exact pattern payload — anonymized, no prompts, no user content.
-- Show the signed attribution and provenance metadata.
-- Trigger export.
-- Switch to the `globex` deployment.
+- On the operator view, click **Modify + Rerun** on the queued PR.
+- The PR merges (this agent has auto-merge-on-green from v0.2), the agent reloads, the previous input is rerun.
+- Show the side-by-side: original output vs new output.
 
 **Say:**
-> "This is what a pattern is, and just as importantly, what it isn't. No raw prompts. No user content. No PII. A pattern is a behavioral signal — the shape of something that worked — with attribution signed by the exporting org."
+> "This is the operator loop in one click. The composite changelog event ties correction → merge → rerun together. Three weeks ago this would have been a ticket."
 
-### 6. Import lands as a PR (16:00 – 22:00)
-**Show:** `globex`'s view of the inbound pattern.
+### 4. Conflict surfaces a variant (14:00 – 24:00)
 **Do:**
-- Show that the import did *not* modify any agent directly.
-- Show the resulting PR, labeled "Mycelium-sourced — Acme Corp (verified attribution)".
-- Show the v0.3 changelog entry on `globex` with originating attribution + the PR link.
-- Walk through the PR review like any other v0.4 correction PR.
+- Submit two more "end-user corrections" from `team-eu` operators asking for a more formal tone.
+- Submit two more from `team-us` asking for a more casual tone.
+- Show the divergence detection proposal that appears.
 
+**Show:**
+- Linked corrections.
+- Suggested variant scope (`team-eu`).
+- Recommended parent.
+
+**Do:** accept the proposal. Show the new variant in the agent list and lineage view.
 **Say:**
-> "This is the key trust move. An imported pattern goes through your existing review surface, not around it. The label tells your reviewer where it came from. The audit trail records the import, the attribution, the policy under which it landed, and the PR that resulted. There is no separate Mycelium activity tab — it lives in the same changelog as your engineers' PRs and your end users' corrections."
+> "We could have averaged the feedback into one definition. We deliberately don't. Conflicting preferences usually mean real structural differences — region, brand, audience. Variants make that explicit and audited instead of hiding it."
 
-### 7. Revocation (22:00 – 27:00)
-**Show:** on `acme`, mark a previously-exported pattern as revoked.
+### 5. Lineage and admin actions (24:00 – 30:00)
+**Show:** the lineage view: parent `customer-reply`, variant `customer-reply [team-eu]`.
 **Do:**
-- Show the changelog entry on `acme`.
-- Switch to `globex`: a notification surfaces to the workspace admin.
-- Show the linked changelog entry on `globex` tying the revocation back to the original import and any merged PR.
-
+- Hover the variant → show creation reason, scope, recent corrections, conflict counter.
+- Walk through (without executing) the **Reconcile** action (merge variant back) and the **Speciate** action (commit variant as its own line).
 **Say:**
-> "Revocation does not auto-rip-out merged changes. That would be its own trust failure. What it does do is notify the receiving admin and link the events together so the rollback decision is an explicit operator action with full context."
+> "Variants are not a one-way door. Admins can pull them back or commit them out — both are explicit, both are audited."
 
-### 8. Wrap (27:00 – 30:00)
-**Show:** the five-phase roadmap, all complete.
+### 6. Correction capture off for sensitive agents (30:00 – 33:00)
+**Show:** the `regulatory-drafting` agent's settings.
+**Do:** show "Correction capture: disabled" with the audit entry. Switch to an end-user view of that agent — the correction UI is hidden.
 **Say:**
-> "v0.1 through v0.4 made TAS deployable, iterable, auditable, and adaptive — inside your walls. v0.5 is the optional next floor: learning across deployments under explicit policy. The trust ladder runs in this direction on purpose. If you want to stay on the v0.4 floor forever, that's a supported choice. If you want to take the v0.5 step with a specific peer, we'll set up the bilateral relationship together."
+> "Not every agent should accept user-driven adaptation. Regulated drafting is the easy example. The toggle is per-agent and the change is audited like any other."
+
+### 7. Wrap and pointer to v0.6 (33:00 – 35:00)
+**Show:** the six-phase roadmap with 0.1–0.5 marked complete and 0.6 (Mycelium) queued.
+**Say:**
+> "v0.1 made TAS deployable, v0.2 made it iterable, v0.3 gave operators a real surface, v0.4 made it auditable, v0.5 made it adaptive — all inside one deployment. v0.6 (Mycelium) is the optional next step: letting two TAS deployments learn from each other under explicit policy. That's a separate conversation with a separate demo, because the trust model is different."
 
 ## Live-Demo Failure Plan
 
 | If… | Then say… |
 | --- | --------- |
-| Pattern exchange transport fails live | Cut to recorded video. Acknowledge: "Mycelium is the capability that benefits most from being seen between real deployments — we can run a guided pilot with a peer customer of yours." |
-| The audience pushes hard on "what if a peer exports something harmful?" | Use the revocation path + PR review as the answer. "The receiving side reviews every import. A bad export gets rejected on the receiving side and revoked on the source side. The pattern abstraction is also the reason this is bounded — no data flows, only behavioral signals." |
-| Org-vs-workspace policy override demo doesn't trigger cleanly | Use the API to show the deny response. "The enforcement is at the API layer, not just the UI — that's a hard constraint." |
+| The correction-to-PR step produces a bad PR | "Worth seeing — same as a junior engineer's first PR. Reviewer rejects, correction stays in the changelog, no auto-retry on the same bad output." |
+| Divergence detection doesn't fire on the staged corrections | "Thresholds are tunable per agent. Let me trigger the manual 'propose variant' path so we can show the lifecycle anyway." |
 
 ## Success Criteria (Demo)
 
-- A peer relationship is established live, with audit entries visible on both sides.
-- A pattern flows from `acme` to `globex` and lands as a reviewable PR with verified attribution.
-- A revocation is demonstrated, with linked audit entries on both sides.
-- The audience leaves understanding that **default is island** and that staying there is a supported outcome.
-- No one in the room mistakes Mycelium for data sharing.
+- An end-user correction produces a live PR with a targeted diff.
+- Modify + Rerun is executed live with a visible behavioral difference.
+- A variant is created (via accepted divergence proposal **or** manual creation) and the lineage view is shown.
+- The audience leaves understanding "adaptation is allowed; drift is governed" — not just "TAS does AI."
 
 ## Common Questions & Crisp Answers
 
-- **"Is this data sharing?"** No. Patterns are anonymized behavioral signals — shape of what worked, not what was said. No prompts, no user content, no PII.
-- **"Is there a marketplace?"** No. Bilateral or group-policy only. No public registry.
-- **"What if we never turn it on?"** Supported outcome. TAS behaves identically for an island-mode customer.
-- **"Can our workspace opt out even if our org turned it on?"** Yes — strictly stricter is always allowed. The reverse is not.
-- **"Can imports modify our agents without us seeing?"** No. Imports always land as PRs and follow your existing review policy.
-- **"What happens to merged imports if the source revokes?"** You get notified and shown the linked audit chain. The rollback decision is explicit — we don't auto-revert.
-- **"Does v0.5 require v0.4?"** Yes. Mycelium builds on v0.4's correction, variant, and changelog substrate.
-- **"What's after v0.5?"** Depth in specific verticals and platform extensibility. Phase docs when planned, not before.
+- **"Will the model adapt without us approving every change?"** No. Every adaptation is a PR. PR policy from v0.2 and RBAC from v0.4 govern whether and by whom review is required.
+- **"Can we opt out of correction-to-code on specific agents?"** Yes — per-agent toggle. Other agents in the workspace are unaffected.
+- **"Can our agents learn from another company's TAS deployment?"** Only under v0.6 (Mycelium), which is opt-in and off by default. v0.5 stays inside your deployment on purpose.
+- **"What's after v0.5?"** v0.6 (Mycelium), then depth in specific verticals and platform extensibility.
+- **"Does v0.5 require us to upgrade our LLM provider?"** No. TAS routes through whichever coding model your customer has configured — we treat that as substitutable.

@@ -1,91 +1,84 @@
-# Tembo Agent Studio v0.4 — Adaptive Intelligence
+# Tembo Agent Studio v0.4 — Governance Depth
 
-> **Headline:** The agent you ship is not the agent you'll run six months later. v0.4 closes the loop *inside a single TAS deployment*: end-user corrections become targeted PRs, and divergence becomes managed variants.
+> **Headline:** Authored fast, operated well, audited deeply. v0.4 makes every change, every human action, and every run explainable — and puts who-can-do-what under explicit policy — before adaptive loops begin to write back into source.
 >
-> **Audience:** product owners with live agents in production who want feedback to round-trip into source without giving up the audit trail.
+> **Audience:** platform admins, compliance/security teams, org admins, and the auditors who will eventually ask "who changed this, when, and why?"
 
 ## Problem
 
-After v0.3, customers have a fast authoring loop and a deep audit trail. They are now hitting the next bottleneck:
+After v0.3, customers have fast authoring (v0.2) and a real operator surface (v0.3). The next failure mode is governance:
 
-- **End-user corrections never reach source.** A user clicks "this answer was wrong, here's the right one" — and the feedback dies in a queue no one reads.
-- **Conflicting preferences silently collide.** Team A wants the assistant terse. Team B wants the assistant chatty. The author flips a coin in chat and one team complains weekly.
+- **The audit trail is thin.** Git tells you who merged a PR, but not who authored it in chat, what they originally said, or which run history motivated the change.
+- **Admin controls are workspace-wide only.** Larger orgs need role boundaries and policies that scale beyond a single workspace.
+- **Adaptive loops are coming and can't run on a thin audit.** v0.5 introduces end-user corrections turning into PRs. That's only safe if every input to the loop — actor, time, source, intent — is already audited and access-controlled.
 
-The product question for v0.4 is: how do we let agents *evolve* without giving up the auditability we just built in v0.3?
-
-(Cross-deployment learning — sharing patterns *between* TAS instances — is a separate question and is addressed in [v0.5 (Mycelium)](../0.5/).)
+Without these, scale doesn't compound — it amplifies risk. And the adaptive intelligence in v0.5 cannot ship responsibly on top of an incomplete audit trail.
 
 ## Our Solution
 
-Three capabilities, all routed through the v0.3 governance substrate:
+v0.4 is the governance release. It adds three interlocking capabilities:
 
-1. **Correction-to-code PRs.** When an end user corrects an output, TAS bundles the original output + the correction + relevant run context and asks a Tembo coding agent to produce a targeted PR.
-2. **Modify + Rerun.** A one-click flow for operators: "apply the change you just opened a PR for, run it now, show me the difference."
-3. **Divergence detection and variant lifecycle.** When conflicting corrections accumulate across user groups, TAS proposes a variant rather than merging incompatible behavior into the base.
-
-## Operating Principle
-
-**Adaptation is allowed; drift is governed.**
-
-Every adaptive change is still a PR. Every variant has lineage.
+1. **Immutable `who/when/why` changelog.** Every agent change, run, human intervention, and policy switch is recorded with the actor, timestamp, and originating intent (chat session ID, PR number, correction ID).
+2. **Role-based access control (RBAC).** Org admin → workspace admin → operator → viewer, enforced at the API layer, not just the UI.
+3. **Org-level policy templates.** Defaults inherited by workspaces, with explicit overrides — and the overrides are themselves audited.
 
 ## What Ships in v0.4
 
-- **Correction capture surface.** Inline correction UI on every agent output that supports it; structured payload (original / correction / context / actor) attached to a changelog event.
-- **Correction-to-code analysis.** LLM-assisted classification of corrections (style / fact / scope / policy) plus a synthesis step that produces a targeted PR or, where appropriate, a recommendation to open a variant.
-- **Modify + Rerun.** A single action that merges a queued PR (subject to policy), refreshes the agent, and reruns the previous input — diff-rendered alongside.
-- **Divergence detection.** Heuristics and explicit operator signals identify conflicting correction trends; the system proposes variants rather than silently averaging.
-- **Variant lifecycle.** Variants have parents, names, scopes (e.g., "team-eu"), and audit history. Reconciliation (merge variants back) and speciation (commit a variant as its own line) are explicit admin actions.
+- **Immutable changelog API + UI.** Per-agent and per-workspace views. Filter by actor, time, source (chat / PR / HITL response / dashboard event / correction / human action).
+- **RBAC.** Org admin → workspace admin → operator → viewer. Custom roles deferred to post-v0.6 unless a customer blocks.
+- **Policy templates.** Org-level defaults (e.g., "all customer-facing agents are review-required") that workspaces inherit; per-workspace override creates an audit entry with required justification.
+- **Cross-system export.** Per-agent JSON export at v0.4. Streaming to a SIEM is in the v0.5 open-questions list — pilot destinations welcome.
 
 ## Out of Scope for v0.4
 
-- Fully autonomous self-modification (we will not ship this; it violates the operating principle).
-- Behavioral A/B routing inside a single agent (separate post-v0.4 conversation).
-- Cross-deployment shared learning — addressed in [v0.5 (Mycelium)](../0.5/).
+- Rich HITL forms and per-agent dashboards — already shipped in [v0.3 (Operational surface)](../0.3/). v0.4 reads the events v0.3 produced; it doesn't reproduce them.
+- Correction-to-code learning, variant lifecycle — [v0.5 (Adaptive intelligence)](../0.5/).
+- Cross-deployment shared learning — [v0.6 (Mycelium)](../0.6/).
+- Custom RBAC roles beyond the four built-ins — post-v0.6 unless a customer blocks.
 
 ## Strategy
 
-Adapt, don't drift. The platform's value compounds only if customers trust that adaptation doesn't outpace governance. We refuse to ship an "auto-apply correction" path; the PR is the contract.
+Increase trust and access discipline **before** introducing adaptive change. We refuse to ship v0.5 learning loops on top of a thin audit trail — the failure mode is "the agent changed and we can't explain why," and that kills the product's enterprise story. Ordering governance ahead of adaptive intelligence is a deliberate, expensive choice and we are making it on purpose.
 
 ## Technical Details
 
-- **Correction model.** Append-only events tied to the run that produced the output, the user who corrected it, and (optionally) the structured form they filled.
-- **Analysis pipeline.** Tembo coding workflows handle synthesis. Classification feeds into the divergence detector; not every correction produces a PR.
-- **Variant graph.** Variants are first-class agent objects with a `parent` reference and a `scope`. The graph is rendered in a lineage view.
+- **Changelog model.** Append-only event store. Every event has `actor`, `at`, `source`, `target`, `payload`. v0.3 already emits the right shape of structured events; v0.4 puts them under audit and access control. Render layers compute the per-agent and per-workspace views.
+- **RBAC.** Identities continue to flow through `better-auth`. Roles are first-class objects with their own audit entries on assignment changes. Enforcement is at the API layer; the UI mirrors API state, never softens it.
+- **Policy templates.** Versioned, org-scoped JSON templates. Workspaces inherit; overrides require a free-text justification persisted to the changelog. Policy diffs render cleanly so the auditor's question is "what changed, who changed it, why" — not "what was the state on March 12."
 
 ## Customer Quote (Drafted)
 
-> "Three months in, our customer-reply agent is measurably better than the day we deployed it — and we can point at every change that got it there. Not magic, just corrections turning into PRs the same way our engineers' edits do."
+> "When the auditors asked who approved the change that altered our customer-reply tone last quarter, we showed them the chat session, the PR, the reviewer, and the timestamp — in one screen. Three months ago that would have been a four-day spelunking exercise."
 >
-> — *Senior PM, e-commerce platform (draft persona)*
+> — *Head of Compliance, regulated B2C platform (draft persona)*
 
 ## FAQ
 
-### Why variants instead of one global behavior?
-Because some divergences are real and structural — EU vs US, enterprise vs SMB, support vs sales tone. Forcing them into one definition is the most common failure mode of "self-improving" agent systems. Variants preserve fit without hiding the split.
+### Why isn't governance bundled with the v0.3 operator surface?
+Because the audiences are different. v0.3 is for the operator doing their job. v0.4 is for the auditor and the org admin shaping who can do what. Bundling them muddies both — and a thinner v0.3 ships faster, which is the whole point of phasing.
 
-### Is this fully autonomous self-modification?
-No. Every change is still a PR. Every PR is still subject to the v0.2 policy and the v0.3 audit. v0.4 changes the *source* of changes, not the review surface.
+### Why land governance before adaptive intelligence in v0.5?
+Because adaptive intelligence rewrites agents based on end-user signal. The cost of *not* auditing those rewrites compounds the first time something goes wrong. We ship the audit substrate first, on purpose, even though "adaptive" demos better than "audit."
 
-### What if the coding agent produces a bad correction PR?
-It gets reviewed and rejected, like any other PR. The correction event remains in the changelog so the same correction doesn't get re-synthesized into the same bad PR.
+### Is the changelog actually immutable, or just hard to edit?
+Append-only at the storage layer. Corrections (e.g., wrong actor recorded) are added as new events with `kind=correction` referencing the original — the original never disappears.
 
-### Can we turn off correction capture entirely?
-Yes, per-agent. Some agents (e.g., regulatory drafting) may not allow user-driven adaptation at all.
+### How does this interact with the v0.2 PR policy?
+PR policy is now itself a recorded thing. Changing a policy creates an event. Auto-merges create events. Reviewer approvals create events.
 
-### When does cross-deployment learning come in?
-That's [v0.5 (Mycelium)](../0.5/). v0.4 keeps everything inside a single TAS deployment on purpose — we want adaptation and audit to be rock-solid intra-deployment before introducing inter-deployment pattern exchange.
+### What about custom RBAC roles?
+The four built-ins (org admin / workspace admin / operator / viewer) cover the cases we've seen in pilots. Custom roles are deferred post-v0.6 unless a customer blocks. Policy templates plus per-workspace overrides cover most of the asks we'd otherwise get there.
 
 ## Exit Bar (Definition of Done for v0.4)
 
-- [ ] A real end-user correction at a pilot customer produces a merged PR with no engineering involvement in the loop.
-- [ ] One pilot customer is running a multi-variant agent in production for at least one month.
-- [ ] The v0.3 changelog cleanly absorbs correction and variant events without a separate audit surface.
+- [ ] A compliance reviewer can, in under five minutes, answer "who changed this agent, when, why, and who approved it?" for any agent in any workspace.
+- [ ] RBAC roles are enforced at the API layer, not just the UI (verified by a deny-test).
+- [ ] An override of an org-level policy template produces a changelog entry with required justification, demonstrated end-to-end.
+- [ ] Per-agent changelog JSON export works for at least one pilot customer's reporting flow.
 
 ## Open Questions Before v0.5
 
-- Which divergence thresholds (correction volume, conflict ratio) should be defaults for proposing a variant?
-- What's the right reconciliation UX when admins want to merge a variant back? Side-by-side diff? Behavior replay?
-- Which correction classes should *always* require human review even under YOLO policy (e.g., factual claims, legal copy)?
-- Where does correction-to-code stop and "the human should just edit the agent" begin?
-- What's the right pattern abstraction for v0.5 to export — diffs? Variant scopes? Correction classifications?
+- What thresholds in run patterns or correction frequency should trigger divergence alerts in v0.5?
+- Which v0.4 changelog event kinds become inputs to v0.5's correction-to-code analysis?
+- Should chat sessions themselves be first-class audit objects, or remain attached to the PR they produced?
+- How do we expose the audit timeline outside the UI (e.g., to a customer's SIEM) before v0.5 demands it?

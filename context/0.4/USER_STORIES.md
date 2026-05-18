@@ -4,87 +4,77 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 
 ## Personas Referenced
 
-- **End User** — interacts with an agent's output; not a TAS operator.
-- **Operator** — runs agents day-to-day.
-- **Workspace Admin** — owns a team's agents.
-- **Team Lead** — owns a multi-team agent footprint.
-- **Platform Architect** — long-term integration owner (e.g., MCP).
+- **Compliance Stakeholder** — owns audit responses; rarely uses the product daily.
+- **Org Admin** — sets policy across many workspaces.
+- **Workspace Admin** — runs one team's TAS workspace; inherits org policy and can tighten but not loosen.
 
-Cross-deployment learning personas (Enterprise Admin setting org-wide sharing policy) live in [v0.5 (Mycelium)](../0.5/).
+Operator-surface personas (Reviewer, Support Engineer) live in [v0.3 (Operational surface)](../0.3/).
 
 ---
 
-## US-0.4-01 — Correction-to-code PR
+## US-0.4-01 — Immutable `who/when/why` changelog
 
-**As an** End User, **I want** to mark an output wrong and provide a correction, and have TAS turn that correction into a targeted PR against the agent, **so that** the system improves from real usage feedback without an engineering escalation.
+**As a** Compliance Stakeholder, **I want** an immutable, append-only changelog of who changed what and why across agents, **so that** we can satisfy audit and incident review requirements without engineering escalation.
 
 **Acceptance Criteria**
-- The correction UI captures: original output, corrected output, optional rationale, and references to the run.
-- The correction event lands in the v0.3 changelog with the actor and timestamp.
-- The system classifies the correction (style / fact / scope / policy) and either opens a PR, proposes a variant, or flags for review.
-- The end user is told what happened to their correction (PR opened, variant proposed, queued for review), not silently dropped.
+- Changelog records actor identity, timestamp, source (chat / PR / HITL response / dashboard event / correction / human action / policy change), target (agent or workspace), and a structured payload.
+- Records are append-only; corrections are added as new events of `kind=correction` referencing the original.
+- Per-agent view shows the agent's complete history. Per-workspace view shows cross-cutting policy and access events.
+- Filterable by actor, time range, and source.
+- The same v0.3 structured events (HITL submissions, dashboard-visible state changes) are first-class in the changelog without re-instrumentation.
 
 ---
 
-## US-0.4-02 — Modify + Rerun
+## US-0.4-02 — RBAC
 
-**As an** Operator, **I want** a one-click "Modify + Rerun" action on a queued correction PR, **so that** I can apply the change, refresh the agent, and rerun the previous input with the new behavior — all from one place.
+**As an** Org Admin, **I want** role-based access (org admin, workspace admin, operator, viewer) enforced at the API layer, **so that** teams can collaborate safely at scale without UI-only safety nets.
 
 **Acceptance Criteria**
-- The action is gated by the agent's PR policy (review-required vs auto-merge).
-- After merge, the rerun uses the same inputs that produced the corrected output.
-- The rerun result is shown side-by-side with the original output for direct comparison.
-- The action records a single composite event in the changelog: `correction → merge → rerun`, with links to each constituent event.
+- Role assignments are themselves audited.
+- A viewer cannot trigger runs, change policy, or approve PRs via API.
+- An operator cannot change policy or RBAC settings via API.
+- A workspace admin's actions are scoped to their workspaces; cross-workspace operations require org admin.
+- API enforcement is verified by a deny-test in CI, not just the UI.
 
 ---
 
-## US-0.4-03 — Divergence detection
+## US-0.4-03 — Org-level policy templates
 
-**As a** Workspace Admin, **I want** TAS to detect when conflicting corrections accumulate along a clear axis (region, team, brand), **so that** user groups can evolve separate variants instead of silently overwriting each other.
+**As an** Org Admin, **I want** to set org-level policy templates (e.g., "customer-facing agents require review") that workspaces inherit, **so that** I do not have to chase each workspace admin to enforce baseline rules.
 
 **Acceptance Criteria**
-- A divergence proposal is created when configured thresholds (correction volume, conflict ratio) are met.
-- The proposal includes the suggested variant scope, the evidence (linked corrections), and the recommended parent agent.
-- Accepting a proposal creates a variant; rejecting it records the rejection rationale.
-- An admin can manually create a variant without waiting for divergence detection.
+- Workspaces inherit org defaults on creation.
+- Overriding an inherited policy at the workspace level produces a changelog event with a required justification field.
+- A view at the org level shows which workspaces are deviating from defaults and why.
+- A workspace can tighten an inherited policy without an audit-required justification; loosening always requires one.
 
 ---
 
-## US-0.4-04 — Variant lineage visualization
+## US-0.4-04 — Audit timeline export
 
-**As a** Team Lead, **I want** to see a lineage view of parent agents and their variants, **so that** I can understand evolution history before recommending a merge (reconciliation) or commit (speciation).
+**As a** Compliance Stakeholder, **I want** to export a filtered audit timeline (per-agent or per-workspace, time-bounded), **so that** I can feed it to our reporting pipeline or share it with auditors.
 
 **Acceptance Criteria**
-- Lineage view shows parent → variant relationships with scope labels.
-- Hovering or clicking a variant surfaces: creation reason, current scope, recent corrections, divergence/conflict counters with the parent.
-- Reconciliation and speciation are explicit actions with their own audit events.
+- JSON export at v0.4 is the supported path.
+- Export honors RBAC: a viewer cannot export entries they could not see in the UI.
+- Streaming to a SIEM is acknowledged as a v0.5 open question; pilot destinations welcome.
 
 ---
 
-## US-0.4-05 — Per-agent correction capture toggle
+## US-0.4-05 — Policy and RBAC change history
 
-**As a** Workspace Admin, **I want** to disable correction capture entirely on specific agents (e.g., regulated drafting), **so that** sensitive workflows do not accept user-driven adaptation.
-
-**Acceptance Criteria**
-- The toggle is per-agent and audited on change.
-- Disabling capture hides the end-user correction UI for that agent.
-- Existing corrections remain in the changelog but no new ones are accepted.
-
----
-
-## US-0.4-06 — Future MCP integration option
-
-**As a** Platform Architect, **I want** a documented MCP integration option for Tembo authentication and tool connectivity, **so that** TAS can adopt standardized tool-server protocols when our internal MCP rollout matures.
+**As an** Org Admin, **I want** policy template changes and role-assignment changes to be first-class entries in the changelog, **so that** governance-affecting changes are themselves governed.
 
 **Acceptance Criteria**
-- An MCP-mode flag exists on the workspace's Tembo integration alongside the v0.1 API-key mode.
-- The integration mode is auditable.
-- API-key mode remains supported throughout v0.4 — MCP is additive, not a forced migration.
+- Policy template version changes appear in the changelog with a diff.
+- Role assignment and revocation events appear with actor and target identity.
+- Override events on inherited policies appear with the justification text.
 
 ---
 
 ## Stretch (Considered, Deferred)
 
-- Behavioral A/B testing routing inside a single agent — separate, later phase.
-- Auto-apply low-risk corrections without a PR — explicitly out of scope; violates operating principle.
-- Cross-deployment pattern exchange — explicitly moved to [v0.5 (Mycelium)](../0.5/).
+- Custom RBAC roles beyond the four built-ins — post-v0.6 unless a customer blocks.
+- Streaming the changelog to an external SIEM — v0.5 open question.
+- Workspace-scoped data residency controls — out of scope until enterprise demand validates priority.
+- Cryptographically signed audit entries (notarization) — promising; gather pilot demand before promoting.
