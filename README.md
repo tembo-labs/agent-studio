@@ -66,6 +66,12 @@ agents/
   mycelium/                       # Optional shared knowledge cache (v0.4+)
   lineage/                        # Lineage metadata (v0.4+)
   skills/                         # Reusable patterns
+concepts/
+  README.md
+  USER_STORIES.md
+  DEMO_SCRIPT_01.md
+  FEATURE_DETAILS.md
+  MYCELIUM.md
 ```
 
 ---
@@ -87,10 +93,11 @@ docker compose up -d
 
 ## Documentation
 
-- [USER_STORIES.md](./USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
-- [DEMO_SCRIPT_01.md](./DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
-- [MYCELIUM.md](./MYCELIUM.md): Tembo Mycelium model, operating modes, and governance
-- [FEATURE_DETAILS.md](./FEATURE_DETAILS.md): restored detailed feature context from earlier README
+- [concepts/README.md](./concepts/README.md): index of product concept docs
+- [concepts/USER_STORIES.md](./concepts/USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
+- [concepts/DEMO_SCRIPT_01.md](./concepts/DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
+- [concepts/MYCELIUM.md](./concepts/MYCELIUM.md): Tembo Mycelium model, operating modes, and governance
+- [concepts/FEATURE_DETAILS.md](./concepts/FEATURE_DETAILS.md): restored detailed feature context from earlier README
 
 ---
 
