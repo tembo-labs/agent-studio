@@ -1,0 +1,67 @@
+# Tembo Agent Studio v0.4: From Usage to Evolution
+
+*Draft — internal review*
+
+Every agent starts smart and gets dumber.
+
+Not because the model regresses, but because the world moves: new vendor names, new tone preferences, new edge cases, new regulations. The first version captures what was true on launch day. Day 90, you're patching it manually. Day 180, you're not patching it at all and your team has stopped clicking "thumbs down" because nothing happens when they do.
+
+TAS v0.4 is the release that fixes this — without sacrificing the audit trail we built in v0.3.
+
+## The Loop, Closed
+
+In v0.4, a correction is not just a thumbs-down. It's a structured event:
+
+1. A user marks an output wrong and provides a correction.
+2. TAS captures the original, the correction, and the surrounding run context.
+3. A Tembo coding agent classifies the correction (style / fact / scope / policy) and either:
+   - opens a targeted PR against the agent definition,
+   - recommends a variant if the correction conflicts with established behavior, or
+   - flags the correction for human review.
+4. The PR flows through the same review policy as any other change. The same `who/when/why` audit timeline records it.
+
+Operators get a one-click **Modify + Rerun**: merge the queued PR (subject to policy), reload the agent, and rerun the previous input — diffed against the original output side-by-side.
+
+## When Preferences Conflict
+
+Adaptive agents usually fail in one of two ways:
+
+1. They average conflicting feedback into a mush nobody asked for.
+2. They overfit to whoever clicked most recently.
+
+v0.4 introduces **variants** for this exact problem. When TAS detects that incoming corrections conflict with the agent's established direction along a clear axis (region, team, brand, tier), it proposes a variant instead of merging the change into the base.
+
+Variants have parents, scopes, and audit history. Admins can later **reconcile** (merge a variant back) or **speciate** (commit a variant as its own line) — both explicit, both audited.
+
+The operating principle: **adaptation is allowed, drift is governed.**
+
+## Mycelium: Shared Learning, On Your Terms
+
+v0.4 also introduces **Tembo Mycelium**, an optional capability for TAS deployments to exchange patterns across organizational boundaries.
+
+Four policy levels:
+
+- **Island.** Nothing leaves. Default.
+- **Share patterns only.** Anonymized behavioral patterns; no data. Recommended for regulated customers.
+- **Share + receive.** Two-way exchange with attribution required.
+- **Receive only.** Import patterns from a partner deployment without contributing.
+
+There is no centralized "marketplace" of agents. Mycelium is bilateral or group-policy, with attribution and provenance preserved across imports.
+
+## What v0.4 Is Not
+
+- Not autonomous self-modification. Every change is a PR.
+- Not a behavioral A/B testing framework — that's a separate, later conversation.
+- Not a way to bypass v0.3 governance. Every correction, variant, and Mycelium import lands in the same changelog.
+
+## Why This Order
+
+We could have shipped correction-to-code as v0.1's headline feature. Several of our competitors did. None of them are still in production at the customers we talk to.
+
+The reason is simple: adaptive systems without audit substrate are how customers get burned, and a burned customer doesn't come back. v0.1 paid the deploy bill. v0.2 paid the velocity bill. v0.3 paid the audit bill. v0.4 collects on all three.
+
+## What's Next
+
+v0.4 is the close of the founding arc. Beyond it, our roadmap shifts to depth in specific verticals (regulated industries, multilingual operations) and to platform extensibility. Those will be their own phase documents when they're ready to be planned, not before.
+
+If v0.1 proved TAS can run, v0.2 proved TAS can iterate, and v0.3 proved TAS can be trusted, v0.4 proves TAS can *grow* — under your team's control, on your audit trail.
