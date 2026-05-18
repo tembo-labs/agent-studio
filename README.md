@@ -7,6 +7,19 @@
 
 Tembo Agent Studio (TAS) is an **open-source, self-hosted** chat-first platform for creating, running, and governing production-grade AI agents. It is the non-technical companion to [tembo.io](https://tembo.io).
 
+TAS is intentionally designed as a clean, governance-oriented web control plane in the spirit of Paperclip-style operational UX, while remaining its own product and architecture.
+
+---
+
+## Core Product Notes
+
+- **Chat-first workflow**: users describe agents and changes in plain language.
+- **Tembo-powered coding changes**: TAS routes implementation work to Tembo coding agents through PRs.
+- **PR policy control**: teams can choose review-required or YOLO auto-merge on green.
+- **Built-in HITL**: agents can pause and request human input using rich web forms.
+- **Continuous learning**: user corrections can trigger targeted source-code updates.
+- **Biological model**: agents can diverge into variants, then be reconciled or speciated.
+
 ---
 
 ## Phased Rollout
@@ -27,7 +40,7 @@ Tembo Agent Studio (TAS) is an **open-source, self-hosted** chat-first platform 
 
 ### `v0.3` Governance and Collaboration (Control at Scale)
 - Immutable changelog (who/when/why)
-- Rich HITL forms (approvals, inputs, files, conditional fields)
+- Rich HITL forms (approvals, inputs, files, conditional fields, previews)
 - Agent-level dashboard views (history, runs, active forms, policies)
 - Admin controls for multi-team operation and audit readiness
 
@@ -35,6 +48,7 @@ Tembo Agent Studio (TAS) is an **open-source, self-hosted** chat-first platform 
 - Correction-to-code loop: feedback creates targeted PRs
 - Explicit Modify + Rerun flow
 - Divergence detection with variant creation + lineage view
+- Admin controls: reconcile variants, force speciation, archive, manual variant creation
 - Optional Tembo Mycelium sharing/import with privacy controls
 - Optional Tembo MCP integration mode (when publicly available)
 
@@ -43,14 +57,14 @@ Tembo Agent Studio (TAS) is an **open-source, self-hosted** chat-first platform 
 ## Architecture
 
 - **Frontend**: Next.js 15 + Tailwind + shadcn/ui
-- **Backend**: Rust API server (agent execution, HITL orchestration, policy controls)
+- **Backend**: Rust API server (agent execution, HITL orchestration, lineage/variant policy controls)
 - **Auth layer**: `better-auth` adapters for enterprise identity integration
 - **Tembo bridge**:
   - Primary: Tembo API access key
   - Future: Tembo MCP connection mode
-- **Coding changes**: Agent creation/edits flow through Tembo coding agents via PRs
-- **Agent format**: Cargo AI JSON (inputs, agent_schema, actions, HITL schemas)
-- **Deployment**: Self-hosted per organization
+- **Coding changes**: agent creation/edits/learning updates flow through Tembo coding agents via PRs
+- **Agent format**: Cargo AI JSON (inputs, agent_schema, actions, HITL schemas) as internal technical representation
+- **Deployment**: self-hosted per organization
 
 ---
 
@@ -72,6 +86,7 @@ concepts/
   DEMO_SCRIPT_01.md
   FEATURE_DETAILS.md
   MYCELIUM.md
+  PROJECT_NOTES_FULL_CONTEXT.md
 ```
 
 ---
@@ -97,17 +112,18 @@ docker compose up -d
 - [concepts/USER_STORIES.md](./concepts/USER_STORIES.md): Connextra user stories grouped by `v0.1` to `v0.4`
 - [concepts/DEMO_SCRIPT_01.md](./concepts/DEMO_SCRIPT_01.md): demo flow for the `v0.1` milestone
 - [concepts/MYCELIUM.md](./concepts/MYCELIUM.md): Tembo Mycelium model, operating modes, and governance
-- [concepts/FEATURE_DETAILS.md](./concepts/FEATURE_DETAILS.md): restored detailed feature context from earlier README
+- [concepts/FEATURE_DETAILS.md](./concepts/FEATURE_DETAILS.md): detailed feature context and implementation notes
+- [concepts/PROJECT_NOTES_FULL_CONTEXT.md](./concepts/PROJECT_NOTES_FULL_CONTEXT.md): full historical notes and decisions from planning
 
 ---
 
 ## Philosophy
 
 TAS treats agents like living systems:
-- They **start from a stable operational foundation**
-- They **improve through governed iteration**
-- They **adapt through human feedback over time**
-- Everything is auditable, version-controlled, and human-governed
+- They **adapt** through human feedback and corrections
+- They **speciate** into variants when user groups diverge
+- They can optionally **connect** via Mycelium to share learning across organizations
+- Everything stays auditable, version-controlled, and human-governed
 
 ---
 

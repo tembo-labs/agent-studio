@@ -6,3 +6,4 @@ This folder contains product concept and planning documents for Tembo Agent Stud
 - `DEMO_SCRIPT_01.md`: Demo script for Phase `0.1` foundation milestone.
 - `FEATURE_DETAILS.md`: Detailed product behavior and scope context.
 - `MYCELIUM.md`: Tembo Mycelium model, operating modes, and governance.
+- `PROJECT_NOTES_FULL_CONTEXT.md`: Consolidated planning notes and product decisions from historical discussion.
