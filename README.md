@@ -34,12 +34,13 @@ The dependency is light in Phase 0.1 (you plug in a Tembo API key and runs work)
 - **Phase 0.2 — chat to PR.** A Tembo coding agent reads the existing definition, the chat context, and the change request, then opens a targeted pull request.
 - **Phase 0.4 — corrections to PR.** A Tembo coding agent turns end-user corrections into candidate PRs.
 - **Phase 0.4 — variant proposals.** A Tembo coding agent helps detect divergence and propose a variant rather than silently averaging incompatible behaviors.
+- **Phase 0.5 — Mycelium.** Patterns proven in one TAS deployment can flow — by explicit policy — to another, attribution and provenance preserved.
 
 TAS keeps the work governed; Tembo makes the work possible. The two are designed together.
 
-## How we're building it: four phases
+## How we're building it: five phases
 
-TAS reaches users as one product. Internally, we're building it in four phases — a construction plan, not a release train. Each phase is a coherent slab of capability that the next one builds on; sequencing them this way is how we keep the floor trustworthy before we add the floors above it.
+TAS reaches users as one product. Internally, we're building it in five phases — a construction plan, not a release train. Each phase is a coherent slab of capability that the next one builds on; sequencing them this way is how we keep the floor trustworthy before we add the floors above it.
 
 ### [Phase 0.1 — Foundation](./context/0.1/) · *The trustworthy floor*
 
@@ -53,9 +54,13 @@ Build the loop that lets a non-engineer change an agent without an engineering q
 
 Build the audit and operational surface that fast authoring demands: an immutable `who/when/why` changelog, rich human-in-the-loop forms (uploads, conditional fields, validation), per-agent operational dashboards, and role-based access with org-level policy templates. The bar is one screen, not four days of spelunking, to answer "who changed this, when, and why?"
 
-### [Phase 0.4 — Adaptive intelligence](./context/0.4/) · *Corrections, variants, optional sharing*
+### [Phase 0.4 — Adaptive intelligence](./context/0.4/) · *Corrections and variants*
 
-Build the closed loop. When an end user corrects an output, TAS bundles the original, the correction, and the run context, and a coding agent proposes a targeted PR. When two teams want incompatible behaviors, TAS proposes a **variant** rather than silently averaging. And — optionally — Tembo Mycelium lets TAS deployments learn from each other, with attribution, provenance, and the right to stay in island mode forever. Every adaptive change is still a PR. Adaptation is allowed; drift is governed.
+Build the closed loop inside a single TAS deployment. When an end user corrects an output, TAS bundles the original, the correction, and the run context, and a coding agent proposes a targeted PR. When two teams want incompatible behaviors, TAS proposes a **variant** rather than silently averaging. Every adaptive change is still a PR. Adaptation is allowed; drift is governed.
+
+### [Phase 0.5 — Mycelium](./context/0.5/) · *Cross-deployment learning, by policy*
+
+Build the optional inter-deployment substrate. Tembo Mycelium lets TAS instances exchange patterns — never raw data — under explicit policy: island, share patterns only, share + receive, or receive only. Bilateral or group-policy, never a public marketplace. Attribution and provenance travel with every pattern, and every import lands in the same v0.3 changelog as any other change. The default is island; opting in is a deliberate org-admin action.
 
 ## Where to read more
 
@@ -63,6 +68,7 @@ Build the closed loop. When an end user corrects an output, TAS bundles the orig
 - [`context/0.1/`](./context/0.1/) — Foundation (deploy, auth, connect, run)
 - [`context/0.2/`](./context/0.2/) — Authoring velocity (chat → PR)
 - [`context/0.3/`](./context/0.3/) — Governance (audit, HITL, dashboards)
-- [`context/0.4/`](./context/0.4/) — Adaptive intelligence (corrections, variants, Mycelium)
+- [`context/0.4/`](./context/0.4/) — Adaptive intelligence (corrections, variants)
+- [`context/0.5/`](./context/0.5/) — Mycelium (cross-deployment shared learning)
 
 Each phase folder contains a PRFAQ-style `README.md`, a `BLOG_POST.md` external announcement draft, a `USER_STORIES.md`, and a `DEMO_SCRIPT.md`.

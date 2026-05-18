@@ -8,8 +8,9 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 - **Operator** — runs agents day-to-day.
 - **Workspace Admin** — owns a team's agents.
 - **Team Lead** — owns a multi-team agent footprint.
-- **Enterprise Admin** — sets org-wide policy on adaptation and shared learning.
 - **Platform Architect** — long-term integration owner (e.g., MCP).
+
+Cross-deployment learning personas (Enterprise Admin setting org-wide sharing policy) live in [v0.5 (Mycelium)](../0.5/).
 
 ---
 
@@ -60,19 +61,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 
 ---
 
-## US-0.4-05 — Mycelium policy controls
-
-**As an** Enterprise Admin, **I want** to set Mycelium participation policy at org and workspace scope (island / share patterns only / share + receive / receive only), **so that** we can match shared-learning behavior to our regulatory posture without surprises.
-
-**Acceptance Criteria**
-- Default is island. Opting in requires an explicit org-admin action.
-- Pattern exports include attribution and provenance; imports preserve them.
-- A workspace cannot exceed the org-level Mycelium policy (e.g., if org policy is "share patterns only", a workspace cannot select "share + receive").
-- Mycelium events appear in the v0.3 changelog like any other change.
-
----
-
-## US-0.4-06 — Per-agent correction capture toggle
+## US-0.4-05 — Per-agent correction capture toggle
 
 **As a** Workspace Admin, **I want** to disable correction capture entirely on specific agents (e.g., regulated drafting), **so that** sensitive workflows do not accept user-driven adaptation.
 
@@ -83,7 +72,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 
 ---
 
-## US-0.4-07 — Future MCP integration option
+## US-0.4-06 — Future MCP integration option
 
 **As a** Platform Architect, **I want** a documented MCP integration option for Tembo authentication and tool connectivity, **so that** TAS can adopt standardized tool-server protocols when our internal MCP rollout matures.
 
@@ -97,5 +86,5 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 ## Stretch (Considered, Deferred)
 
 - Behavioral A/B testing routing inside a single agent — separate, later phase.
-- A Mycelium "marketplace" / public registry of agents — explicitly not in scope.
 - Auto-apply low-risk corrections without a PR — explicitly out of scope; violates operating principle.
+- Cross-deployment pattern exchange — explicitly moved to [v0.5 (Mycelium)](../0.5/).
