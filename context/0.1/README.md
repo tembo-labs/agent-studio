@@ -98,3 +98,5 @@ A user picks an agent, clicks "Run", and watches a status panel. No scheduling, 
 - Which default PR policy should be preselected at workspace onboarding when v0.2 ships?
 - What minimum run metadata must already be visible in v0.1 so that v0.3's audit feature feels like an extension, not a rewrite?
 - Should we ship a "starter agent library" in v0.1, or hold those until chat authoring exists?
+- The v0.3 mockup distinguishes a "lightweight" agent (editable in-app) from a "heavyweight" agent (repo-defined, `View Source`). v0.1's position is that Git is the only source of truth. If we adopt the lightweight distinction in v0.3, does v0.1 need a `lightweight: true|false` field on the agent definition now, or do we keep the v0.1 model strict and treat "lightweight" as v0.3-and-later UI affordance only?
+- The mockup treats `harness` and `model` as first-class agent fields ([US-0.1-07](./USER_STORIES.md#us-01-07--harness-and-model-as-first-class-agent-fields)). Should the v0.1 starter templates declare a default harness/model pair, or should every workspace pick its own at onboarding?
