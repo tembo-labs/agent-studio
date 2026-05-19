@@ -51,7 +51,7 @@
 - Save.
 
 **Say:**
-> "v0.1 ships with a small starter library. The format under the hood is a single YAML or JSON file per agent — declarative, diffable, lives in your repo. We support Pydantic AI `AgentSpec` as the primary format and import from Cargo AI JSON, but at v0.1 we're not asking your team to learn either. In v0.2 you'll create these from chat instead."
+> "v0.1 ships with a small starter library. The default starters are declarative — a single YAML or JSON file per agent (Pydantic AI `AgentSpec` or Cargo AI JSON). For complex agents that need custom code, we also support code-defined agents — LangGraph, the OpenAI Agents SDK, Mastra, and similar — pointed at from the same repo. At v0.1 we're not asking your team to learn any specific format. In v0.2 you'll author these from chat instead, and policy controls which changes need human review."
 
 ### 6. Run manually and show logs (10:00 – 13:00)
 **Show:** the new agent's detail page.
@@ -90,3 +90,4 @@
 - **"Can we use GitLab / self-hosted Git?"** GitHub at v0.1. GitLab and self-hosted Git on the roadmap — open question we'd like pilot feedback on.
 - **"Does TAS need OpenAI / Anthropic keys?"** Those live inside agent definitions in your repo, not in TAS itself. TAS is the control plane.
 - **"When is v0.2 chat authoring?"** On the public roadmap; we'll share the date when v0.1 has cleared its exit bar.
+- **"Which agent frameworks do you support?"** Two declarative defaults — Pydantic AI `AgentSpec` and Cargo AI — ship as v0.1 starters. Code-defined frameworks (LangGraph, OpenAI Agents SDK, Mastra, CrewAI, Pydantic AI's code mode) are first-class supported because complex agents need custom code; the v0.1 runtime ships one of those wired, with the others sequenced based on pilot demand. The PR policy engine (review-required vs YOLO auto-merge) gates changes regardless of which format the agent is in.

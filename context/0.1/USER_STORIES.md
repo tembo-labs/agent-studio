@@ -61,13 +61,16 @@ Format: Connextra (**As a** _role_, **I want** _capability_, **so that** _benefi
 
 ## US-0.1-05 — Create or import a baseline agent
 
-**As an** Operator, **I want** to create an agent from a starter template (Pydantic AI `AgentSpec` YAML by default) or import an existing Cargo AI JSON definition, **so that** I can run a first production-relevant workflow without authoring code from scratch.
+**As an** Operator, **I want** to create an agent from a starter template, import an existing declarative definition, or point at an existing code-defined agent, **so that** I can run a first production-relevant workflow without rewriting work I already have.
 
 **Acceptance Criteria**
 
-- At least one starter template is available out of the box, in Pydantic AI `AgentSpec` YAML.
-- Importing a Cargo AI JSON definition works and surfaces validation errors clearly (no silent failure).
+- At least one starter template ships in Pydantic AI `AgentSpec` YAML (the v0.1 canonical declarative default).
+- At least one starter template ships in Cargo AI JSON (the v0.1 alternate declarative default).
+- At least one runnable code-defined starter ships in v0.1 (framework choice deferred per [`AGENT_FORMAT.md`](./AGENT_FORMAT.md) open question; Pydantic AI's Python code mode and OpenAI Agents SDK are the leading candidates).
 - Importing a Pydantic AI `AgentSpec` YAML or JSON definition works and surfaces validation errors clearly (no silent failure).
+- Importing a Cargo AI JSON definition works and surfaces validation errors clearly (no silent failure).
+- Pointing at an existing code-defined agent in the connected repo works for the v0.1 supported framework and surfaces a clear "framework not supported in v0.1" message for any framework on the supported list that hasn't been wired yet.
 - A created/imported agent shows up in the workspace agent list with a known status, regardless of which source format it was created from.
 
 ---
