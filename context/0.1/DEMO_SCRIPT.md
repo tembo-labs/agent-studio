@@ -51,7 +51,7 @@
 - Save.
 
 **Say:**
-> "v0.1 ships with a small starter library. We're not asking your team to learn an agent JSON format — that's an implementation detail. In v0.2 you'll create these from chat instead."
+> "v0.1 ships with a small starter library. The format under the hood is a single YAML or JSON file per agent — declarative, diffable, lives in your repo. We support Pydantic AI `AgentSpec` as the primary format and import from Cargo AI JSON, but at v0.1 we're not asking your team to learn either. In v0.2 you'll create these from chat instead."
 
 ### 6. Run manually and show logs (10:00 – 13:00)
 **Show:** the new agent's detail page.
