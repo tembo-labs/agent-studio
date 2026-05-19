@@ -17,7 +17,8 @@ program.command('onboard').description('Bootstrap').option('--yes').action(async
   await fs.writeFile('docker-compose.yml', 'version: \'3.8\'\nservices:\n  tas:\n    image: node:20-alpine\n    working_dir: /app\n    volumes:\n      - .:/app\n    ports:\n      - "3000:3000"\n    command: npm start\n    environment:\n      - NODE_ENV=production\n');
   await fs.writeFile('.env.example', '# Tembo Agent Studio\nTEMBO_API_KEY=your_key\nGITHUB_TOKEN=your_token\nDATABASE_URL=sqlite:./tas.db\nPORT=3000\n');
   await fs.writeJson('agents/hello-world.json', {name:"hello-world",description:"Sample",instructions:"You are a friendly agent.",triggers:{schedule:"0 9 * * *"}}, {spaces:2});
-  await fs.writeFile('agents/README.md', '# Agents\n\nPlace your agent JSON files here.\n');
+  await fs.writeFile('agents/hello-world.yaml', '# Sample agent — Pydantic AI `AgentSpec` (YAML).\n# This is the canonical, primary format for Tembo Agent Studio agents.\n# See ../context/0.1/AGENT_FORMAT.md for the format decision.\nmodel: anthropic:claude-opus-4-6\nname: hello-world\ndescription: Sample agent — friendly greeter used to verify a workspace runs.\ninstructions: |\n  You are a friendly agent.\n  Greet the user warmly and answer briefly.\nmodel_settings:\n  max_tokens: 512\n');
+  await fs.writeFile('agents/README.md', '# Agents\n\nTAS supports two declarative agent formats:\n\n- **Pydantic AI `AgentSpec` (YAML or JSON)** — canonical, primary format. See `hello-world.yaml`.\n- **Cargo AI JSON** — supported import format. See `hello-world.json`.\n\nSee `../context/0.1/AGENT_FORMAT.md` for the format decision.\n');
   console.log(chalk.green('✅ Done!'));
   console.log('Next: cp .env.example .env && docker compose up -d');
 });

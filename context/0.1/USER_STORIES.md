@@ -61,13 +61,14 @@ Format: Connextra (**As a** _role_, **I want** _capability_, **so that** _benefi
 
 ## US-0.1-05 — Create or import a baseline agent
 
-**As an** Operator, **I want** to create an agent from a starter template or import an existing Cargo AI JSON definition, **so that** I can run a first production-relevant workflow without authoring code from scratch.
+**As an** Operator, **I want** to create an agent from a starter template (Pydantic AI `AgentSpec` YAML by default) or import an existing Cargo AI JSON definition, **so that** I can run a first production-relevant workflow without authoring code from scratch.
 
 **Acceptance Criteria**
 
-- At least one starter template is available out of the box.
-- Importing an existing definition surfaces validation errors clearly (no silent failure).
-- A created/imported agent shows up in the workspace agent list with a known status.
+- At least one starter template is available out of the box, in Pydantic AI `AgentSpec` YAML.
+- Importing a Cargo AI JSON definition works and surfaces validation errors clearly (no silent failure).
+- Importing a Pydantic AI `AgentSpec` YAML or JSON definition works and surfaces validation errors clearly (no silent failure).
+- A created/imported agent shows up in the workspace agent list with a known status, regardless of which source format it was created from.
 
 ---
 

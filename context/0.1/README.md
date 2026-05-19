@@ -31,7 +31,7 @@ We are not trying to be impressive yet. We are trying to be dependable enough th
 - **Self-hosted deploy.** Docker Compose path + environment variable reference. Single-node target.
 - **`better-auth` integration.** Email/password baseline plus SSO adapter slots so customers can wire their own IdP.
 - **Workspace onboarding.** Connect one Git repository and store one Tembo API key per workspace.
-- **Baseline agent definition.** Create from a starter template or import an existing Cargo AI JSON file.
+- **Baseline agent definition.** Create from a starter template (Pydantic AI `AgentSpec` YAML by default) or import an existing Cargo AI JSON file. See [`AGENT_FORMAT.md`](./AGENT_FORMAT.md) for the format decision.
 - **Manual run + logs.** "Run now" button, status (queued/running/succeeded/failed), tail of run output.
 
 ## Out of Scope for v0.1
@@ -55,7 +55,7 @@ Build the minimum trustworthy control plane first. Resist the temptation to demo
 - **Backend:** Rust API for runtime and orchestration.
 - **Auth:** `better-auth` with adapter slots for SAML/OIDC.
 - **Tembo integration:** API-key mode (a future phase may add MCP-based auth when public MCP is stable).
-- **Agent format:** Cargo AI JSON. Treated as an implementation detail in v0.1 — users do not need to learn it to import a starter template.
+- **Agent format:** Pydantic AI `AgentSpec` (YAML or JSON) as the canonical, primary format; Cargo AI JSON supported as an import path. Both are declarative, diff-native single-file definitions — exactly what the v0.2 chat-to-PR loop and the v0.4 audit trail depend on. See [`AGENT_FORMAT.md`](./AGENT_FORMAT.md) for the full rationale, including why we did not pick a code-first framework (LangGraph, OpenAI Agents SDK, Mastra, CrewAI). Treated as an implementation detail in v0.1 — users do not need to learn either format to import a starter template.
 - **Storage:** workspace-local Postgres for run metadata; Git for agent source.
 
 ## Customer Quote (Drafted)
