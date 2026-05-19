@@ -90,8 +90,22 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 
 ---
 
+## US-0.2-08 — Event-driven trigger ("On PR open" and friends)
+
+**As an** Ops Lead, **I want** to attach an agent to an event in a connected system (e.g. "on PR open", "on incoming webhook") instead of a cron schedule, **so that** the agent fires in response to real activity rather than on a fixed wall-clock cadence.
+
+**Acceptance Criteria**
+- An agent's trigger may be one of `manual`, `schedule` (cron, [US-0.2-05](#us-02-05--recurring-schedules)), or `event` (event source + filter).
+- At least one event source ships in v0.2: `github` with the `pull_request.opened` event. Additional sources are open questions for v0.3.
+- The event trigger is configurable per agent and respects the same per-agent PR policy ([US-0.2-03](#us-02-03--per-agent-pr-policy)) for any change to its trigger configuration.
+- A run produced by an event trigger appears in the run list with a `trigger=event` indicator and a link back to the originating event payload (e.g. PR number).
+- The trigger surface in the agent list and topology map renders the trigger as a single human-readable string (`"Every 5 min"`, `"On PR open"`, `"Manual"`) — the underlying cron expression or event filter is not exposed to read-only views.
+
+---
+
 ## Stretch (Considered, Deferred)
 
 - Rich HITL forms with conditional fields and uploads — explicitly v0.3.
 - Behavioral diff or test-coverage signals on the PR — v0.3 open question.
 - Cross-repo agent edits — past v0.4 unless a customer blocks on it.
+- A library of event sources beyond `github` (Slack messages, inbound email, generic webhook) — promising; gather pilot signal before v0.3 promotes any of them.

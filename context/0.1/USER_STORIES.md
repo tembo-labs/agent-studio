@@ -84,8 +84,22 @@ Format: Connextra (**As a** _role_, **I want** _capability_, **so that** _benefi
 
 ---
 
+## US-0.1-07 — Harness and model as first-class agent fields
+
+**As an** Operator, **I want** an agent's **harness** (e.g. Claude Code, OpenCode, Pi) and **model** (e.g. claude-sonnet-4.5, gpt-4o) to be visible everywhere the agent is rendered, **so that** when an agent misbehaves I can tell at a glance whether the issue is the prompt, the harness, or the model — before opening a ticket.
+
+**Acceptance Criteria**
+- Both `harness` and `model` are declared in the agent definition and rendered as visible badges on the agent list card, the agent detail page header, and any topology / dashboard view that lists agents.
+- Changing harness or model goes through the same review path as any other agent definition change (chat-to-PR in v0.2, direct PR otherwise) — it is never edited in a live console.
+- The harness and model values are part of the run metadata captured on every run record, so v0.3's failure investigation surface can pivot on them.
+- The set of supported harness/model values is documented; an unrecognized value validates at PR time, not at run time.
+
+---
+
 ## Stretch (Considered, Deferred)
 
 - Run scheduling — pushed to v0.2.
 - Multi-repo per workspace — pushed past v0.4 unless a customer blocks on it.
 - Agent definition editor in-app — explicitly deferred; v0.2 introduces chat-to-PR, which is the right authoring surface.
+- A pre-populated "starter agent library" beyond the single starter template in [US-0.1-05](#us-01-05--create-or-import-a-baseline-agent) — open question; see v0.1 README.
+- A visible distinction between "lightweight" (in-app editable) and "heavyweight" (repo-defined) agent representations — promising as a UI affordance, but conflicts with the v0.1 rule that Git is the only source of truth. See v0.1 README open questions.

@@ -95,3 +95,6 @@ The PR is opened with a clear "I could not complete this — here's what I tried
 - What additional review signals (test coverage, lint, behavioral diff) should we surface on the PR before v0.3 governance lands?
 - Should chat sessions themselves be persisted as part of the audit trail, or only the PR they produce?
 - How do we communicate to a chat user that their request crosses a high-risk threshold and needs a human review even under YOLO policy?
+- Event triggers ship in v0.2 with `github.pull_request.opened` ([US-0.2-08](./USER_STORIES.md#us-02-08--event-driven-trigger-on-pr-open-and-friends)). Which additional event sources are worth promoting to v0.2 vs. left for v0.3 (e.g. Slack mentions, inbound email, generic webhook)?
+- The agent list and topology map render an agent's trigger as a single human-readable string ("Every 5 min", "On PR open"). Where is this string computed — at write time when the cron / event filter is saved, or at render time? (Affects how we handle malformed cron strings and renamed event sources.)
+- The v0.3 mockup launches the chat-to-PR loop from a per-agent modal. Does v0.2 need to ship the global chat surface and the per-agent entry point simultaneously, or is the per-agent surface acceptable as v0.3?
