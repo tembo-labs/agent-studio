@@ -42,6 +42,42 @@ v0.3 is the operational-surface release. It adds five interlocking capabilities,
 
 Get the operator experience right *before* layering governance and adaptive loops on top. A reviewer who can't upload a PDF or an oncall who can't read run health on one screen will not care that the platform has a clean audit story. The v0.4 governance work depends on v0.3 forms and dashboards producing structured events worth auditing.
 
+## Direction (v0.3+): Multi-framework agent runtime support
+
+> **Status:** Direction, not exit-bar. Concrete delivery is paced by pilot demand, not pinned to the v0.3 release.
+
+[v0.1's `AGENT_FORMAT.md`](../0.1/AGENT_FORMAT.md) intentionally limited the supported authoring formats to single-file declarative specs (Pydantic AI `AgentSpec` and Cargo AI JSON), on the grounds that the v0.2 chat-to-PR loop needs diffs a non-engineer can read. That constraint was right for v0.1, but it does not extend to every agent forever:
+
+- **YOLO mode breaks the universal-diff-readability premise.** [v0.2's PR policy](../0.2/) already lets organizations opt individual agents into auto-merge on green CI. For an agent under YOLO, the gate is CI, not human review — so the format does not need to be approachable for a non-engineer.
+- **Production review applies regardless of format.** Once an agent ships to production, [v0.4](../0.4/)'s RBAC + policy templates gate every change. A senior engineer reviewing a LangGraph PR is doing the same governed thing as a PM reviewing an `AgentSpec` YAML PR; the policy engine is the lever, not the format.
+- **Complex agents need code.** Stateful multi-tool workflows, durable execution, and tight host-app integration outgrow a declarative spec. Telling a customer with a working LangGraph or Mastra agent "TAS isn't for you" defeats the goal of being *the* control plane for agents, plural.
+
+Starting in v0.3+, TAS expands the set of **runtimes** it can host while keeping a small, opinionated default for **authoring starters**. The candidate first-class supported runtimes:
+
+| Runtime | Language | Why included |
+| --- | --- | --- |
+| [LangGraph](https://github.com/langchain-ai/langgraph) | Python (and LangGraph.js) | Industry-standard for stateful, durable, long-running agents. |
+| [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) | Python + JS/TS | Lightweight, multi-provider via LiteLLM/any-llm; sandbox-friendly. |
+| [Mastra](https://github.com/mastra-ai/mastra) | TypeScript | Native fit for TS shops; agents live alongside Next.js / React app code. |
+| [CrewAI](https://github.com/crewAIInc/crewAI) | Python + YAML | Role-based multi-agent crews with strong community traction. |
+| Pydantic AI (code mode) | Python | Same runtime as the declarative default, but type-safe Python authoring. |
+
+"Supported" means concretely:
+
+- **Runtime:** TAS can execute the agent. Containerized Python or Node runtime per workspace.
+- **Git integration:** the agent's source — whether one YAML file or a Python module — lives in the workspace repo. PRs work the same way.
+- **Run history + logs:** identical surface across formats. v0.3's per-agent dashboards stay format-agnostic.
+- **Authoring path:** [v0.2](../0.2/)'s chat-to-PR loop continues to produce diffs against the code, but the reviewer is expected to be an engineer when the artifact is code.
+- **Observability:** OTel-based and format-agnostic. Each framework's instrumentation maps to the same trace surface.
+
+What this is **not**:
+
+- Not a promise that every framework above ships a starter template on day one of v0.3. Pydantic AI `AgentSpec` + Cargo AI remain the v0.1 starters. Other framework starters roll out across v0.3–v0.6 based on pilot demand.
+- Not a relaxation of governance. The policy engine still gates everything that reaches production.
+- Not feature parity across all formats from day one. The format-specific feature matrix is tracked separately (TBD: `context/0.3/AGENT_FORMAT_MATRIX.md`).
+
+This direction is captured here rather than in [v0.1's AGENT_FORMAT.md](../0.1/AGENT_FORMAT.md) because adding framework runtimes is a v0.3+ operational concern, not a v0.1 foundation concern. The v0.1 doc is updated with a forward-pointer so the trade-off is visible to anyone reading it.
+
 ## Technical Details
 
 - **Form schema.** JSON Schema-based, with conditional visibility expressed as a small DSL. Uploaded files are stored in workspace-scoped object storage with the workspace's encryption settings.
@@ -55,6 +91,9 @@ Get the operator experience right *before* layering governance and adaptive loop
 > — *Head of Operations, regulated B2C platform (draft persona)*
 
 ## FAQ
+
+### Why isn't multi-framework support in v0.3's exit bar?
+Because v0.3's job is the operator experience — forms, dashboards, triage. Bolting "host four new runtimes" onto that release doubles the surface area and dilutes both. The Direction section above captures the commitment in main so the team can plan against it; concrete framework support lands when a pilot needs it, and the v0.3 exit bar stays focused on the operator surface.
 
 ### Why isn't audit in v0.3?
 Because the audit conversation is fundamentally a *governance* conversation — RBAC, policy templates, org-level inheritance — and bundling it with reviewer forms and dashboards muddies both. v0.3 is what an operator needs to do their job; v0.4 is what an auditor needs to do theirs.
@@ -88,3 +127,5 @@ HITL form responses and dashboard-visible state changes will be the *raw events*
 - Per-agent vs workspace-wide dashboards both ship in v0.3. If they disagree (e.g., per-agent success rate uses a 7d window but workspace dashboard uses 13w), which is canonical for incident response?
 - Should the log explorer support persistent filters / saved queries in v0.3, or is that explicitly v0.4 alongside audit export?
 - Five HITL task archetypes ship as templates in v0.3. What is the upgrade path when a customer needs a sixth — author a custom form schema, request a new archetype, or fall back to v0.2 free-text pause/resume?
+- Which of the candidate multi-framework runtimes (LangGraph, OpenAI Agents SDK, Mastra, CrewAI, Pydantic AI code mode) lands first, and what is the trigger — a specific pilot, a stars-of-Tembo signal, or an explicit RFC?
+- For code-defined agents under YOLO, what's the minimum CI signal we require before auto-merge — green tests only, or also a schema-shape check / eval-suite pass?

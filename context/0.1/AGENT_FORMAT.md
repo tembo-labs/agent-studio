@@ -80,6 +80,8 @@ LangGraph, OpenAI Agents SDK, Mastra, and Vercel AI SDK are excellent runtimes. 
 
 We expect to **run** code-defined agents eventually (the Pydantic AI library itself supports them), but authoring them in chat-to-PR is not a v0.1–v0.2 promise.
 
+> **Update (v0.3+ direction):** The v0.1 framing above implicitly assumes "the reviewer is always a non-engineer," which the v0.2 PR policy already breaks — agents opted into YOLO auto-merge gate on CI, not human diff-reading. v0.3 captures the resulting direction: LangGraph, OpenAI Agents SDK, Mastra, CrewAI, and Pydantic AI's code mode become first-class **supported runtimes** (run history, dashboards, HITL, observability, and governance all parity), even though declarative remains the v0.1 starter. See the *Direction (v0.3+): Multi-framework agent runtime support* section in [`context/0.3/README.md`](../0.3/README.md) and [US-0.3-13](../0.3/USER_STORIES.md#us-03-13--run-a-code-defined-agent-langgraph--mastra--openai-agents-sdk--crewai).
+
 ## Why we did not pick CrewAI specifically
 
 CrewAI's YAML covers role/goal/backstory/tasks, but the orchestration always lives in a Python `crew.py`. So changing an agent's *behavior* is usually a code change in practice, which puts it back in the "code-first" bucket above. The YAML-only surface is too thin for what TAS needs.
@@ -100,6 +102,7 @@ CrewAI's YAML covers role/goal/backstory/tasks, but the orchestration always liv
 ### v0.3 — Operational surface
 - `instrument: true` is the default for new `AgentSpec` agents; this drives the per-agent dashboard with no extra wiring.
 - Per-agent operational dashboards read from Logfire / OpenTelemetry traces.
+- Multi-framework support enters as a direction: LangGraph, OpenAI Agents SDK, Mastra, CrewAI, and Pydantic AI code mode become first-class supported *runtimes* (not starter formats) — see [v0.3 README, Direction section](../0.3/README.md) and [US-0.3-13](../0.3/USER_STORIES.md#us-03-13--run-a-code-defined-agent-langgraph--mastra--openai-agents-sdk--crewai).
 
 ### v0.4 — Governance depth
 - `output_schema` and `deps_schema` deltas are first-class signals in the audit timeline ("schema-breaking change" gets its own badge).

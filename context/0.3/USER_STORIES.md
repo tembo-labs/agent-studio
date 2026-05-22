@@ -180,6 +180,22 @@ Governance personas (Compliance Stakeholder, Org Admin) live in [v0.4 (Governanc
 
 ---
 
+## US-0.3-13 — Run a code-defined agent (LangGraph / Mastra / OpenAI Agents SDK / CrewAI)
+
+> **Status:** Direction (v0.3+), not pinned to the v0.3 exit bar. See the "Direction (v0.3+)" section in [`README.md`](./README.md) and the v0.1 [`AGENT_FORMAT.md`](../0.1/AGENT_FORMAT.md) for the format-decision context.
+
+**As a** senior engineer with a working LangGraph (or Mastra, or OpenAI Agents SDK, or CrewAI) agent, **I want** to run it inside TAS and get the same governance, run history, and per-agent dashboard as a declarative `AgentSpec` agent, **so that** complex stateful agents are first-class citizens of the platform rather than work I have to host separately.
+
+**Acceptance Criteria**
+- TAS executes the agent in a workspace-scoped container with a runtime appropriate to the framework (Python or Node).
+- The agent's source lives in the workspace's Git repo; PRs go through the same v0.2 policy engine as a declarative agent.
+- Run history, run logs, and the per-agent operational dashboard (US-0.3-02) work identically — no second-class status on observability.
+- HITL tasks (US-0.3-01) and the human-tasks inbox (US-0.3-07) work for code-defined agents on the same surface.
+- An agent under YOLO (per the v0.2 PR policy) can auto-merge a code change on green CI without human review; the format does not change the policy.
+- Format-specific limitations (e.g., starter template availability, eval-suite integration, schema-shape diff checks) are documented in the format matrix, not silently absent.
+
+---
+
 ## Stretch (Considered, Deferred)
 
 - AV scanning on file uploads — pilot-feedback bucket.
