@@ -1,6 +1,6 @@
 # Tembo Agent Studio
 
-> Status: **pre-v0.1** — planning and definition phase.
+> Status: **building v0.1** — empty-but-runnable skeleton is in place (Next.js web, Rust API, Postgres, better-auth). Real user stories land on top.
 
 ## What this is, in plain English
 
@@ -77,3 +77,46 @@ Build the optional inter-deployment substrate. Tembo Mycelium lets TAS instances
 - [`context/0.6/`](./context/0.6/) — Mycelium (cross-deployment shared learning)
 
 Each phase folder contains a PRFAQ-style `README.md`, a `BLOG_POST.md` external announcement draft, a `USER_STORIES.md`, and a `DEMO_SCRIPT.md`.
+
+## Repository layout
+
+```
+agent-studio/
+├── web/        Next.js 16 + Tailwind v4 + shadcn/ui + better-auth (control plane UI)
+├── api/        Rust (axum + sqlx) — runtime + orchestration, owns Postgres migrations
+├── agents/     Seed Pydantic AI `AgentSpec` fixtures (see context/0.1/AGENT_FORMAT.md)
+├── context/    Phase docs (PRFAQ, blog, user stories, demo script per phase)
+└── docker-compose.yml
+```
+
+## Running locally
+
+Requires Docker (or OrbStack), Node 22+, and Rust 1.93+.
+
+```bash
+cp .env.example .env
+# Required: set BETTER_AUTH_SECRET. Generate one with:
+#   openssl rand -base64 32
+docker compose up --build
+```
+
+Once healthy:
+
+- Web: http://localhost:3000
+- API: http://localhost:8080/health
+- Postgres: localhost:5432 (user/db: `tas`, password from `.env`)
+
+Database migrations live in `api/migrations/` and are applied by the Rust API on boot via `sqlx::migrate!()`. The first migration (`0001_better_auth.sql`) creates the `user`, `session`, `account`, and `verification` tables that better-auth expects.
+
+### Developing without Docker
+
+```bash
+# Postgres only via Docker, app code on host
+docker compose up -d postgres
+
+# Terminal 1 — API
+cd api && cargo run
+
+# Terminal 2 — web
+cd web && pnpm install && pnpm dev
+```

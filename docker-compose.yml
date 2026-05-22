@@ -1,16 +1,66 @@
-version: '3.8'
+# Tembo Agent Studio — v0.1 skeleton.
+# Single-node target per context/0.1/README.md.
+# Usage:
+#   cp .env.example .env  # fill in secrets
+#   docker compose up --build
+
 services:
-  tas:
-    build: .
-    ports: ["3000:3000"]
-    volumes: [".:/app", "/app/node_modules"]
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      - NODE_ENV=production
-      - TEMBO_API_KEY=${TEMBO_API_KEY}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      POSTGRES_USER: ${POSTGRES_USER:-tas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tas}
+      POSTGRES_DB: ${POSTGRES_DB:-tas}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tas} -d ${POSTGRES_DB:-tas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
     restart: unless-stopped
-  redis:
-    image: redis:7-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-tas}:${POSTGRES_PASSWORD:-tas}@postgres:5432/${POSTGRES_DB:-tas}
+      RUST_LOG: ${RUST_LOG:-info,tas_api=debug}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
     restart: unless-stopped
-    volumes: ["redis_data:/data"]
-volumes: {redis_data: {}}
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-tas}:${POSTGRES_PASSWORD:-tas}@postgres:5432/${POSTGRES_DB:-tas}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in .env}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      API_INTERNAL_URL: http://api:8080
+      NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      TAS_INSTANCE_NAME: ${TAS_INSTANCE_NAME:-Tembo Agent Studio}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+volumes:
+  postgres_data:

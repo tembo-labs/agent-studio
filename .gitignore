@@ -1,5 +1,23 @@
+# Node / Next.js
 node_modules/
+web/.next/
+web/.turbo/
+web/out/
+web/next-env.d.ts
+
+# Rust
+api/target/
+
+# Env / secrets
 .env
-*.db
-*.log
+.env.local
+.env.*.local
+
+# Local agent / editor state
+.claude/
+.tmp-screenshots/
+
+# OS / editor
 .DS_Store
+*.log
+*.db
