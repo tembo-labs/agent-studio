@@ -49,7 +49,7 @@ export default async function AgentDetailPage({
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-2">
         <BackLink href={`/${workspace.slug}`} label="Agents" />
         <div className="flex flex-wrap items-start justify-between gap-4">
