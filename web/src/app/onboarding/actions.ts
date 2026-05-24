@@ -35,5 +35,8 @@ export async function createWorkspaceAction(
     return { error: ERROR_MESSAGES[result.error] };
   }
 
-  redirect(`/${result.workspace.slug}`);
+  // Repo connect is the required next step. The workspace home page also
+  // enforces this — going directly to /{slug} without a repo will redirect
+  // back here.
+  redirect(`/onboarding/repo?ws=${encodeURIComponent(result.workspace.slug)}`);
 }

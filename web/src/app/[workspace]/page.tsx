@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { SignOutButton } from "@/components/sign-out-button";
+import { Button } from "@/components/ui/button";
 import { getInstanceName } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
 import {
   getWorkspaceBySlug,
+  getWorkspaceRepo,
   getWorkspaceSecretPreview,
   userIsMember,
 } from "@/lib/workspace";
@@ -28,9 +30,17 @@ export default async function WorkspacePage({
   const isMember = await userIsMember(workspace.id, session.user.id);
   if (!isMember) notFound();
 
-  const [apiKeyPreview] = await Promise.all([
-    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
-  ]);
+  const repo = await getWorkspaceRepo(workspace.id);
+  if (!repo) {
+    // Onboarding repo step is mandatory — workspace home is unreachable
+    // until a repo is connected. See US-0.1-04.
+    redirect(`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`);
+  }
+
+  const apiKeyPreview = await getWorkspaceSecretPreview(
+    workspace.id,
+    "tembo_api_key",
+  );
   const instanceName = getInstanceName();
 
   return (
@@ -44,6 +54,18 @@ export default async function WorkspacePage({
             {workspace.name}
           </h1>
           <p className="text-foreground-weak text-sm">
+            <a
+              href={`https://github.com/${repo.owner}/${repo.name}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="hover:underline"
+            >
+              github.com/{repo.owner}/{repo.name}
+            </a>
+            <span className="text-foreground-muted"> · </span>
+            <span>default branch {repo.defaultBranch}</span>
+          </p>
+          <p className="text-foreground-weak text-sm">
             Signed in as{" "}
             <span className="text-foreground font-medium">
               {session.user.email}
@@ -51,12 +73,9 @@ export default async function WorkspacePage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href={`/${workspace.slug}/settings`}
-            className="text-foreground-weak hover:text-foreground text-sm"
-          >
-            Settings
-          </Link>
+          <Button asChild variant="ghost" size="small">
+            <Link href={`/${workspace.slug}/settings`}>Settings</Link>
+          </Button>
           <SignOutButton />
         </div>
       </header>
@@ -86,7 +105,7 @@ export default async function WorkspacePage({
           Agents
         </h2>
         <div className="bg-surface-raised border-border text-foreground-weak rounded-lg border p-8 text-center text-sm">
-          No agents yet. Repo wiring + agent creation land in the next slice.
+          No agents yet. Agent creation lands in a follow-up slice.
         </div>
       </section>
     </main>

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { getServerSession } from "@/lib/session";
 import {
+  disconnectWorkspaceRepo,
   getWorkspaceBySlug,
   removeWorkspaceSecret,
   setWorkspaceSecret,
@@ -69,4 +70,22 @@ export async function removeTemboApiKeyAction(
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
   return { message: "Tembo API key removed." };
+}
+
+export type DisconnectRepoFormState = {
+  message?: string;
+};
+
+export async function disconnectRepoAction(
+  _prev: DisconnectRepoFormState,
+  formData: FormData,
+): Promise<DisconnectRepoFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const workspace = await authorizeWorkspace(slug);
+  await disconnectWorkspaceRepo(workspace.id);
+
+  revalidatePath(`/${slug}/settings`);
+  // The workspace home gate will now redirect to the repo connect step.
+  revalidatePath(`/${slug}`);
+  return { message: "Repository disconnected." };
 }

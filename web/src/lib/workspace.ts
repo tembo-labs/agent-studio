@@ -2,9 +2,14 @@ import "server-only";
 
 import { decryptSecret, encryptSecret, last4 } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import {
+  parseRepoInput,
+  validateRepo,
+  type ValidateRepoError,
+} from "@/lib/github";
 import { suggestSlug, validateSlug } from "@/lib/slugify";
 
-export type WorkspaceSecretKind = "tembo_api_key";
+export type WorkspaceSecretKind = "tembo_api_key" | "github_pat";
 
 export type Workspace = {
   id: string;
@@ -242,4 +247,143 @@ export async function removeWorkspaceSecret(
     `DELETE FROM workspace_secret WHERE workspace_id = $1 AND kind = $2`,
     [workspaceId, kind],
   );
+}
+
+// ── Workspace Git repo ───────────────────────────────────────────────────
+
+export type WorkspaceRepo = {
+  workspaceId: string;
+  provider: "github";
+  owner: string;
+  name: string;
+  defaultBranch: string;
+  connectedAt: Date;
+  connectedBy: string;
+};
+
+export async function getWorkspaceRepo(
+  workspaceId: string,
+): Promise<WorkspaceRepo | null> {
+  const { rows } = await db.query<{
+    workspace_id: string;
+    provider: "github";
+    owner: string;
+    name: string;
+    default_branch: string;
+    connected_at: Date;
+    connected_by: string;
+  }>(
+    `SELECT workspace_id, provider, owner, name, default_branch, connected_at, connected_by
+       FROM workspace_repo
+      WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  if (!rows[0]) return null;
+  const r = rows[0];
+  return {
+    workspaceId: r.workspace_id,
+    provider: r.provider,
+    owner: r.owner,
+    name: r.name,
+    defaultBranch: r.default_branch,
+    connectedAt: r.connected_at,
+    connectedBy: r.connected_by,
+  };
+}
+
+export type ConnectWorkspaceRepoError =
+  | "unparseable-repo"
+  | "missing-token"
+  | ValidateRepoError;
+
+export type ConnectWorkspaceRepoResult =
+  | { ok: true; repo: WorkspaceRepo }
+  | { ok: false; error: ConnectWorkspaceRepoError; detail?: string };
+
+/**
+ * Validate the PAT can read+write the repo (via GitHub API), then store
+ * both the encrypted PAT and the resolved repo metadata atomically.
+ * Replaces any prior repo connection on the workspace.
+ */
+export async function connectWorkspaceRepo(
+  workspaceId: string,
+  userId: string,
+  input: { repo: string; token: string },
+): Promise<ConnectWorkspaceRepoResult> {
+  const token = input.token.trim();
+  if (!token) return { ok: false, error: "missing-token" };
+
+  const parsed = parseRepoInput(input.repo);
+  if (!parsed) return { ok: false, error: "unparseable-repo" };
+
+  const validation = await validateRepo(token, parsed);
+  if (!validation.ok) {
+    return { ok: false, error: validation.error, detail: validation.detail };
+  }
+
+  const ciphertext = encryptSecret(token);
+  const tokenLast4 = last4(token);
+
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `INSERT INTO workspace_secret (workspace_id, kind, ciphertext, last4)
+         VALUES ($1, 'github_pat', $2, $3)
+         ON CONFLICT (workspace_id, kind)
+         DO UPDATE SET ciphertext = EXCLUDED.ciphertext,
+                       last4 = EXCLUDED.last4,
+                       updated_at = NOW()`,
+      [workspaceId, ciphertext, tokenLast4],
+    );
+    await client.query(
+      `INSERT INTO workspace_repo
+         (workspace_id, provider, owner, name, default_branch, connected_by)
+         VALUES ($1, 'github', $2, $3, $4, $5)
+         ON CONFLICT (workspace_id)
+         DO UPDATE SET provider = EXCLUDED.provider,
+                       owner = EXCLUDED.owner,
+                       name = EXCLUDED.name,
+                       default_branch = EXCLUDED.default_branch,
+                       connected_by = EXCLUDED.connected_by,
+                       connected_at = NOW()`,
+      [workspaceId, validation.owner, validation.name, validation.defaultBranch, userId],
+    );
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const repo = await getWorkspaceRepo(workspaceId);
+  if (!repo) throw new Error("workspace_repo disappeared after insert");
+  return { ok: true, repo };
+}
+
+/**
+ * Disconnect the repo: drops both the row and the encrypted PAT.
+ */
+export async function disconnectWorkspaceRepo(
+  workspaceId: string,
+): Promise<void> {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `DELETE FROM workspace_repo WHERE workspace_id = $1`,
+      [workspaceId],
+    );
+    await client.query(
+      `DELETE FROM workspace_secret WHERE workspace_id = $1 AND kind = 'github_pat'`,
+      [workspaceId],
+    );
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
