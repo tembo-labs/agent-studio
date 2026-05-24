@@ -85,15 +85,17 @@ Format: Connextra (**As a** _role_, **I want** _capability_, **so that** _benefi
 
 ---
 
-## US-0.1-07 — Harness and model as first-class agent fields
+## US-0.1-07 — Framework and model as first-class agent fields
 
-**As an** Operator, **I want** an agent's **harness** (e.g. Claude Code, OpenCode, Pi) and **model** (e.g. claude-sonnet-4.5, gpt-4o) to be visible everywhere the agent is rendered, **so that** when an agent misbehaves I can tell at a glance whether the issue is the prompt, the harness, or the model — before opening a ticket.
+> **Reframed (May 2026).** An earlier draft made this story about `harness` (Claude Code / OpenCode / Pi). Once multiple agent **frameworks** (Pydantic AgentSpec, Cargo AI, and the v0.3+ direction in [`context/0.3/README.md`](../0.3/README.md)) entered the picture, framework became the more meaningful "what kind of agent is this" axis. Harness — the coding-agent runtime driving a flow — is a *different* concept and is deferred to v0.3+ when raw-coding-agent flows become first-class. See [`AGENT_FORMAT.md`](./AGENT_FORMAT.md#what-about-coding-agent-harness-claude-code--opencode--pi).
+
+**As an** Operator, **I want** an agent's **framework** (e.g. Pydantic AgentSpec, Cargo AI) and **model** (e.g. claude-sonnet-4.6, gpt-4o) to be visible everywhere the agent is rendered, **so that** when an agent misbehaves I can tell at a glance whether the issue is the prompt, the framework choice, or the model — before opening a ticket.
 
 **Acceptance Criteria**
-- Both `harness` and `model` are declared in the agent definition and rendered as visible badges on the agent list card, the agent detail page header, and any topology / dashboard view that lists agents.
-- Changing harness or model goes through the same review path as any other agent definition change (chat-to-PR in v0.2, direct PR otherwise) — it is never edited in a live console.
-- The harness and model values are part of the run metadata captured on every run record, so v0.3's failure investigation surface can pivot on them.
-- The set of supported harness/model values is documented; an unrecognized value validates at PR time, not at run time.
+- Both `framework` and `model` are surfaced on the agent definition (framework is computed from the parsed shape; model is a declared field) and rendered as visible badges on the agent list card, the agent detail page header, and any topology / dashboard view that lists agents.
+- Changing framework or model goes through the same review path as any other agent definition change (chat-to-PR in v0.2, direct PR otherwise) — it is never edited in a live console.
+- The framework and model values are part of the run metadata captured on every run record, so v0.3's failure investigation surface can pivot on them.
+- The set of supported framework values is documented; an unrecognized framework (i.e. a file shape no parser recognizes) surfaces as an invalid agent on the list with a clear error, not as a silently-skipped file.
 
 ---
 

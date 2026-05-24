@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 
-import { HARNESSES, type Harness } from "@/lib/agent-format";
 import { getServerSession } from "@/lib/session";
 import {
   createAgentFromContent,
@@ -20,8 +19,6 @@ const ERROR_MESSAGES: Record<CreateAgentError, string> = {
   "no-repo": "Connect a Git repository before creating an agent.",
   "invalid-name":
     "Agent name must be 2–64 chars, lowercase letters, digits, and hyphens.",
-  "missing-harness": `Agent definition is missing a \`harness\` field. Supported: ${HARNESSES.join(", ")}.`,
-  "invalid-harness": `Unrecognized harness. Supported: ${HARNESSES.join(", ")}.`,
   "unsupported-extension":
     "Only .yaml, .yml, and .json agent files are supported.",
   "invalid-yaml": "Could not parse that YAML.",
@@ -59,26 +56,15 @@ async function authorize(slug: string) {
   return workspace;
 }
 
-function parseHarnessField(raw: unknown): Harness | null {
-  if (typeof raw !== "string") return null;
-  return (HARNESSES as readonly string[]).includes(raw)
-    ? (raw as Harness)
-    : null;
-}
-
 export async function createFromTemplateAction(
   _prev: NewAgentFormState,
   formData: FormData,
 ): Promise<NewAgentFormState> {
   const slug = String(formData.get("workspace") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const harness = parseHarnessField(formData.get("harness"));
-  if (!harness) {
-    return { error: ERROR_MESSAGES["invalid-harness"] };
-  }
 
   const workspace = await authorize(slug);
-  const result = await createAgentFromTemplate(workspace.id, name, harness);
+  const result = await createAgentFromTemplate(workspace.id, name);
   if (!result.ok) {
     return { error: ERROR_MESSAGES[result.error] };
   }

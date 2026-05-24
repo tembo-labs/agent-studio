@@ -1,25 +1,20 @@
 import "server-only";
 import YAML from "yaml";
 
-import { HARNESSES, type Harness } from "@/lib/agent-harness";
+import type { Framework } from "@/lib/agent-framework";
 
 // Pydantic AI AgentSpec — minimum shape we require for v0.1. The full spec
 // is broader (capabilities, output_schema, deps_schema, model_settings,
 // instrument, …); we deliberately validate only the load-bearing fields so
 // custom extensions pass through. See context/0.1/AGENT_FORMAT.md.
-//
-// `harness` is a TAS extension to the standard AgentSpec, added by US-0.1-07
-// so reviewers can tell at a glance whether a misbehaving agent's issue is
-// the prompt, the harness, or the model. Enforced as an enum at validation
-// time so a typo (claude-codee) is caught on commit instead of at run time.
 
 // Re-export so callers that import from agent-format keep working.
-export { HARNESSES, HARNESS_LABELS } from "@/lib/agent-harness";
-export type { Harness } from "@/lib/agent-harness";
+export { FRAMEWORKS, FRAMEWORK_LABELS } from "@/lib/agent-framework";
+export type { Framework } from "@/lib/agent-framework";
 
 export type AgentSpec = {
   name: string;
-  harness: Harness;
+  framework: Framework;
   model: string;
   instructions: string;
   description?: string;
@@ -35,8 +30,6 @@ export type ParseAgentError =
   | "invalid-json"
   | "not-an-object"
   | "missing-name"
-  | "missing-harness"
-  | "invalid-harness"
   | "missing-model"
   | "missing-instructions"
   | "invalid-name";
@@ -57,10 +50,6 @@ const NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function validateAgentName(name: string): boolean {
   return name.length >= 2 && name.length <= 64 && NAME_RE.test(name);
-}
-
-function isHarness(v: unknown): v is Harness {
-  return typeof v === "string" && (HARNESSES as readonly string[]).includes(v);
 }
 
 export function parseAgentContent(
@@ -97,22 +86,6 @@ export function parseAgentContent(
     };
   }
 
-  const harnessVal = obj.harness;
-  if (harnessVal === undefined || harnessVal === null || harnessVal === "") {
-    return {
-      ok: false,
-      error: "missing-harness",
-      detail: `Add a harness field. Supported: ${HARNESSES.join(", ")}.`,
-    };
-  }
-  if (!isHarness(harnessVal)) {
-    return {
-      ok: false,
-      error: "invalid-harness",
-      detail: `Unrecognized harness "${String(harnessVal)}". Supported: ${HARNESSES.join(", ")}.`,
-    };
-  }
-
   const model = obj.model;
   if (typeof model !== "string" || !model.trim()) {
     return { ok: false, error: "missing-model" };
@@ -125,10 +98,15 @@ export function parseAgentContent(
   const description =
     typeof obj.description === "string" ? obj.description : undefined;
 
+  // Framework is computed from the parsed shape. Today only Pydantic
+  // AgentSpec is supported, so this is constant; when the Cargo AI parser
+  // lands (US-0.1-05 follow-up), this dispatch grows a branch.
+  const framework: Framework = "pydantic-agentspec";
+
   return {
     ok: true,
     format,
-    spec: { name, harness: harnessVal, model, instructions, description, raw: obj },
+    spec: { name, framework, model, instructions, description, raw: obj },
   };
 }
 
@@ -143,17 +121,15 @@ export function parseAgentFile(
   return parseAgentContent(content, format);
 }
 
-// The starter template ships with a default harness/model pair so the
-// "from template" path stays a one-field form. Per the v0.1 README open
+// The starter template ships with a default model so the "from template"
+// path stays a one-field form (name only). Per the v0.1 README open
 // question, this is the agreed default; per-workspace defaults can land
 // later if a customer asks.
-export const STARTER_DEFAULT_HARNESS: Harness = "claude-code";
 export const STARTER_DEFAULT_MODEL = "anthropic:claude-sonnet-4-6";
 
-export function renderStarter(name: string, harness: Harness): string {
+export function renderStarter(name: string): string {
   return `# Pydantic AI AgentSpec — see context/0.1/AGENT_FORMAT.md
 name: ${name}
-harness: ${harness}
 model: ${STARTER_DEFAULT_MODEL}
 description: Sample agent generated from the v0.1 starter template.
 instructions: |

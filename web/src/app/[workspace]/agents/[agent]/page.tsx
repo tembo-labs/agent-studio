@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { HARNESS_LABELS } from "@/lib/agent-format";
+import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
 import { getInstanceName } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
 import { getAgentByName } from "@/lib/workspace-agents";
@@ -72,7 +72,7 @@ export default async function AgentDetailPage({
           {agent.ok ? (
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="blue" size="default">
-                {HARNESS_LABELS[agent.spec.harness]}
+                {FRAMEWORK_LABELS[agent.spec.framework]}
               </Badge>
               <Badge variant="purple" size="default">
                 {agent.spec.model}
@@ -115,11 +115,10 @@ export default async function AgentDetailPage({
           </pre>
           <p className="text-foreground-muted mt-2 text-xs">
             Edits go through Git. v0.2 adds chat-to-PR; for now, edit the file
-            in your repo and commit. Changes to{" "}
-            <code className="bg-surface rounded px-1 py-0.5">harness</code> or{" "}
-            <code className="bg-surface rounded px-1 py-0.5">model</code> go
-            through the same review path as any other change — never edited in
-            a live console.
+            in your repo and commit. Framework and{" "}
+            <code className="bg-surface rounded px-1 py-0.5">model</code>{" "}
+            changes go through the same review path as any other change —
+            never edited in a live console.
           </p>
         </CardContent>
       </Card>

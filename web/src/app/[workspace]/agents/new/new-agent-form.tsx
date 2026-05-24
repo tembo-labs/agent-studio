@@ -5,11 +5,6 @@ import { useState, useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  HARNESSES,
-  HARNESS_LABELS,
-  type Harness,
-} from "@/lib/agent-harness";
 
 import {
   createFromContentAction,
@@ -21,10 +16,7 @@ const INITIAL: NewAgentFormState = {};
 
 type Tab = "template" | "paste";
 
-const DEFAULT_HARNESS: Harness = "claude-code";
-
 const SAMPLE_AGENTSPEC = `name: my-agent
-harness: claude-code
 model: anthropic:claude-sonnet-4-6
 description: A short description of what this agent does.
 instructions: |
@@ -84,30 +76,6 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
                 agents/hello-world.yaml
               </code>
               ) and the canonical agent name.
-            </p>
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="harness" className="text-sm">
-              Harness
-            </Label>
-            <select
-              id="harness"
-              name="harness"
-              defaultValue={DEFAULT_HARNESS}
-              disabled={templatePending}
-              className="bg-input text-foreground-strong hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled flex h-7 w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-1 pr-1 pl-2 text-sm font-medium tracking-[-0.1px] focus:outline-none transition-[background-color,box-shadow,color] duration-150"
-            >
-              {HARNESSES.map((h) => (
-                <option key={h} value={h}>
-                  {HARNESS_LABELS[h]}
-                </option>
-              ))}
-            </select>
-            <p className="text-foreground-muted text-xs">
-              The runtime that drives this agent. Surfaced as a badge
-              everywhere the agent appears so triage tells prompt from harness
-              from model.
             </p>
           </div>
 

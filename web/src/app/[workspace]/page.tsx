@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { HARNESS_LABELS } from "@/lib/agent-format";
+import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
 import { getInstanceName } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
 import { listAgents, type ListedAgent } from "@/lib/workspace-agents";
@@ -202,7 +202,7 @@ function AgentRow({
           </span>
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="blue" size="small">
-              {HARNESS_LABELS[agent.spec.harness]}
+              {FRAMEWORK_LABELS[agent.spec.framework]}
             </Badge>
             <Badge variant="purple" size="small">
               {agent.spec.model}

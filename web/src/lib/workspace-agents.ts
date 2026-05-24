@@ -8,7 +8,6 @@ import {
   validateAgentName,
   type AgentFileFormat,
   type AgentSpec,
-  type Harness,
   type ParseAgentError,
 } from "@/lib/agent-format";
 import {
@@ -190,7 +189,6 @@ async function commitAgentFile(
 export async function createAgentFromTemplate(
   workspaceId: string,
   name: string,
-  harness: Harness,
 ): Promise<CreateAgentResult> {
   if (!validateAgentName(name)) {
     return {
@@ -199,7 +197,7 @@ export async function createAgentFromTemplate(
       detail: "Use 2–64 chars, lowercase letters, digits, and hyphens.",
     };
   }
-  const content = renderStarter(name, harness);
+  const content = renderStarter(name);
   return commitAgentFile(
     workspaceId,
     `${name}.yaml`,

@@ -6,7 +6,6 @@
 #   from pydantic_ai import Agent
 #   agent = Agent.from_file('agents/hello-world.yaml')
 name: hello-world
-harness: claude-code
 model: anthropic:claude-opus-4-6
 description: Sample agent — friendly greeter used to verify a workspace runs.
 instructions: |
