@@ -24,12 +24,16 @@ const ERROR_MESSAGES: Record<CreateAgentError, string> = {
   "invalid-yaml": "Could not parse that YAML.",
   "invalid-json": "Could not parse that JSON.",
   "not-an-object":
-    "Agent definition must be a top-level object with name, model, and instructions.",
+    "Agent definition must be a top-level object.",
+  "unrecognized-shape":
+    "Not a recognized agent format. Pydantic AgentSpec needs `instructions`; Cargo AI needs an `actions` array.",
   "missing-name": "Agent definition is missing a `name` field.",
   "missing-model":
     "Agent definition is missing a `model` field (e.g. `anthropic:claude-sonnet-4-6`).",
   "missing-instructions":
     "Agent definition is missing an `instructions` field.",
+  "missing-actions":
+    "Cargo AI agent definition is missing an `actions` array.",
   "invalid-token":
     "The workspace's stored GitHub token is no longer valid. Reconnect the repo in Settings.",
   "not-found":

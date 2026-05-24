@@ -205,7 +205,7 @@ function AgentRow({
               {FRAMEWORK_LABELS[agent.spec.framework]}
             </Badge>
             <Badge variant="purple" size="small">
-              {agent.spec.model}
+              {agent.spec.model ?? "—"}
             </Badge>
             <span className="text-foreground-muted text-xs">
               <code>{agent.filename}</code>

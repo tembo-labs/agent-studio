@@ -90,6 +90,17 @@ export async function runNowAction(
   }
   const spec = found.agent.spec;
 
+  // Only Pydantic AgentSpec agents are runnable in v0.1. Cargo AI parses
+  // and lists fine; its runtime lands with the v0.3+ multi-framework
+  // slice. The Run now button is hidden in the UI for non-Pydantic
+  // frameworks, but defend the server action too.
+  if (spec.framework !== "pydantic-agentspec") {
+    return {
+      error:
+        "This framework's runtime isn't wired in v0.1. Cargo AI runs land in v0.3+ (see context/0.3/README.md).",
+    };
+  }
+
   let runId: string;
   try {
     const res = await createRun({

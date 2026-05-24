@@ -125,17 +125,17 @@ Framework is *computed* from the parsed spec — there's no `framework:` field i
 
 | Framework key | Label | Status |
 | --- | --- | --- |
-| `pydantic-agentspec` | Pydantic AgentSpec | Implemented in v0.1 (slice 4). |
-| `cargo-ai` | Cargo AI | Parser is a follow-up to v0.1 slice 4; the badge slot is reserved. |
+| `pydantic-agentspec` | Pydantic AgentSpec | Implemented end-to-end in v0.1 (parser, badge, runtime). |
+| `cargo-ai` | Cargo AI | Parser + badge implemented in v0.1 (importable via paste). **Runtime deferred** to the v0.3+ multi-framework slice — see [`../0.3/README.md`](../0.3/README.md). Run now is hidden on these agents until then. |
 
 The `FRAMEWORKS` constant in [`web/src/lib/agent-framework.ts`](../../web/src/lib/agent-framework.ts) is the source of truth.
 
 ### Model
 
-`model` is a required string. It stays open-ended because the supported model surface changes faster than any schema enum can keep up with. Examples:
+`model` is a string. For Pydantic AgentSpec it is **required** (the runner refuses to run an agent without one). For Cargo AI it is **optional**: the parser looks at the top-level `model` field first, then `runtime_vars.model`, then renders the badge as `—` if neither is set. The model surface stays open-ended because supported models change faster than any schema enum can keep up with. Examples:
 
 - Pydantic AgentSpec: `anthropic:claude-sonnet-4-6`, `openai:gpt-4o`, `groq:llama-3.3-70b`, …
-- Cargo AI (forthcoming): provider/model pairs per the Cargo AI runtime.
+- Cargo AI: provider/model pairs per the Cargo AI runtime when present.
 
 ### Where this surfaces
 

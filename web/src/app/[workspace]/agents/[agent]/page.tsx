@@ -85,7 +85,7 @@ export default async function AgentDetailPage({
                 {FRAMEWORK_LABELS[agent.spec.framework]}
               </Badge>
               <Badge variant="purple" size="default">
-                {agent.spec.model}
+                {agent.spec.model ?? "—"}
               </Badge>
               <span className="text-foreground-muted text-xs">
                 <code>{agent.filename}</code>
@@ -104,7 +104,7 @@ export default async function AgentDetailPage({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {agent.ok && (
+          {agent.ok && agent.spec.framework === "pydantic-agentspec" && (
             <RunNowButton
               workspaceSlug={workspace.slug}
               agentName={canonicalName}
@@ -122,6 +122,24 @@ export default async function AgentDetailPage({
           <SignOutButton />
         </div>
       </header>
+
+      {agent.ok && agent.spec.framework === "cargo-ai" && (
+        <div className="bg-surface-raised border-border rounded-lg border p-4 text-sm">
+          <p className="text-foreground font-medium">
+            Cargo AI runtime is not enabled yet
+          </p>
+          <p className="text-foreground-weak mt-1">
+            This agent imports cleanly and is listed alongside your Pydantic
+            AgentSpec agents, but{" "}
+            <strong className="text-foreground">Run now</strong> is hidden
+            until the v0.3+ multi-framework runtime slice lands. See the{" "}
+            <code className="bg-surface rounded px-1 py-0.5 text-xs">
+              context/0.3/README.md
+            </code>{" "}
+            Direction section for the scope.
+          </p>
+        </div>
+      )}
 
       <Card className="p-3">
         <CardHeader className="px-1 pb-3 pt-1">
