@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { ensureRepoReadme } from "@/lib/repo-init";
 import { getServerSession } from "@/lib/session";
 import {
   connectWorkspaceRepo,
@@ -52,6 +53,16 @@ export async function connectRepoAction(
   });
   if (!result.ok) {
     return { error: ERROR_MESSAGES[result.error] };
+  }
+
+  // Seed a workspace README on the default branch if the repo doesn't
+  // already have one. Non-fatal — if the write fails (branch protection,
+  // rate limit, etc.) we log and continue; the connect itself succeeded.
+  const readme = await ensureRepoReadme(workspace.id, workspace.name);
+  if (readme.status === "skipped") {
+    console.warn(
+      `repo-init: skipped README seed for ${workspace.slug}: ${readme.reason}`,
+    );
   }
 
   redirect(`/${workspace.slug}`);
