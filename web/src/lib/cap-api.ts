@@ -1,14 +1,15 @@
 import "server-only";
 
-// Thin client for the Tembo Coding Agent Platform create-session API.
-// See https://docs.tembo.io/api/create-session — POSTs a free-text
-// prompt + repo handle and returns a session record with an htmlUrl
-// the user can follow to track the change. The session is what
-// eventually opens the PR against the repo.
+// Thin client for the Tembo Coding Agent Platform task API. The
+// hosted docs at https://docs.tembo.io/api/create-session call it
+// "session" but the live API (and the @tembo-io/sdk) use "task" —
+// POST /task/create. POSTs a free-text prompt + repo URL and returns
+// a task record with an htmlUrl the user can follow to track the
+// change. The task is what eventually opens the PR.
 
 const DEFAULT_TEMBO_API_URL = "https://api.tembo.io";
 
-export interface CreateSessionInput {
+export interface CreateTaskInput {
   // The plain-English prompt describing what should change in the
   // agent file. We build this from the run context + the user's
   // feedback. CAP supports file tagging in the prompt.
@@ -23,8 +24,8 @@ export interface CreateSessionInput {
   branchName?: string;
 }
 
-export interface CreateSessionResult {
-  sessionId: string;
+export interface CreateTaskResult {
+  taskId: string;
   title: string;
   status: string;
   htmlUrl: string;
@@ -35,10 +36,10 @@ export type CapError =
   | { kind: "http"; status: number; body: string; url: string }
   | { kind: "network"; message: string };
 
-export async function createTemboSession(args: {
+export async function createTemboTask(args: {
   apiKey: string;
-  input: CreateSessionInput;
-}): Promise<{ ok: true; result: CreateSessionResult } | { ok: false; error: CapError }> {
+  input: CreateTaskInput;
+}): Promise<{ ok: true; result: CreateTaskResult } | { ok: false; error: CapError }> {
   const baseUrl = process.env.TEMBO_API_URL ?? DEFAULT_TEMBO_API_URL;
 
   const body = {
@@ -49,7 +50,7 @@ export async function createTemboSession(args: {
     queueRightAway: true,
   };
 
-  const url = `${baseUrl}/session/create`;
+  const url = `${baseUrl}/task/create`;
   // Log the outbound payload so the docker logs make it obvious what
   // we sent when CAP rejects us. v0.2 integration is brittle by
   // design until we settle the contract.
@@ -91,7 +92,7 @@ export async function createTemboSession(args: {
   return {
     ok: true,
     result: {
-      sessionId: json.id,
+      taskId: json.id,
       title: json.title,
       status: json.status,
       htmlUrl: json.htmlUrl,

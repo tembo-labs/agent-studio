@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import {
   buildImprovePrompt,
-  createTemboSession,
+  createTemboTask,
   type CapError,
 } from "@/lib/cap-api";
 import { getRun } from "@/lib/runs-api";
@@ -17,7 +17,7 @@ import {
 } from "@/lib/workspace";
 
 export type ImproveResult =
-  | { ok: true; sessionId: string; htmlUrl: string; status: string }
+  | { ok: true; taskId: string; htmlUrl: string; status: string }
   | { ok: false; error: string };
 
 export async function improveAgentAction(args: {
@@ -68,7 +68,7 @@ export async function improveAgentAction(args: {
     feedback,
   });
 
-  const res = await createTemboSession({
+  const res = await createTemboTask({
     apiKey,
     input: {
       prompt,
@@ -83,7 +83,7 @@ export async function improveAgentAction(args: {
 
   return {
     ok: true,
-    sessionId: res.result.sessionId,
+    taskId: res.result.taskId,
     htmlUrl: res.result.htmlUrl,
     status: res.result.status,
   };

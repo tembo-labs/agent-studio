@@ -85,7 +85,7 @@ function ResultBanner({ result }: { result: ImproveResult }) {
     return (
       <div className="border-sentiment-positive bg-[var(--color-sentiment-positive-subtle)] flex flex-col gap-1 rounded-lg border p-3 text-sm">
         <span className="text-foreground font-medium">
-          Tembo session created
+          Tembo task created
         </span>
         <span className="text-foreground-weak text-xs">
           Status: {result.status}
@@ -96,7 +96,7 @@ function ResultBanner({ result }: { result: ImproveResult }) {
           rel="noreferrer noopener"
           className="text-foreground text-sm font-medium hover:underline"
         >
-          View session →
+          View task →
         </a>
       </div>
     );
