@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import { Badge } from "@/components/ui/badge";
 import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
 import { getRun, type RunRecord } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
@@ -31,7 +30,6 @@ export default async function RunDetailPage({
   // Defense against URL guessing for other workspaces' runs.
   if (run.workspaceId !== workspace.id) notFound();
 
-  const tone = STATUS_TONE[run.status];
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;
   const totalTokens =
     run.tokensInput !== null && run.tokensOutput !== null
@@ -50,15 +48,21 @@ export default async function RunDetailPage({
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Run
         </h1>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={tone.variant} size="small">
-            {STATUS_LABELS[run.status]}
-          </Badge>
-          <Badge variant="purple" size="small">
-            {run.model}
-          </Badge>
-        </div>
         <dl className="flex flex-col gap-1 text-sm">
+          <div className="flex gap-3">
+            <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+              Status
+            </dt>
+            <dd className={`${STATUS_TEXT_TONE[run.status]} font-medium`}>
+              {STATUS_LABELS[run.status]}
+            </dd>
+          </div>
+          <div className="flex gap-3">
+            <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+              Model
+            </dt>
+            <dd className="text-foreground">{run.model}</dd>
+          </div>
           <div className="flex gap-3">
             <dt className="text-foreground-weak w-24 shrink-0 font-medium">
               Queued
@@ -148,14 +152,14 @@ const STATUS_LABELS: Record<RunRecord["status"], string> = {
   failed: "Failed",
 };
 
-const STATUS_TONE: Record<
-  RunRecord["status"],
-  { variant: "blue" | "yellow" | "green" | "red" }
-> = {
-  queued: { variant: "yellow" },
-  running: { variant: "blue" },
-  succeeded: { variant: "green" },
-  failed: { variant: "red" },
+// Colored text tone per status, used inline in the meta <dl>. Replaces
+// the Badge pair we used to render above the metadata block — same
+// semantics, less visual weight.
+const STATUS_TEXT_TONE: Record<RunRecord["status"], string> = {
+  queued: "text-[var(--color-yellow-700)]",
+  running: "text-[var(--color-blue-600)]",
+  succeeded: "text-sentiment-positive",
+  failed: "text-sentiment-negative",
 };
 
 function formatRelative(fromIso: string, toIso: string): string {
