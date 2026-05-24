@@ -103,6 +103,57 @@ export async function listChatRunsForAgent(
   }));
 }
 
+/**
+ * Returns the distinct agent names that have at least one run in the
+ * workspace — across all time. Used by the dashboard to count "agents
+ * ever with at least one run".
+ */
+export async function listAgentNamesWithRuns(
+  workspaceId: string,
+): Promise<string[]> {
+  const { rows } = await db.query<{ agent_name: string }>(
+    `SELECT DISTINCT agent_name
+       FROM run
+      WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  return rows.map((r) => r.agent_name);
+}
+
+/**
+ * Total count of `run` rows in the workspace, no filters. Drives the
+ * "total runs all time" stat on the dashboard.
+ */
+export async function countRunsForWorkspace(
+  workspaceId: string,
+): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM run WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * Count of runs whose agent_name is in the supplied list. Caller
+ * passes the names of currently-active (still-in-repo) agents to
+ * get "total runs across active agents". Empty input short-circuits
+ * to 0.
+ */
+export async function countRunsForAgents(
+  workspaceId: string,
+  agentNames: string[],
+): Promise<number> {
+  if (agentNames.length === 0) return 0;
+  const { rows } = await db.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n
+       FROM run
+      WHERE workspace_id = $1 AND agent_name = ANY($2)`,
+    [workspaceId, agentNames],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
 export async function listRecentRunsForAgent(
   workspaceId: string,
   agentName: string,

@@ -10,8 +10,14 @@ import {
   listOpenFeedbacks,
   type FeedbackStatus,
 } from "@/lib/feedbacks-api";
+import {
+  countRunsForAgents,
+  countRunsForWorkspace,
+  listAgentNamesWithRuns,
+} from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
+import { listAgents } from "@/lib/workspace-agents";
 
 export const dynamic = "force-dynamic";
 
@@ -42,10 +48,33 @@ export default async function DashboardPage({
   const open = await listOpenFeedbacks(workspace.id);
   await scanFeedbacksForPRs(workspace.id, open);
 
-  const [counts, recent] = await Promise.all([
-    countFeedbacksSince(workspace.id, since),
-    listFeedbacks(workspace.id, 10),
-  ]);
+  // Pull the data the two dashboard sections need in parallel.
+  //   - feedback counts + recent list drive the Feedback section
+  //   - listAgents + run aggregates drive the Agents section
+  // listAgents hits GitHub once; the run aggregates are single SQL
+  // queries each. We then derive the "active" set client-side as
+  // the intersection of "ever ran" and "still in the repo".
+  const [counts, recent, agentsResult, agentsWithRuns, totalRunsAllTime] =
+    await Promise.all([
+      countFeedbacksSince(workspace.id, since),
+      listFeedbacks(workspace.id, 10),
+      listAgents(workspace.id),
+      listAgentNamesWithRuns(workspace.id),
+      countRunsForWorkspace(workspace.id),
+    ]);
+
+  const activeAgentNames = agentsResult.ok
+    ? new Set(
+        agentsResult.agents.filter((a) => a.ok).map((a) => a.spec.name),
+      )
+    : new Set<string>();
+  const activeAgentsWithRunsCount = agentsWithRuns.filter((n) =>
+    activeAgentNames.has(n),
+  ).length;
+  const totalRunsActiveAgents = await countRunsForAgents(
+    workspace.id,
+    agentsWithRuns.filter((n) => activeAgentNames.has(n)),
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8">
@@ -61,7 +90,41 @@ export default async function DashboardPage({
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-foreground text-sm font-medium">This week</h2>
+        <h2 className="text-foreground text-lg font-semibold">Agents</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* Inventory + activity at-a-glance. "Ever" includes
+              agents that have since been deleted; "active" is the
+              subset still present in the connected repo. The two
+              run counts let us answer "how much of the run volume
+              is concentrated on agents we still ship?". */}
+          <StatCard
+            label="Agents ever (≥1 run)"
+            value={agentsWithRuns.length}
+            accent="gray"
+          />
+          <StatCard
+            label="Active agents"
+            value={activeAgentsWithRunsCount}
+            accent="green"
+          />
+          <StatCard
+            label="Runs · active"
+            value={totalRunsActiveAgents}
+            accent="blue"
+          />
+          <StatCard
+            label="Runs · all time"
+            value={totalRunsAllTime}
+            accent="gray"
+          />
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-foreground text-lg font-semibold">Feedback</h2>
+        <h3 className="text-foreground-weak text-xs font-medium uppercase tracking-wide">
+          This week
+        </h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {/* Submitted is the cumulative count of *all* feedback rows
               created in the window, regardless of their current status —
@@ -77,9 +140,9 @@ export default async function DashboardPage({
 
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-foreground text-sm font-medium">
+          <h3 className="text-foreground-weak text-xs font-medium uppercase tracking-wide">
             Recent feedback
-          </h2>
+          </h3>
           <Link
             href={`/${workspace.slug}/feedbacks`}
             className="text-foreground-weak hover:text-foreground text-xs"
