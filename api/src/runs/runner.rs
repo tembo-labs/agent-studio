@@ -80,10 +80,14 @@ async fn run_anthropic(
          Set it under Settings → Anthropic API key.",
     )?;
 
-    // Empty user message is fine — exercises the agent's instructions
-    // directly. The UI labels this clearly in v0.1.
+    // The Anthropic Messages API requires at least one non-empty user
+    // turn. "Hello." is the most neutral starter we can send: it reads
+    // as a natural opening and lets the agent's instructions drive the
+    // reply, rather than the model commenting on the input itself.
+    // v0.3's rich HITL forms (US-0.3-01) are the right home for real
+    // structured input.
     let user_message = if ctx.user_message.is_empty() {
-        "(v0.1 manual run with empty input — exercising the agent's instructions)"
+        "Hello."
     } else {
         ctx.user_message.as_str()
     };
