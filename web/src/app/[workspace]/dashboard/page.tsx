@@ -92,16 +92,10 @@ export default async function DashboardPage({
       <section className="flex flex-col gap-3">
         <h2 className="text-foreground text-lg font-semibold">Agents</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {/* Inventory + activity at-a-glance. "Ever" includes
-              agents that have since been deleted; "active" is the
-              subset still present in the connected repo. The two
-              run counts let us answer "how much of the run volume
-              is concentrated on agents we still ship?". */}
-          <StatCard
-            label="Agents ever (≥1 run)"
-            value={agentsWithRuns.length}
-            accent="gray"
-          />
+          {/* Ordered active-first so the "what we ship today"
+              numbers lead. The all-time pair sits to the right as
+              context — historical breadth of the agent surface
+              and total runs we've shouldered. */}
           <StatCard
             label="Active agents"
             value={activeAgentsWithRunsCount}
@@ -111,6 +105,11 @@ export default async function DashboardPage({
             label="Runs · active"
             value={totalRunsActiveAgents}
             accent="blue"
+          />
+          <StatCard
+            label="Agents ever (≥1 run)"
+            value={agentsWithRuns.length}
+            accent="gray"
           />
           <StatCard
             label="Runs · all time"
