@@ -159,18 +159,30 @@ async fn run_cargo_ai(
     })
     .await?;
 
-    // cargo-ai's stdout interleaves progress lines with the agent's
-    // structured output. Keep both for the run row's transcript;
-    // operators can read the progress trail when something looks
-    // off. Token usage isn't currently surfaced by cargo-ai so we
-    // record None (the run page renders that gracefully).
+    // cargo-ai writes the agent reply through a synthetic emit
+    // action (see cargo_ai::synthesize_emit_actions), so every
+    // content line lands prefixed with `[Action N: _tas_emit_output] reply: …`.
+    // Strip that wrapping for the user-facing transcript and keep
+    // the raw stdout under a "cargo-ai trace" footer so operators
+    // can still debug. Token usage isn't currently surfaced by
+    // cargo-ai (queued as an upstream PR); we record None and the
+    // run page hides the "Consumed" row gracefully.
+    let reply = extract_emit_reply(&result.stdout);
     let mut transcript = String::new();
     if !ctx.user_message.is_empty() {
         transcript.push_str("user> ");
         transcript.push_str(&ctx.user_message);
         transcript.push_str("\n\n");
     }
-    transcript.push_str(result.stdout.trim_end());
+    if reply.trim().is_empty() {
+        // Defensive: if the emit action didn't fire (older cargo-ai
+        // version, schema with no `properties`, action runtime
+        // failure), fall back to the raw stdout so the user at least
+        // sees what cargo-ai produced.
+        transcript.push_str(result.stdout.trim_end());
+    } else {
+        transcript.push_str(reply.trim_end());
+    }
     if !result.stderr.trim().is_empty() {
         transcript.push_str("\n\n[cargo-ai stderr]\n");
         transcript.push_str(result.stderr.trim_end());
@@ -272,6 +284,30 @@ async fn run_openai(
     })
 }
 
+// Pull the agent's reply out of cargo-ai's mixed stdout. Each
+// content line emitted by the synthetic action shows up as
+// `[Action N: _tas_emit_output] reply: <text>` — we drop the
+// prefix and concatenate the remaining text with newlines. Other
+// cargo-ai progress lines (started / step N / completed) are
+// ignored. Kept stable against changing Action numbers via a
+// substring match on the unique action name we inject.
+fn extract_emit_reply(stdout: &str) -> String {
+    const MARKER: &str = ": _tas_emit_output] reply: ";
+    let mut out = String::new();
+    for line in stdout.lines() {
+        if let Some(idx) = line.find(MARKER) {
+            let start = idx + MARKER.len();
+            if start <= line.len() {
+                if !out.is_empty() {
+                    out.push('\n');
+                }
+                out.push_str(&line[start..]);
+            }
+        }
+    }
+    out
+}
+
 // Common output framing across providers. When the user supplied a
 // message we prefix it with "user> " so the saved output reads as a
 // transcript; otherwise we render just the agent's text.
@@ -320,6 +356,35 @@ async fn mark_succeeded(
     .execute(&state.db)
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_emit_reply;
+
+    #[test]
+    fn extracts_reply_lines_drops_progress_lines() {
+        let stdout = "\
+Using explicit --token override; bypassing profile auth-mode resolution.
+using: profile=none auth=api_key server=openai model=gpt-4o-mini
+run: sequential
+[Action 1: _tas_emit_output] started
+[Action 1: _tas_emit_output] step 1/1 exec started; waiting for command to finish...
+[Action 1: _tas_emit_output] reply: greeting: Hi there!
+[Action 1: _tas_emit_output] reply: mood: cheerful
+[Action 1: _tas_emit_output] completed · 3ms
+
+Run complete · 3.7s total
+";
+        let reply = extract_emit_reply(stdout);
+        assert_eq!(reply, "greeting: Hi there!\nmood: cheerful");
+    }
+
+    #[test]
+    fn returns_empty_when_no_emit_lines_present() {
+        let stdout = "Run complete · 1.0s total\n";
+        assert!(extract_emit_reply(stdout).is_empty());
+    }
 }
 
 async fn mark_failed(
