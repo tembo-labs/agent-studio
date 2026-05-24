@@ -161,6 +161,40 @@ export async function getFeedback(id: string): Promise<Feedback | null> {
   return res.rows[0] ? rowToFeedback(res.rows[0]) : null;
 }
 
+export interface FeedbackCounts {
+  submitted: number;
+  pr_opened: number;
+  merged: number;
+  closed: number;
+  total: number;
+}
+
+export async function countFeedbacksSince(
+  workspaceId: string,
+  since: Date,
+): Promise<FeedbackCounts> {
+  const res = await db.query<{ status: FeedbackStatus; n: string }>(
+    `SELECT status, COUNT(*)::text AS n
+     FROM feedback
+     WHERE workspace_id = $1 AND created_at >= $2
+     GROUP BY status`,
+    [workspaceId, since],
+  );
+  const counts: FeedbackCounts = {
+    submitted: 0,
+    pr_opened: 0,
+    merged: 0,
+    closed: 0,
+    total: 0,
+  };
+  for (const row of res.rows) {
+    const n = Number(row.n);
+    counts[row.status] = n;
+    counts.total += n;
+  }
+  return counts;
+}
+
 // Marker the PR body should contain. Tembo is asked (via the
 // prompt) to include this line so we can correlate the merged PR
 // back to the feedback row that triggered it.

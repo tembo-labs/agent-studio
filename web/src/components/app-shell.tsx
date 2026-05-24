@@ -8,6 +8,7 @@ import type { Workspace } from "@/lib/workspace";
 import {
   IconAgent,
   IconChatBubbles,
+  IconDashboardMiddle,
   IconSettingsSliderHor,
 } from "central-icons";
 
@@ -46,6 +47,11 @@ export function AppShell({ workspace, user, children }: Props) {
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 px-2 pb-3 pt-6">
+          <SidebarNavItem
+            href={`${home}/dashboard`}
+            label="Dashboard"
+            icon={<IconDashboardMiddle />}
+          />
           <SidebarNavItem
             href={home}
             label="Agents"
