@@ -1,6 +1,18 @@
 # Tembo Agent Studio
 
-> Status: **building v0.1** — empty-but-runnable skeleton is in place (Next.js web, Rust API, Postgres, better-auth). Real user stories land on top.
+> Status: **v0.1 — Foundation — shipped (May 2026).** Self-hosted deploy, Google OAuth, GitHub repo connection, agents listed/created/run from the connected repo, run history with token usage + approximate cost, per-workspace branding, and a theme picker. v0.2 (chat-to-PR) starts next.
+
+## v0.1 — what shipped
+
+- Docker-compose deploy: Next.js 16 web + Rust axum API + Postgres.
+- Auth via better-auth + Google OAuth (email/password disabled, instructions in-app for swapping providers).
+- GitHub OAuth repo connection — token stored AES-256-GCM-encrypted in the workspace.
+- Agents listed from the connected repo as a 3-column card grid (last run status, framework + model badges, search). Two framework families supported: **Pydantic AgentSpec** and **Cargo AI**, each under their own `agents/<framework>/` subfolder.
+- Create an agent — from template or paste, with framework picker.
+- Manual runs against Anthropic Claude (Opus / Sonnet / Haiku). Output streams to a run detail page with status, model, queued/started/duration, and token consumption + approximate cost.
+- Soft-delete + restore for agents (commits to the repo on both ends, deletion record retained for audit).
+- Per-workspace favicon picker (default set + custom upload).
+- Theme picker in settings: System / Light / Dark mode toggle, eight built-in presets (Light, Paper, Pure Light, Dark, Midnight, Forest, Ember, Blackout), local-only persistence.
 
 ## What this is, in plain English
 
