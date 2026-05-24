@@ -118,11 +118,10 @@ async fn run_anthropic(
         out.push_str("\n\n");
     }
     out.push_str(&result.text);
-    if let Some(reason) = result.stop_reason {
-        out.push_str("\n\n[stop_reason=");
-        out.push_str(&reason);
-        out.push(']');
-    }
+    // We keep result.stop_reason on the wire for telemetry but no
+    // longer append it to the user-visible output — it was useful
+    // during the v0.1 bootstrap and now reads as noise.
+    let _ = result.stop_reason;
     Ok(RunOutcome {
         output: out,
         usage: result.usage,

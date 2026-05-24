@@ -130,7 +130,7 @@ export default async function RunDetailPage({
         )}
         {run.output && (
           <pre className="bg-surface border-border text-foreground overflow-x-auto whitespace-pre-wrap rounded-lg border p-4 font-mono text-xs leading-5">
-            {run.output}
+            {stripStopReason(run.output)}
           </pre>
         )}
         {run.status === "failed" && run.errorMessage && (
@@ -185,6 +185,13 @@ const STATUS_TEXT_TONE: Record<RunRecord["status"], string> = {
   succeeded: "text-sentiment-positive",
   failed: "text-sentiment-negative",
 };
+
+// Historical runs (pre-9d5f2dc) have a `\n\n[stop_reason=...]`
+// suffix appended by the Rust runner. Strip it on read so older
+// outputs render cleanly. Future runs don't write the suffix at all.
+function stripStopReason(output: string): string {
+  return output.replace(/\n*\[stop_reason=[^\]]*\]\s*$/, "");
+}
 
 function formatRelative(fromIso: string, toIso: string): string {
   const ms = new Date(toIso).getTime() - new Date(fromIso).getTime();
