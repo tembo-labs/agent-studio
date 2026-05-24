@@ -53,10 +53,25 @@ pub struct CargoAiArgs<'a> {
 pub struct CargoAiResult {
     pub stdout: String,
     pub stderr: String,
+    /// Names of non-LLM actions in the source spec that the
+    /// translator dropped (HTTP / exec / anything that isn't
+    /// `type: "llm"`). Surfaced in the run transcript so the user
+    /// understands why the agent couldn't fetch live data instead
+    /// of having to read this file to find out.
+    pub dropped_actions: Vec<DroppedAction>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DroppedAction {
+    pub id: String,
+    pub kind: String,
 }
 
 pub async fn invoke(args: CargoAiArgs<'_>) -> anyhow::Result<CargoAiResult> {
-    let translated = translate_spec(args.spec_json, args.user_message)
+    let TranslationResult {
+        json: translated,
+        dropped_actions,
+    } = translate_spec(args.spec_json, args.user_message)
         .context("couldn't translate Cargo AI spec into cargo-ai's expected schema")?;
 
     let mut child = Command::new(CARGO_AI_BIN)
@@ -110,7 +125,16 @@ pub async fn invoke(args: CargoAiArgs<'_>) -> anyhow::Result<CargoAiResult> {
         );
     }
 
-    Ok(CargoAiResult { stdout, stderr })
+    Ok(CargoAiResult {
+        stdout,
+        stderr,
+        dropped_actions,
+    })
+}
+
+struct TranslationResult {
+    json: String,
+    dropped_actions: Vec<DroppedAction>,
 }
 
 /// Translate our simplified Cargo AI agent JSON into the schema
@@ -119,7 +143,16 @@ pub async fn invoke(args: CargoAiArgs<'_>) -> anyhow::Result<CargoAiResult> {
 /// "llm"` action's prompt into a single inputs[] text block, keeps
 /// `agent_schema` verbatim, and appends the user's freeform input
 /// (when present) as a trailing text input.
-fn translate_spec(simplified_json: &str, user_message: &str) -> anyhow::Result<String> {
+///
+/// Non-LLM actions (`type: "http"`, `"exec"`, anything else) are
+/// captured in `dropped_actions` so the runner can surface that to
+/// the user — without this, an agent that depended on live HTTP
+/// fetches would silently fall back to whatever the LLM can
+/// hallucinate, which is the failure mode we hit in the wild.
+fn translate_spec(
+    simplified_json: &str,
+    user_message: &str,
+) -> anyhow::Result<TranslationResult> {
     let parsed: Value =
         serde_json::from_str(simplified_json).context("agent JSON was not valid JSON")?;
     let obj = parsed
@@ -137,14 +170,25 @@ fn translate_spec(simplified_json: &str, user_message: &str) -> anyhow::Result<S
         .ok_or_else(|| anyhow!("agent JSON is missing `actions[]`"))?;
 
     let mut llm_prompts = Vec::new();
+    let mut dropped_actions = Vec::new();
     for action in actions {
         let Some(a) = action.as_object() else { continue };
-        let is_llm = a.get("type").and_then(Value::as_str) == Some("llm");
-        if !is_llm {
-            continue;
-        }
-        if let Some(p) = a.get("prompt").and_then(Value::as_str) {
-            llm_prompts.push(p.to_string());
+        let kind = a
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("(unknown)")
+            .to_string();
+        let id = a
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("(unnamed)")
+            .to_string();
+        if kind == "llm" {
+            if let Some(p) = a.get("prompt").and_then(Value::as_str) {
+                llm_prompts.push(p.to_string());
+            }
+        } else {
+            dropped_actions.push(DroppedAction { id, kind });
         }
     }
     if llm_prompts.is_empty() {
@@ -175,7 +219,10 @@ fn translate_spec(simplified_json: &str, user_message: &str) -> anyhow::Result<S
     out.insert("agent_schema".to_string(), agent_schema);
     out.insert("actions".to_string(), Value::Array(emit_actions));
 
-    Ok(Value::Object(out).to_string())
+    Ok(TranslationResult {
+        json: Value::Object(out).to_string(),
+        dropped_actions,
+    })
 }
 
 /// Build one cargo-ai action per top-level field of the agent_schema
@@ -221,6 +268,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn reports_dropped_non_llm_actions() {
+        let simplified = serde_json::json!({
+            "agent_schema": { "properties": { "answer": { "type": "string" } } },
+            "actions": [
+                { "id": "fetch_weather", "type": "http", "url": "https://example.com" },
+                { "id": "summarize", "type": "llm", "prompt": "Summarize." },
+                { "id": "notify", "type": "exec", "program": "echo" }
+            ]
+        })
+        .to_string();
+        let out = translate_spec(&simplified, "").unwrap();
+        assert_eq!(out.dropped_actions.len(), 2);
+        assert_eq!(out.dropped_actions[0].id, "fetch_weather");
+        assert_eq!(out.dropped_actions[0].kind, "http");
+        assert_eq!(out.dropped_actions[1].id, "notify");
+        assert_eq!(out.dropped_actions[1].kind, "exec");
+    }
+
+    #[test]
     fn translates_simplified_into_cargo_ai_schema() {
         let simplified = serde_json::json!({
             "name": "demo",
@@ -236,7 +302,8 @@ mod tests {
         })
         .to_string();
         let out = translate_spec(&simplified, "Hi there!").unwrap();
-        let parsed: Value = serde_json::from_str(&out).unwrap();
+        assert!(out.dropped_actions.is_empty());
+        let parsed: Value = serde_json::from_str(&out.json).unwrap();
         assert_eq!(parsed["version"], CARGO_AI_SCHEMA_VERSION);
         assert_eq!(parsed["agent_schema"]["properties"]["greeting"]["type"], "string");
         let inputs = parsed["inputs"].as_array().unwrap();

@@ -174,6 +174,24 @@ async fn run_cargo_ai(
         transcript.push_str(&ctx.user_message);
         transcript.push_str("\n\n");
     }
+    // Warn the user up front when the translator dropped non-LLM
+    // actions: their agent expected those to run, the LLM half then
+    // ran without their output, and the reply will reflect that
+    // (typically "data was not provided"). Without this banner the
+    // failure mode is invisible — debug info matters more than
+    // polish at this stage.
+    if !result.dropped_actions.is_empty() {
+        transcript.push_str("[warning] The v0.2 Cargo AI runtime only executes `type: \"llm\"` actions.\n");
+        transcript.push_str("The following non-LLM actions were skipped — the model didn't see their output:\n");
+        for d in &result.dropped_actions {
+            transcript.push_str("  - ");
+            transcript.push_str(&d.id);
+            transcript.push_str(" (");
+            transcript.push_str(&d.kind);
+            transcript.push_str(")\n");
+        }
+        transcript.push('\n');
+    }
     if reply.trim().is_empty() {
         // Defensive: if the emit action didn't fire (older cargo-ai
         // version, schema with no `properties`, action runtime
