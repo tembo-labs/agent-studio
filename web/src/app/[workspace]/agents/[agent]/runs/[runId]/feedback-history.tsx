@@ -5,6 +5,7 @@
 
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
+import { feedbackSubmitterLabel } from "@/lib/feedback-display";
 import { type Feedback, type FeedbackStatus } from "@/lib/feedbacks-api";
 
 export function FeedbackHistory({ feedbacks }: { feedbacks: Feedback[] }) {
@@ -21,6 +22,9 @@ export function FeedbackHistory({ feedbacks }: { feedbacks: Feedback[] }) {
             <StatusBadge status={f.status} />
           </div>
           <div className="text-foreground-weak flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className="text-foreground font-medium">
+              {feedbackSubmitterLabel(f)}
+            </span>
             <span>
               <LocalTime iso={f.createdAt.toISOString()} />
             </span>

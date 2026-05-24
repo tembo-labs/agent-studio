@@ -25,6 +25,8 @@ export interface Feedback {
   prState: string | null;
   status: FeedbackStatus;
   createdBy: string;
+  createdByName: string | null;
+  createdByEmail: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +45,8 @@ type Row = {
   pr_state: string | null;
   status: FeedbackStatus;
   created_by: string;
+  created_by_name: string | null;
+  created_by_email: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -62,16 +66,24 @@ function rowToFeedback(r: Row): Feedback {
     prState: r.pr_state,
     status: r.status,
     createdBy: r.created_by,
+    createdByName: r.created_by_name,
+    createdByEmail: r.created_by_email,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
 }
 
+// SELECT projection with a LEFT JOIN against "user" so the row
+// includes the submitter's display name + email. LEFT JOIN keeps
+// the row visible if the user has been deleted.
 const COLUMNS = `
-  id, workspace_id, run_id, agent_name, agent_path, feedback_text,
-  tembo_task_id, tembo_task_html_url, pr_url, pr_number, pr_state,
-  status, created_by, created_at, updated_at
+  f.id, f.workspace_id, f.run_id, f.agent_name, f.agent_path, f.feedback_text,
+  f.tembo_task_id, f.tembo_task_html_url, f.pr_url, f.pr_number, f.pr_state,
+  f.status, f.created_by,
+  u.name AS created_by_name, u.email AS created_by_email,
+  f.created_at, f.updated_at
 `;
+const FROM_JOIN = `FROM feedback f LEFT JOIN "user" u ON u.id = f.created_by`;
 
 export async function createFeedback(input: {
   workspaceId: string;
@@ -81,10 +93,17 @@ export async function createFeedback(input: {
   feedbackText: string;
   userId: string;
 }): Promise<Feedback> {
+  // INSERT into a CTE so we can re-SELECT with the user join applied,
+  // matching the projection used everywhere else that returns Feedback.
   const res = await db.query<Row>(
-    `INSERT INTO feedback (workspace_id, run_id, agent_name, agent_path, feedback_text, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING ${COLUMNS}`,
+    `WITH inserted AS (
+       INSERT INTO feedback (workspace_id, run_id, agent_name, agent_path, feedback_text, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *
+     )
+     SELECT ${COLUMNS}
+     FROM inserted f
+     LEFT JOIN "user" u ON u.id = f.created_by`,
     [
       input.workspaceId,
       input.runId,
@@ -131,9 +150,9 @@ export async function listFeedbacks(
 ): Promise<Feedback[]> {
   const res = await db.query<Row>(
     `SELECT ${COLUMNS}
-     FROM feedback
-     WHERE workspace_id = $1
-     ORDER BY created_at DESC
+     ${FROM_JOIN}
+     WHERE f.workspace_id = $1
+     ORDER BY f.created_at DESC
      LIMIT $2`,
     [workspaceId, limit],
   );
@@ -145,9 +164,9 @@ export async function listFeedbacksForRun(
 ): Promise<Feedback[]> {
   const res = await db.query<Row>(
     `SELECT ${COLUMNS}
-     FROM feedback
-     WHERE run_id = $1
-     ORDER BY created_at DESC`,
+     ${FROM_JOIN}
+     WHERE f.run_id = $1
+     ORDER BY f.created_at DESC`,
     [runId],
   );
   return res.rows.map(rowToFeedback);
@@ -155,7 +174,7 @@ export async function listFeedbacksForRun(
 
 export async function getFeedback(id: string): Promise<Feedback | null> {
   const res = await db.query<Row>(
-    `SELECT ${COLUMNS} FROM feedback WHERE id = $1`,
+    `SELECT ${COLUMNS} ${FROM_JOIN} WHERE f.id = $1`,
     [id],
   );
   return res.rows[0] ? rowToFeedback(res.rows[0]) : null;

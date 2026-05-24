@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
+import { feedbackSubmitterLabel } from "@/lib/feedback-display";
 import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
 import {
   listFeedbacks,
@@ -74,6 +75,7 @@ function FeedbackTable({
           <tr>
             <th className="px-3 py-2 text-left font-medium">Agent</th>
             <th className="px-3 py-2 text-left font-medium">Feedback</th>
+            <th className="px-3 py-2 text-left font-medium">By</th>
             <th className="px-3 py-2 text-left font-medium">Status</th>
             <th className="px-3 py-2 text-left font-medium">Submitted</th>
             <th className="px-3 py-2 text-left font-medium">Links</th>
@@ -114,6 +116,9 @@ function FeedbackRow({
       </td>
       <td className="text-foreground max-w-md px-3 py-2 align-top">
         <span className="line-clamp-2 leading-5">{feedback.feedbackText}</span>
+      </td>
+      <td className="text-foreground px-3 py-2 align-top text-xs">
+        {feedbackSubmitterLabel(feedback)}
       </td>
       <td className="px-3 py-2 align-top">
         <StatusBadge status={feedback.status} />
