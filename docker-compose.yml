@@ -32,6 +32,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-tas}:${POSTGRES_PASSWORD:-tas}@postgres:5432/${POSTGRES_DB:-tas}
+      TAS_ENCRYPTION_KEY: ${TAS_ENCRYPTION_KEY:?TAS_ENCRYPTION_KEY must be set in .env}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}
       RUST_LOG: ${RUST_LOG:-info,tas_api=debug}
     ports:
       - "${API_PORT:-8080}:8080"
@@ -56,6 +58,7 @@ services:
       TAS_ENCRYPTION_KEY: ${TAS_ENCRYPTION_KEY:?TAS_ENCRYPTION_KEY must be set in .env}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       API_INTERNAL_URL: http://api:8080
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}
       NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       TAS_INSTANCE_NAME: ${TAS_INSTANCE_NAME:-Tembo Agent Studio}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}

@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 
+import { createRun } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
 import {
   deleteAgent,
+  getAgentByName,
   type DeleteAgentError,
 } from "@/lib/workspace-agents";
 import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
@@ -53,4 +55,60 @@ export async function deleteAgentAction(
   revalidatePath(`/${slug}`);
   revalidatePath(`/${slug}/settings`);
   redirect(`/${slug}`);
+}
+
+export type RunNowFormState = {
+  error?: string;
+};
+
+export async function runNowAction(
+  _prev: RunNowFormState,
+  formData: FormData,
+): Promise<RunNowFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const agentName = String(formData.get("agent") ?? "");
+
+  const session = await getServerSession();
+  if (!session) notFound();
+
+  const workspace = await getWorkspaceBySlug(slug);
+  if (!workspace) notFound();
+
+  const isMember = await userIsMember(workspace.id, session.user.id);
+  if (!isMember) notFound();
+
+  // Pull the current agent definition off the repo. We pass model +
+  // instructions to the Rust API as plaintext rather than having Rust
+  // re-read GitHub — keeps the Rust surface focused on execution.
+  const found = await getAgentByName(workspace.id, agentName);
+  if (!found || !found.agent.ok) {
+    return {
+      error: found
+        ? "This agent's definition file is invalid; fix it before running."
+        : "Agent no longer exists in the connected repo.",
+    };
+  }
+  const spec = found.agent.spec;
+
+  let runId: string;
+  try {
+    const res = await createRun({
+      workspaceId: workspace.id,
+      userId: session.user.id,
+      agentName: spec.name,
+      agentPath: found.agent.path,
+      model: spec.model,
+      instructions: spec.instructions,
+    });
+    runId = res.runId;
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Couldn't queue the run.",
+    };
+  }
+
+  revalidatePath(`/${slug}/agents/${encodeURIComponent(spec.name)}`);
+  redirect(
+    `/${slug}/agents/${encodeURIComponent(spec.name)}/runs/${encodeURIComponent(runId)}`,
+  );
 }

@@ -21,7 +21,7 @@ import {
 
 import { DisconnectRepoForm } from "./disconnect-repo-form";
 import { RestoreAgentForm } from "./restore-agent-form";
-import { TemboApiKeyForm } from "./tembo-api-key-form";
+import { SecretKeyForm } from "./secret-key-form";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +41,9 @@ export default async function SettingsPage({
   const isMember = await userIsMember(workspace.id, session.user.id);
   if (!isMember) notFound();
 
-  const [preview, repo, deletedAgents] = await Promise.all([
+  const [temboPreview, anthropicPreview, repo, deletedAgents] = await Promise.all([
     getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
+    getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
     getWorkspaceRepo(workspace.id),
     listDeletedAgents(workspace.id),
   ]);
@@ -171,6 +172,42 @@ export default async function SettingsPage({
       <Card className="p-3">
         <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
           <CardTitle className="text-foreground-title text-base">
+            Anthropic API key
+          </CardTitle>
+          <CardDescription>
+            Required to run agents whose{" "}
+            <code className="bg-surface rounded px-1 py-0.5 text-xs">
+              model
+            </code>{" "}
+            field is an Anthropic model (e.g.{" "}
+            <code className="bg-surface rounded px-1 py-0.5 text-xs">
+              anthropic:claude-sonnet-4-6
+            </code>
+            ).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-1 pb-1">
+          <SecretKeyForm
+            workspaceSlug={workspace.slug}
+            kind="anthropic_api_key"
+            label="Anthropic API key"
+            placeholder="sk-ant-…"
+            maskedPrefix="sk-ant-"
+            preview={
+              anthropicPreview
+                ? {
+                    last4: anthropicPreview.last4,
+                    updatedAt: anthropicPreview.updatedAt.toISOString(),
+                  }
+                : null
+            }
+          />
+        </CardContent>
+      </Card>
+
+      <Card className="p-3">
+        <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
+          <CardTitle className="text-foreground-title text-base">
             Tembo API key
           </CardTitle>
           <CardDescription>
@@ -182,13 +219,17 @@ export default async function SettingsPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="px-1 pb-1">
-          <TemboApiKeyForm
+          <SecretKeyForm
             workspaceSlug={workspace.slug}
+            kind="tembo_api_key"
+            label="Tembo API key"
+            placeholder="tembo_pk_…"
+            maskedPrefix="tembo_"
             preview={
-              preview
+              temboPreview
                 ? {
-                    last4: preview.last4,
-                    updatedAt: preview.updatedAt.toISOString(),
+                    last4: temboPreview.last4,
+                    updatedAt: temboPreview.updatedAt.toISOString(),
                   }
                 : null
             }

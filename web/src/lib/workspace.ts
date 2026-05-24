@@ -9,7 +9,10 @@ import {
 } from "@/lib/github";
 import { suggestSlug, validateSlug } from "@/lib/slugify";
 
-export type WorkspaceSecretKind = "tembo_api_key" | "github_pat";
+export type WorkspaceSecretKind =
+  | "tembo_api_key"
+  | "github_pat"
+  | "anthropic_api_key";
 
 export type Workspace = {
   id: string;

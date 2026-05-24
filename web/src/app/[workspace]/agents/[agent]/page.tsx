@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import { DeleteAgentButton } from "./delete-agent-button";
+import { RunNowButton } from "./run-now-button";
 import {
   Card,
   CardContent,
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
 import { getInstanceName } from "@/lib/config";
+import { listRecentRunsForAgent, type RunSummary } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getAgentByName } from "@/lib/workspace-agents";
 import {
@@ -48,6 +50,11 @@ export default async function AgentDetailPage({
   const result = await getAgentByName(workspace.id, agentName);
   if (!result) notFound();
   const { agent, raw } = result;
+  const canonicalName = agent.ok ? agent.spec.name : agentName;
+
+  const [recentRuns] = await Promise.all([
+    listRecentRunsForAgent(workspace.id, canonicalName, 10),
+  ]);
 
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
   const instanceName = getInstanceName();
@@ -96,6 +103,12 @@ export default async function AgentDetailPage({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {agent.ok && (
+            <RunNowButton
+              workspaceSlug={workspace.slug}
+              agentName={canonicalName}
+            />
+          )}
           <Button asChild variant="ghost" size="small">
             <a href={sourceHref} target="_blank" rel="noreferrer noopener">
               View source
@@ -103,11 +116,26 @@ export default async function AgentDetailPage({
           </Button>
           <DeleteAgentButton
             workspaceSlug={workspace.slug}
-            agentName={agent.ok ? agent.spec.name : agentName}
+            agentName={canonicalName}
           />
           <SignOutButton />
         </div>
       </header>
+
+      <Card className="p-3">
+        <CardHeader className="px-1 pb-3 pt-1">
+          <CardTitle className="text-foreground-title text-base">
+            Recent runs
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-1 pb-1">
+          <RecentRuns
+            runs={recentRuns}
+            workspaceSlug={workspace.slug}
+            agentName={canonicalName}
+          />
+        </CardContent>
+      </Card>
 
       <Card className="p-3">
         <CardHeader className="px-1 pb-3 pt-1">
@@ -130,4 +158,75 @@ export default async function AgentDetailPage({
       </Card>
     </main>
   );
+}
+
+function RecentRuns({
+  runs,
+  workspaceSlug,
+  agentName,
+}: {
+  runs: RunSummary[];
+  workspaceSlug: string;
+  agentName: string;
+}) {
+  if (runs.length === 0) {
+    return (
+      <p className="text-foreground-weak text-sm">
+        No runs yet. Click <strong className="text-foreground">Run now</strong>{" "}
+        in the header to kick one off.
+      </p>
+    );
+  }
+  return (
+    <ul className="divide-border flex flex-col divide-y">
+      {runs.map((run) => {
+        const tone = STATUS_TONE[run.status];
+        return (
+          <li key={run.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+            <Link
+              href={`/${workspaceSlug}/agents/${encodeURIComponent(agentName)}/runs/${run.id}`}
+              className="flex flex-1 items-center gap-3"
+            >
+              <Badge variant={tone.variant} size="small">
+                {STATUS_LABELS[run.status]}
+              </Badge>
+              <span className="text-foreground-muted text-xs">
+                {formatDate(run.createdAt)}
+              </span>
+            </Link>
+            <Link
+              href={`/${workspaceSlug}/agents/${encodeURIComponent(agentName)}/runs/${run.id}`}
+              className="text-foreground-weak hover:text-foreground text-xs"
+            >
+              Open →
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+const STATUS_LABELS: Record<RunSummary["status"], string> = {
+  queued: "Queued",
+  running: "Running",
+  succeeded: "Succeeded",
+  failed: "Failed",
+};
+
+const STATUS_TONE: Record<
+  RunSummary["status"],
+  { variant: "blue" | "yellow" | "green" | "red" }
+> = {
+  queued: { variant: "yellow" },
+  running: { variant: "blue" },
+  succeeded: { variant: "green" },
+  failed: { variant: "red" },
+};
+
+function formatDate(d: Date): string {
+  return d.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }

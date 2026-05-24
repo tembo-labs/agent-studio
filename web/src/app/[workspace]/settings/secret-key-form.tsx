@@ -7,30 +7,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import {
-  removeTemboApiKeyAction,
-  saveTemboApiKeyAction,
-  type TemboApiKeyFormState,
+  removeSecretAction,
+  saveSecretAction,
+  type SecretFormState,
 } from "./actions";
 
-const INITIAL: TemboApiKeyFormState = {};
+const INITIAL: SecretFormState = {};
 
 type Props = {
   workspaceSlug: string;
+  kind: "tembo_api_key" | "anthropic_api_key";
+  /** Short label used in the input ("Tembo API key") */
+  label: string;
+  /** Placeholder shown in the input field */
+  placeholder: string;
+  /** Static prefix shown in the masked preview (e.g. "tembo_") */
+  maskedPrefix: string;
   preview: { last4: string; updatedAt: string } | null;
 };
 
-export function TemboApiKeyForm({ workspaceSlug, preview }: Props) {
+export function SecretKeyForm({
+  workspaceSlug,
+  kind,
+  label,
+  placeholder,
+  maskedPrefix,
+  preview,
+}: Props) {
   const [rotating, setRotating] = useState(false);
   const [saveState, saveAction, savePending] = useActionState(
-    saveTemboApiKeyAction,
+    saveSecretAction,
     INITIAL,
   );
   const [removeState, removeAction, removePending] = useActionState(
-    removeTemboApiKeyAction,
+    removeSecretAction,
     INITIAL,
   );
 
-  // After a successful save, collapse back to the masked-preview view.
   const showForm = !preview || rotating;
 
   if (!showForm && preview) {
@@ -39,7 +52,7 @@ export function TemboApiKeyForm({ workspaceSlug, preview }: Props) {
         <div className="bg-surface border-border flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
           <div className="flex flex-col">
             <span className="text-foreground text-sm font-medium">
-              tembo_••••••••{preview.last4}
+              {maskedPrefix}••••••••{preview.last4}
             </span>
             <span className="text-foreground-muted text-xs">
               Last set {formatDate(preview.updatedAt)}
@@ -56,6 +69,7 @@ export function TemboApiKeyForm({ workspaceSlug, preview }: Props) {
             </Button>
             <form action={removeAction}>
               <input type="hidden" name="workspace" value={workspaceSlug} />
+              <input type="hidden" name="kind" value={kind} />
               <Button
                 type="submit"
                 variant="ghost"
@@ -74,22 +88,24 @@ export function TemboApiKeyForm({ workspaceSlug, preview }: Props) {
     );
   }
 
+  const inputId = `${kind}-input`;
   return (
     <form action={saveAction} className="flex flex-col gap-3">
       <input type="hidden" name="workspace" value={workspaceSlug} />
+      <input type="hidden" name="kind" value={kind} />
       <div className="grid gap-1.5">
-        <Label htmlFor="apiKey" className="text-sm">
-          {preview ? "New Tembo API key" : "Tembo API key"}
+        <Label htmlFor={inputId} className="text-sm">
+          {preview ? `New ${label}` : label}
         </Label>
         <Input
-          id="apiKey"
+          id={inputId}
           name="apiKey"
           type="password"
           autoComplete="off"
           spellCheck={false}
           required
           disabled={savePending}
-          placeholder="tembo_pk_…"
+          placeholder={placeholder}
         />
         <p className="text-foreground-muted text-xs">
           Stored encrypted at rest (AES-256-GCM). Only the last four characters

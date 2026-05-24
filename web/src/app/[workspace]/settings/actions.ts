@@ -15,18 +15,45 @@ import {
   setWorkspaceSecret,
   userIsMember,
   type SetWorkspaceSecretError,
+  type WorkspaceSecretKind,
 } from "@/lib/workspace";
 
-export type TemboApiKeyFormState = {
+// Keep the union narrow — only kinds the settings UI lets you manage
+// land here. The repo-connect flow writes github_pat; the runtime stores
+// keys through this surface only.
+type SettingsKind = Extract<
+  WorkspaceSecretKind,
+  "tembo_api_key" | "anthropic_api_key"
+>;
+
+const SETTINGS_KIND_LABELS: Record<SettingsKind, string> = {
+  tembo_api_key: "Tembo API key",
+  anthropic_api_key: "Anthropic API key",
+};
+
+function isSettingsKind(v: string): v is SettingsKind {
+  return v === "tembo_api_key" || v === "anthropic_api_key";
+}
+
+export type SecretFormState = {
   message?: string;
   error?: string;
 };
 
-const SAVE_ERROR_MESSAGES: Record<SetWorkspaceSecretError, string> = {
-  empty: "Please paste your Tembo API key.",
-  "too-short": "That key looks too short to be a Tembo API key.",
-  "too-long": "That key is longer than we expected. Double-check what you pasted.",
-};
+function saveErrorMessage(
+  kind: SettingsKind,
+  err: SetWorkspaceSecretError,
+): string {
+  const label = SETTINGS_KIND_LABELS[kind];
+  switch (err) {
+    case "empty":
+      return `Please paste your ${label}.`;
+    case "too-short":
+      return `That key looks too short to be a ${label}.`;
+    case "too-long":
+      return `That key is longer than we expected. Double-check what you pasted.`;
+  }
+}
 
 async function authorizeWorkspace(slug: string) {
   const session = await getServerSession();
@@ -41,39 +68,48 @@ async function authorizeWorkspace(slug: string) {
   return workspace;
 }
 
-export async function saveTemboApiKeyAction(
-  _prev: TemboApiKeyFormState,
+export async function saveSecretAction(
+  _prev: SecretFormState,
   formData: FormData,
-): Promise<TemboApiKeyFormState> {
+): Promise<SecretFormState> {
   const slug = String(formData.get("workspace") ?? "");
+  const kindRaw = String(formData.get("kind") ?? "");
   const apiKey = String(formData.get("apiKey") ?? "");
 
+  if (!isSettingsKind(kindRaw)) {
+    return { error: "Unsupported secret kind." };
+  }
+  const kind: SettingsKind = kindRaw;
+
   const workspace = await authorizeWorkspace(slug);
-  const result = await setWorkspaceSecret(
-    workspace.id,
-    "tembo_api_key",
-    apiKey,
-  );
+  const result = await setWorkspaceSecret(workspace.id, kind, apiKey);
   if (!result.ok) {
-    return { error: SAVE_ERROR_MESSAGES[result.error] };
+    return { error: saveErrorMessage(kind, result.error) };
   }
 
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
-  return { message: "Tembo API key saved." };
+  return { message: `${SETTINGS_KIND_LABELS[kind]} saved.` };
 }
 
-export async function removeTemboApiKeyAction(
-  _prev: TemboApiKeyFormState,
+export async function removeSecretAction(
+  _prev: SecretFormState,
   formData: FormData,
-): Promise<TemboApiKeyFormState> {
+): Promise<SecretFormState> {
   const slug = String(formData.get("workspace") ?? "");
+  const kindRaw = String(formData.get("kind") ?? "");
+
+  if (!isSettingsKind(kindRaw)) {
+    return { error: "Unsupported secret kind." };
+  }
+  const kind: SettingsKind = kindRaw;
+
   const workspace = await authorizeWorkspace(slug);
-  await removeWorkspaceSecret(workspace.id, "tembo_api_key");
+  await removeWorkspaceSecret(workspace.id, kind);
 
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
-  return { message: "Tembo API key removed." };
+  return { message: `${SETTINGS_KIND_LABELS[kind]} removed.` };
 }
 
 export type DisconnectRepoFormState = {
@@ -129,7 +165,6 @@ export async function disconnectRepoAction(
   await disconnectWorkspaceRepo(workspace.id);
 
   revalidatePath(`/${slug}/settings`);
-  // The workspace home gate will now redirect to the repo connect step.
   revalidatePath(`/${slug}`);
   return { message: "Repository disconnected." };
 }
