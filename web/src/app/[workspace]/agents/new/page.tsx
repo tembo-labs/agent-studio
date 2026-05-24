@@ -81,11 +81,12 @@ export default async function NewAgentPage({
       <Card className="p-3">
         <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
           <CardTitle className="text-foreground-title text-base">
-            Create a Pydantic AgentSpec
+            Create an agent
           </CardTitle>
           <CardDescription>
-            Pick the starter template or paste your own. Cargo AI import lands
-            in a follow-up slice.
+            Pick a starter template (Pydantic AgentSpec or Cargo AI), or
+            paste your own definition. The file is committed directly to
+            the connected repo on the default branch.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-1 pb-1">

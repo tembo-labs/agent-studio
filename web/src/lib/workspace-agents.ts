@@ -61,12 +61,13 @@ export type ListAgentsResult =
 /**
  * Walk the connected repo's `agents/` tree and parse every file we find.
  *
- *   agents/                        ← legacy flat layout (still read in v0.1)
- *   agents/pydantic-agentspec/     ← new layout, framework subfolder
- *   agents/cargo-ai/               ← new layout, framework subfolder
+ *   agents/pydantic-agentspec/   one Pydantic AgentSpec file per agent
+ *   agents/cargo-ai/             one Cargo AI JSON file per agent
  *
+ * Only the framework subfolders are read. Files placed directly at
+ * `agents/foo.yaml` are ignored — move them into the right subfolder.
  * Invalid files are surfaced inline with their parser error rather than
- * silently filtered — US-0.1-05 explicitly rejects "silent failure."
+ * silently filtered (US-0.1-05 explicitly rejects "silent failure").
  */
 export async function listAgents(workspaceId: string): Promise<ListAgentsResult> {
   const repo = await getWorkspaceRepo(workspaceId);
@@ -78,15 +79,6 @@ export async function listAgents(workspaceId: string): Promise<ListAgentsResult>
     name: repo.name,
     branch: repo.defaultBranch,
   };
-
-  // Top-level listing. We want only file entries (legacy flat agents)
-  // here — subfolders for each known framework get walked separately.
-  const top = await listDirectory(token, ref, AGENTS_DIR);
-  if (!top.ok) return { ok: false, error: top.error, detail: top.detail };
-
-  const flatFileEntries = top.entries.filter(
-    (e) => e.type === "file" && detectFormat(e.name) !== null,
-  );
 
   // Walk each framework subfolder. Missing subfolders are normal (a
   // fresh repo won't have an agents/cargo-ai/ directory yet) — those
@@ -103,15 +95,13 @@ export async function listAgents(workspaceId: string): Promise<ListAgentsResult>
     }
   }
 
-  const subfolderFileEntries = subfolderListings.flatMap((sub) =>
+  const allEntries = subfolderListings.flatMap((sub) =>
     sub.ok
       ? sub.entries.filter(
           (e) => e.type === "file" && detectFormat(e.name) !== null,
         )
       : [],
   );
-
-  const allEntries = [...flatFileEntries, ...subfolderFileEntries];
 
   const agents = await Promise.all(
     allEntries.map(async (entry): Promise<ListedAgent> => {

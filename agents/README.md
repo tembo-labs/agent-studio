@@ -22,11 +22,10 @@ into the right subfolder automatically based on the parsed shape.
   separately (see `context/0.3/README.md` for the broader multi-framework
   direction).
 
-**Legacy layout note.** v0.1 still *reads* files at the top level of
-`agents/` for backwards compatibility with workspaces that pre-date the
-subfolder convention. New writes always go to the subfolder. Migrate
-old flat files by moving them into the right subfolder — no parser
-changes needed.
+**Layout is required.** Agents must live in the right framework
+subfolder. Files placed directly at `agents/foo.yaml` (no subfolder)
+are ignored by the listing surface — move them into
+`agents/pydantic-agentspec/` or `agents/cargo-ai/` as appropriate.
 
 For the format decision and rationale, see
 [`../context/0.1/AGENT_FORMAT.md`](../context/0.1/AGENT_FORMAT.md).
