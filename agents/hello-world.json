@@ -1,1 +1,0 @@
-{"name":"hello-world","description":"Sample agent","instructions":"You are a friendly agent.","triggers":{"schedule":"0 9 * * *"}}
