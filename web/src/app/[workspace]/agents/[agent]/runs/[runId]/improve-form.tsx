@@ -8,20 +8,26 @@
 // Today there's only one supported mode (Always PR) so we don't
 // re-display it here.
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Section } from "@/components/section";
 import { Button } from "@/components/ui/button";
+import { type Feedback } from "@/lib/feedbacks-api";
 
 import { improveAgentAction, type ImproveResult } from "./actions";
+import { FeedbackHistory } from "./feedback-history";
 
 export function ImproveForm({
   workspaceSlug,
   runId,
+  feedbacks,
 }: {
   workspaceSlug: string;
   runId: string;
+  feedbacks: Feedback[];
 }) {
+  const router = useRouter();
   const [feedback, setFeedback] = useState("");
   const [result, setResult] = useState<ImproveResult | null>(null);
   const [pending, startTransition] = useTransition();
@@ -34,24 +40,23 @@ export function ImproveForm({
       setResult(r);
       if (r.ok) {
         setFeedback("");
+        // Re-run the server component so the new feedback row shows
+        // up in the inline history without a hard reload.
+        router.refresh();
       }
     });
   };
 
   return (
     <Section title="Improve the Agent">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <FeedbackHistory feedbacks={feedbacks} />
+      <form
+        onSubmit={handleSubmit}
+        className={`flex flex-col gap-3 ${feedbacks.length > 0 ? "mt-4" : ""}`}
+      >
         <p className="text-foreground-weak text-sm">
-          Describe what should change about this agent. We&apos;ll ask the{" "}
-          <a
-            href="https://docs.tembo.io/api/create-session"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="text-foreground hover:underline"
-          >
-            Tembo Coding Agent Platform
-          </a>{" "}
-          to open a pull request against your connected repo with the change.
+          Describe what should change about this agent, and it will be
+          submitted for approval.
         </p>
 
         <textarea

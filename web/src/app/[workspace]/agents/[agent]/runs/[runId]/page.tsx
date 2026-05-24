@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
+import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
+import { listFeedbacksForRun } from "@/lib/feedbacks-api";
 import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
 import { getRun, type RunRecord } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
@@ -30,6 +32,12 @@ export default async function RunDetailPage({
   if (!run) notFound();
   // Defense against URL guessing for other workspaces' runs.
   if (run.workspaceId !== workspace.id) notFound();
+
+  // Inline feedback history. Scan refreshes pr_state for the few
+  // open rows tied to this run — cheap because it's at most a
+  // handful of feedbacks per run, not the whole workspace.
+  const storedFeedbacks = await listFeedbacksForRun(run.id);
+  const feedbacks = await scanFeedbacksForPRs(workspace.id, storedFeedbacks);
 
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;
   const totalTokens =
@@ -132,7 +140,11 @@ export default async function RunDetailPage({
 
       <hr className="border-[var(--color-border-weak)]" />
 
-      <ImproveForm workspaceSlug={workspace.slug} runId={run.id} />
+      <ImproveForm
+        workspaceSlug={workspace.slug}
+        runId={run.id}
+        feedbacks={feedbacks}
+      />
     </div>
   );
 }

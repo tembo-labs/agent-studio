@@ -140,6 +140,19 @@ export async function listFeedbacks(
   return res.rows.map(rowToFeedback);
 }
 
+export async function listFeedbacksForRun(
+  runId: string,
+): Promise<Feedback[]> {
+  const res = await db.query<Row>(
+    `SELECT ${COLUMNS}
+     FROM feedback
+     WHERE run_id = $1
+     ORDER BY created_at DESC`,
+    [runId],
+  );
+  return res.rows.map(rowToFeedback);
+}
+
 export async function getFeedback(id: string): Promise<Feedback | null> {
   const res = await db.query<Row>(
     `SELECT ${COLUMNS} FROM feedback WHERE id = $1`,
