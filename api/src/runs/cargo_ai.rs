@@ -53,11 +53,12 @@ pub struct CargoAiArgs<'a> {
 pub struct CargoAiResult {
     pub stdout: String,
     pub stderr: String,
-    /// Names of non-LLM actions in the source spec that the
-    /// translator dropped (HTTP / exec / anything that isn't
-    /// `type: "llm"`). Surfaced in the run transcript so the user
-    /// understands why the agent couldn't fetch live data instead
-    /// of having to read this file to find out.
+    /// Actions in the source spec the translator couldn't run as
+    /// declared — either fully skipped (`exec`, unknown kinds,
+    /// http without a url) or partially translated (http with
+    /// method/headers/body where only the URL fetch carried over).
+    /// The runner uses `severity` to decide whether to render a
+    /// loud warning or a quieter note.
     pub dropped_actions: Vec<DroppedAction>,
 }
 
@@ -65,6 +66,18 @@ pub struct CargoAiResult {
 pub struct DroppedAction {
     pub id: String,
     pub kind: String,
+    pub severity: DroppedSeverity,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DroppedSeverity {
+    /// The action didn't run at all (exec, unknown kind, missing
+    /// required field). The model never saw its output.
+    Skipped,
+    /// Part of the action ran (e.g. the URL was fetched) but custom
+    /// shaping was ignored. Surface as a quieter note so users
+    /// know without thinking the run is broken.
+    Partial,
 }
 
 pub async fn invoke(args: CargoAiArgs<'_>) -> anyhow::Result<CargoAiResult> {
@@ -209,27 +222,32 @@ fn translate_spec(
                     dropped_actions.push(DroppedAction {
                         id: id.clone(),
                         kind: "http (missing url)".to_string(),
+                        severity: DroppedSeverity::Skipped,
                     });
                     continue;
                 };
                 inputs.push(json!({ "type": "url", "url": url }));
                 // Method / headers / body don't translate cleanly to
-                // cargo-ai's GET-only URL input. Note them as
-                // dropped-but-fetched so users understand the URL
-                // ran but custom request shaping didn't.
+                // cargo-ai's GET-only URL input. Note them as a
+                // Partial drop so the warning stays quiet — the URL
+                // still fetched, the agent still got data.
                 let has_extras = a.get("method").is_some()
                     || a.get("headers").is_some()
                     || a.get("body").is_some();
                 if has_extras {
                     dropped_actions.push(DroppedAction {
                         id: id.clone(),
-                        kind: "http extras (method/headers/body ignored — URL fetched as GET)"
-                            .to_string(),
+                        kind: "http (method/headers/body ignored, URL fetched as GET)".to_string(),
+                        severity: DroppedSeverity::Partial,
                     });
                 }
             }
             _ => {
-                dropped_actions.push(DroppedAction { id, kind });
+                dropped_actions.push(DroppedAction {
+                    id,
+                    kind,
+                    severity: DroppedSeverity::Skipped,
+                });
             }
         }
     }
@@ -352,7 +370,8 @@ mod tests {
         let out = translate_spec(&simplified, "").unwrap();
         assert_eq!(out.dropped_actions.len(), 1);
         assert_eq!(out.dropped_actions[0].id, "post_data");
-        assert!(out.dropped_actions[0].kind.starts_with("http extras"));
+        assert!(out.dropped_actions[0].kind.starts_with("http (method"));
+        assert_eq!(out.dropped_actions[0].severity, DroppedSeverity::Partial);
         // The URL was still fetched — verify it landed in inputs.
         let parsed: Value = serde_json::from_str(&out.json).unwrap();
         let inputs = parsed["inputs"].as_array().unwrap();
@@ -372,6 +391,7 @@ mod tests {
         let out = translate_spec(&simplified, "").unwrap();
         assert_eq!(out.dropped_actions.len(), 1);
         assert_eq!(out.dropped_actions[0].kind, "exec");
+        assert_eq!(out.dropped_actions[0].severity, DroppedSeverity::Skipped);
     }
 
     #[test]

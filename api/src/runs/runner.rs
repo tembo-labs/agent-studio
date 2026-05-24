@@ -174,16 +174,29 @@ async fn run_cargo_ai(
         transcript.push_str(&ctx.user_message);
         transcript.push_str("\n\n");
     }
-    // Warn the user up front when the translator dropped non-LLM
-    // actions: their agent expected those to run, the LLM half then
-    // ran without their output, and the reply will reflect that
-    // (typically "data was not provided"). Without this banner the
-    // failure mode is invisible — debug info matters more than
-    // polish at this stage.
-    if !result.dropped_actions.is_empty() {
+    // Tiered drop reporting:
+    //   Skipped  → loud "[warning]" banner. The model never saw
+    //              this action's output; the reply almost
+    //              certainly reflects that.
+    //   Partial  → quieter "[note]" footnote. The action did run
+    //              (e.g. URL fetched), just not with the exact
+    //              custom shaping. Worth saying once so users
+    //              don't keep hunting an explanation for an
+    //              answer that's actually fine.
+    let skipped: Vec<&cargo_ai::DroppedAction> = result
+        .dropped_actions
+        .iter()
+        .filter(|d| d.severity == cargo_ai::DroppedSeverity::Skipped)
+        .collect();
+    let partial: Vec<&cargo_ai::DroppedAction> = result
+        .dropped_actions
+        .iter()
+        .filter(|d| d.severity == cargo_ai::DroppedSeverity::Partial)
+        .collect();
+    if !skipped.is_empty() {
         transcript.push_str("[warning] The v0.2 Cargo AI runtime only executes `type: \"llm\"` actions.\n");
         transcript.push_str("The following non-LLM actions were skipped — the model didn't see their output:\n");
-        for d in &result.dropped_actions {
+        for d in skipped {
             transcript.push_str("  - ");
             transcript.push_str(&d.id);
             transcript.push_str(" (");
@@ -200,6 +213,16 @@ async fn run_cargo_ai(
         transcript.push_str(result.stdout.trim_end());
     } else {
         transcript.push_str(reply.trim_end());
+    }
+    if !partial.is_empty() {
+        transcript.push_str("\n\n[note] Some HTTP actions ran with reduced shaping:\n");
+        for d in partial {
+            transcript.push_str("  - ");
+            transcript.push_str(&d.id);
+            transcript.push_str(": ");
+            transcript.push_str(&d.kind);
+            transcript.push('\n');
+        }
     }
     // cargo-ai's stderr is operational noise ("Initialized Cargo AI
     // Home at …") — keep it out of the user transcript; it still
