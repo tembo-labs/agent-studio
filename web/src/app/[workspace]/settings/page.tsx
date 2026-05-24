@@ -40,7 +40,7 @@ export default async function SettingsPage({
     ]);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Settings

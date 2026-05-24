@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/back-link";
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import { TopBar } from "@/components/top-bar";
 import { Badge } from "@/components/ui/badge";
 import { getRun, type RunRecord } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
@@ -34,58 +34,54 @@ export default async function RunDetailPage({
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;
 
   return (
-    <>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
       <RunPoller status={run.status} />
-      <TopBar
-        back={{ href: agentHref }}
-        crumbs={[
-          { label: "Agents", href: `/${workspace.slug}` },
-          { label: run.agentName, href: agentHref },
-        ]}
-        title="Run"
-        meta={
-          <span className="flex flex-wrap items-center gap-1.5">
-            <Badge variant={tone.variant} size="small">
-              {STATUS_LABELS[run.status]}
-            </Badge>
-            <Badge variant="purple" size="small">
-              {run.model}
-            </Badge>
-            <span className="text-foreground-muted">
-              Queued <LocalTime iso={run.createdAt} />
-              {run.startedAt && (
-                <> · started {formatRelative(run.createdAt, run.startedAt)}</>
-              )}
-              {run.completedAt && run.startedAt && (
-                <>
-                  {" · ran "}
-                  {formatDuration(run.startedAt, run.completedAt)}
-                </>
-              )}
-            </span>
+      <div className="flex flex-col gap-2">
+        <BackLink href={agentHref} label={run.agentName} />
+        <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
+          Run
+        </h1>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant={tone.variant} size="small">
+            {STATUS_LABELS[run.status]}
+          </Badge>
+          <Badge variant="purple" size="small">
+            {run.model}
+          </Badge>
+          <span className="text-foreground-muted text-xs">
+            Queued <LocalTime iso={run.createdAt} />
+            {run.startedAt && (
+              <> · started {formatRelative(run.createdAt, run.startedAt)}</>
+            )}
+            {run.completedAt && run.startedAt && (
+              <>
+                {" · ran "}
+                {formatDuration(run.startedAt, run.completedAt)}
+              </>
+            )}
           </span>
-        }
-      />
-
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-6">
-        <Section title="Output">
-          {run.status === "queued" && !run.output && (
-            <p className="text-foreground-weak text-sm">Waiting to start…</p>
-          )}
-          {run.status === "running" && !run.output && (
-            <p className="text-foreground-weak text-sm">Running…</p>
-          )}
-          {run.output && (
-            <pre className="bg-surface border-border text-foreground overflow-x-auto whitespace-pre-wrap rounded-lg border p-4 font-mono text-xs leading-5">
-              {run.output}
-            </pre>
-          )}
-          {run.status === "failed" && run.errorMessage && (
-            <FailedReason run={run} />
-          )}
-        </Section>
+        </div>
       </div>
-    </>
+
+      <hr className="border-[var(--color-border-weak)]" />
+
+      <Section title="Output">
+        {run.status === "queued" && !run.output && (
+          <p className="text-foreground-weak text-sm">Waiting to start…</p>
+        )}
+        {run.status === "running" && !run.output && (
+          <p className="text-foreground-weak text-sm">Running…</p>
+        )}
+        {run.output && (
+          <pre className="bg-surface border-border text-foreground overflow-x-auto whitespace-pre-wrap rounded-lg border p-4 font-mono text-xs leading-5">
+            {run.output}
+          </pre>
+        )}
+        {run.status === "failed" && run.errorMessage && (
+          <FailedReason run={run} />
+        )}
+      </Section>
+    </div>
   );
 }
 

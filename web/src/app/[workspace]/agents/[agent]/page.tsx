@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { BackLink } from "@/components/back-link";
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import { TopBar } from "@/components/top-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
@@ -49,33 +49,34 @@ export default async function AgentDetailPage({
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
 
   return (
-    <>
-      <TopBar
-        back={{ href: `/${workspace.slug}` }}
-        crumbs={[{ label: "Agents", href: `/${workspace.slug}` }]}
-        title={canonicalName}
-        meta={
-          agent.ok ? (
-            <span className="flex flex-wrap items-center gap-1.5">
-              <Badge variant="blue" size="small">
-                {FRAMEWORK_LABELS[agent.spec.framework]}
-              </Badge>
-              <Badge variant="purple" size="small">
-                {agent.spec.model ?? "—"}
-              </Badge>
-              <code className="text-foreground-muted text-[10px]">
-                {agent.filename}
-              </code>
-            </span>
-          ) : (
-            <span className="text-sentiment-negative">
-              Invalid agent: {agent.error}
-              {agent.detail ? ` — ${agent.detail}` : ""}
-            </span>
-          )
-        }
-        actions={
-          <>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
+      <div className="flex flex-col gap-2">
+        <BackLink href={`/${workspace.slug}`} label="Agents" />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-2">
+            <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
+              {canonicalName}
+            </h1>
+            {agent.ok ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="blue" size="small">
+                  {FRAMEWORK_LABELS[agent.spec.framework]}
+                </Badge>
+                <Badge variant="purple" size="small">
+                  {agent.spec.model ?? "—"}
+                </Badge>
+                <code className="text-foreground-muted text-[11px]">
+                  {agent.filename}
+                </code>
+              </div>
+            ) : (
+              <p className="text-sentiment-negative text-sm">
+                Invalid agent: {agent.error}
+                {agent.detail ? ` — ${agent.detail}` : ""}
+              </p>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
             {agent.ok && (
               <RunNowButton
                 workspaceSlug={workspace.slug}
@@ -91,17 +92,18 @@ export default async function AgentDetailPage({
               workspaceSlug={workspace.slug}
               agentName={canonicalName}
             />
-          </>
-        }
-      />
-
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-6">
+          </div>
+        </div>
         {agent.ok && agent.spec.description && (
           <p className="text-foreground-weak max-w-prose text-sm leading-6">
             {agent.spec.description}
           </p>
         )}
+      </div>
 
+      <hr className="border-[var(--color-border-weak)]" />
+
+      <div className="flex flex-col gap-8">
         <Section
           title="Recent runs"
           description={
@@ -126,7 +128,7 @@ export default async function AgentDetailPage({
           </pre>
         </Section>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -143,7 +145,7 @@ function RecentRuns({
     return (
       <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
         No runs yet. Click <strong className="text-foreground">Run now</strong>{" "}
-        in the header.
+        above.
       </p>
     );
   }
