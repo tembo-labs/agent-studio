@@ -159,16 +159,61 @@ fn translate_spec(simplified_json: &str, user_message: &str) -> anyhow::Result<S
         inputs.push(json!({ "type": "text", "text": format!("User input: {}", user_message) }));
     }
 
+    // cargo-ai validates the LLM response against agent_schema but
+    // doesn't print it — the validated output only drives downstream
+    // `actions`. With our v1 translation those would be empty, so the
+    // user would see no result. Bridge by synthesising one always-
+    // true action per top-level schema property that echoes its
+    // value, so the run's stdout contains the model's reply. Once
+    // our upstream PR adds a --emit-output flag we delete this
+    // synthesis and pass that flag instead.
+    let emit_actions = synthesize_emit_actions(&agent_schema);
+
     let mut out = Map::new();
     out.insert("version".to_string(), json!(CARGO_AI_SCHEMA_VERSION));
     out.insert("inputs".to_string(), Value::Array(inputs));
     out.insert("agent_schema".to_string(), agent_schema);
-    // cargo-ai requires `actions[]` to be present; our v1 has nothing
-    // to put there (no HTTP / exec side effects), so we send an empty
-    // array. Action graph support lands in a follow-up.
-    out.insert("actions".to_string(), Value::Array(Vec::new()));
+    out.insert("actions".to_string(), Value::Array(emit_actions));
 
     Ok(Value::Object(out).to_string())
+}
+
+/// Build one cargo-ai action per top-level field of the agent_schema
+/// that always fires and exec-echoes the value, so the model's
+/// response reaches the run row's output. Falls back to an empty
+/// vec when the schema has no `properties` block — cargo-ai already
+/// handles "no-output" agents on its own (empty_action_only_output).
+fn synthesize_emit_actions(agent_schema: &Value) -> Vec<Value> {
+    let Some(props) = agent_schema
+        .get("properties")
+        .and_then(|p| p.as_object())
+    else {
+        return Vec::new();
+    };
+
+    let mut steps = Vec::with_capacity(props.len());
+    for (field_name, _) in props {
+        // Emit one line per field as "field: value" so multi-field
+        // agents read clearly. `printf` is portable across the
+        // bookworm-slim runtime image and Alpine-based hosts; the
+        // first arg is a format string, the rest are values.
+        steps.push(json!({
+            "kind": "exec",
+            "program": "printf",
+            "args": ["%s: %s\n", field_name, { "var": field_name }],
+        }));
+    }
+
+    if steps.is_empty() {
+        return Vec::new();
+    }
+
+    vec![json!({
+        "name": "_tas_emit_output",
+        // Always-true logic so the action fires for every run.
+        "logic": { "==": [1, 1] },
+        "run": steps,
+    })]
 }
 
 #[cfg(test)]
@@ -193,12 +238,21 @@ mod tests {
         let out = translate_spec(&simplified, "Hi there!").unwrap();
         let parsed: Value = serde_json::from_str(&out).unwrap();
         assert_eq!(parsed["version"], CARGO_AI_SCHEMA_VERSION);
-        assert_eq!(parsed["actions"], serde_json::json!([]));
         assert_eq!(parsed["agent_schema"]["properties"]["greeting"]["type"], "string");
         let inputs = parsed["inputs"].as_array().unwrap();
         assert_eq!(inputs.len(), 2);
         assert_eq!(inputs[0]["text"], "Greet warmly.");
         assert_eq!(inputs[1]["text"], "User input: Hi there!");
+        // The synthesised emit action surfaces each schema field
+        // through stdout — without it cargo-ai would silently drop
+        // the validated LLM response.
+        let actions = parsed["actions"].as_array().unwrap();
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0]["name"], "_tas_emit_output");
+        let steps = actions[0]["run"].as_array().unwrap();
+        assert_eq!(steps[0]["program"], "printf");
+        assert_eq!(steps[0]["args"][1], "greeting");
+        assert_eq!(steps[0]["args"][2]["var"], "greeting");
     }
 
     #[test]
