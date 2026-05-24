@@ -2,22 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { LocalTime } from "@/components/local-time";
-import { SignOutButton } from "@/components/sign-out-button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { getInstanceName } from "@/lib/config";
+import { Section } from "@/components/section";
+import { TopBar } from "@/components/top-bar";
 import { getServerSession } from "@/lib/session";
 import { listDeletedAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
   getWorkspaceSecretPreview,
-  userIsMember,
 } from "@/lib/workspace";
 
 import { DisconnectRepoForm } from "./disconnect-repo-form";
@@ -39,58 +31,23 @@ export default async function SettingsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
-
-  const [temboPreview, anthropicPreview, repo, deletedAgents] = await Promise.all([
-    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
-    getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
-    getWorkspaceRepo(workspace.id),
-    listDeletedAgents(workspace.id),
-  ]);
-  const instanceName = getInstanceName();
+  const [temboPreview, anthropicPreview, repo, deletedAgents] =
+    await Promise.all([
+      getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
+      getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
+      getWorkspaceRepo(workspace.id),
+      listDeletedAgents(workspace.id),
+    ]);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-8 py-16">
-      <header className="flex items-start justify-between gap-6">
-        <div className="space-y-2">
-          <p className="text-foreground-weak text-xs font-medium uppercase tracking-widest">
-            {instanceName}
-          </p>
-          <div className="flex items-baseline gap-3">
-            <Link
-              href={`/${workspace.slug}`}
-              className="text-foreground-weak hover:text-foreground text-sm"
-            >
-              {workspace.name}
-            </Link>
-            <span className="text-foreground-muted text-sm">/</span>
-            <h1 className="text-foreground-title text-3xl font-semibold tracking-tight">
-              Settings
-            </h1>
-          </div>
-          <p className="text-foreground-weak text-sm">
-            Signed in as{" "}
-            <span className="text-foreground font-medium">
-              {session.user.email}
-            </span>
-          </p>
-        </div>
-        <SignOutButton />
-      </header>
+    <>
+      <TopBar title="Settings" />
 
-      <Card className="p-3">
-        <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
-          <CardTitle className="text-foreground-title text-base">
-            GitHub repository
-          </CardTitle>
-          <CardDescription>
-            The repo where this workspace&apos;s agent definitions live.
-            Disconnecting drops the stored token and returns the workspace to
-            the onboarding repo step.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-1 pb-1">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-6">
+        <Section
+          title="GitHub repository"
+          description="The repo where this workspace's agent definitions live. Disconnecting drops the stored token and returns the workspace to the onboarding repo step."
+        >
           {repo ? (
             <div className="bg-surface border-border flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
               <div className="flex flex-col">
@@ -120,35 +77,82 @@ export default async function SettingsPage({
               </Link>
             </p>
           )}
-        </CardContent>
-      </Card>
+        </Section>
 
-      <Card className="p-3">
-        <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
-          <CardTitle className="text-foreground-title text-base">
-            Deleted agents
-          </CardTitle>
-          <CardDescription>
-            Agents removed from{" "}
-            <span className="text-foreground font-medium">
-              {workspace.name}
-            </span>{" "}
-            stay listed here so you can restore them. Restore writes the file
-            back to the connected repo with a new commit; the deletion record
-            is preserved for audit.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-1 pb-1">
+        <Section
+          title="Anthropic API key"
+          description={
+            <>
+              Required to run agents whose{" "}
+              <code className="bg-surface rounded px-1 py-0.5 text-xs">
+                model
+              </code>{" "}
+              field is an Anthropic model (e.g.{" "}
+              <code className="bg-surface rounded px-1 py-0.5 text-xs">
+                anthropic:claude-sonnet-4-6
+              </code>
+              ).
+            </>
+          }
+        >
+          <SecretKeyForm
+            workspaceSlug={workspace.slug}
+            kind="anthropic_api_key"
+            label="Anthropic API key"
+            placeholder="sk-ant-…"
+            maskedPrefix="sk-ant-"
+            preview={
+              anthropicPreview
+                ? {
+                    last4: anthropicPreview.last4,
+                    updatedAt: anthropicPreview.updatedAt.toISOString(),
+                  }
+                : null
+            }
+          />
+        </Section>
+
+        <Section
+          title="Tembo API key"
+          description={
+            <>
+              Used by this workspace to invoke Tembo services. Scoped to{" "}
+              <span className="text-foreground font-medium">
+                {workspace.name}
+              </span>{" "}
+              only — not shared with other workspaces.
+            </>
+          }
+        >
+          <SecretKeyForm
+            workspaceSlug={workspace.slug}
+            kind="tembo_api_key"
+            label="Tembo API key"
+            placeholder="tembo_pk_…"
+            maskedPrefix="tembo_"
+            preview={
+              temboPreview
+                ? {
+                    last4: temboPreview.last4,
+                    updatedAt: temboPreview.updatedAt.toISOString(),
+                  }
+                : null
+            }
+          />
+        </Section>
+
+        <Section
+          title="Deleted agents"
+          description="Agents removed from this workspace stay listed here so you can restore them. Restore writes the file back to the connected repo with a new commit; the deletion record is preserved for audit."
+        >
           {deletedAgents.length === 0 ? (
-            <p className="text-foreground-weak text-sm">
-              No deleted agents.
-            </p>
+            <p className="text-foreground-weak text-sm">No deleted agents.</p>
           ) : (
-            <ul className="divide-border flex flex-col divide-y">
+            <ul className="divide-border flex flex-col divide-y border-y border-[var(--color-border)]">
               {deletedAgents.map((d) => (
                 <li
                   key={d.id}
-                  className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                  className="flex items-start justify-between gap-3 py-2"
                 >
                   <div className="flex flex-col">
                     <span className="text-foreground text-sm font-medium">
@@ -170,77 +174,8 @@ export default async function SettingsPage({
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
-
-      <Card className="p-3">
-        <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
-          <CardTitle className="text-foreground-title text-base">
-            Anthropic API key
-          </CardTitle>
-          <CardDescription>
-            Required to run agents whose{" "}
-            <code className="bg-surface rounded px-1 py-0.5 text-xs">
-              model
-            </code>{" "}
-            field is an Anthropic model (e.g.{" "}
-            <code className="bg-surface rounded px-1 py-0.5 text-xs">
-              anthropic:claude-sonnet-4-6
-            </code>
-            ).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-1 pb-1">
-          <SecretKeyForm
-            workspaceSlug={workspace.slug}
-            kind="anthropic_api_key"
-            label="Anthropic API key"
-            placeholder="sk-ant-…"
-            maskedPrefix="sk-ant-"
-            preview={
-              anthropicPreview
-                ? {
-                    last4: anthropicPreview.last4,
-                    updatedAt: anthropicPreview.updatedAt.toISOString(),
-                  }
-                : null
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="p-3">
-        <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
-          <CardTitle className="text-foreground-title text-base">
-            Tembo API key
-          </CardTitle>
-          <CardDescription>
-            Used by this workspace to invoke Tembo services. Scoped to{" "}
-            <span className="text-foreground font-medium">
-              {workspace.name}
-            </span>{" "}
-            only — not shared with other workspaces.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-1 pb-1">
-          <SecretKeyForm
-            workspaceSlug={workspace.slug}
-            kind="tembo_api_key"
-            label="Tembo API key"
-            placeholder="tembo_pk_…"
-            maskedPrefix="tembo_"
-            preview={
-              temboPreview
-                ? {
-                    last4: temboPreview.last4,
-                    updatedAt: temboPreview.updatedAt.toISOString(),
-                  }
-                : null
-            }
-          />
-        </CardContent>
-      </Card>
-    </main>
+        </Section>
+      </div>
+    </>
   );
 }
-

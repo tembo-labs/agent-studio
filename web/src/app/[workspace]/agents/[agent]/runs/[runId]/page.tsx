@@ -1,20 +1,12 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { LocalTime } from "@/components/local-time";
-import { SignOutButton } from "@/components/sign-out-button";
+import { Section } from "@/components/section";
+import { TopBar } from "@/components/top-bar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { getInstanceName } from "@/lib/config";
 import { getRun, type RunRecord } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
+import { getWorkspaceBySlug } from "@/lib/workspace";
 
 import { RunPoller } from "./run-poller";
 
@@ -25,7 +17,7 @@ export default async function RunDetailPage({
 }: {
   params: Promise<{ workspace: string; agent: string; runId: string }>;
 }) {
-  const { workspace: slug, agent: agentName, runId } = await params;
+  const { workspace: slug, runId } = await params;
 
   const session = await getServerSession();
   if (!session) notFound();
@@ -33,75 +25,50 @@ export default async function RunDetailPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
-
   const run = await getRun(runId);
   if (!run) notFound();
   // Defense against URL guessing for other workspaces' runs.
   if (run.workspaceId !== workspace.id) notFound();
 
-  const instanceName = getInstanceName();
   const tone = STATUS_TONE[run.status];
+  const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-8 py-16">
+    <>
       <RunPoller status={run.status} />
-      <header className="flex items-start justify-between gap-6">
-        <div className="space-y-3">
-          <p className="text-foreground-weak text-xs font-medium uppercase tracking-widest">
-            {instanceName}
-          </p>
-          <div className="flex flex-wrap items-baseline gap-3">
-            <Link
-              href={`/${workspace.slug}`}
-              className="text-foreground-weak hover:text-foreground text-sm"
-            >
-              {workspace.name}
-            </Link>
-            <span className="text-foreground-muted text-sm">/</span>
-            <Link
-              href={`/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`}
-              className="text-foreground-weak hover:text-foreground text-sm"
-            >
-              {run.agentName}
-            </Link>
-            <span className="text-foreground-muted text-sm">/</span>
-            <h1 className="text-foreground-title text-2xl font-semibold tracking-tight">
-              Run
-            </h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={tone.variant} size="default">
+      <TopBar
+        back={{ href: agentHref }}
+        crumbs={[
+          { label: "Agents", href: `/${workspace.slug}` },
+          { label: run.agentName, href: agentHref },
+        ]}
+        title="Run"
+        meta={
+          <span className="flex flex-wrap items-center gap-1.5">
+            <Badge variant={tone.variant} size="small">
               {STATUS_LABELS[run.status]}
             </Badge>
-            <Badge variant="purple" size="default">
+            <Badge variant="purple" size="small">
               {run.model}
             </Badge>
-            <span className="text-foreground-muted text-xs">
+            <span className="text-foreground-muted">
               Queued <LocalTime iso={run.createdAt} />
               {run.startedAt && (
                 <> · started {formatRelative(run.createdAt, run.startedAt)}</>
               )}
               {run.completedAt && run.startedAt && (
                 <>
-                  {" · "}
-                  ran {formatDuration(run.startedAt, run.completedAt)}
+                  {" · ran "}
+                  {formatDuration(run.startedAt, run.completedAt)}
                 </>
               )}
             </span>
-          </div>
-        </div>
-        <SignOutButton />
-      </header>
+          </span>
+        }
+      />
 
-      <Card className="p-3">
-        <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
-          <CardTitle className="text-foreground-title text-base">
-            Output
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-1 pb-1">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-6">
+        <Section title="Output">
           {run.status === "queued" && !run.output && (
             <p className="text-foreground-weak text-sm">Waiting to start…</p>
           )}
@@ -116,17 +83,9 @@ export default async function RunDetailPage({
           {run.status === "failed" && run.errorMessage && (
             <FailedReason run={run} />
           )}
-        </CardContent>
-      </Card>
-
-      <div>
-        <Button asChild variant="ghost" size="small">
-          <Link href={`/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`}>
-            ← Back to agent
-          </Link>
-        </Button>
+        </Section>
       </div>
-    </main>
+    </>
   );
 }
 
