@@ -16,7 +16,7 @@ const INITIAL: SecretFormState = {};
 
 type Props = {
   workspaceSlug: string;
-  kind: "tembo_api_key" | "anthropic_api_key";
+  kind: "tembo_api_key" | "anthropic_api_key" | "openai_api_key";
   /** Short label used in the input ("Tembo API key") */
   label: string;
   /** Placeholder shown in the input field */

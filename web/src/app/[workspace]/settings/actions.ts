@@ -28,16 +28,21 @@ import {
 // keys through this surface only.
 type SettingsKind = Extract<
   WorkspaceSecretKind,
-  "tembo_api_key" | "anthropic_api_key"
+  "tembo_api_key" | "anthropic_api_key" | "openai_api_key"
 >;
 
 const SETTINGS_KIND_LABELS: Record<SettingsKind, string> = {
   tembo_api_key: "Tembo API key",
   anthropic_api_key: "Anthropic API key",
+  openai_api_key: "OpenAI API key",
 };
 
 function isSettingsKind(v: string): v is SettingsKind {
-  return v === "tembo_api_key" || v === "anthropic_api_key";
+  return (
+    v === "tembo_api_key" ||
+    v === "anthropic_api_key" ||
+    v === "openai_api_key"
+  );
 }
 
 export type SecretFormState = {

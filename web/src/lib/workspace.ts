@@ -12,7 +12,8 @@ import { suggestSlug, validateSlug } from "@/lib/slugify";
 export type WorkspaceSecretKind =
   | "tembo_api_key"
   | "github_pat"
-  | "anthropic_api_key";
+  | "anthropic_api_key"
+  | "openai_api_key";
 
 // Single source of truth lives in @/lib/favicon-constants (client-safe).
 // Re-exported here so server-side callers don't need to know.

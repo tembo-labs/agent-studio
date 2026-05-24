@@ -33,10 +33,11 @@ export default async function SettingsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const [temboPreview, anthropicPreview, repo, deletedAgents] =
+  const [temboPreview, anthropicPreview, openaiPreview, repo, deletedAgents] =
     await Promise.all([
       getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
       getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
+      getWorkspaceSecretPreview(workspace.id, "openai_api_key"),
       getWorkspaceRepo(workspace.id),
       listDeletedAgents(workspace.id),
     ]);
@@ -154,6 +155,41 @@ export default async function SettingsPage({
                     ? {
                         last4: anthropicPreview.last4,
                         updatedAt: anthropicPreview.updatedAt.toISOString(),
+                      }
+                    : null
+                }
+              />
+            </Section>
+          </div>
+
+        <div className="pb-5 pt-8">
+            <Section
+              title="OpenAI API key"
+              description={
+                <>
+                  Required to run agents whose{" "}
+                  <code className="bg-surface rounded px-1 py-0.5 text-xs">
+                    model
+                  </code>{" "}
+                  field is an OpenAI model (e.g.{" "}
+                  <code className="bg-surface rounded px-1 py-0.5 text-xs">
+                    openai:gpt-4o-mini
+                  </code>
+                  ).
+                </>
+              }
+            >
+              <SecretKeyForm
+                workspaceSlug={workspace.slug}
+                kind="openai_api_key"
+                label="OpenAI API key"
+                placeholder="sk-…"
+                maskedPrefix="sk-"
+                preview={
+                  openaiPreview
+                    ? {
+                        last4: openaiPreview.last4,
+                        updatedAt: openaiPreview.updatedAt.toISOString(),
                       }
                     : null
                 }

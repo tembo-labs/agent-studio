@@ -1,14 +1,15 @@
 //! The actual run task. Lifecycle:
 //!   queued → running → succeeded | failed
 //! Output and error_message are written back to the run row so the web
-//! poller can render them. Anthropic is the only provider wired in v0.1;
-//! other providers slot in as additional `match` arms once supported.
+//! poller can render them. Dispatches on the model's `provider:` prefix
+//! (anthropic | openai) so each provider's response shape is normalised
+//! into a common RunOutcome.
 
 use anyhow::{anyhow, Context};
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::providers::anthropic;
+use crate::providers::{anthropic, openai};
 use crate::workspace::{get_workspace_secret_plaintext, SecretKind};
 use crate::AppState;
 
@@ -22,7 +23,35 @@ pub struct RunContext {
 
 struct RunOutcome {
     output: String,
-    usage: Option<anthropic::Usage>,
+    usage: Option<Usage>,
+}
+
+// Provider-neutral usage shape. Both anthropic::Usage and
+// openai::Usage normalise into this before crossing into the run
+// row so the column semantics ({tokens_input, tokens_output}) stay
+// consistent regardless of which provider produced them.
+#[derive(Debug, Clone, Copy)]
+struct Usage {
+    input_tokens: i32,
+    output_tokens: i32,
+}
+
+impl From<anthropic::Usage> for Usage {
+    fn from(u: anthropic::Usage) -> Self {
+        Self {
+            input_tokens: u.input_tokens,
+            output_tokens: u.output_tokens,
+        }
+    }
+}
+
+impl From<openai::Usage> for Usage {
+    fn from(u: openai::Usage) -> Self {
+        Self {
+            input_tokens: u.input_tokens,
+            output_tokens: u.output_tokens,
+        }
+    }
 }
 
 /// Drive a single run from queued through to terminal state. Always
@@ -63,9 +92,10 @@ async fn run_inner(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunOutc
 
     match provider {
         "anthropic" => run_anthropic(state, ctx, model).await,
+        "openai" => run_openai(state, ctx, model).await,
         other => Err(anyhow!(
             "Provider `{other}` is not enabled in this TAS build. \
-             v0.1 supports anthropic; other providers land in follow-up slices."
+             Supported: `anthropic`, `openai`."
         )),
     }
 }
@@ -111,21 +141,67 @@ async fn run_anthropic(
     )
     .await?;
 
-    let mut out = String::new();
-    if !ctx.user_message.is_empty() {
-        out.push_str("user> ");
-        out.push_str(&ctx.user_message);
-        out.push_str("\n\n");
-    }
-    out.push_str(&result.text);
-    // We keep result.stop_reason on the wire for telemetry but no
-    // longer append it to the user-visible output — it was useful
-    // during the v0.1 bootstrap and now reads as noise.
     let _ = result.stop_reason;
     Ok(RunOutcome {
-        output: out,
-        usage: result.usage,
+        output: render_output(&ctx.user_message, &result.text),
+        usage: result.usage.map(Usage::from),
     })
+}
+
+async fn run_openai(
+    state: &AppState,
+    ctx: &RunContext,
+    model: &str,
+) -> anyhow::Result<RunOutcome> {
+    let api_key = get_workspace_secret_plaintext(
+        &state.db,
+        &state.encryption_key,
+        ctx.workspace_id,
+        SecretKind::OpenAiApiKey,
+    )
+    .await
+    .context(
+        "Couldn't load this workspace's OpenAI API key. \
+         Set it under Settings → OpenAI API key.",
+    )?;
+
+    let user_message = if ctx.user_message.is_empty() {
+        "Hello."
+    } else {
+        ctx.user_message.as_str()
+    };
+
+    let result = openai::invoke(
+        &state.http,
+        &api_key,
+        openai::InvokeArgs {
+            model,
+            instructions: &ctx.instructions,
+            user_message,
+            max_tokens: 1024,
+        },
+    )
+    .await?;
+
+    let _ = result.stop_reason;
+    Ok(RunOutcome {
+        output: render_output(&ctx.user_message, &result.text),
+        usage: result.usage.map(Usage::from),
+    })
+}
+
+// Common output framing across providers. When the user supplied a
+// message we prefix it with "user> " so the saved output reads as a
+// transcript; otherwise we render just the agent's text.
+fn render_output(user_message: &str, text: &str) -> String {
+    let mut out = String::new();
+    if !user_message.is_empty() {
+        out.push_str("user> ");
+        out.push_str(user_message);
+        out.push_str("\n\n");
+    }
+    out.push_str(text);
+    out
 }
 
 async fn mark_running(state: &AppState, run_id: Uuid) -> anyhow::Result<()> {
@@ -143,7 +219,7 @@ async fn mark_succeeded(
     state: &AppState,
     run_id: Uuid,
     output: &str,
-    usage: Option<anthropic::Usage>,
+    usage: Option<Usage>,
 ) -> anyhow::Result<()> {
     let (tokens_in, tokens_out) = match usage {
         Some(u) => (Some(u.input_tokens), Some(u.output_tokens)),

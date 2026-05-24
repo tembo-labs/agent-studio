@@ -9,12 +9,14 @@ use crate::crypto::MasterKey;
 #[derive(Debug, Clone, Copy)]
 pub enum SecretKind {
     AnthropicApiKey,
+    OpenAiApiKey,
 }
 
 impl SecretKind {
     fn as_db_str(self) -> &'static str {
         match self {
             SecretKind::AnthropicApiKey => "anthropic_api_key",
+            SecretKind::OpenAiApiKey => "openai_api_key",
         }
     }
 }

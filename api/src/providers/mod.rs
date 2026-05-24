@@ -1,4 +1,5 @@
-//! Provider HTTP clients for agent model calls. Anthropic is the only
-//! one wired in v0.1; others follow the same shape when added.
+//! Provider HTTP clients for agent model calls. Each provider exposes
+//! the same `invoke()` shape so the runner's dispatch stays uniform.
 
 pub mod anthropic;
+pub mod openai;
