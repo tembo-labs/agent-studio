@@ -14,7 +14,9 @@ export type FeedbackStatus = "submitted" | "pr_opened" | "merged" | "closed";
 export interface Feedback {
   id: string;
   workspaceId: string;
-  runId: string;
+  // Null when the feedback came from a chat-to-edit thread (not
+  // anchored to a specific run).
+  runId: string | null;
   agentName: string;
   agentPath: string;
   feedbackText: string;
@@ -34,7 +36,7 @@ export interface Feedback {
 type Row = {
   id: string;
   workspace_id: string;
-  run_id: string;
+  run_id: string | null;
   agent_name: string;
   agent_path: string;
   feedback_text: string;
@@ -87,7 +89,7 @@ const FROM_JOIN = `FROM feedback f LEFT JOIN "user" u ON u.id = f.created_by`;
 
 export async function createFeedback(input: {
   workspaceId: string;
-  runId: string;
+  runId: string | null;
   agentName: string;
   agentPath: string;
   feedbackText: string;
@@ -144,6 +146,25 @@ export async function setFeedbackPr(input: {
   );
 }
 
+// All feedbacks for a workspace whose status is not yet terminal
+// (i.e. still 'submitted' or 'pr_opened'). Used to bound the scan
+// the dashboard / feedbacks page run on every visit so a merged-but-
+// not-yet-detected PR shows up regardless of how old the feedback
+// row is. Terminal rows ('merged' / 'closed') never need rechecking.
+export async function listOpenFeedbacks(
+  workspaceId: string,
+): Promise<Feedback[]> {
+  const res = await db.query<Row>(
+    `SELECT ${COLUMNS}
+     ${FROM_JOIN}
+     WHERE f.workspace_id = $1
+       AND f.status IN ('submitted', 'pr_opened')
+     ORDER BY f.created_at DESC`,
+    [workspaceId],
+  );
+  return res.rows.map(rowToFeedback);
+}
+
 export async function listFeedbacks(
   workspaceId: string,
   limit = 100,
@@ -155,6 +176,22 @@ export async function listFeedbacks(
      ORDER BY f.created_at DESC
      LIMIT $2`,
     [workspaceId, limit],
+  );
+  return res.rows.map(rowToFeedback);
+}
+
+export async function listFeedbacksForAgent(
+  workspaceId: string,
+  agentName: string,
+  limit = 100,
+): Promise<Feedback[]> {
+  const res = await db.query<Row>(
+    `SELECT ${COLUMNS}
+     ${FROM_JOIN}
+     WHERE f.workspace_id = $1 AND f.agent_name = $2
+     ORDER BY f.created_at ASC
+     LIMIT $3`,
+    [workspaceId, agentName, limit],
   );
   return res.rows.map(rowToFeedback);
 }

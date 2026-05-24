@@ -100,6 +100,31 @@ export async function createTemboTask(args: {
   };
 }
 
+// Build a chat-to-edit prompt. No specific run is anchored; this is
+// the agent-level "I want to change X about this agent" path. Same
+// marker contract as the run-anchored variant so the same scanner
+// works for both.
+export function buildChatEditPrompt(args: {
+  agentPath: string;
+  feedback: string;
+  feedbackMarker: string;
+}): string {
+  return [
+    `Improve the agent defined at @${args.agentPath}.`,
+    "",
+    "Open a pull request with the targeted change.",
+    "",
+    "IMPORTANT: Include this exact line on its own at the end of the pull",
+    "request description so the Tembo Agent Studio can correlate the PR",
+    "with the user's feedback:",
+    "",
+    args.feedbackMarker,
+    "",
+    "## Requested change",
+    args.feedback.trim(),
+  ].join("\n");
+}
+
 // Build the prompt we send to CAP from the run context + the user's
 // freeform feedback. We tag the agent file path so CAP knows which
 // file to edit; the run input/output give it the concrete failure to

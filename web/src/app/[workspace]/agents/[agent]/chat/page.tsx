@@ -1,0 +1,64 @@
+import { notFound } from "next/navigation";
+
+import { BackLink } from "@/components/back-link";
+import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
+import { listFeedbacksForAgent } from "@/lib/feedbacks-api";
+import { getServerSession } from "@/lib/session";
+import { getWorkspaceBySlug } from "@/lib/workspace";
+import { getAgentByName } from "@/lib/workspace-agents";
+
+import { ChatThread } from "./chat-thread";
+
+export const dynamic = "force-dynamic";
+
+export default async function AgentChatPage({
+  params,
+}: {
+  params: Promise<{ workspace: string; agent: string }>;
+}) {
+  const { workspace: slug, agent: agentParam } = await params;
+  const agentName = decodeURIComponent(agentParam);
+
+  const session = await getServerSession();
+  if (!session) notFound();
+
+  const workspace = await getWorkspaceBySlug(slug);
+  if (!workspace) notFound();
+
+  const result = await getAgentByName(workspace.id, agentName);
+  if (!result) notFound();
+  const { agent } = result;
+  const canonicalName = agent.ok ? agent.spec.name : agentName;
+
+  const stored = await listFeedbacksForAgent(workspace.id, canonicalName);
+  const feedbacks = await scanFeedbacksForPRs(workspace.id, stored);
+
+  const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(canonicalName)}`;
+
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
+      <div className="flex flex-col gap-2">
+        <BackLink href={agentHref} label={canonicalName} />
+        <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
+          Chat to edit
+        </h1>
+        <p className="text-foreground-weak text-sm">
+          Describe a change you&apos;d like to make to{" "}
+          <span className="text-foreground font-medium">
+            {canonicalName}
+          </span>
+          . Each request opens a pull request for review; merged PRs become
+          live behavior.
+        </p>
+      </div>
+
+      <hr className="border-[var(--color-border-weak)]" />
+
+      <ChatThread
+        workspaceSlug={workspace.slug}
+        agentName={canonicalName}
+        feedbacks={feedbacks}
+      />
+    </div>
+  );
+}

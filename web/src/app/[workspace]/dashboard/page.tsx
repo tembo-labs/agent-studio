@@ -7,6 +7,7 @@ import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
 import {
   countFeedbacksSince,
   listFeedbacks,
+  listOpenFeedbacks,
   type FeedbackStatus,
 } from "@/lib/feedbacks-api";
 import { getServerSession } from "@/lib/session";
@@ -34,10 +35,12 @@ export default async function DashboardPage({
 
   const since = new Date(Date.now() - WEEK_MS);
   // Refresh open PR statuses before reading counts so the headline
-  // numbers reflect reality. The scan is bounded to feedbacks that
-  // haven't reached a terminal status, so it stays cheap.
-  const stored = await listFeedbacks(workspace.id, 50);
-  await scanFeedbacksForPRs(workspace.id, stored);
+  // numbers reflect reality. listOpenFeedbacks returns every non-
+  // terminal row regardless of age — a six-week-old "PR opened" that
+  // got merged yesterday still gets flipped to "merged" before we
+  // count.
+  const open = await listOpenFeedbacks(workspace.id);
+  await scanFeedbacksForPRs(workspace.id, open);
 
   const [counts, recent] = await Promise.all([
     countFeedbacksSince(workspace.id, since),

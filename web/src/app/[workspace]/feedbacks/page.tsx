@@ -7,6 +7,7 @@ import { feedbackSubmitterLabel } from "@/lib/feedback-display";
 import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
 import {
   listFeedbacks,
+  listOpenFeedbacks,
   type Feedback,
   type FeedbackStatus,
 } from "@/lib/feedbacks-api";
@@ -28,11 +29,13 @@ export default async function FeedbacksPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const stored = await listFeedbacks(workspace.id);
-  // Refresh status from GitHub on every page visit. Trades GitHub
-  // API hits for staleness; fine for dev scale, swap to a webhook
-  // when traffic grows.
-  const feedbacks = await scanFeedbacksForPRs(workspace.id, stored);
+  // Scan open rows for PR updates before reading the full list. The
+  // scan writes back to postgres, so the subsequent listFeedbacks
+  // returns fresh status values without us having to merge two
+  // arrays.
+  const open = await listOpenFeedbacks(workspace.id);
+  await scanFeedbacksForPRs(workspace.id, open);
+  const feedbacks = await listFeedbacks(workspace.id);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">

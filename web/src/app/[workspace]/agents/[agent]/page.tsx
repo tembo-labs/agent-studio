@@ -82,6 +82,15 @@ export default async function AgentDetailPage({
                 View source
               </a>
             </Button>
+            {agent.ok && (
+              <Button asChild variant="secondary">
+                <Link
+                  href={`/${workspace.slug}/agents/${encodeURIComponent(canonicalName)}/chat`}
+                >
+                  Chat to edit
+                </Link>
+              </Button>
+            )}
             <DeleteAgentButton
               workspaceSlug={workspace.slug}
               agentName={canonicalName}
