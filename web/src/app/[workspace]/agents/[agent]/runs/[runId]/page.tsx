@@ -138,13 +138,20 @@ export default async function RunDetailPage({
         )}
       </Section>
 
-      <hr className="border-[var(--color-border-weak)]" />
-
-      <ImproveForm
-        workspaceSlug={workspace.slug}
-        runId={run.id}
-        feedbacks={feedbacks}
-      />
+      {/* Hide the feedback section while the run is in flight — there's
+          nothing to feed back on yet, and the form pulling the eye away
+          from the streaming output feels wrong. Fade it in two seconds
+          after the output settles so the user finishes reading first. */}
+      {(run.status === "succeeded" || run.status === "failed") && (
+        <>
+          <hr className="border-[var(--color-border-weak)]" />
+          <ImproveForm
+            workspaceSlug={workspace.slug}
+            runId={run.id}
+            feedbacks={feedbacks}
+          />
+        </>
+      )}
     </div>
   );
 }

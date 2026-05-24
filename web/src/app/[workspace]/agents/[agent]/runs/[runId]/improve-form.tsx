@@ -9,7 +9,7 @@
 // re-display it here.
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { Section } from "@/components/section";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,11 @@ import { type Feedback } from "@/lib/feedbacks-api";
 
 import { improveAgentAction, type ImproveResult } from "./actions";
 import { FeedbackHistory } from "./feedback-history";
+
+// Delay before the Improve section fades in once the run has
+// settled. Gives the user a beat to read the output before the
+// feedback affordance grabs attention.
+const REVEAL_DELAY_MS = 2000;
 
 export function ImproveForm({
   workspaceSlug,
@@ -31,6 +36,12 @@ export function ImproveForm({
   const [feedback, setFeedback] = useState("");
   const [result, setResult] = useState<ImproveResult | null>(null);
   const [pending, startTransition] = useTransition();
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setRevealed(true), REVEAL_DELAY_MS);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -48,6 +59,9 @@ export function ImproveForm({
   };
 
   return (
+    <div
+      className={`transition-opacity duration-700 ease-out ${revealed ? "opacity-100" : "opacity-0"}`}
+    >
     <Section title="Improve the Agent">
       <FeedbackHistory feedbacks={feedbacks} />
       <form
@@ -82,6 +96,7 @@ export function ImproveForm({
         {result && <ResultBanner result={result} />}
       </form>
     </Section>
+    </div>
   );
 }
 
