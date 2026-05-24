@@ -53,6 +53,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-tas}:${POSTGRES_PASSWORD:-tas}@postgres:5432/${POSTGRES_DB:-tas}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in .env}
+      TAS_ENCRYPTION_KEY: ${TAS_ENCRYPTION_KEY:?TAS_ENCRYPTION_KEY must be set in .env}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       API_INTERNAL_URL: http://api:8080
       NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}

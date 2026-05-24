@@ -1,10 +1,14 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { SignOutButton } from "@/components/sign-out-button";
-import { getApiHealth } from "@/lib/api";
 import { getInstanceName } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
+import {
+  getWorkspaceBySlug,
+  getWorkspaceSecretPreview,
+  userIsMember,
+} from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -16,23 +20,17 @@ export default async function WorkspacePage({
   const { workspace: slug } = await params;
 
   const session = await getServerSession();
-  if (!session) {
-    // Unauthenticated visitor — let the root page render the login screen
-    // rather than leaking the existence of the workspace.
-    notFound();
-  }
+  if (!session) notFound();
 
   const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) {
-    notFound();
-  }
+  if (!workspace) notFound();
 
   const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) {
-    notFound();
-  }
+  if (!isMember) notFound();
 
-  const [health] = await Promise.all([getApiHealth()]);
+  const [apiKeyPreview] = await Promise.all([
+    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
+  ]);
   const instanceName = getInstanceName();
 
   return (
@@ -52,8 +50,36 @@ export default async function WorkspacePage({
             </span>
           </p>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/${workspace.slug}/settings`}
+            className="text-foreground-weak hover:text-foreground text-sm"
+          >
+            Settings
+          </Link>
+          <SignOutButton />
+        </div>
       </header>
+
+      {!apiKeyPreview && (
+        <section className="bg-surface-raised border-border flex flex-col gap-2 rounded-lg border p-4">
+          <h2 className="text-foreground text-sm font-medium">
+            Add your Tembo API key
+          </h2>
+          <p className="text-foreground-weak text-sm">
+            TAS needs a Tembo API key to invoke Tembo services on this
+            workspace&apos;s behalf. Until it&apos;s set, agents can&apos;t run.
+          </p>
+          <div>
+            <Link
+              href={`/${workspace.slug}/settings`}
+              className="text-foreground hover:underline text-sm font-medium"
+            >
+              Add it in Settings →
+            </Link>
+          </div>
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="text-foreground-weak text-sm font-medium uppercase tracking-wider">
@@ -62,15 +88,6 @@ export default async function WorkspacePage({
         <div className="bg-surface-raised border-border text-foreground-weak rounded-lg border p-8 text-center text-sm">
           No agents yet. Repo wiring + agent creation land in the next slice.
         </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-foreground-weak text-sm font-medium uppercase tracking-wider">
-          API health
-        </h2>
-        <pre className="bg-surface-raised border-border text-foreground overflow-x-auto rounded-lg border p-4 text-sm leading-6">
-          {JSON.stringify(health, null, 2)}
-        </pre>
       </section>
     </main>
   );
