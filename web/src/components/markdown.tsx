@@ -10,6 +10,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
 import { cn } from "@/lib/utils";
@@ -38,7 +39,15 @@ export function Markdown({ children, className }: Props) {
         className,
       )}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
+      {/* remark-breaks turns every single newline into a <br>, so
+          agent output that wraps "NBA Scores\nKnicks…" doesn't get
+          mashed onto the same line by CommonMark's default
+          (newline-as-whitespace) rule. Chat UIs uniformly expect
+          this for LLM output; switching back if we ever render
+          long-form authored markdown is one line. */}
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+        {children}
+      </ReactMarkdown>
     </div>
   );
 }
