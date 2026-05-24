@@ -77,12 +77,6 @@ export default async function AgentDetailPage({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {agent.ok && (
-              <RunNowButton
-                workspaceSlug={workspace.slug}
-                agentName={canonicalName}
-              />
-            )}
             <Button asChild variant="ghost">
               <a href={sourceHref} target="_blank" rel="noreferrer noopener">
                 View source
@@ -100,6 +94,13 @@ export default async function AgentDetailPage({
           </p>
         )}
       </div>
+
+      {agent.ok && (
+        <RunNowButton
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+        />
+      )}
 
       <hr className="border-[var(--color-border-weak)]" />
 
