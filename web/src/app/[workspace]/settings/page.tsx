@@ -13,6 +13,7 @@ import {
 } from "@/lib/workspace";
 
 import { DisconnectRepoForm } from "./disconnect-repo-form";
+import { FaviconPicker } from "./favicon-picker";
 import { RestoreAgentForm } from "./restore-agent-form";
 import { SecretKeyForm } from "./secret-key-form";
 
@@ -44,6 +45,17 @@ export default async function SettingsPage({
       <TopBar title="Settings" />
 
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-6">
+        <Section
+          title="Favicon"
+          description="Shown in the browser tab for everyone using this workspace. Pick a default or upload a custom image."
+        >
+          <FaviconPicker
+            workspaceSlug={workspace.slug}
+            currentKind={workspace.faviconKind}
+            cacheKey={workspace.updatedAt.getTime().toString()}
+          />
+        </Section>
+
         <Section
           title="GitHub repository"
           description="The repo where this workspace's agent definitions live. Disconnecting drops the stored token and returns the workspace to the onboarding repo step."

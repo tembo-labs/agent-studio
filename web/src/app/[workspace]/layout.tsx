@@ -1,8 +1,25 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ workspace: string }>;
+}): Promise<Metadata> {
+  const { workspace: slug } = await params;
+  // Point at our favicon route handler — the handler resolves the
+  // workspace's chosen default or streams the custom blob. We deliberately
+  // don't await getWorkspaceBySlug here just to read favicon_kind because
+  // the handler does that for itself; this keeps metadata generation fast.
+  const href = `/api/workspaces/${encodeURIComponent(slug)}/favicon`;
+  return {
+    icons: { icon: href, shortcut: href, apple: href },
+  };
+}
 
 export default async function WorkspaceLayout({
   children,

@@ -14,6 +14,17 @@ export type WorkspaceSecretKind =
   | "github_pat"
   | "anthropic_api_key";
 
+// Single source of truth lives in @/lib/favicon-constants (client-safe).
+// Re-exported here so server-side callers don't need to know.
+export {
+  FAVICON_KINDS,
+  DEFAULT_FAVICON_KINDS,
+  FAVICON_LABELS,
+} from "@/lib/favicon-constants";
+export type { FaviconKind } from "@/lib/favicon-constants";
+
+import type { FaviconKind } from "@/lib/favicon-constants";
+
 export type Workspace = {
   id: string;
   name: string;
@@ -21,6 +32,7 @@ export type Workspace = {
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
+  faviconKind: FaviconKind;
 };
 
 function rowToWorkspace(row: {
@@ -30,6 +42,7 @@ function rowToWorkspace(row: {
   created_by: string;
   created_at: Date;
   updated_at: Date;
+  favicon_kind: FaviconKind;
 }): Workspace {
   return {
     id: row.id,
@@ -38,19 +51,26 @@ function rowToWorkspace(row: {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    faviconKind: row.favicon_kind,
   };
 }
 
+type WorkspaceRow = {
+  id: string;
+  name: string;
+  slug: string;
+  created_by: string;
+  created_at: Date;
+  updated_at: Date;
+  favicon_kind: FaviconKind;
+};
+
+const WORKSPACE_COLUMNS =
+  "id, name, slug, created_by, created_at, updated_at, favicon_kind";
+
 export async function listWorkspacesForUser(userId: string): Promise<Workspace[]> {
-  const { rows } = await db.query<{
-    id: string;
-    name: string;
-    slug: string;
-    created_by: string;
-    created_at: Date;
-    updated_at: Date;
-  }>(
-    `SELECT w.id, w.name, w.slug, w.created_by, w.created_at, w.updated_at
+  const { rows } = await db.query<WorkspaceRow>(
+    `SELECT w.id, w.name, w.slug, w.created_by, w.created_at, w.updated_at, w.favicon_kind
        FROM workspace w
        JOIN workspace_member m ON m.workspace_id = w.id
       WHERE m.user_id = $1
@@ -63,15 +83,8 @@ export async function listWorkspacesForUser(userId: string): Promise<Workspace[]
 export async function getWorkspaceBySlug(
   slug: string,
 ): Promise<Workspace | null> {
-  const { rows } = await db.query<{
-    id: string;
-    name: string;
-    slug: string;
-    created_by: string;
-    created_at: Date;
-    updated_at: Date;
-  }>(
-    `SELECT id, name, slug, created_by, created_at, updated_at
+  const { rows } = await db.query<WorkspaceRow>(
+    `SELECT ${WORKSPACE_COLUMNS}
        FROM workspace
       WHERE slug = $1
       LIMIT 1`,
@@ -138,17 +151,10 @@ export async function createWorkspace(
       return { ok: false, error: "slug-taken" };
     }
 
-    const { rows } = await client.query<{
-      id: string;
-      name: string;
-      slug: string;
-      created_by: string;
-      created_at: Date;
-      updated_at: Date;
-    }>(
+    const { rows } = await client.query<WorkspaceRow>(
       `INSERT INTO workspace (name, slug, created_by)
        VALUES ($1, $2, $3)
-       RETURNING id, name, slug, created_by, created_at, updated_at`,
+       RETURNING ${WORKSPACE_COLUMNS}`,
       [name, slug, userId],
     );
     const workspace = rowToWorkspace(rows[0]);
@@ -167,6 +173,91 @@ export async function createWorkspace(
   } finally {
     client.release();
   }
+}
+
+// ── Workspace favicon ────────────────────────────────────────────────────
+
+const FAVICON_ALLOWED_MIMES = new Set([
+  "image/png",
+  "image/svg+xml",
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
+]);
+const FAVICON_MAX_BYTES = 200 * 1024;
+
+export type SetFaviconError =
+  | "no-workspace"
+  | "empty"
+  | "too-large"
+  | "unsupported-mime";
+
+export type SetFaviconResult =
+  | { ok: true; kind: FaviconKind }
+  | { ok: false; error: SetFaviconError };
+
+export async function setFaviconDefault(
+  workspaceId: string,
+  kind: Exclude<FaviconKind, "custom">,
+): Promise<SetFaviconResult> {
+  // Clearing blob+mime keeps `custom` data from lingering after switching
+  // away from it.
+  const { rowCount } = await db.query(
+    `UPDATE workspace
+        SET favicon_kind = $2,
+            favicon_blob = NULL,
+            favicon_mime = NULL,
+            updated_at = NOW()
+      WHERE id = $1`,
+    [workspaceId, kind],
+  );
+  if (!rowCount) return { ok: false, error: "no-workspace" };
+  return { ok: true, kind };
+}
+
+export async function setFaviconCustom(
+  workspaceId: string,
+  args: { bytes: Buffer; mime: string },
+): Promise<SetFaviconResult> {
+  if (args.bytes.length === 0) return { ok: false, error: "empty" };
+  if (args.bytes.length > FAVICON_MAX_BYTES) {
+    return { ok: false, error: "too-large" };
+  }
+  if (!FAVICON_ALLOWED_MIMES.has(args.mime)) {
+    return { ok: false, error: "unsupported-mime" };
+  }
+  const { rowCount } = await db.query(
+    `UPDATE workspace
+        SET favicon_kind = 'custom',
+            favicon_blob = $2,
+            favicon_mime = $3,
+            updated_at = NOW()
+      WHERE id = $1`,
+    [workspaceId, args.bytes, args.mime],
+  );
+  if (!rowCount) return { ok: false, error: "no-workspace" };
+  return { ok: true, kind: "custom" };
+}
+
+/**
+ * Returns the custom favicon bytes + mime if `favicon_kind = 'custom'`,
+ * otherwise null (the caller redirects to the static default).
+ */
+export async function getCustomFaviconBytes(
+  workspaceId: string,
+): Promise<{ bytes: Buffer; mime: string } | null> {
+  const { rows } = await db.query<{
+    favicon_kind: FaviconKind;
+    favicon_blob: Buffer | null;
+    favicon_mime: string | null;
+  }>(
+    `SELECT favicon_kind, favicon_blob, favicon_mime
+       FROM workspace WHERE id = $1`,
+    [workspaceId],
+  );
+  const row = rows[0];
+  if (!row || row.favicon_kind !== "custom") return null;
+  if (!row.favicon_blob || !row.favicon_mime) return null;
+  return { bytes: row.favicon_blob, mime: row.favicon_mime };
 }
 
 // ── Workspace secrets ────────────────────────────────────────────────────

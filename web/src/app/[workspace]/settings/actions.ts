@@ -9,11 +9,16 @@ import {
   type RestoreAgentError,
 } from "@/lib/workspace-agents";
 import {
+  DEFAULT_FAVICON_KINDS,
   disconnectWorkspaceRepo,
   getWorkspaceBySlug,
   removeWorkspaceSecret,
+  setFaviconCustom,
+  setFaviconDefault,
   setWorkspaceSecret,
   userIsMember,
+  type FaviconKind,
+  type SetFaviconError,
   type SetWorkspaceSecretError,
   type WorkspaceSecretKind,
 } from "@/lib/workspace";
@@ -154,6 +159,70 @@ export async function restoreAgentAction(
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
   return { message: `Restored ${result.agentName}.` };
+}
+
+export type FaviconFormState = {
+  message?: string;
+  error?: string;
+};
+
+const FAVICON_ERROR_MESSAGES: Record<SetFaviconError, string> = {
+  "no-workspace": "Workspace not found.",
+  empty: "Pick a file to upload.",
+  "too-large":
+    "Favicons must be 200 KB or smaller. Compress the image and try again.",
+  "unsupported-mime":
+    "Use PNG, SVG, or ICO. Other formats aren't supported for favicons.",
+};
+
+function isDefaultFaviconKind(
+  v: string,
+): v is Exclude<FaviconKind, "custom"> {
+  return (DEFAULT_FAVICON_KINDS as readonly string[]).includes(v);
+}
+
+export async function setFaviconDefaultAction(
+  _prev: FaviconFormState,
+  formData: FormData,
+): Promise<FaviconFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const kindRaw = String(formData.get("kind") ?? "");
+  if (!isDefaultFaviconKind(kindRaw)) {
+    return { error: "Unknown favicon kind." };
+  }
+
+  const workspace = await authorizeWorkspace(slug);
+  const result = await setFaviconDefault(workspace.id, kindRaw);
+  if (!result.ok) {
+    return { error: FAVICON_ERROR_MESSAGES[result.error] };
+  }
+  revalidatePath(`/${slug}/settings`);
+  revalidatePath(`/${slug}`);
+  return { message: "Favicon updated." };
+}
+
+export async function uploadFaviconAction(
+  _prev: FaviconFormState,
+  formData: FormData,
+): Promise<FaviconFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: FAVICON_ERROR_MESSAGES.empty };
+  }
+
+  const workspace = await authorizeWorkspace(slug);
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const result = await setFaviconCustom(workspace.id, {
+    bytes: buffer,
+    mime: file.type || "application/octet-stream",
+  });
+  if (!result.ok) {
+    return { error: FAVICON_ERROR_MESSAGES[result.error] };
+  }
+  revalidatePath(`/${slug}/settings`);
+  revalidatePath(`/${slug}`);
+  return { message: "Custom favicon uploaded." };
 }
 
 export async function disconnectRepoAction(

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { SignOutButton } from "@/components/sign-out-button";
 import { SidebarNavItem } from "@/components/sidebar-nav-item";
+import { UserMenu } from "@/components/user-menu";
 import { getInstanceName } from "@/lib/config";
 import type { Workspace } from "@/lib/workspace";
 import { IconAgent, IconSettingsSliderHor } from "central-icons";
@@ -53,20 +53,8 @@ export function AppShell({ workspace, user, children }: Props) {
           />
         </nav>
 
-        <div className="border-border flex flex-col gap-2 border-t px-3 py-3">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-foreground text-xs font-medium leading-tight">
-              {user.name ?? user.email}
-            </span>
-            {user.name && (
-              <span className="text-foreground-muted text-[11px] leading-tight">
-                {user.email}
-              </span>
-            )}
-          </div>
-          <div>
-            <SignOutButton />
-          </div>
+        <div className="border-border border-t px-2 py-2">
+          <UserMenu name={user.name ?? null} email={user.email} />
         </div>
       </aside>
 
