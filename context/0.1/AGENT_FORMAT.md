@@ -115,6 +115,42 @@ CrewAI's YAML covers role/goal/backstory/tasks, but the orchestration always liv
 ### v0.6 — Mycelium
 - Patterns are exchanged as `AgentSpec` fragments (typed, schema-validated, provenance-bearing), not as opaque blobs.
 
+## Harness field (US-0.1-07)
+
+TAS extends the standard Pydantic AI `AgentSpec` with a **required** `harness` field. The motivation comes straight from the user story: when an agent misbehaves, the triaging operator should be able to tell *at a glance* whether the problem is the prompt, the harness, or the model — without opening a ticket. Putting harness next to model in the agent definition makes the on-call's first instinct ("which knob moved?") a one-glance answer.
+
+### Supported values
+
+| Value | Label | Notes |
+| --- | --- | --- |
+| `claude-code` | Claude Code | Anthropic's coding-agent harness. The v0.1 starter default. |
+| `opencode` | OpenCode | Open-source coding harness compatible with multiple model providers. |
+| `pi` | Pi | Tembo's internal harness. |
+
+Unrecognized harness values are rejected at PR/commit time by the validator in `web/src/lib/agent-format.ts` (the `HARNESSES` constant is the source of truth). A typo like `claude-codee` fails on the create-agent form, never at run time. Adding a new harness is a single code change plus a docs update — intentionally cheap, so the floor stays current with what customers actually use.
+
+### Model field
+
+`model` remains a free-form string. Different harnesses support different model sets and the mapping changes too often to bake into the schema. Documented examples per harness:
+
+- `claude-code` — `anthropic:claude-sonnet-4-6`, `anthropic:claude-opus-4-6`.
+- `opencode` — any provider URI the OpenCode runtime supports (`openai:gpt-4o`, `anthropic:claude-sonnet-4-6`, `groq:llama-3.3-70b`, …).
+- `pi` — Tembo-hosted aliases (TBD; track in the format matrix doc as it stabilizes).
+
+If a customer pilot blocks on per-harness model whitelisting, we can add CHECK-style enums in a follow-up; the current open-string approach trades some strictness for keeping new model releases self-serve.
+
+### Where this surfaces
+
+- The agent definition file itself (committed to Git like any other field).
+- Agent list rows on the workspace home — both shown as visible Badges (harness in blue, model in purple).
+- The per-agent detail page header — same badges, bigger.
+- v0.3 dashboards / topology / failure-investigation surfaces will pivot on `harness` and `model` as first-class run-metadata facets.
+- Changes to either go through the same review path as any other agent change (chat-to-PR in v0.2, direct PR otherwise) — never edited in a live console.
+
+### Starter template default
+
+The v0.1 starter ships with `harness: claude-code` + `model: anthropic:claude-sonnet-4-6`. This resolves the open question in [`context/0.1/README.md`](./README.md): a workspace-level default would shift the decision from per-agent to per-workspace, but most early pilots have heterogeneous agents and want to pick at create time. Starter defaults stay simple; the create-agent form's harness dropdown lets the author override.
+
 ## Open questions
 
 - Should the v0.1 converter (Cargo AI JSON → `AgentSpec` YAML) be one-way only, or round-trippable? Lossless round-tripping is hard because the two formats have different action models (JSON Logic + run-steps vs. capabilities + tools).

@@ -8,6 +8,7 @@ import {
   validateAgentName,
   type AgentFileFormat,
   type AgentSpec,
+  type Harness,
   type ParseAgentError,
 } from "@/lib/agent-format";
 import {
@@ -112,6 +113,43 @@ export async function listAgents(workspaceId: string): Promise<ListAgentsResult>
   return { ok: true, agents };
 }
 
+/**
+ * Find one agent by its declared name. Returns:
+ *  - the agent (valid or invalid) if a file in agents/ parses to that name
+ *  - the invalid file if its filename basename matches (so broken specs
+ *    are still inspectable on the detail page)
+ *  - null otherwise
+ */
+export async function getAgentByName(
+  workspaceId: string,
+  agentName: string,
+): Promise<{
+  agent: ListedAgent;
+  raw: string;
+} | null> {
+  const list = await listAgents(workspaceId);
+  if (!list.ok) return null;
+
+  const match = list.agents.find((a) => {
+    if (a.ok) return a.spec.name === agentName;
+    // For invalid files, fall back to filename-basename match.
+    const base = a.filename.replace(/\.(yaml|yml|json)$/i, "");
+    return base === agentName;
+  });
+  if (!match) return null;
+
+  const repo = await getWorkspaceRepo(workspaceId);
+  if (!repo) return null;
+  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
+  const read = await readFile(
+    token,
+    { owner: repo.owner, name: repo.name, branch: repo.defaultBranch },
+    match.path,
+  );
+  if (!read.ok) return null;
+  return { agent: match, raw: read.content };
+}
+
 export type CreateAgentError =
   | "no-repo"
   | "invalid-name"
@@ -152,6 +190,7 @@ async function commitAgentFile(
 export async function createAgentFromTemplate(
   workspaceId: string,
   name: string,
+  harness: Harness,
 ): Promise<CreateAgentResult> {
   if (!validateAgentName(name)) {
     return {
@@ -160,7 +199,7 @@ export async function createAgentFromTemplate(
       detail: "Use 2–64 chars, lowercase letters, digits, and hyphens.",
     };
   }
-  const content = renderStarter(name);
+  const content = renderStarter(name, harness);
   return commitAgentFile(
     workspaceId,
     `${name}.yaml`,

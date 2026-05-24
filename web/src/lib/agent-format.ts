@@ -1,13 +1,25 @@
 import "server-only";
 import YAML from "yaml";
 
+import { HARNESSES, type Harness } from "@/lib/agent-harness";
+
 // Pydantic AI AgentSpec — minimum shape we require for v0.1. The full spec
 // is broader (capabilities, output_schema, deps_schema, model_settings,
 // instrument, …); we deliberately validate only the load-bearing fields so
 // custom extensions pass through. See context/0.1/AGENT_FORMAT.md.
+//
+// `harness` is a TAS extension to the standard AgentSpec, added by US-0.1-07
+// so reviewers can tell at a glance whether a misbehaving agent's issue is
+// the prompt, the harness, or the model. Enforced as an enum at validation
+// time so a typo (claude-codee) is caught on commit instead of at run time.
+
+// Re-export so callers that import from agent-format keep working.
+export { HARNESSES, HARNESS_LABELS } from "@/lib/agent-harness";
+export type { Harness } from "@/lib/agent-harness";
 
 export type AgentSpec = {
   name: string;
+  harness: Harness;
   model: string;
   instructions: string;
   description?: string;
@@ -23,6 +35,8 @@ export type ParseAgentError =
   | "invalid-json"
   | "not-an-object"
   | "missing-name"
+  | "missing-harness"
+  | "invalid-harness"
   | "missing-model"
   | "missing-instructions"
   | "invalid-name";
@@ -45,6 +59,10 @@ export function validateAgentName(name: string): boolean {
   return name.length >= 2 && name.length <= 64 && NAME_RE.test(name);
 }
 
+function isHarness(v: unknown): v is Harness {
+  return typeof v === "string" && (HARNESSES as readonly string[]).includes(v);
+}
+
 export function parseAgentContent(
   content: string,
   format: AgentFileFormat,
@@ -65,6 +83,7 @@ export function parseAgentContent(
   }
 
   const obj = parsed as Record<string, unknown>;
+
   const name = obj.name;
   if (typeof name !== "string" || !name.trim()) {
     return { ok: false, error: "missing-name" };
@@ -77,6 +96,23 @@ export function parseAgentContent(
         "Agent name must be 2–64 chars, lowercase letters, digits, and hyphens.",
     };
   }
+
+  const harnessVal = obj.harness;
+  if (harnessVal === undefined || harnessVal === null || harnessVal === "") {
+    return {
+      ok: false,
+      error: "missing-harness",
+      detail: `Add a harness field. Supported: ${HARNESSES.join(", ")}.`,
+    };
+  }
+  if (!isHarness(harnessVal)) {
+    return {
+      ok: false,
+      error: "invalid-harness",
+      detail: `Unrecognized harness "${String(harnessVal)}". Supported: ${HARNESSES.join(", ")}.`,
+    };
+  }
+
   const model = obj.model;
   if (typeof model !== "string" || !model.trim()) {
     return { ok: false, error: "missing-model" };
@@ -92,7 +128,7 @@ export function parseAgentContent(
   return {
     ok: true,
     format,
-    spec: { name, model, instructions, description, raw: obj },
+    spec: { name, harness: harnessVal, model, instructions, description, raw: obj },
   };
 }
 
@@ -107,9 +143,18 @@ export function parseAgentFile(
   return parseAgentContent(content, format);
 }
 
-export const STARTER_TEMPLATE_YAML = `# Pydantic AI AgentSpec — see context/0.1/AGENT_FORMAT.md
-name: {{NAME}}
-model: anthropic:claude-sonnet-4-6
+// The starter template ships with a default harness/model pair so the
+// "from template" path stays a one-field form. Per the v0.1 README open
+// question, this is the agreed default; per-workspace defaults can land
+// later if a customer asks.
+export const STARTER_DEFAULT_HARNESS: Harness = "claude-code";
+export const STARTER_DEFAULT_MODEL = "anthropic:claude-sonnet-4-6";
+
+export function renderStarter(name: string, harness: Harness): string {
+  return `# Pydantic AI AgentSpec — see context/0.1/AGENT_FORMAT.md
+name: ${name}
+harness: ${harness}
+model: ${STARTER_DEFAULT_MODEL}
 description: Sample agent generated from the v0.1 starter template.
 instructions: |
   You are a friendly agent.
@@ -117,8 +162,4 @@ instructions: |
 model_settings:
   max_tokens: 512
 `;
-
-/** Render the starter template with the given agent name interpolated. */
-export function renderStarter(name: string): string {
-  return STARTER_TEMPLATE_YAML.replace("{{NAME}}", name);
 }

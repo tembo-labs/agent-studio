@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { SignOutButton } from "@/components/sign-out-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { HARNESS_LABELS } from "@/lib/agent-format";
 import { getInstanceName } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
 import { listAgents, type ListedAgent } from "@/lib/workspace-agents";
@@ -162,6 +164,7 @@ function AgentList({
         <li key={agent.path} className="px-4 py-3">
           <AgentRow
             agent={agent}
+            workspaceSlug={workspaceSlug}
             repoOwner={repoOwner}
             repoName={repoName}
             defaultBranch={defaultBranch}
@@ -174,29 +177,41 @@ function AgentList({
 
 function AgentRow({
   agent,
+  workspaceSlug,
   repoOwner,
   repoName,
   defaultBranch,
 }: {
   agent: ListedAgent;
+  workspaceSlug: string;
   repoOwner: string;
   repoName: string;
   defaultBranch: string;
 }) {
   const sourceHref = `https://github.com/${repoOwner}/${repoName}/blob/${defaultBranch}/${agent.path}`;
   if (agent.ok) {
+    const detailHref = `/${workspaceSlug}/agents/${encodeURIComponent(agent.spec.name)}`;
     return (
       <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col">
-          <span className="text-foreground text-sm font-medium">
+        <Link
+          href={detailHref}
+          className="flex flex-1 flex-col gap-1 -my-1 py-1"
+        >
+          <span className="text-foreground text-sm font-medium hover:underline">
             {agent.spec.name}
           </span>
-          <span className="text-foreground-muted text-xs">
-            <code>{agent.spec.model}</code>
-            <span className="text-foreground-muted"> · </span>
-            <code>{agent.filename}</code>
-          </span>
-        </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant="blue" size="small">
+              {HARNESS_LABELS[agent.spec.harness]}
+            </Badge>
+            <Badge variant="purple" size="small">
+              {agent.spec.model}
+            </Badge>
+            <span className="text-foreground-muted text-xs">
+              <code>{agent.filename}</code>
+            </span>
+          </div>
+        </Link>
         <a
           href={sourceHref}
           target="_blank"
