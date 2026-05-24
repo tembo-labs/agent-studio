@@ -8,6 +8,7 @@ import {
   validateAgentName,
   type AgentFileFormat,
   type AgentSpec,
+  type Framework,
   type ParseAgentError,
 } from "@/lib/agent-format";
 import { db } from "@/lib/db";
@@ -22,6 +23,18 @@ import {
 import { getWorkspaceRepo, getWorkspaceSecretPlaintext } from "@/lib/workspace";
 
 const AGENTS_DIR = "agents";
+
+// Where new agents are written, per framework. The repo's `agents/`
+// directory uses one subfolder per supported framework so v0.3+ multi-
+// file frameworks (LangGraph, Mastra, …) slot in cleanly without
+// migration churn. v0.1 still *reads* agents directly under agents/
+// (legacy flat layout) so existing workspaces keep working.
+const FRAMEWORK_DIRS: Record<Framework, string> = {
+  "pydantic-agentspec": "pydantic-agentspec",
+  "cargo-ai": "cargo-ai",
+};
+
+const FRAMEWORK_DIR_VALUES = Object.values(FRAMEWORK_DIRS);
 
 export type ListedAgent =
   | {
@@ -45,9 +58,14 @@ export type ListAgentsResult =
   | { ok: false; error: GitHubFileError | "no-repo"; detail?: string };
 
 /**
- * Loads the connected repo's `agents/` directory and parses every file.
- * Invalid files are surfaced in the list with their parser error rather
- * than silently filtered — US-0.1-05 explicitly rejects "silent failure."
+ * Walk the connected repo's `agents/` tree and parse every file we find.
+ *
+ *   agents/                        ← legacy flat layout (still read in v0.1)
+ *   agents/pydantic-agentspec/     ← new layout, framework subfolder
+ *   agents/cargo-ai/               ← new layout, framework subfolder
+ *
+ * Invalid files are surfaced inline with their parser error rather than
+ * silently filtered — US-0.1-05 explicitly rejects "silent failure."
  */
 export async function listAgents(workspaceId: string): Promise<ListAgentsResult> {
   const repo = await getWorkspaceRepo(workspaceId);
@@ -60,17 +78,42 @@ export async function listAgents(workspaceId: string): Promise<ListAgentsResult>
     branch: repo.defaultBranch,
   };
 
-  const dir = await listDirectory(token, ref, AGENTS_DIR);
-  if (!dir.ok) return { ok: false, error: dir.error, detail: dir.detail };
+  // Top-level listing. We want only file entries (legacy flat agents)
+  // here — subfolders for each known framework get walked separately.
+  const top = await listDirectory(token, ref, AGENTS_DIR);
+  if (!top.ok) return { ok: false, error: top.error, detail: top.detail };
 
-  // Only `.yaml` / `.yml` / `.json` files at the top level for now. Subdirs
-  // are out of scope until we have a clear use case.
-  const fileEntries = dir.entries.filter(
+  const flatFileEntries = top.entries.filter(
     (e) => e.type === "file" && detectFormat(e.name) !== null,
   );
 
+  // Walk each framework subfolder. Missing subfolders are normal (a
+  // fresh repo won't have an agents/cargo-ai/ directory yet) — those
+  // surface as `entries: []` from listDirectory's `missing: true` path.
+  const subfolderListings = await Promise.all(
+    FRAMEWORK_DIR_VALUES.map((dir) =>
+      listDirectory(token, ref, `${AGENTS_DIR}/${dir}`),
+    ),
+  );
+
+  for (const sub of subfolderListings) {
+    if (!sub.ok) {
+      return { ok: false, error: sub.error, detail: sub.detail };
+    }
+  }
+
+  const subfolderFileEntries = subfolderListings.flatMap((sub) =>
+    sub.ok
+      ? sub.entries.filter(
+          (e) => e.type === "file" && detectFormat(e.name) !== null,
+        )
+      : [],
+  );
+
+  const allEntries = [...flatFileEntries, ...subfolderFileEntries];
+
   const agents = await Promise.all(
-    fileEntries.map(async (entry): Promise<ListedAgent> => {
+    allEntries.map(async (entry): Promise<ListedAgent> => {
       const read = await readFile(token, ref, entry.path);
       if (!read.ok) {
         return {
@@ -78,7 +121,7 @@ export async function listAgents(workspaceId: string): Promise<ListAgentsResult>
           path: entry.path,
           format: detectFormat(entry.name),
           ok: false,
-          error: "invalid-yaml", // approximate — file read failure surfaces as parse error
+          error: "invalid-yaml",
           detail: read.detail ?? read.error,
         };
       }
@@ -116,7 +159,7 @@ export async function listAgents(workspaceId: string): Promise<ListAgentsResult>
 
 /**
  * Find one agent by its declared name. Returns:
- *  - the agent (valid or invalid) if a file in agents/ parses to that name
+ *  - the agent (valid or invalid) if a file in agents/** parses to that name
  *  - the invalid file if its filename basename matches (so broken specs
  *    are still inspectable on the detail page)
  *  - null otherwise
@@ -133,7 +176,6 @@ export async function getAgentByName(
 
   const match = list.agents.find((a) => {
     if (a.ok) return a.spec.name === agentName;
-    // For invalid files, fall back to filename-basename match.
     const base = a.filename.replace(/\.(yaml|yml|json)$/i, "");
     return base === agentName;
   });
@@ -154,6 +196,7 @@ export async function getAgentByName(
 export type CreateAgentError =
   | "no-repo"
   | "invalid-name"
+  | "name-taken"
   | ParseAgentError
   | GitHubFileError;
 
@@ -161,8 +204,22 @@ export type CreateAgentResult =
   | { ok: true; filename: string; path: string; commitSha: string }
   | { ok: false; error: CreateAgentError; detail?: string };
 
+async function nameAlreadyExists(
+  workspaceId: string,
+  name: string,
+): Promise<boolean> {
+  const list = await listAgents(workspaceId);
+  if (!list.ok) return false;
+  return list.agents.some((a) => {
+    if (a.ok) return a.spec.name === name;
+    const base = a.filename.replace(/\.(yaml|yml|json)$/i, "");
+    return base === name;
+  });
+}
+
 async function commitAgentFile(
   workspaceId: string,
+  framework: Framework,
   filename: string,
   content: string,
   commitMessage: string,
@@ -176,7 +233,7 @@ async function commitAgentFile(
     name: repo.name,
     branch: repo.defaultBranch,
   };
-  const path = `${AGENTS_DIR}/${filename}`;
+  const path = `${AGENTS_DIR}/${FRAMEWORK_DIRS[framework]}/${filename}`;
 
   const result = await createFile(token, ref, path, {
     content,
@@ -199,9 +256,17 @@ export async function createAgentFromTemplate(
       detail: "Use 2–64 chars, lowercase letters, digits, and hyphens.",
     };
   }
+  if (await nameAlreadyExists(workspaceId, name)) {
+    return {
+      ok: false,
+      error: "name-taken",
+      detail: "An agent with this name already exists in the repo.",
+    };
+  }
   const content = renderStarter(name);
   return commitAgentFile(
     workspaceId,
+    "pydantic-agentspec",
     `${name}.yaml`,
     content,
     `Create agent: ${name} (from starter template)`,
@@ -217,9 +282,17 @@ export async function createAgentFromContent(
   if (!parsed.ok) {
     return { ok: false, error: parsed.error, detail: parsed.detail };
   }
+  if (await nameAlreadyExists(workspaceId, parsed.spec.name)) {
+    return {
+      ok: false,
+      error: "name-taken",
+      detail: "An agent with this name already exists in the repo.",
+    };
+  }
   const filename = `${parsed.spec.name}.${format === "yaml" ? "yaml" : "json"}`;
   return commitAgentFile(
     workspaceId,
+    parsed.spec.framework,
     filename,
     content,
     `Create agent: ${parsed.spec.name}`,
@@ -238,11 +311,6 @@ export type DeleteAgentResult =
   | { ok: true; commitSha: string }
   | { ok: false; error: DeleteAgentError; detail?: string };
 
-/**
- * Remove the agent's file from the connected repo *and* record the
- * deletion (with a full content snapshot) so it can be restored later
- * without walking Git history.
- */
 export async function deleteAgent(
   workspaceId: string,
   userId: string,
@@ -261,8 +329,6 @@ export async function deleteAgent(
     branch: repo.defaultBranch,
   };
 
-  // Re-read for an up-to-date sha (the snapshot from getAgentByName may
-  // have lost the race to a concurrent edit).
   const read = await readFile(token, ref, found.agent.path);
   if (!read.ok) {
     return {
@@ -378,9 +444,6 @@ export async function restoreAgent(
     message: `Restore agent: ${row.agent_name}`,
   });
   if (!create.ok) {
-    // path-exists means someone re-created an agent with the same name
-    // since the original deletion. Surface that explicitly so the UI can
-    // tell the user to rename the live one first.
     return { ok: false, error: create.error, detail: create.detail };
   }
 

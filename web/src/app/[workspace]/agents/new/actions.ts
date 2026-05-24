@@ -19,6 +19,8 @@ const ERROR_MESSAGES: Record<CreateAgentError, string> = {
   "no-repo": "Connect a Git repository before creating an agent.",
   "invalid-name":
     "Agent name must be 2–64 chars, lowercase letters, digits, and hyphens.",
+  "name-taken":
+    "An agent with this name already exists in the connected repo. Pick a different name.",
   "unsupported-extension":
     "Only .yaml, .yml, and .json agent files are supported.",
   "invalid-yaml": "Could not parse that YAML.",

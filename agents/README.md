@@ -1,23 +1,32 @@
 # Agents
 
-This folder holds your agent definitions. Tembo Agent Studio supports two
-declarative, file-based formats out of the box:
+This folder holds your agent definitions, organized by framework:
 
-- **Pydantic AI `AgentSpec` (YAML or JSON)** — the canonical, primary format.
-  Parsed, listed, and **runnable** in v0.1. The "From template" path in the
-  create-agent UI emits this format. Example:
-  [`hello-world.yaml`](./hello-world.yaml).
+```
+agents/
+├── pydantic-agentspec/    Pydantic AI `AgentSpec` (YAML or JSON)
+│   └── hello-world.yaml   ← starter sample
+└── cargo-ai/              Cargo AI JSON
+    └── hello-world.json   ← starter sample
+```
 
-- **Cargo AI JSON** — single-file agent definitions with `agent_schema` and
-  `actions`. Parsed and listed in v0.1 (paste-import via the create-agent
-  UI). The Cargo AI **runtime** lands with the v0.3+ multi-framework slice
-  (see [`../context/0.3/README.md`](../context/0.3/README.md)) — until
-  then, Run now is hidden on these agents. Example:
-  [`hello-world-cargo.json`](./hello-world-cargo.json).
+One subfolder per framework. The v0.1 create-agent UI writes new files
+into the right subfolder automatically based on the parsed shape.
 
-Pick whichever format fits the agent. Both live next to each other in the
-repo, both diff cleanly in a pull request, and both surface in the same
-agent list with framework + model badges so triage knows which is which.
+**Supported frameworks in v0.1:**
+
+- **Pydantic AI `AgentSpec`** (YAML or JSON) — the canonical, primary
+  format. Parsed, listed, and **runnable** end-to-end against Anthropic.
+- **Cargo AI** (JSON) — single-file definitions with `agent_schema` and
+  `actions`. Parsed and listed in v0.1; runtime support is wired
+  separately (see `context/0.3/README.md` for the broader multi-framework
+  direction).
+
+**Legacy layout note.** v0.1 still *reads* files at the top level of
+`agents/` for backwards compatibility with workspaces that pre-date the
+subfolder convention. New writes always go to the subfolder. Migrate
+old flat files by moving them into the right subfolder — no parser
+changes needed.
 
 For the format decision and rationale, see
 [`../context/0.1/AGENT_FORMAT.md`](../context/0.1/AGENT_FORMAT.md).
