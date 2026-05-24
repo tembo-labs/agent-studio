@@ -7,6 +7,11 @@ import {
   createTemboTask,
   type CapError,
 } from "@/lib/cap-api";
+import {
+  createFeedback,
+  feedbackMarker,
+  setFeedbackTask,
+} from "@/lib/feedbacks-api";
 import { getRun } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
 import {
@@ -17,7 +22,13 @@ import {
 } from "@/lib/workspace";
 
 export type ImproveResult =
-  | { ok: true; taskId: string; htmlUrl: string; status: string }
+  | {
+      ok: true;
+      feedbackId: string;
+      taskId: string;
+      htmlUrl: string;
+      status: string;
+    }
   | { ok: false; error: string };
 
 export async function improveAgentAction(args: {
@@ -60,12 +71,25 @@ export async function improveAgentAction(args: {
     };
   }
 
+  // Persist the feedback row before talking to Tembo so we own the
+  // id we embed in the prompt — even if the CAP call fails the row
+  // exists with status='submitted' and we can retry later.
+  const row = await createFeedback({
+    workspaceId: workspace.id,
+    runId: run.id,
+    agentName: run.agentName,
+    agentPath: run.agentPath,
+    feedbackText: feedback,
+    userId: session.user.id,
+  });
+
   const prompt = buildImprovePrompt({
     agentPath: run.agentPath,
     model: run.model,
-    userMessage: "", // The run record doesn't currently capture the user message separately from the prompt; revisit when chat lands.
+    userMessage: "", // Run record doesn't capture the user message separately from the prompt; revisit when chat lands.
     output: run.output,
     feedback,
+    feedbackMarker: feedbackMarker(row.id),
   });
 
   const res = await createTemboTask({
@@ -81,8 +105,15 @@ export async function improveAgentAction(args: {
     return { ok: false, error: formatCapError(res.error) };
   }
 
+  await setFeedbackTask({
+    id: row.id,
+    temboTaskId: res.result.taskId,
+    temboTaskHtmlUrl: res.result.htmlUrl,
+  });
+
   return {
     ok: true,
+    feedbackId: row.id,
     taskId: res.result.taskId,
     htmlUrl: res.result.htmlUrl,
     status: res.result.status,

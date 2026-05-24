@@ -39,7 +39,7 @@ export function ImproveForm({
   };
 
   return (
-    <Section title="Improve me">
+    <Section title="Improve the Agent">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <p className="text-foreground-weak text-sm">
           Describe what should change about this agent. We&apos;ll ask the{" "}

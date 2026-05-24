@@ -5,7 +5,11 @@ import { SidebarNavItem } from "@/components/sidebar-nav-item";
 import { UserMenu } from "@/components/user-menu";
 import { getInstanceName } from "@/lib/config";
 import type { Workspace } from "@/lib/workspace";
-import { IconAgent, IconSettingsSliderHor } from "central-icons";
+import {
+  IconAgent,
+  IconChatBubbles,
+  IconSettingsSliderHor,
+} from "central-icons";
 
 // Layout shell shared by every signed-in workspace route. Modeled on
 // Tembo's apps/web sidebar pattern — fixed-width left rail, top bar
@@ -47,6 +51,11 @@ export function AppShell({ workspace, user, children }: Props) {
             label="Agents"
             icon={<IconAgent />}
             matchPrefix
+          />
+          <SidebarNavItem
+            href={`${home}/feedbacks`}
+            label="Feedbacks"
+            icon={<IconChatBubbles />}
           />
           <SidebarNavItem
             href={`${home}/settings`}

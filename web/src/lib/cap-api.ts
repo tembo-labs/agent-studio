@@ -103,13 +103,15 @@ export async function createTemboTask(args: {
 // Build the prompt we send to CAP from the run context + the user's
 // freeform feedback. We tag the agent file path so CAP knows which
 // file to edit; the run input/output give it the concrete failure to
-// fix.
+// fix; the feedback marker is what lets us later correlate the
+// merged PR back to the feedback row that triggered it.
 export function buildImprovePrompt(args: {
   agentPath: string;
   model: string;
   userMessage: string;
   output: string;
   feedback: string;
+  feedbackMarker: string;
 }): string {
   const trimmedOutput = args.output.length > 4000
     ? args.output.slice(0, 4000) + "\n…[truncated]"
@@ -119,6 +121,12 @@ export function buildImprovePrompt(args: {
     `Improve the agent defined at @${args.agentPath}.`,
     "",
     "Open a pull request with the targeted change.",
+    "",
+    "IMPORTANT: Include this exact line on its own at the end of the pull",
+    "request description so the Tembo Agent Studio can correlate the PR",
+    "with the user's feedback:",
+    "",
+    args.feedbackMarker,
     "",
     "## Feedback from the user",
     args.feedback.trim(),
