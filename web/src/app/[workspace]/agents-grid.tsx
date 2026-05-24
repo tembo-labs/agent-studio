@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 
+import { IconPlusLarge } from "central-icons";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 // Shape we accept from the server. Server-only types (AgentSpec et al)
@@ -34,9 +37,10 @@ export type GridAgent =
 
 type Props = {
   agents: GridAgent[];
+  newAgentHref: string;
 };
 
-export function AgentsGrid({ agents }: Props) {
+export function AgentsGrid({ agents, newAgentHref }: Props) {
   const [query, setQuery] = useState("");
   const deferred = useDeferredValue(query);
 
@@ -60,11 +64,19 @@ export function AgentsGrid({ agents }: Props) {
           className="max-w-sm"
           aria-label="Search agents"
         />
-        <span className="text-foreground-muted text-xs">
-          {filtered.length === agents.length
-            ? `${agents.length} agent${agents.length === 1 ? "" : "s"}`
-            : `Showing ${filtered.length} of ${agents.length}`}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-foreground-muted text-xs">
+            {filtered.length === agents.length
+              ? `${agents.length} agent${agents.length === 1 ? "" : "s"}`
+              : `Showing ${filtered.length} of ${agents.length}`}
+          </span>
+          <Button asChild>
+            <Link href={newAgentHref}>
+              <IconPlusLarge />
+              <span>New agent</span>
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
