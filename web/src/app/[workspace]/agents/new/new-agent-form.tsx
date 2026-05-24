@@ -5,12 +5,19 @@ import { useState, useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  FRAMEWORKS,
+  FRAMEWORK_LABELS,
+  type Framework,
+} from "@/lib/agent-framework";
 
 import {
   createFromContentAction,
   createFromTemplateAction,
   type NewAgentFormState,
 } from "./actions";
+
+const DEFAULT_FRAMEWORK: Framework = "pydantic-agentspec";
 
 const INITIAL: NewAgentFormState = {};
 
@@ -70,12 +77,38 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
               placeholder="hello-world"
             />
             <p className="text-foreground-muted text-xs">
-              Lowercase letters, digits, and hyphens. Becomes the filename
-              (e.g.{" "}
+              Lowercase letters, digits, and hyphens. Becomes the filename and
+              the canonical agent name.
+            </p>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="framework" className="text-sm">
+              Framework
+            </Label>
+            <select
+              id="framework"
+              name="framework"
+              defaultValue={DEFAULT_FRAMEWORK}
+              disabled={templatePending}
+              className="bg-input text-foreground-strong hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled flex h-7 w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-1 pr-1 pl-2 text-sm font-medium tracking-[-0.1px] focus:outline-none transition-[background-color,box-shadow,color] duration-150"
+            >
+              {FRAMEWORKS.map((f) => (
+                <option key={f} value={f}>
+                  {FRAMEWORK_LABELS[f]}
+                </option>
+              ))}
+            </select>
+            <p className="text-foreground-muted text-xs">
+              Pydantic AgentSpec emits a YAML file under{" "}
               <code className="bg-surface rounded px-1 py-0.5">
-                agents/hello-world.yaml
+                agents/pydantic-agentspec/
               </code>
-              ) and the canonical agent name.
+              . Cargo AI emits JSON under{" "}
+              <code className="bg-surface rounded px-1 py-0.5">
+                agents/cargo-ai/
+              </code>
+              .
             </p>
           </div>
 

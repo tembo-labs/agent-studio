@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 
+import { extractCargoAiRunnable } from "@/lib/agent-format";
 import { createRun } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
 import {
@@ -90,15 +91,25 @@ export async function runNowAction(
   }
   const spec = found.agent.spec;
 
-  // Only Pydantic AgentSpec agents are runnable in v0.1. Cargo AI parses
-  // and lists fine; its runtime lands with the v0.3+ multi-framework
-  // slice. The Run now button is hidden in the UI for non-Pydantic
-  // frameworks, but defend the server action too.
-  if (spec.framework !== "pydantic-agentspec") {
-    return {
-      error:
-        "This framework's runtime isn't wired in v0.1. Cargo AI runs land in v0.3+ (see context/0.3/README.md).",
-    };
+  // Flatten the spec down to the (model, instructions) tuple the Rust
+  // runner expects, regardless of framework. Pydantic carries them
+  // directly; Cargo AI's are extracted from runtime_vars + actions.
+  let model: string;
+  let instructions: string;
+  if (spec.framework === "pydantic-agentspec") {
+    model = spec.model;
+    instructions = spec.instructions;
+  } else {
+    const extracted = extractCargoAiRunnable(spec);
+    if (!extracted.ok) {
+      return {
+        error:
+          extracted.error === "missing-model"
+            ? "This Cargo AI agent has no model declared. Add `runtime_vars.model` (e.g. `anthropic:claude-sonnet-4-6`) and try again."
+            : "This Cargo AI agent has no `type: \"llm\"` actions with prompts — the v0.1 runtime needs at least one to execute.",
+      };
+    }
+    ({ model, instructions } = extracted.runnable);
   }
 
   let runId: string;
@@ -108,8 +119,8 @@ export async function runNowAction(
       userId: session.user.id,
       agentName: spec.name,
       agentPath: found.agent.path,
-      model: spec.model,
-      instructions: spec.instructions,
+      model,
+      instructions,
     });
     runId = res.runId;
   } catch (err) {

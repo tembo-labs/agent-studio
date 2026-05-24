@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 
+import { FRAMEWORKS, type Framework } from "@/lib/agent-framework";
 import { getServerSession } from "@/lib/session";
 import {
   createAgentFromContent,
@@ -10,6 +11,13 @@ import {
   type CreateAgentError,
 } from "@/lib/workspace-agents";
 import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
+
+function parseFrameworkField(raw: unknown): Framework | null {
+  if (typeof raw !== "string") return null;
+  return (FRAMEWORKS as readonly string[]).includes(raw)
+    ? (raw as Framework)
+    : null;
+}
 
 export type NewAgentFormState = {
   error?: string;
@@ -68,9 +76,13 @@ export async function createFromTemplateAction(
 ): Promise<NewAgentFormState> {
   const slug = String(formData.get("workspace") ?? "");
   const name = String(formData.get("name") ?? "").trim();
+  const framework = parseFrameworkField(formData.get("framework"));
+  if (!framework) {
+    return { error: "Pick a framework for the new agent." };
+  }
 
   const workspace = await authorize(slug);
-  const result = await createAgentFromTemplate(workspace.id, name);
+  const result = await createAgentFromTemplate(workspace.id, name, framework);
   if (!result.ok) {
     return { error: ERROR_MESSAGES[result.error] };
   }

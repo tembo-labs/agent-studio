@@ -126,7 +126,7 @@ Framework is *computed* from the parsed spec — there's no `framework:` field i
 | Framework key | Label | Status |
 | --- | --- | --- |
 | `pydantic-agentspec` | Pydantic AgentSpec | Implemented end-to-end in v0.1 (parser, badge, runtime). |
-| `cargo-ai` | Cargo AI | Parser + badge implemented in v0.1 (importable via paste). **Runtime deferred** to the v0.3+ multi-framework slice — see [`../0.3/README.md`](../0.3/README.md). Run now is hidden on these agents until then. |
+| `cargo-ai` | Cargo AI | Implemented end-to-end in v0.1 (parser, badge, runtime). The v0.1 runner is a **simplified interpretation**: it flattens an agent down to (`runtime_vars.model`, concatenated `type:"llm"` action prompts) and makes a single provider call. JSON Logic branching, non-llm action types, multi-step orchestration, and `agent_schema` validation land with the richer Cargo AI runtime alongside the v0.3+ multi-framework slice — see [`../0.3/README.md`](../0.3/README.md). |
 
 The `FRAMEWORKS` constant in [`web/src/lib/agent-framework.ts`](../../web/src/lib/agent-framework.ts) is the source of truth.
 

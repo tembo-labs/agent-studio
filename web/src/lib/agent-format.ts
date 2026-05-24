@@ -203,6 +203,57 @@ export function parseAgentFile(
 // later if a customer asks.
 export const STARTER_DEFAULT_MODEL = "anthropic:claude-sonnet-4-6";
 
+// ── Cargo AI runtime extraction ────────────────────────────────────────
+//
+// The Rust runner takes a single (model, instructions, user_message)
+// tuple and calls the provider once. To make Cargo AI agents runnable
+// without building a full action-graph interpreter, the web layer
+// flattens a Cargo AI spec down to that shape:
+//   model         ← runtime_vars.model (or top-level `model`)
+//   instructions  ← concatenated prompts of every `type: "llm"` action
+//
+// This is intentionally a v0.1 simplification — JSON Logic branching,
+// non-llm action types, agent_schema validation, and multi-step run
+// orchestration all stay deferred to a richer Cargo AI runtime that
+// can land alongside the v0.3+ multi-framework slice.
+
+export type CargoAiRunnable = {
+  model: string;
+  instructions: string;
+};
+
+export type CargoAiRunnableError = "missing-model" | "no-llm-actions";
+
+export function extractCargoAiRunnable(
+  spec: CargoAiSpec,
+):
+  | { ok: true; runnable: CargoAiRunnable }
+  | { ok: false; error: CargoAiRunnableError } {
+  if (!spec.model) return { ok: false, error: "missing-model" };
+
+  const actions = spec.raw.actions;
+  if (!Array.isArray(actions)) return { ok: false, error: "no-llm-actions" };
+
+  const prompts: string[] = [];
+  for (const a of actions) {
+    if (
+      a &&
+      typeof a === "object" &&
+      !Array.isArray(a) &&
+      (a as Record<string, unknown>).type === "llm" &&
+      typeof (a as Record<string, unknown>).prompt === "string"
+    ) {
+      prompts.push((a as Record<string, unknown>).prompt as string);
+    }
+  }
+  if (prompts.length === 0) return { ok: false, error: "no-llm-actions" };
+
+  return {
+    ok: true,
+    runnable: { model: spec.model, instructions: prompts.join("\n\n") },
+  };
+}
+
 export function renderStarter(name: string): string {
   return `# Pydantic AI AgentSpec — see context/0.1/AGENT_FORMAT.md
 name: ${name}
@@ -214,4 +265,36 @@ instructions: |
 model_settings:
   max_tokens: 512
 `;
+}
+
+export function renderCargoStarter(name: string): string {
+  // Minimal-but-real Cargo AI JSON: parses cleanly under the v0.1
+  // parser (has `agent_schema` and `actions`), is runnable via the
+  // simplified Cargo runner (has runtime_vars.model + one llm action),
+  // and reads as something a customer would actually keep as a base.
+  const obj = {
+    name,
+    description: "Sample agent generated from the v0.1 starter template.",
+    agent_schema: {
+      type: "object",
+      properties: {
+        reply: {
+          type: "string",
+          description: "The agent's response.",
+        },
+      },
+      required: ["reply"],
+    },
+    runtime_vars: {
+      model: STARTER_DEFAULT_MODEL,
+    },
+    actions: [
+      {
+        id: "respond",
+        type: "llm",
+        prompt: "You are a friendly agent. Greet the user warmly and answer briefly.",
+      },
+    ],
+  };
+  return `${JSON.stringify(obj, null, 2)}\n`;
 }

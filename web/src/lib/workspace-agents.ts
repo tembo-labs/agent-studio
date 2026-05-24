@@ -4,6 +4,7 @@ import {
   detectFormat,
   parseAgentContent,
   parseAgentFile,
+  renderCargoStarter,
   renderStarter,
   validateAgentName,
   type AgentFileFormat,
@@ -248,6 +249,7 @@ async function commitAgentFile(
 export async function createAgentFromTemplate(
   workspaceId: string,
   name: string,
+  framework: Framework,
 ): Promise<CreateAgentResult> {
   if (!validateAgentName(name)) {
     return {
@@ -263,13 +265,21 @@ export async function createAgentFromTemplate(
       detail: "An agent with this name already exists in the repo.",
     };
   }
-  const content = renderStarter(name);
+  let content: string;
+  let filename: string;
+  if (framework === "pydantic-agentspec") {
+    content = renderStarter(name);
+    filename = `${name}.yaml`;
+  } else {
+    content = renderCargoStarter(name);
+    filename = `${name}.json`;
+  }
   return commitAgentFile(
     workspaceId,
-    "pydantic-agentspec",
-    `${name}.yaml`,
+    framework,
+    filename,
     content,
-    `Create agent: ${name} (from starter template)`,
+    `Create agent: ${name} (from ${framework} starter template)`,
   );
 }
 
