@@ -10,8 +10,15 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::providers::{anthropic, openai};
+use crate::runs::cargo_ai;
 use crate::workspace::{get_workspace_secret_plaintext, SecretKind};
 use crate::AppState;
+
+#[derive(Debug, Clone, Copy)]
+pub enum Framework {
+    Pydantic,
+    CargoAi,
+}
 
 pub struct RunContext {
     pub run_id: Uuid,
@@ -19,6 +26,9 @@ pub struct RunContext {
     pub model: String,
     pub instructions: String,
     pub user_message: String,
+    pub framework: Framework,
+    /// Raw Cargo AI JSON. Required when framework is CargoAi.
+    pub spec_json: Option<String>,
 }
 
 struct RunOutcome {
@@ -90,14 +100,86 @@ async fn run_inner(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunOutc
         .split_once(':')
         .ok_or_else(|| anyhow!("agent's model field must be `provider:model` (got `{}`)", ctx.model))?;
 
-    match provider {
-        "anthropic" => run_anthropic(state, ctx, model).await,
-        "openai" => run_openai(state, ctx, model).await,
-        other => Err(anyhow!(
-            "Provider `{other}` is not enabled in this TAS build. \
-             Supported: `anthropic`, `openai`."
-        )),
+    match ctx.framework {
+        Framework::CargoAi => run_cargo_ai(state, ctx, provider, model).await,
+        Framework::Pydantic => match provider {
+            "anthropic" => run_anthropic(state, ctx, model).await,
+            "openai" => run_openai(state, ctx, model).await,
+            other => Err(anyhow!(
+                "Provider `{other}` is not enabled in this TAS build. \
+                 Supported: `anthropic`, `openai`."
+            )),
+        },
     }
+}
+
+async fn run_cargo_ai(
+    state: &AppState,
+    ctx: &RunContext,
+    provider: &str,
+    model: &str,
+) -> anyhow::Result<RunOutcome> {
+    // Today cargo-ai 0.3.0 only ships OpenAI + Ollama providers, so
+    // an Anthropic Cargo AI agent has no upstream to talk to. We
+    // unblock that once our cargo-ai Anthropic-provider PR lands;
+    // until then, surface the limitation explicitly rather than
+    // silently failing inside cargo-ai.
+    if provider != "openai" {
+        return Err(anyhow!(
+            "Cargo AI agents currently only run against `openai:` models. \
+             The bundled cargo-ai CLI doesn't yet support `{}` — track the upstream PR \
+             in https://github.com/analyzer1/cargo-ai for Anthropic support.",
+            provider
+        ));
+    }
+
+    let spec_json = ctx
+        .spec_json
+        .as_deref()
+        .ok_or_else(|| anyhow!("Cargo AI run is missing the agent's raw JSON"))?;
+
+    let api_key = get_workspace_secret_plaintext(
+        &state.db,
+        &state.encryption_key,
+        ctx.workspace_id,
+        SecretKind::OpenAiApiKey,
+    )
+    .await
+    .context(
+        "Couldn't load this workspace's OpenAI API key. \
+         Set it under Settings → OpenAI API key.",
+    )?;
+
+    let result = cargo_ai::invoke(cargo_ai::CargoAiArgs {
+        spec_json,
+        provider,
+        model,
+        api_key: &api_key,
+        user_message: &ctx.user_message,
+    })
+    .await?;
+
+    // cargo-ai's stdout interleaves progress lines with the agent's
+    // structured output. Keep both for the run row's transcript;
+    // operators can read the progress trail when something looks
+    // off. Token usage isn't currently surfaced by cargo-ai so we
+    // record None (the run page renders that gracefully).
+    let mut transcript = String::new();
+    if !ctx.user_message.is_empty() {
+        transcript.push_str("user> ");
+        transcript.push_str(&ctx.user_message);
+        transcript.push_str("\n\n");
+    }
+    transcript.push_str(result.stdout.trim_end());
+    if !result.stderr.trim().is_empty() {
+        transcript.push_str("\n\n[cargo-ai stderr]\n");
+        transcript.push_str(result.stderr.trim_end());
+    }
+
+    Ok(RunOutcome {
+        output: transcript,
+        usage: None,
+    })
 }
 
 async fn run_anthropic(

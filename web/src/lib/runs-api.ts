@@ -25,6 +25,12 @@ export type CreateRunInput = {
   model: string;
   instructions: string;
   userMessage?: string;
+  // Optional framework hint. Pydantic agents run through our direct
+  // Anthropic / OpenAI client. Cargo AI agents delegate to the
+  // bundled cargo-ai CLI on the api container; specJson must be
+  // populated for that path.
+  framework?: "pydantic-agentspec" | "cargo-ai";
+  specJson?: string;
 };
 
 export type CreateRunResponse = { runId: string };
@@ -98,6 +104,8 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
       model: input.model,
       instructions: input.instructions,
       user_message: input.userMessage ?? "",
+      framework: input.framework,
+      spec_json: input.specJson,
     }),
   });
   if (!res.ok) {

@@ -91,25 +91,36 @@ export async function runNowAction(
   }
   const spec = found.agent.spec;
 
-  // Flatten the spec down to the (model, instructions) tuple the Rust
-  // runner expects, regardless of framework. Pydantic carries them
-  // directly; Cargo AI's are extracted from runtime_vars + actions.
+  // Build the createRun payload depending on framework. Pydantic
+  // agents fly their instructions string directly to the runner.
+  // Cargo AI agents pass the raw JSON to the runner — the runner
+  // hands it to the bundled cargo-ai CLI, which executes the action
+  // graph end-to-end.
   let model: string;
   let instructions: string;
+  let specJson: string | undefined;
+  let framework: "pydantic-agentspec" | "cargo-ai";
   if (spec.framework === "pydantic-agentspec") {
+    framework = "pydantic-agentspec";
     model = spec.model;
     instructions = spec.instructions;
   } else {
+    framework = "cargo-ai";
     const extracted = extractCargoAiRunnable(spec);
     if (!extracted.ok) {
       return {
         error:
           extracted.error === "missing-model"
-            ? "This Cargo AI agent has no model declared. Add `runtime_vars.model` (e.g. `anthropic:claude-sonnet-4-6`) and try again."
-            : "This Cargo AI agent has no `type: \"llm\"` actions with prompts — the v0.1 runtime needs at least one to execute.",
+            ? "This Cargo AI agent has no model declared. Add `runtime_vars.model` (e.g. `openai:gpt-4o-mini`) and try again."
+            : "This Cargo AI agent has no `type: \"llm\"` actions with prompts — cargo-ai needs at least one to execute.",
       };
     }
-    ({ model, instructions } = extracted.runnable);
+    model = extracted.runnable.model;
+    // Cargo-ai-side ignores `instructions`; we still send the joined
+    // prompt text so historical run rows remain readable if anything
+    // logs the request payload.
+    instructions = extracted.runnable.instructions;
+    specJson = found.raw;
   }
 
   let runId: string;
@@ -121,6 +132,8 @@ export async function runNowAction(
       agentPath: found.agent.path,
       model,
       instructions,
+      framework,
+      specJson,
     });
     runId = res.runId;
   } catch (err) {

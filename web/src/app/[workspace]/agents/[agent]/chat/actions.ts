@@ -165,16 +165,19 @@ export async function sendToAgentAction(args: {
   }
   const spec = agent.spec;
 
-  // Same flattening logic the Run-now action uses — pull model +
-  // instructions out of whichever framework the agent uses and hand
-  // them to the Rust runner. Cargo AI agents that don't have the
-  // pieces we need surface that as an inline error.
+  // Same dispatch the Run-now action uses — Pydantic agents pass
+  // their flattened instructions string; Cargo AI agents pass the
+  // raw JSON which the api then hands to the bundled cargo-ai CLI.
   let model: string;
   let instructions: string;
+  let specJson: string | undefined;
+  let framework: "pydantic-agentspec" | "cargo-ai";
   if (spec.framework === "pydantic-agentspec") {
+    framework = "pydantic-agentspec";
     model = spec.model;
     instructions = spec.instructions;
   } else {
+    framework = "cargo-ai";
     const extracted = extractCargoAiRunnable(spec);
     if (!extracted.ok) {
       return {
@@ -182,10 +185,12 @@ export async function sendToAgentAction(args: {
         error:
           extracted.error === "missing-model"
             ? "This Cargo AI agent has no model declared. Add runtime_vars.model and try again."
-            : "This Cargo AI agent has no type: \"llm\" actions with prompts — the runtime needs at least one.",
+            : "This Cargo AI agent has no type: \"llm\" actions with prompts — cargo-ai needs at least one.",
       };
     }
-    ({ model, instructions } = extracted.runnable);
+    model = extracted.runnable.model;
+    instructions = extracted.runnable.instructions;
+    specJson = result.raw;
   }
 
   try {
@@ -197,6 +202,8 @@ export async function sendToAgentAction(args: {
       model,
       instructions,
       userMessage: text,
+      framework,
+      specJson,
     });
     return { ok: true, runId: res.runId };
   } catch (err) {

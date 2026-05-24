@@ -28,6 +28,17 @@ pub struct CreateRunRequest {
     /// Optional user message; v0.1 leaves it empty (US-0.1-06 ran for "empty input").
     #[serde(default)]
     pub user_message: Option<String>,
+    /// Agent framework. "pydantic-agentspec" runs through our direct
+    /// provider client; "cargo-ai" delegates to the bundled cargo-ai
+    /// CLI. Defaults to pydantic-agentspec when omitted to keep older
+    /// callers working.
+    #[serde(default)]
+    pub framework: Option<String>,
+    /// Raw agent JSON. Required when framework=cargo-ai (we hand it to
+    /// cargo-ai). Ignored for pydantic-agentspec, where the
+    /// instructions field is already flattened.
+    #[serde(default)]
+    pub spec_json: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -63,6 +74,12 @@ pub async fn create_run(
     let model = req.model;
     let instructions = req.instructions;
     let workspace_id = req.workspace_id;
+    let framework = req
+        .framework
+        .as_deref()
+        .map(parse_framework)
+        .unwrap_or(runner::Framework::Pydantic);
+    let spec_json = req.spec_json;
 
     tokio::spawn(async move {
         runner::execute_run(
@@ -73,12 +90,24 @@ pub async fn create_run(
                 model,
                 instructions,
                 user_message,
+                framework,
+                spec_json,
             },
         )
         .await;
     });
 
     Ok(Json(CreateRunResponse { run_id }))
+}
+
+// Tolerate either of our two canonical framework strings. Anything
+// else (typos, future frameworks) falls back to pydantic so a single
+// malformed request doesn't take down the runner.
+fn parse_framework(s: &str) -> runner::Framework {
+    match s {
+        "cargo-ai" => runner::Framework::CargoAi,
+        _ => runner::Framework::Pydantic,
+    }
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
