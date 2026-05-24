@@ -11,6 +11,7 @@ import {
   getWorkspaceSecretPreview,
 } from "@/lib/workspace";
 
+import { ChangeModeSetting } from "./change-mode-setting";
 import { DisconnectRepoForm } from "./disconnect-repo-form";
 import { FaviconPicker } from "./favicon-picker";
 import { RestoreAgentForm } from "./restore-agent-form";
@@ -113,6 +114,15 @@ export default async function SettingsPage({
                   </Link>
                 </p>
               )}
+            </Section>
+          </div>
+
+        <div className="pb-5 pt-8">
+            <Section
+              title="Change delivery"
+              description="How edits from the Improve form ship to your repo. YOLO commits directly to the default branch and is coming in a later release."
+            >
+              <ChangeModeSetting />
             </Section>
           </div>
 

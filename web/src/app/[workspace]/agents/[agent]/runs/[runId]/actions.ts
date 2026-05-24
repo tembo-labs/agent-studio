@@ -94,7 +94,7 @@ function formatCapError(error: CapError): string {
     case "missing_tembo_key":
       return "Tembo API key not set for this workspace.";
     case "http":
-      return `Tembo CAP returned ${error.status}: ${error.body.slice(0, 400) || "(no body)"}`;
+      return `POST ${error.url} → ${error.status}\n${error.body.slice(0, 600) || "(no body)"}`;
     case "network":
       return `Could not reach Tembo CAP: ${error.message}`;
   }

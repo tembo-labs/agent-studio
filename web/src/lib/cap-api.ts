@@ -32,7 +32,7 @@ export interface CreateSessionResult {
 
 export type CapError =
   | { kind: "missing_tembo_key" }
-  | { kind: "http"; status: number; body: string }
+  | { kind: "http"; status: number; body: string; url: string }
   | { kind: "network"; message: string };
 
 export async function createTemboSession(args: {
@@ -49,9 +49,15 @@ export async function createTemboSession(args: {
     queueRightAway: true,
   };
 
+  const url = `${baseUrl}/session/create`;
+  // Log the outbound payload so the docker logs make it obvious what
+  // we sent when CAP rejects us. v0.2 integration is brittle by
+  // design until we settle the contract.
+  console.log("[cap] POST", url, "payload=", JSON.stringify(body));
+
   let res: Response;
   try {
-    res = await fetch(`${baseUrl}/session/create`, {
+    res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -72,7 +78,8 @@ export async function createTemboSession(args: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    return { ok: false, error: { kind: "http", status: res.status, body: text } };
+    console.log("[cap] ←", res.status, text);
+    return { ok: false, error: { kind: "http", status: res.status, body: text, url } };
   }
 
   const json = (await res.json()) as {

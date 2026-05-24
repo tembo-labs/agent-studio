@@ -4,20 +4,16 @@
 // describes what should change in the agent; on submit we ask the
 // Tembo Coding Agent Platform to open a session that produces a PR.
 //
-// Mode picker has two slots: "Always PR" (the only working mode at
-// v0.2-bootstrap) and "YOLO" (placeholder for direct-commit, coming
-// later). YOLO is rendered disabled so the affordance is visible
-// but the user can't pick it.
+// Mode is a workspace-level setting — see Settings → Change delivery.
+// Today there's only one supported mode (Always PR) so we don't
+// re-display it here.
 
 import { useState, useTransition } from "react";
 
 import { Section } from "@/components/section";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 import { improveAgentAction, type ImproveResult } from "./actions";
-
-type Mode = "always_pr" | "yolo";
 
 export function ImproveForm({
   workspaceSlug,
@@ -27,13 +23,11 @@ export function ImproveForm({
   runId: string;
 }) {
   const [feedback, setFeedback] = useState("");
-  const [mode, setMode] = useState<Mode>("always_pr");
   const [result, setResult] = useState<ImproveResult | null>(null);
   const [pending, startTransition] = useTransition();
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (mode !== "always_pr") return;
     setResult(null);
     startTransition(async () => {
       const r = await improveAgentAction({ workspaceSlug, runId, feedback });
@@ -69,13 +63,8 @@ export function ImproveForm({
           className="bg-surface border-border text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)] rounded-md border px-3 py-2 text-sm leading-6 resize-y"
         />
 
-        <ModePicker value={mode} onChange={setMode} />
-
         <div className="flex items-center gap-3">
-          <Button
-            type="submit"
-            disabled={pending || !feedback.trim() || mode !== "always_pr"}
-          >
+          <Button type="submit" disabled={pending || !feedback.trim()}>
             {pending ? "Asking Tembo…" : "Open a PR"}
           </Button>
           {pending && (
@@ -88,44 +77,6 @@ export function ImproveForm({
         {result && <ResultBanner result={result} />}
       </form>
     </Section>
-  );
-}
-
-function ModePicker({
-  value,
-  onChange,
-}: {
-  value: Mode;
-  onChange: (m: Mode) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-foreground-weak text-xs font-medium">Mode</span>
-      <div className="inline-flex w-fit rounded-lg border border-[var(--color-border-weak)] bg-surface-raised p-0.5">
-        <button
-          type="button"
-          onClick={() => onChange("always_pr")}
-          aria-pressed={value === "always_pr"}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-            value === "always_pr"
-              ? "bg-surface text-foreground shadow-sm"
-              : "text-foreground-weak hover:text-foreground",
-          )}
-        >
-          Always PR
-        </button>
-        <button
-          type="button"
-          disabled
-          aria-disabled
-          title="YOLO mode lets a change land directly on the default branch — coming in a later release."
-          className="rounded-md px-3 py-1.5 text-sm font-medium text-foreground-weak opacity-50 cursor-not-allowed"
-        >
-          YOLO <span className="text-[10px] uppercase tracking-wide">soon</span>
-        </button>
-      </div>
-    </div>
   );
 }
 
