@@ -8,6 +8,7 @@ import { getRun, type RunRecord } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
 
+import { ImproveForm } from "./improve-form";
 import { RunPoller } from "./run-poller";
 
 export const dynamic = "force-dynamic";
@@ -128,6 +129,10 @@ export default async function RunDetailPage({
           <FailedReason run={run} />
         )}
       </Section>
+
+      <hr className="border-[var(--color-border-weak)]" />
+
+      <ImproveForm workspaceSlug={workspace.slug} runId={run.id} />
     </div>
   );
 }
