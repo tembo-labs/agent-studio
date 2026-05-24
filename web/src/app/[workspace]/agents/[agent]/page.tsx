@@ -83,7 +83,7 @@ export default async function AgentDetailPage({
                 agentName={canonicalName}
               />
             )}
-            <Button asChild variant="ghost" size="small">
+            <Button asChild variant="ghost">
               <a href={sourceHref} target="_blank" rel="noreferrer noopener">
                 View source
               </a>

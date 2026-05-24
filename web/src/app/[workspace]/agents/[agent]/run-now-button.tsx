@@ -21,12 +21,7 @@ export function RunNowButton({ workspaceSlug, agentName }: Props) {
       <form action={formAction}>
         <input type="hidden" name="workspace" value={workspaceSlug} />
         <input type="hidden" name="agent" value={agentName} />
-        <Button
-          type="submit"
-          variant="primary"
-          size="small"
-          disabled={pending}
-        >
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Queueing…" : "Run now"}
         </Button>
       </form>

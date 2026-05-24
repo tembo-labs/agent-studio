@@ -34,7 +34,7 @@ export function DeleteAgentButton({ workspaceSlug, agentName }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="small" disabled={pending}>
+        <Button variant="destructive" disabled={pending}>
           Delete
         </Button>
       </AlertDialogTrigger>
