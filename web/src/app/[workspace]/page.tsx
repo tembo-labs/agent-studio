@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { IconPlusLarge } from "central-icons";
+
 import { Section } from "@/components/section";
 import { TopBar } from "@/components/top-bar";
 import { Button } from "@/components/ui/button";
@@ -94,8 +96,11 @@ export default async function WorkspacePage({
           </>
         }
         actions={
-          <Button asChild variant="primary" size="small">
-            <Link href={`/${workspace.slug}/agents/new`}>New agent</Link>
+          <Button asChild>
+            <Link href={`/${workspace.slug}/agents/new`}>
+              <IconPlusLarge />
+              <span>New agent</span>
+            </Link>
           </Button>
         }
       />
