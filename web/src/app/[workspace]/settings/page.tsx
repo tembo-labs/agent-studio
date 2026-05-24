@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { LocalTime } from "@/components/local-time";
 import { SignOutButton } from "@/components/sign-out-button";
 import {
   Card,
@@ -103,7 +104,7 @@ export default async function SettingsPage({
                 </a>
                 <span className="text-foreground-muted text-xs">
                   Default branch {repo.defaultBranch} · connected{" "}
-                  {formatDate(repo.connectedAt)}
+                  <LocalTime iso={repo.connectedAt.toISOString()} />
                 </span>
               </div>
               <DisconnectRepoForm workspaceSlug={workspace.slug} />
@@ -155,7 +156,10 @@ export default async function SettingsPage({
                     </span>
                     <span className="text-foreground-muted text-xs">
                       <code>{d.filePath}</code>
-                      <span> · deleted {formatDate(d.deletedAt)}</span>
+                      <span>
+                        {" · deleted "}
+                        <LocalTime iso={d.deletedAt.toISOString()} />
+                      </span>
                     </span>
                   </div>
                   <RestoreAgentForm
@@ -240,9 +244,3 @@ export default async function SettingsPage({
   );
 }
 
-function formatDate(d: Date): string {
-  return d.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}

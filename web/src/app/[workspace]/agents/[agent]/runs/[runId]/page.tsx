@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { LocalTime } from "@/components/local-time";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,7 +79,7 @@ export default async function RunDetailPage({
               {run.model}
             </Badge>
             <span className="text-foreground-muted text-xs">
-              Queued {formatDate(run.createdAt)}
+              Queued <LocalTime iso={run.createdAt} />
               {run.startedAt && (
                 <> · started {formatRelative(run.createdAt, run.startedAt)}</>
               )}
@@ -160,13 +161,6 @@ const STATUS_TONE: Record<
   succeeded: { variant: "green" },
   failed: { variant: "red" },
 };
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
 
 function formatRelative(fromIso: string, toIso: string): string {
   const ms = new Date(toIso).getTime() - new Date(fromIso).getTime();

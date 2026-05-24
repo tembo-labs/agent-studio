@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 
 import { DeleteAgentButton } from "./delete-agent-button";
 import { RunNowButton } from "./run-now-button";
+import { LocalTime } from "@/components/local-time";
 import {
   Card,
   CardContent,
@@ -190,9 +191,10 @@ function RecentRuns({
               <Badge variant={tone.variant} size="small">
                 {STATUS_LABELS[run.status]}
               </Badge>
-              <span className="text-foreground-muted text-xs">
-                {formatDate(run.createdAt)}
-              </span>
+              <LocalTime
+                iso={run.createdAt.toISOString()}
+                className="text-foreground-muted text-xs"
+              />
             </Link>
             <Link
               href={`/${workspaceSlug}/agents/${encodeURIComponent(agentName)}/runs/${run.id}`}
@@ -223,10 +225,3 @@ const STATUS_TONE: Record<
   succeeded: { variant: "green" },
   failed: { variant: "red" },
 };
-
-function formatDate(d: Date): string {
-  return d.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
