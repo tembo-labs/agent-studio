@@ -5,6 +5,7 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { Button } from "@/components/ui/button";
 import { getInstanceName } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
+import { listAgents, type ListedAgent } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
@@ -32,15 +33,13 @@ export default async function WorkspacePage({
 
   const repo = await getWorkspaceRepo(workspace.id);
   if (!repo) {
-    // Onboarding repo step is mandatory — workspace home is unreachable
-    // until a repo is connected. See US-0.1-04.
     redirect(`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`);
   }
 
-  const apiKeyPreview = await getWorkspaceSecretPreview(
-    workspace.id,
-    "tembo_api_key",
-  );
+  const [apiKeyPreview, agentsResult] = await Promise.all([
+    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
+    listAgents(workspace.id),
+  ]);
   const instanceName = getInstanceName();
 
   return (
@@ -101,13 +100,133 @@ export default async function WorkspacePage({
       )}
 
       <section className="space-y-3">
-        <h2 className="text-foreground-weak text-sm font-medium uppercase tracking-wider">
-          Agents
-        </h2>
-        <div className="bg-surface-raised border-border text-foreground-weak rounded-lg border p-8 text-center text-sm">
-          No agents yet. Agent creation lands in a follow-up slice.
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-foreground-weak text-sm font-medium uppercase tracking-wider">
+            Agents
+          </h2>
+          <Button asChild variant="primary" size="small">
+            <Link href={`/${workspace.slug}/agents/new`}>New agent</Link>
+          </Button>
         </div>
+        <AgentList
+          workspaceSlug={workspace.slug}
+          repoOwner={repo.owner}
+          repoName={repo.name}
+          defaultBranch={repo.defaultBranch}
+          result={agentsResult}
+        />
       </section>
     </main>
+  );
+}
+
+function AgentList({
+  workspaceSlug,
+  repoOwner,
+  repoName,
+  defaultBranch,
+  result,
+}: {
+  workspaceSlug: string;
+  repoOwner: string;
+  repoName: string;
+  defaultBranch: string;
+  result: Awaited<ReturnType<typeof listAgents>>;
+}) {
+  if (!result.ok) {
+    return (
+      <div className="bg-surface-raised border-border text-sentiment-negative rounded-lg border p-4 text-sm">
+        Couldn&apos;t list agents: {result.error}
+        {result.detail ? ` — ${result.detail}` : ""}
+      </div>
+    );
+  }
+
+  if (result.agents.length === 0) {
+    return (
+      <div className="bg-surface-raised border-border text-foreground-weak rounded-lg border p-8 text-center text-sm">
+        No agents yet.{" "}
+        <Link
+          href={`/${workspaceSlug}/agents/new`}
+          className="text-foreground hover:underline font-medium"
+        >
+          Create one →
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="bg-surface-raised border-border flex flex-col divide-y divide-[var(--color-border)] overflow-hidden rounded-lg border">
+      {result.agents.map((agent) => (
+        <li key={agent.path} className="px-4 py-3">
+          <AgentRow
+            agent={agent}
+            repoOwner={repoOwner}
+            repoName={repoName}
+            defaultBranch={defaultBranch}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function AgentRow({
+  agent,
+  repoOwner,
+  repoName,
+  defaultBranch,
+}: {
+  agent: ListedAgent;
+  repoOwner: string;
+  repoName: string;
+  defaultBranch: string;
+}) {
+  const sourceHref = `https://github.com/${repoOwner}/${repoName}/blob/${defaultBranch}/${agent.path}`;
+  if (agent.ok) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col">
+          <span className="text-foreground text-sm font-medium">
+            {agent.spec.name}
+          </span>
+          <span className="text-foreground-muted text-xs">
+            <code>{agent.spec.model}</code>
+            <span className="text-foreground-muted"> · </span>
+            <code>{agent.filename}</code>
+          </span>
+        </div>
+        <a
+          href={sourceHref}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-foreground-weak hover:text-foreground text-xs"
+        >
+          View source
+        </a>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-foreground text-sm font-medium">
+          {agent.filename}
+        </span>
+        <a
+          href={sourceHref}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-foreground-weak hover:text-foreground text-xs"
+        >
+          View source
+        </a>
+      </div>
+      <p className="text-sentiment-negative text-xs">
+        Invalid agent: {agent.error}
+        {agent.detail ? ` — ${agent.detail}` : ""}
+      </p>
+    </div>
   );
 }
