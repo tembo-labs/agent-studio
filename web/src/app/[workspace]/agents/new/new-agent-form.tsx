@@ -45,7 +45,7 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
           From template
         </TabButton>
         <TabButton active={tab === "paste"} onClick={() => setTab("paste")}>
-          Paste AgentSpec
+          Paste definition
         </TabButton>
       </div>
 
@@ -127,7 +127,7 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
 
           <div className="grid gap-1.5">
             <Label htmlFor="content" className="text-sm">
-              Pydantic AgentSpec definition
+              Agent definition
             </Label>
             <textarea
               id="content"
@@ -140,11 +140,15 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
               className="bg-input text-foreground-strong placeholder:text-foreground-weak hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled disabled:text-foreground-muted flex w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-2 px-3 font-mono text-xs leading-5 focus:outline-none transition-[background-color,box-shadow,color] duration-150 disabled:cursor-not-allowed"
             />
             <p className="text-foreground-muted text-xs">
-              Required fields:{" "}
+              Framework is auto-detected from shape. <strong>Pydantic
+              AgentSpec</strong> needs{" "}
               <code className="bg-surface rounded px-1 py-0.5">name</code>,{" "}
               <code className="bg-surface rounded px-1 py-0.5">model</code>,{" "}
               <code className="bg-surface rounded px-1 py-0.5">instructions</code>
-              . Other AgentSpec fields pass through unchanged.
+              . <strong>Cargo AI</strong> needs{" "}
+              <code className="bg-surface rounded px-1 py-0.5">name</code> and an{" "}
+              <code className="bg-surface rounded px-1 py-0.5">actions</code>{" "}
+              array. Other fields pass through unchanged.
             </p>
           </div>
 
