@@ -42,6 +42,8 @@ export type RunRecord = {
   createdAt: string;
   startedAt: string | null;
   completedAt: string | null;
+  tokensInput: number | null;
+  tokensOutput: number | null;
 };
 
 type ApiRunRecord = {
@@ -57,6 +59,8 @@ type ApiRunRecord = {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  tokens_input: number | null;
+  tokens_output: number | null;
 };
 
 function fromApi(r: ApiRunRecord): RunRecord {
@@ -73,6 +77,8 @@ function fromApi(r: ApiRunRecord): RunRecord {
     createdAt: r.created_at,
     startedAt: r.started_at,
     completedAt: r.completed_at,
+    tokensInput: r.tokens_input,
+    tokensOutput: r.tokens_output,
   };
 }
 

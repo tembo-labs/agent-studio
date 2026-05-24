@@ -20,6 +20,11 @@ pub struct RunContext {
     pub user_message: String,
 }
 
+struct RunOutcome {
+    output: String,
+    usage: Option<anthropic::Usage>,
+}
+
 /// Drive a single run from queued through to terminal state. Always
 /// updates the run row even on error so the UI never sees a row stuck
 /// in `running` forever.
@@ -32,8 +37,10 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
     }
 
     match run_inner(state, &ctx).await {
-        Ok(output) => {
-            if let Err(e) = mark_succeeded(state, ctx.run_id, &output).await {
+        Ok(outcome) => {
+            if let Err(e) =
+                mark_succeeded(state, ctx.run_id, &outcome.output, outcome.usage).await
+            {
                 tracing::error!(run_id = %ctx.run_id, ?e, "mark_succeeded failed");
             }
         }
@@ -47,7 +54,7 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
     }
 }
 
-async fn run_inner(state: &AppState, ctx: &RunContext) -> anyhow::Result<String> {
+async fn run_inner(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunOutcome> {
     // Model format is `provider:model`, e.g. `anthropic:claude-sonnet-4-6`.
     let (provider, model) = ctx
         .model
@@ -67,7 +74,7 @@ async fn run_anthropic(
     state: &AppState,
     ctx: &RunContext,
     model: &str,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<RunOutcome> {
     let api_key = get_workspace_secret_plaintext(
         &state.db,
         &state.encryption_key,
@@ -116,7 +123,10 @@ async fn run_anthropic(
         out.push_str(&reason);
         out.push(']');
     }
-    Ok(out)
+    Ok(RunOutcome {
+        output: out,
+        usage: result.usage,
+    })
 }
 
 async fn mark_running(state: &AppState, run_id: Uuid) -> anyhow::Result<()> {
@@ -134,12 +144,21 @@ async fn mark_succeeded(
     state: &AppState,
     run_id: Uuid,
     output: &str,
+    usage: Option<anthropic::Usage>,
 ) -> anyhow::Result<()> {
+    let (tokens_in, tokens_out) = match usage {
+        Some(u) => (Some(u.input_tokens), Some(u.output_tokens)),
+        None => (None, None),
+    };
     sqlx::query(
-        "UPDATE run SET status = 'succeeded', output = $1, completed_at = $2 WHERE id = $3",
+        "UPDATE run SET status = 'succeeded', output = $1, completed_at = $2, \
+                        tokens_input = $3, tokens_output = $4 \
+                  WHERE id = $5",
     )
     .bind(output)
     .bind(Utc::now())
+    .bind(tokens_in)
+    .bind(tokens_out)
     .bind(run_id)
     .execute(&state.db)
     .await?;

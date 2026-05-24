@@ -86,6 +86,12 @@ export default async function AgentDetailPage({
               workspaceSlug={workspace.slug}
               agentName={canonicalName}
             />
+            {agent.ok && (
+              <RunNowButton
+                workspaceSlug={workspace.slug}
+                agentName={canonicalName}
+              />
+            )}
           </div>
         </div>
         {agent.ok && agent.spec.description && (
@@ -94,13 +100,6 @@ export default async function AgentDetailPage({
           </p>
         )}
       </div>
-
-      {agent.ok && (
-        <RunNowButton
-          workspaceSlug={workspace.slug}
-          agentName={canonicalName}
-        />
-      )}
 
       <hr className="border-[var(--color-border-weak)]" />
 

@@ -93,6 +93,8 @@ pub struct RunRecord {
     pub created_at: DateTime<Utc>,
     pub started_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
+    pub tokens_input: Option<i32>,
+    pub tokens_output: Option<i32>,
 }
 
 pub async fn get_run(
@@ -102,7 +104,7 @@ pub async fn get_run(
     let row: Option<RunRecord> = sqlx::query_as(
         r#"SELECT id, workspace_id, agent_name, agent_path, model, status,
                   output, error_message, created_by, created_at,
-                  started_at, completed_at
+                  started_at, completed_at, tokens_input, tokens_output
              FROM run WHERE id = $1"#,
     )
     .bind(id)

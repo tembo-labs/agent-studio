@@ -25,6 +25,14 @@ struct Message<'a> {
 struct Response {
     content: Vec<ContentBlock>,
     stop_reason: Option<String>,
+    #[serde(default)]
+    usage: Option<UsageBlock>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UsageBlock {
+    input_tokens: i32,
+    output_tokens: i32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -57,6 +65,13 @@ pub struct InvokeArgs<'a> {
 pub struct InvokeResult {
     pub text: String,
     pub stop_reason: Option<String>,
+    pub usage: Option<Usage>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Usage {
+    pub input_tokens: i32,
+    pub output_tokens: i32,
 }
 
 pub async fn invoke(
@@ -119,5 +134,9 @@ pub async fn invoke(
     Ok(InvokeResult {
         text,
         stop_reason: parsed.stop_reason,
+        usage: parsed.usage.map(|u| Usage {
+            input_tokens: u.input_tokens,
+            output_tokens: u.output_tokens,
+        }),
     })
 }

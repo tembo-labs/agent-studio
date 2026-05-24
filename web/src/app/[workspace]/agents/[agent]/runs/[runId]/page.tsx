@@ -4,6 +4,7 @@ import { BackLink } from "@/components/back-link";
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
+import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
 import { getRun, type RunRecord } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
@@ -32,11 +33,19 @@ export default async function RunDetailPage({
 
   const tone = STATUS_TONE[run.status];
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;
+  const totalTokens =
+    run.tokensInput !== null && run.tokensOutput !== null
+      ? run.tokensInput + run.tokensOutput
+      : null;
+  const estimatedCost =
+    run.tokensInput !== null && run.tokensOutput !== null
+      ? estimateRunCost(run.model, run.tokensInput, run.tokensOutput)
+      : null;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
       <RunPoller status={run.status} />
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <BackLink href={agentHref} label={run.agentName} />
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Run
@@ -48,19 +57,42 @@ export default async function RunDetailPage({
           <Badge variant="purple" size="small">
             {run.model}
           </Badge>
-          <span className="text-foreground-muted text-xs">
-            Queued <LocalTime iso={run.createdAt} />
-            {run.startedAt && (
-              <> · started {formatRelative(run.createdAt, run.startedAt)}</>
-            )}
-            {run.completedAt && run.startedAt && (
-              <>
-                {" · ran "}
-                {formatDuration(run.startedAt, run.completedAt)}
-              </>
-            )}
-          </span>
         </div>
+        <dl className="flex flex-col gap-0.5 text-xs">
+          <div className="flex gap-2">
+            <dt className="text-foreground-weak w-20 shrink-0">Queued</dt>
+            <dd className="text-foreground-muted">
+              <LocalTime iso={run.createdAt} />
+            </dd>
+          </div>
+          {run.startedAt && (
+            <div className="flex gap-2">
+              <dt className="text-foreground-weak w-20 shrink-0">Started</dt>
+              <dd className="text-foreground-muted">
+                {formatRelative(run.createdAt, run.startedAt)}
+              </dd>
+            </div>
+          )}
+          {run.completedAt && run.startedAt && (
+            <div className="flex gap-2">
+              <dt className="text-foreground-weak w-20 shrink-0">Ran for</dt>
+              <dd className="text-foreground-muted">
+                {formatDuration(run.startedAt, run.completedAt)}
+              </dd>
+            </div>
+          )}
+          {totalTokens !== null && (
+            <div className="flex gap-2">
+              <dt className="text-foreground-weak w-20 shrink-0">Consumed</dt>
+              <dd className="text-foreground-muted">
+                {formatTokens(totalTokens)} tokens
+                {estimatedCost !== null && (
+                  <span> (~{formatCurrency(estimatedCost)})</span>
+                )}
+              </dd>
+            </div>
+          )}
+        </dl>
       </div>
 
       <hr className="border-[var(--color-border-weak)]" />
@@ -86,8 +118,6 @@ export default async function RunDetailPage({
 }
 
 function FailedReason({ run }: { run: RunRecord }) {
-  // Surface the failure reason prominently — US-0.1-06 explicitly asks
-  // for "clear failure reason, not a stack trace."
   return (
     <div className="mt-3 flex flex-col gap-1 rounded-lg border border-[var(--color-sentiment-negative)] bg-[var(--color-input-error)] p-3 text-sm">
       <span className="text-sentiment-negative font-medium">
@@ -125,6 +155,6 @@ function formatRelative(fromIso: string, toIso: string): string {
 
 function formatDuration(fromIso: string, toIso: string): string {
   const ms = new Date(toIso).getTime() - new Date(fromIso).getTime();
-  if (ms < 1000) return `for ${ms}ms`;
-  return `for ${(ms / 1000).toFixed(1)}s`;
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }
