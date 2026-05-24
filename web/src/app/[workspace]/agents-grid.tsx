@@ -140,10 +140,10 @@ function AgentCard({ agent }: { agent: GridAgent }) {
       </div>
 
       <div className="mt-auto flex flex-wrap items-center gap-1.5">
-        <Badge variant="blue" size="small">
+        <Badge variant="gray" size="small">
           {agent.frameworkLabel}
         </Badge>
-        <Badge variant="purple" size="small">
+        <Badge variant="gray" size="small">
           {agent.model ?? "—"}
         </Badge>
       </div>

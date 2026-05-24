@@ -6,10 +6,7 @@
 
 import { useMemo } from "react";
 
-import {
-  CUSTOM_THEME_ID,
-  type THEME_PRESETS,
-} from "@/components/providers/accent-provider";
+import { type THEME_PRESETS } from "@/components/providers/accent-provider";
 import { cn } from "@/lib/utils";
 
 export type ThemePresetItem = (typeof THEME_PRESETS)[number];
@@ -27,7 +24,10 @@ export interface PreviewShape {
 }
 
 interface ThemePreviewProps {
-  preset: ThemePresetItem | { id: typeof CUSTOM_THEME_ID };
+  // Either a full preset record (used for swatches) or a bare-id
+  // object (used for custom slots — the actual shape comes from
+  // `customShape` in that case).
+  preset: ThemePresetItem | { id: string };
   customShape?: PreviewShape;
   className?: string;
 }
@@ -37,11 +37,10 @@ export function ThemePreview({
   customShape,
   className,
 }: ThemePreviewProps) {
-  const shape = useMemo<PreviewShape | "system" | null>(() => {
+  const shape = useMemo<PreviewShape | null>(() => {
     if (!("mode" in preset)) {
       return customShape ?? null;
     }
-    if (preset.mode === "system") return "system";
     return {
       mode: preset.mode,
       surface: preset.surface,
@@ -51,7 +50,7 @@ export function ThemePreview({
   }, [preset, customShape]);
 
   const style = useMemo(() => {
-    if (!shape || shape === "system") return;
+    if (!shape) return;
     const isDark = shape.mode === "dark";
     const baseBg = isDark ? "#0a0a0a" : "#ffffff";
     const baseBorder = isDark ? "#262626" : "#e5e5e5";
@@ -63,26 +62,9 @@ export function ThemePreview({
   }, [shape]);
 
   const accentStyle = useMemo(() => {
-    if (!shape || shape === "system" || !shape.accent) return null;
+    if (!shape || !shape.accent) return null;
     return { backgroundColor: shape.accent };
   }, [shape]);
-
-  if (shape === "system") {
-    return (
-      <span
-        aria-hidden
-        className={cn(
-          PREVIEW_BASE_CLASS,
-          PREVIEW_SIZE_CLASS,
-          "relative",
-          className,
-        )}
-      >
-        <span className="absolute inset-y-0 left-0 w-1/2 bg-white" />
-        <span className="absolute inset-y-0 right-0 w-1/2 bg-[#0a0a0a]" />
-      </span>
-    );
-  }
 
   if (!shape) {
     return (
@@ -119,4 +101,3 @@ export function ThemePreview({
   );
 }
 
-export const CUSTOM_PREVIEW_PRESET = { id: CUSTOM_THEME_ID } as const;

@@ -79,16 +79,6 @@ export default async function WorkspacePage({
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Agents
         </h1>
-        <p className="text-foreground-weak text-sm">
-          <a
-            href={`https://github.com/${repo.owner}/${repo.name}`}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="hover:underline"
-          >
-            github.com/{repo.owner}/{repo.name}
-          </a>
-        </p>
       </div>
 
       <hr className="border-[var(--color-border-weak)]" />

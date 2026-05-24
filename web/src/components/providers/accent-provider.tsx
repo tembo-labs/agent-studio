@@ -1,11 +1,18 @@
 "use client";
 
-// Accent theme provider. Adapted from Tembo's apps/web accent system,
-// with the next-themes dependency replaced by our local ThemeProvider.
-// Storage shape and CSS contract (--accent-surface, --accent-fill,
-// --accent-fill-fg, --tint-intensity, --focus-ring-color, data-tint,
-// data-accent) are kept identical so the boot script in app/layout.tsx
-// can restore state before hydration without duplicating logic.
+// Accent theme provider. Splits theme selection into a mode
+// (system / light / dark) and two side-specific "picks" — a light
+// preset and a dark preset. When mode is system, the OS preference
+// decides which side is active. Each side can also be a per-mode
+// Custom (custom-light / custom-dark) with its own surface, accent,
+// and intensity, so the two never clobber each other.
+//
+// CSS contract (data-tint, data-accent, --accent-surface,
+// --accent-fill, --accent-fill-fg, --tint-intensity,
+// --focus-ring-color) and storage location (localStorage
+// `accent-theme` + active snapshot at `accent-theme-active`) match
+// Tembo's apps/web system, so the same pre-hydration boot script
+// approach restores state before React mounts.
 
 import {
   createContext,
@@ -25,12 +32,15 @@ export const INTENSITY_MIN = 0.25;
 export const INTENSITY_MAX = 2;
 const INTENSITY_DEFAULT = 1;
 
-export const CUSTOM_THEME_ID = "custom";
+export const CUSTOM_LIGHT_ID = "custom-light";
+export const CUSTOM_DARK_ID = "custom-dark";
+
+export type ThemeMode = "system" | "light" | "dark";
 
 export interface ThemePreset {
   id: string;
   name: string;
-  mode: "system" | "light" | "dark";
+  mode: "light" | "dark";
   surface: string | null;
   accent: string | null;
   intensity: number;
@@ -42,14 +52,6 @@ export interface ThemePreset {
 }
 
 export const THEME_PRESETS: ThemePreset[] = [
-  {
-    id: "system",
-    name: "System preference",
-    mode: "system",
-    surface: null,
-    accent: null,
-    intensity: 1,
-  },
   {
     id: "light",
     name: "Light",
@@ -120,29 +122,38 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
 ];
 
-const DEFAULT_SYSTEM_LIGHT = "light";
-const DEFAULT_SYSTEM_DARK = "dark";
-
 function findPreset(id: string): ThemePreset | undefined {
   return THEME_PRESETS.find((p) => p.id === id);
 }
 
-interface AccentTheme {
-  themeId: string;
-  customSurface: string | null;
-  customAccent: string | null;
-  customIntensity: number;
-  systemLight: string;
-  systemDark: string;
+export interface CustomConfig {
+  surface: string | null;
+  accent: string | null;
+  intensity: number;
 }
 
+interface AccentTheme {
+  mode: ThemeMode;
+  // Which preset (or 'custom-light') to render when light side is active.
+  lightPick: string;
+  // Which preset (or 'custom-dark') to render when dark side is active.
+  darkPick: string;
+  customLight: CustomConfig;
+  customDark: CustomConfig;
+}
+
+const DEFAULT_CUSTOM: CustomConfig = {
+  surface: null,
+  accent: null,
+  intensity: INTENSITY_DEFAULT,
+};
+
 const DEFAULT_THEME: AccentTheme = {
-  themeId: "system",
-  customSurface: null,
-  customAccent: null,
-  customIntensity: INTENSITY_DEFAULT,
-  systemLight: DEFAULT_SYSTEM_LIGHT,
-  systemDark: DEFAULT_SYSTEM_DARK,
+  mode: "system",
+  lightPick: "light",
+  darkPick: "dark",
+  customLight: DEFAULT_CUSTOM,
+  customDark: DEFAULT_CUSTOM,
 };
 
 const DEFAULT_JSON = JSON.stringify(DEFAULT_THEME);
@@ -171,7 +182,14 @@ function parseTheme(raw: string): AccentTheme {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
-      return { ...DEFAULT_THEME, ...parsed };
+      // Shallow merge with deep-merge for the customLight/customDark nests
+      // so partial old/v0 blobs don't replace the defaults with undefined.
+      return {
+        ...DEFAULT_THEME,
+        ...parsed,
+        customLight: { ...DEFAULT_CUSTOM, ...(parsed.customLight ?? {}) },
+        customDark: { ...DEFAULT_CUSTOM, ...(parsed.customDark ?? {}) },
+      };
     }
   } catch {
     /* ignore */
@@ -209,9 +227,6 @@ function contrastColor(hex: string): string {
   return relativeLuminance(hex) > 0.5 ? "#0a0a0a" : "#ffffff";
 }
 
-// Return the accent color to use for the focus ring, or null if the
-// accent is too light to contrast on a light background — caller
-// falls back to the default ring color in that case.
 function focusRingColor(hex: string): string | null {
   return relativeLuminance(hex) > 0.85 ? null : hex;
 }
@@ -244,26 +259,26 @@ function fromPreset(preset: ThemePreset): EffectiveTheme {
   };
 }
 
+function fromCustom(c: CustomConfig): EffectiveTheme {
+  return {
+    surface: c.surface,
+    accent: c.accent,
+    intensity: c.intensity,
+    surfaceSolid: false,
+    focusRing: null,
+  };
+}
+
 function resolveEffective(
   theme: AccentTheme,
   resolvedMode: string | undefined,
 ): EffectiveTheme {
-  if (theme.themeId === CUSTOM_THEME_ID) {
-    return {
-      surface: theme.customSurface,
-      accent: theme.customAccent,
-      intensity: theme.customIntensity,
-      surfaceSolid: false,
-      focusRing: null,
-    };
-  }
-  if (theme.themeId === "system") {
-    const subId =
-      resolvedMode === "dark" ? theme.systemDark : theme.systemLight;
-    const preset = findPreset(subId);
-    if (preset) return fromPreset(preset);
-  }
-  const preset = findPreset(theme.themeId);
+  const isDark =
+    theme.mode === "dark" || (theme.mode === "system" && resolvedMode === "dark");
+  const pickId = isDark ? theme.darkPick : theme.lightPick;
+  if (pickId === CUSTOM_LIGHT_ID) return fromCustom(theme.customLight);
+  if (pickId === CUSTOM_DARK_ID) return fromCustom(theme.customDark);
+  const preset = findPreset(pickId);
   if (preset) return fromPreset(preset);
   return {
     surface: null,
@@ -277,12 +292,11 @@ function resolveEffective(
 interface AccentContextValue {
   theme: AccentTheme;
   effective: EffectiveTheme;
-  setSurface: (color: string | null) => void;
-  setAccent: (color: string | null) => void;
-  setIntensity: (intensity: number) => void;
-  setThemeId: (id: string) => void;
-  setSystemLight: (id: string) => void;
-  setSystemDark: (id: string) => void;
+  setMode: (mode: ThemeMode) => void;
+  setLightPick: (id: string) => void;
+  setDarkPick: (id: string) => void;
+  setCustomLight: (patch: Partial<CustomConfig>) => void;
+  setCustomDark: (patch: Partial<CustomConfig>) => void;
 }
 
 const AccentContext = createContext<AccentContextValue | null>(null);
@@ -368,70 +382,72 @@ export function AccentProvider({ children }: { children: React.ReactNode }) {
     writeStored({ ...current, ...patch });
   }, []);
 
-  const setSurface = useCallback(
-    (color: string | null) => {
-      update({ customSurface: color, themeId: CUSTOM_THEME_ID });
-    },
-    [update],
-  );
-
-  const setAccent = useCallback(
-    (color: string | null) => {
-      update({ customAccent: color, themeId: CUSTOM_THEME_ID });
-    },
-    [update],
-  );
-
-  const setIntensity = useCallback(
-    (intensity: number) => {
-      update({ customIntensity: intensity, themeId: CUSTOM_THEME_ID });
-    },
-    [update],
-  );
-
-  const setThemeId = useCallback(
-    (id: string) => {
-      const preset = findPreset(id);
-      if (preset) setNextTheme(preset.mode);
-      update({ themeId: id });
+  const setMode = useCallback(
+    (mode: ThemeMode) => {
+      setNextTheme(mode);
+      update({ mode });
     },
     [setNextTheme, update],
   );
 
-  const setSystemLight = useCallback(
+  const setLightPick = useCallback(
     (id: string) => {
-      update({ systemLight: id });
+      update({ lightPick: id });
     },
     [update],
   );
 
-  const setSystemDark = useCallback(
+  const setDarkPick = useCallback(
     (id: string) => {
-      update({ systemDark: id });
+      update({ darkPick: id });
     },
     [update],
+  );
+
+  const setCustomLight = useCallback(
+    (patch: Partial<CustomConfig>) => {
+      const current = parseTheme(getSnapshot());
+      writeStored({
+        ...current,
+        customLight: { ...current.customLight, ...patch },
+        // Auto-select the custom-light pick when the user starts editing
+        // values, so the change is immediately visible.
+        lightPick: CUSTOM_LIGHT_ID,
+      });
+    },
+    [],
+  );
+
+  const setCustomDark = useCallback(
+    (patch: Partial<CustomConfig>) => {
+      const current = parseTheme(getSnapshot());
+      writeStored({
+        ...current,
+        customDark: { ...current.customDark, ...patch },
+        darkPick: CUSTOM_DARK_ID,
+      });
+    },
+    [],
   );
 
   const value = useMemo(
     () => ({
       theme,
       effective,
-      setSurface,
-      setAccent,
-      setIntensity,
-      setThemeId,
-      setSystemLight,
-      setSystemDark,
+      setMode,
+      setLightPick,
+      setDarkPick,
+      setCustomLight,
+      setCustomDark,
     }),
     [
       theme,
       effective,
-      setSurface,
-      setAccent,
-      setIntensity,
-      setThemeId,
-      setSystemLight,
-      setSystemDark,
+      setMode,
+      setLightPick,
+      setDarkPick,
+      setCustomLight,
+      setCustomDark,
     ],
   );
 
@@ -448,9 +464,9 @@ export function useAccent() {
   return ctx;
 }
 
-// Inline boot script. Runs before hydration so accent CSS vars are
-// applied at first paint and the user doesn't see a flash of the
-// unstyled / default accent.
+// Inline boot script. Restores accent CSS vars from the active
+// snapshot before body parses so first paint matches the user's
+// chosen surface tint + accent fill.
 export const ACCENT_BOOT_SCRIPT = `(function () {
   try {
     var d = document.documentElement;
