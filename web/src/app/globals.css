@@ -1314,3 +1314,105 @@
 		color: var(--color-white);
 	}
 }
+
+/* Accent theme overrides. Adapted from Tembo apps/web globals.css.
+   - data-tint: writes --accent-surface onto <html>, low-opacity overlay on
+     surface tokens. Opacity = base% * var(--tint-intensity).
+   - data-accent: writes --accent-fill onto <html>, 100% recolor of the
+     primary interactive fill. Independent of data-tint.
+   - --tint-intensity: scalar (0.25-2) that multiplies the per-surface
+     opacity. Defaults to 1 when unset. */
+@layer utilities {
+	html {
+		--tint-intensity: 1;
+	}
+
+	html[data-tint] {
+		--surface-background: color-mix(
+			in srgb,
+			var(--accent-surface) calc(5% * var(--tint-intensity)),
+			var(--color-gray-50)
+		);
+		--surface-raised: color-mix(
+			in srgb,
+			var(--accent-surface) calc(2% * var(--tint-intensity)),
+			var(--color-white)
+		);
+		--surface-secondary: color-mix(
+			in srgb,
+			var(--accent-surface) calc(5% * var(--tint-intensity)),
+			var(--color-gray-100)
+		);
+	}
+
+	html[data-tint].dark {
+		--surface-background: color-mix(
+			in srgb,
+			var(--accent-surface) calc(10% * var(--tint-intensity)),
+			var(--color-gray-950)
+		);
+		--surface-raised: color-mix(
+			in srgb,
+			var(--accent-surface) calc(10% * var(--tint-intensity)),
+			var(--color-gray-900)
+		);
+		--surface-secondary: color-mix(
+			in srgb,
+			var(--accent-surface) calc(10% * var(--tint-intensity)),
+			var(--color-gray-900)
+		);
+	}
+
+	/* Solid-surface presets (Pure White, Blackout) replace surface tokens
+	   1:1 with --accent-surface instead of mixing a tint. */
+	html[data-tint][data-tint-solid],
+	html[data-tint][data-tint-solid].dark {
+		--surface-background: var(--accent-surface, #ffffff);
+		--surface-raised: var(--accent-surface, #ffffff);
+		--surface-secondary: var(--accent-surface, #ffffff);
+	}
+
+	html[data-accent] {
+		--interactive-fill-primary-enabled: var(--accent-fill);
+		--interactive-fill-primary-hover: color-mix(
+			in srgb,
+			var(--accent-fill) 88%,
+			black
+		);
+		--interactive-fill-primary-pressed: color-mix(
+			in srgb,
+			var(--accent-fill) 78%,
+			black
+		);
+		--interactive-fill-primary-active: color-mix(
+			in srgb,
+			var(--accent-fill) 88%,
+			black
+		);
+		/* Icon/text foreground on accent fill — computed from accent
+		   luminance (black on light accents, white on dark). */
+		--icon-accent: var(--accent-fill-fg, #ffffff);
+		--text-on-accent: var(--accent-fill-fg, #ffffff);
+	}
+
+	html[data-accent].dark {
+		--interactive-fill-primary-enabled: var(--accent-fill);
+		--interactive-fill-primary-hover: color-mix(
+			in srgb,
+			var(--accent-fill) 85%,
+			white
+		);
+		--interactive-fill-primary-pressed: color-mix(
+			in srgb,
+			var(--accent-fill) 75%,
+			white
+		);
+		--interactive-fill-primary-active: color-mix(
+			in srgb,
+			var(--accent-fill) 85%,
+			white
+		);
+		--icon-accent: var(--accent-fill-fg, #ffffff);
+		--text-on-accent: var(--accent-fill-fg, #ffffff);
+	}
+}

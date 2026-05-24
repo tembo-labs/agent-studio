@@ -15,6 +15,7 @@ import { DisconnectRepoForm } from "./disconnect-repo-form";
 import { FaviconPicker } from "./favicon-picker";
 import { RestoreAgentForm } from "./restore-agent-form";
 import { SecretKeyForm } from "./secret-key-form";
+import { ThemeSettings } from "./theme-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,15 @@ export default async function SettingsPage({
       {/* Flat layout — hr dividers between sections, no card wrapper. */}
       <div className="divide-y divide-[var(--color-border-weak)]">
         <div className="pb-5 first:pt-0">
+            <Section
+              title="Theme"
+              description="Pick a curated theme or roll your own. Changes are stored locally to your browser."
+            >
+              <ThemeSettings />
+            </Section>
+          </div>
+
+        <div className="pb-5 pt-8">
             <Section
               title="Favicon"
               description="Shown in the browser tab for everyone using this workspace. Pick a default or upload a custom image."
