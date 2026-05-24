@@ -88,8 +88,6 @@ export default async function WorkspacePage({
           >
             github.com/{repo.owner}/{repo.name}
           </a>
-          <span className="text-foreground-muted"> · </span>
-          <span>default branch {repo.defaultBranch}</span>
         </p>
       </div>
 
