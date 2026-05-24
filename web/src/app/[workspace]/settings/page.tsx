@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import { TopBar } from "@/components/top-bar";
 import { getServerSession } from "@/lib/session";
 import { listDeletedAgents } from "@/lib/workspace-agents";
 import {
@@ -41,13 +40,23 @@ export default async function SettingsPage({
     ]);
 
   return (
-    <>
-      <TopBar title="Settings" />
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
+          Settings
+        </h1>
+        <p className="text-foreground-weak text-sm">
+          Manage{" "}
+          <span className="text-foreground font-medium">{workspace.name}</span>
+          &apos;s repository, credentials, and branding.
+        </p>
+      </div>
 
-      <div className="mx-auto flex w-full max-w-3xl flex-col px-6 py-6">
-        {/* Flat layout — hr dividers between sections, no card wrapper. */}
-        <div className="divide-y divide-[var(--color-border-weak)]">
-          <div className="pb-5 pt-8 first:pt-0">
+      <hr className="border-[var(--color-border-weak)]" />
+
+      {/* Flat layout — hr dividers between sections, no card wrapper. */}
+      <div className="divide-y divide-[var(--color-border-weak)]">
+        <div className="pb-5 first:pt-0">
             <Section
               title="Favicon"
               description="Shown in the browser tab for everyone using this workspace. Pick a default or upload a custom image."
@@ -60,7 +69,7 @@ export default async function SettingsPage({
             </Section>
           </div>
 
-          <div className="pb-5 pt-8">
+        <div className="pb-5 pt-8">
             <Section
               title="GitHub repository"
               description="The repo where this workspace's agent definitions live. Disconnecting drops the stored token and returns the workspace to the onboarding repo step."
@@ -97,7 +106,7 @@ export default async function SettingsPage({
             </Section>
           </div>
 
-          <div className="pb-5 pt-8">
+        <div className="pb-5 pt-8">
             <Section
               title="Anthropic API key"
               description={
@@ -132,7 +141,7 @@ export default async function SettingsPage({
             </Section>
           </div>
 
-          <div className="pb-5 pt-8">
+        <div className="pb-5 pt-8">
             <Section
               title="Tembo API key"
               description={
@@ -163,7 +172,7 @@ export default async function SettingsPage({
             </Section>
           </div>
 
-          <div className="pb-5 pt-8">
+        <div className="pb-5 pt-8">
             <Section
               title="Deleted agents"
               description="Agents removed from this workspace stay listed here so you can restore them. Restore writes the file back to the connected repo with a new commit; the deletion record is preserved for audit."
@@ -200,9 +209,8 @@ export default async function SettingsPage({
                 </ul>
               )}
             </Section>
-          </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

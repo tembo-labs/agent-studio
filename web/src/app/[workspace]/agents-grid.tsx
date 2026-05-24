@@ -72,7 +72,7 @@ export function AgentsGrid({ agents, newAgentHref }: Props) {
           </span>
           <Button asChild>
             <Link href={newAgentHref}>
-              <IconPlusLarge />
+              <IconPlusLarge size={16} />
               <span>New agent</span>
             </Link>
           </Button>
