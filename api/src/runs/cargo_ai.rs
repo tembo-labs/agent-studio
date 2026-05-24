@@ -139,16 +139,27 @@ struct TranslationResult {
 
 /// Translate our simplified Cargo AI agent JSON into the schema
 /// cargo-ai 0.3.0 actually validates. Drops fields cargo-ai doesn't
-/// know (`name`, `description`, `runtime_vars`), folds every `type:
-/// "llm"` action's prompt into a single inputs[] text block, keeps
-/// `agent_schema` verbatim, and appends the user's freeform input
-/// (when present) as a trailing text input.
+/// know (`name`, `description`, `runtime_vars`), keeps `agent_schema`
+/// verbatim, and walks `actions[]` in order to build cargo-ai's
+/// `inputs[]`:
 ///
-/// Non-LLM actions (`type: "http"`, `"exec"`, anything else) are
-/// captured in `dropped_actions` so the runner can surface that to
-/// the user — without this, an agent that depended on live HTTP
-/// fetches would silently fall back to whatever the LLM can
-/// hallucinate, which is the failure mode we hit in the wild.
+///   - `type: "llm"` actions contribute their `prompt` as a
+///     `{ "type": "text", "text": ... }` input.
+///   - `type: "http"` actions become `{ "type": "url", "url": ... }`
+///     inputs — cargo-ai fetches the URL before the LLM call and
+///     includes the body in the prompt context. Method/headers/body
+///     are ignored (cargo-ai's URL input is GET-only); we log a
+///     dropped-actions warning for those carry-overs separately so
+///     users know.
+///   - Anything else (`exec`, unknown kinds) is recorded as a
+///     dropped action so the runner can surface it.
+///
+/// Order across kinds is preserved so a downstream LLM prompt that
+/// expected to reference fetched URL content sees that content
+/// upstream in `inputs[]`.
+///
+/// Finally the freeform `user_message` (when present) is appended
+/// as a trailing text input so chat-thread runs flow naturally.
 fn translate_spec(
     simplified_json: &str,
     user_message: &str,
@@ -169,7 +180,8 @@ fn translate_spec(
         .and_then(|v| v.as_array())
         .ok_or_else(|| anyhow!("agent JSON is missing `actions[]`"))?;
 
-    let mut llm_prompts = Vec::new();
+    let mut inputs: Vec<Value> = Vec::with_capacity(actions.len() + 1);
+    let mut llm_action_count = 0;
     let mut dropped_actions = Vec::new();
     for action in actions {
         let Some(a) = action.as_object() else { continue };
@@ -183,22 +195,48 @@ fn translate_spec(
             .and_then(Value::as_str)
             .unwrap_or("(unnamed)")
             .to_string();
-        if kind == "llm" {
-            if let Some(p) = a.get("prompt").and_then(Value::as_str) {
-                llm_prompts.push(p.to_string());
+        match kind.as_str() {
+            "llm" => {
+                if let Some(p) = a.get("prompt").and_then(Value::as_str) {
+                    inputs.push(json!({ "type": "text", "text": p }));
+                    llm_action_count += 1;
+                }
             }
-        } else {
-            dropped_actions.push(DroppedAction { id, kind });
+            "http" => {
+                let Some(url) = a.get("url").and_then(Value::as_str) else {
+                    // Action declared http but has no URL — keep it
+                    // visible so the user can fix the spec.
+                    dropped_actions.push(DroppedAction {
+                        id: id.clone(),
+                        kind: "http (missing url)".to_string(),
+                    });
+                    continue;
+                };
+                inputs.push(json!({ "type": "url", "url": url }));
+                // Method / headers / body don't translate cleanly to
+                // cargo-ai's GET-only URL input. Note them as
+                // dropped-but-fetched so users understand the URL
+                // ran but custom request shaping didn't.
+                let has_extras = a.get("method").is_some()
+                    || a.get("headers").is_some()
+                    || a.get("body").is_some();
+                if has_extras {
+                    dropped_actions.push(DroppedAction {
+                        id: id.clone(),
+                        kind: "http extras (method/headers/body ignored — URL fetched as GET)"
+                            .to_string(),
+                    });
+                }
+            }
+            _ => {
+                dropped_actions.push(DroppedAction { id, kind });
+            }
         }
     }
-    if llm_prompts.is_empty() {
+    if llm_action_count == 0 {
         bail!("agent has no `type: \"llm\"` actions with prompts — nothing to send to the model");
     }
 
-    let mut inputs: Vec<Value> = Vec::with_capacity(llm_prompts.len() + 1);
-    for p in llm_prompts {
-        inputs.push(json!({ "type": "text", "text": p }));
-    }
     if !user_message.is_empty() {
         inputs.push(json!({ "type": "text", "text": format!("User input: {}", user_message) }));
     }
@@ -268,22 +306,88 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reports_dropped_non_llm_actions() {
+    fn http_actions_become_url_inputs_and_arent_dropped() {
         let simplified = serde_json::json!({
             "agent_schema": { "properties": { "answer": { "type": "string" } } },
             "actions": [
-                { "id": "fetch_weather", "type": "http", "url": "https://example.com" },
-                { "id": "summarize", "type": "llm", "prompt": "Summarize." },
-                { "id": "notify", "type": "exec", "program": "echo" }
+                { "id": "fetch_weather", "type": "http", "url": "https://api.example.com/weather" },
+                { "id": "summarize", "type": "llm", "prompt": "Summarize the fetched data." }
             ]
         })
         .to_string();
         let out = translate_spec(&simplified, "").unwrap();
-        assert_eq!(out.dropped_actions.len(), 2);
-        assert_eq!(out.dropped_actions[0].id, "fetch_weather");
-        assert_eq!(out.dropped_actions[0].kind, "http");
-        assert_eq!(out.dropped_actions[1].id, "notify");
-        assert_eq!(out.dropped_actions[1].kind, "exec");
+        // No HTTP actions show up as dropped — they were translated
+        // into cargo-ai URL inputs, which the runtime will actually
+        // fetch before the LLM call.
+        assert!(out.dropped_actions.is_empty());
+        let parsed: Value = serde_json::from_str(&out.json).unwrap();
+        let inputs = parsed["inputs"].as_array().unwrap();
+        // Order preserved: URL first, then the LLM prompt text.
+        assert_eq!(inputs.len(), 2);
+        assert_eq!(inputs[0]["type"], "url");
+        assert_eq!(inputs[0]["url"], "https://api.example.com/weather");
+        assert_eq!(inputs[1]["type"], "text");
+        assert_eq!(inputs[1]["text"], "Summarize the fetched data.");
+    }
+
+    #[test]
+    fn http_with_extras_notes_dropped_request_shaping() {
+        // cargo-ai's URL input is GET-only — method/headers/body in
+        // the source agent get fetched but the custom shaping is
+        // surfaced as a dropped entry so users know to revisit.
+        let simplified = serde_json::json!({
+            "agent_schema": { "properties": { "ok": { "type": "string" } } },
+            "actions": [
+                {
+                    "id": "post_data",
+                    "type": "http",
+                    "url": "https://api.example.com/x",
+                    "method": "POST",
+                    "headers": { "X-Token": "abc" }
+                },
+                { "id": "summarize", "type": "llm", "prompt": "summarize" }
+            ]
+        })
+        .to_string();
+        let out = translate_spec(&simplified, "").unwrap();
+        assert_eq!(out.dropped_actions.len(), 1);
+        assert_eq!(out.dropped_actions[0].id, "post_data");
+        assert!(out.dropped_actions[0].kind.starts_with("http extras"));
+        // The URL was still fetched — verify it landed in inputs.
+        let parsed: Value = serde_json::from_str(&out.json).unwrap();
+        let inputs = parsed["inputs"].as_array().unwrap();
+        assert_eq!(inputs[0]["type"], "url");
+    }
+
+    #[test]
+    fn exec_actions_still_drop() {
+        let simplified = serde_json::json!({
+            "agent_schema": { "properties": { "x": { "type": "string" } } },
+            "actions": [
+                { "id": "notify", "type": "exec", "program": "echo" },
+                { "id": "summarize", "type": "llm", "prompt": "say hi" }
+            ]
+        })
+        .to_string();
+        let out = translate_spec(&simplified, "").unwrap();
+        assert_eq!(out.dropped_actions.len(), 1);
+        assert_eq!(out.dropped_actions[0].kind, "exec");
+    }
+
+    #[test]
+    fn http_without_url_is_dropped_with_explicit_kind() {
+        let simplified = serde_json::json!({
+            "agent_schema": { "properties": { "x": { "type": "string" } } },
+            "actions": [
+                { "id": "bad", "type": "http" },
+                { "id": "summarize", "type": "llm", "prompt": "say hi" }
+            ]
+        })
+        .to_string();
+        let out = translate_spec(&simplified, "").unwrap();
+        assert_eq!(out.dropped_actions.len(), 1);
+        assert_eq!(out.dropped_actions[0].id, "bad");
+        assert!(out.dropped_actions[0].kind.contains("missing url"));
     }
 
     #[test]
