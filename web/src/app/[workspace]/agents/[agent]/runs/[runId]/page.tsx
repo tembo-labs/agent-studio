@@ -48,7 +48,7 @@ export default async function RunDetailPage({
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Run
         </h1>
-        <dl className="flex flex-col gap-1 text-sm">
+        <dl className="flex flex-col gap-2 text-sm">
           <div className="flex gap-3">
             <dt className="text-foreground-weak w-24 shrink-0 font-medium">
               Status
