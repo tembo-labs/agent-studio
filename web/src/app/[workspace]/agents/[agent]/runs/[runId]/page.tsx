@@ -58,36 +58,47 @@ export default async function RunDetailPage({
             {run.model}
           </Badge>
         </div>
-        <dl className="flex flex-col gap-0.5 text-xs">
-          <div className="flex gap-2">
-            <dt className="text-foreground-weak w-20 shrink-0">Queued</dt>
-            <dd className="text-foreground-muted">
+        <dl className="flex flex-col gap-1 text-sm">
+          <div className="flex gap-3">
+            <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+              Queued
+            </dt>
+            <dd className="text-foreground">
               <LocalTime iso={run.createdAt} />
             </dd>
           </div>
           {run.startedAt && (
-            <div className="flex gap-2">
-              <dt className="text-foreground-weak w-20 shrink-0">Started</dt>
-              <dd className="text-foreground-muted">
+            <div className="flex gap-3">
+              <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+                Started
+              </dt>
+              <dd className="text-foreground">
                 {formatRelative(run.createdAt, run.startedAt)}
               </dd>
             </div>
           )}
           {run.completedAt && run.startedAt && (
-            <div className="flex gap-2">
-              <dt className="text-foreground-weak w-20 shrink-0">Ran for</dt>
-              <dd className="text-foreground-muted">
+            <div className="flex gap-3">
+              <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+                Ran for
+              </dt>
+              <dd className="text-foreground">
                 {formatDuration(run.startedAt, run.completedAt)}
               </dd>
             </div>
           )}
           {totalTokens !== null && (
-            <div className="flex gap-2">
-              <dt className="text-foreground-weak w-20 shrink-0">Consumed</dt>
-              <dd className="text-foreground-muted">
+            <div className="flex gap-3">
+              <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+                Consumed
+              </dt>
+              <dd className="text-foreground">
                 {formatTokens(totalTokens)} tokens
                 {estimatedCost !== null && (
-                  <span> (~{formatCurrency(estimatedCost)})</span>
+                  <span className="text-foreground-weak">
+                    {" "}
+                    (~{formatCurrency(estimatedCost)})
+                  </span>
                 )}
               </dd>
             </div>

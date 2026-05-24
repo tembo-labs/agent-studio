@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-// Server-side renders are in the container's UTC tz; this component
-// re-renders the same ISO string in the *browser's* tz on mount. The
-// brief flash from UTC to local lands in <50ms in practice.
-// `suppressHydrationWarning` silences React's expected mismatch.
+// The server renders Date.toLocaleString in the container's UTC, so
+// SSR'd date text would briefly flash UTC before hydration swaps it
+// to local. To eliminate the flash we render nothing until the
+// component mounts on the client — only then is `Intl.DateTimeFormat`
+// guaranteed to use the user's browser-side time zone.
 
 type Style = "datetime" | "date" | "time";
 
@@ -22,24 +23,18 @@ type Props = {
 };
 
 export function LocalTime({ iso, style = "datetime", className }: Props) {
-  const [text, setText] = useState(() => formatIso(iso, style));
-
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    setText(formatIso(iso, style));
-  }, [iso, style]);
+    setMounted(true);
+  }, []);
 
   return (
-    <time
-      dateTime={iso}
-      className={className}
-      suppressHydrationWarning
-    >
-      {text}
+    <time dateTime={iso} className={className} suppressHydrationWarning>
+      {mounted ? formatIso(iso, style) : ""}
     </time>
   );
 }
 
 function formatIso(iso: string, style: Style): string {
-  const d = new Date(iso);
-  return d.toLocaleString(undefined, STYLES[style]);
+  return new Date(iso).toLocaleString(undefined, STYLES[style]);
 }
