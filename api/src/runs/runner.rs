@@ -183,10 +183,9 @@ async fn run_cargo_ai(
     } else {
         transcript.push_str(reply.trim_end());
     }
-    if !result.stderr.trim().is_empty() {
-        transcript.push_str("\n\n[cargo-ai stderr]\n");
-        transcript.push_str(result.stderr.trim_end());
-    }
+    // cargo-ai's stderr is operational noise ("Initialized Cargo AI
+    // Home at …") — keep it out of the user transcript; it still
+    // lands in docker logs if anything goes wrong.
 
     Ok(RunOutcome {
         output: transcript,
@@ -284,28 +283,42 @@ async fn run_openai(
     })
 }
 
-// Pull the agent's reply out of cargo-ai's mixed stdout. Each
-// content line emitted by the synthetic action shows up as
-// `[Action N: _tas_emit_output] reply: <text>` — we drop the
-// prefix and concatenate the remaining text with newlines. Other
-// cargo-ai progress lines (started / step N / completed) are
-// ignored. Kept stable against changing Action numbers via a
-// substring match on the unique action name we inject.
+// Pull the agent's reply out of cargo-ai's mixed stdout. Every line
+// emitted by the synthetic action is prefixed with
+// `[Action N: _tas_emit_output] ` — first content line follows with
+// `reply: <text>`, continuation lines just `<text>`. The action also
+// emits its own progress noise (`started`, `step N/N exec started; …`,
+// `completed · <duration>`) under the same prefix. We strip the
+// prefix on every match, drop the noise patterns, strip an optional
+// `reply: ` on the first line, and concatenate the rest.
 fn extract_emit_reply(stdout: &str) -> String {
-    const MARKER: &str = ": _tas_emit_output] reply: ";
+    const ACTION_NAME: &str = ": _tas_emit_output] ";
     let mut out = String::new();
     for line in stdout.lines() {
-        if let Some(idx) = line.find(MARKER) {
-            let start = idx + MARKER.len();
-            if start <= line.len() {
-                if !out.is_empty() {
-                    out.push('\n');
-                }
-                out.push_str(&line[start..]);
-            }
+        let Some(idx) = line.find(ACTION_NAME) else { continue };
+        let mut content = &line[idx + ACTION_NAME.len()..];
+        if is_action_progress_noise(content) {
+            continue;
         }
+        if let Some(stripped) = content.strip_prefix("reply: ") {
+            content = stripped;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(content);
     }
     out
+}
+
+// cargo-ai narrates exec steps with these lifecycle lines. We don't
+// want them in the user-facing transcript — they're operational
+// noise, not agent content. Match by prefix so cargo-ai can add
+// trailing context (duration, exit code, etc.) without breaking us.
+fn is_action_progress_noise(content: &str) -> bool {
+    content == "started"
+        || content.starts_with("step ")
+        || content.starts_with("completed")
 }
 
 // Common output framing across providers. When the user supplied a
@@ -371,13 +384,33 @@ run: sequential
 [Action 1: _tas_emit_output] started
 [Action 1: _tas_emit_output] step 1/1 exec started; waiting for command to finish...
 [Action 1: _tas_emit_output] reply: greeting: Hi there!
-[Action 1: _tas_emit_output] reply: mood: cheerful
+[Action 1: _tas_emit_output] mood: cheerful
 [Action 1: _tas_emit_output] completed · 3ms
 
 Run complete · 3.7s total
 ";
         let reply = extract_emit_reply(stdout);
         assert_eq!(reply, "greeting: Hi there!\nmood: cheerful");
+    }
+
+    #[test]
+    fn keeps_multiline_content_continuation_lines() {
+        // Real shape we see from cargo-ai when an exec emits a
+        // multi-line value: the first content line carries the
+        // `reply:` prefix, every continuation line just has the
+        // bracket prefix and the raw text. Continuation lines must
+        // not be dropped (that's the bug we hit in the wild).
+        let stdout = "\
+[Action 1: _tas_emit_output] reply: **Weather Report:**
+[Action 1: _tas_emit_output] Current conditions are partly cloudy.
+[Action 1: _tas_emit_output] High of 72°F, low of 55°F.
+[Action 1: _tas_emit_output] completed · 3ms
+";
+        let reply = extract_emit_reply(stdout);
+        assert_eq!(
+            reply,
+            "**Weather Report:**\nCurrent conditions are partly cloudy.\nHigh of 72°F, low of 55°F."
+        );
     }
 
     #[test]
