@@ -35,7 +35,7 @@ export function FeedbackHistory({ feedbacks }: { feedbacks: Feedback[] }) {
                 rel="noreferrer noopener"
                 className="text-foreground hover:underline"
               >
-                Tembo task ↗
+                Tembo Session ↗
               </a>
             )}
             {f.prUrl && (

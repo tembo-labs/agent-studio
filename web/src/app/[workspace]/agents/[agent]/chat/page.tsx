@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
 import { listFeedbacksForAgent } from "@/lib/feedbacks-api";
+import { listChatRunsForAgent } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
 import { getAgentByName } from "@/lib/workspace-agents";
 
-import { ChatThread } from "./chat-thread";
+import { ChatThread, type ChatTurn } from "./chat-thread";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,27 @@ export default async function AgentChatPage({
   const { agent } = result;
   const canonicalName = agent.ok ? agent.spec.name : agentName;
 
-  const stored = await listFeedbacksForAgent(workspace.id, canonicalName);
+  const [stored, chatRuns] = await Promise.all([
+    listFeedbacksForAgent(workspace.id, canonicalName),
+    listChatRunsForAgent(workspace.id, canonicalName),
+  ]);
   const feedbacks = await scanFeedbacksForPRs(workspace.id, stored);
+
+  // Merge runs + feedbacks into a single chronological turn list.
+  // Stable sort against created_at keeps "send" / "submit change"
+  // ordering intuitive even when they fire in quick succession.
+  const turns: ChatTurn[] = [
+    ...chatRuns.map<ChatTurn>((run) => ({
+      kind: "run",
+      createdAt: run.createdAt,
+      run,
+    })),
+    ...feedbacks.map<ChatTurn>((feedback) => ({
+      kind: "feedback",
+      createdAt: feedback.createdAt,
+      feedback,
+    })),
+  ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(canonicalName)}`;
 
@@ -57,7 +77,7 @@ export default async function AgentChatPage({
       <ChatThread
         workspaceSlug={workspace.slug}
         agentName={canonicalName}
-        feedbacks={feedbacks}
+        turns={turns}
       />
     </div>
   );

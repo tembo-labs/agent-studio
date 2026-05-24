@@ -141,7 +141,7 @@ function FeedbackRow({
               rel="noreferrer noopener"
               className="text-foreground hover:underline"
             >
-              Tembo task ↗
+              Tembo Session ↗
             </a>
           )}
           {feedback.prUrl && (

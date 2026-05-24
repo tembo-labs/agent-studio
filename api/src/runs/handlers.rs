@@ -41,10 +41,12 @@ pub async fn create_run(
 ) -> Result<Json<CreateRunResponse>, (StatusCode, String)> {
     let run_id = Uuid::new_v4();
 
+    let user_message = req.user_message.unwrap_or_default();
+
     sqlx::query(
         r#"INSERT INTO run
-            (id, workspace_id, agent_name, agent_path, model, status, created_by)
-            VALUES ($1, $2, $3, $4, $5, 'queued', $6)"#,
+            (id, workspace_id, agent_name, agent_path, model, status, created_by, user_message)
+            VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7)"#,
     )
     .bind(run_id)
     .bind(req.workspace_id)
@@ -52,12 +54,12 @@ pub async fn create_run(
     .bind(&req.agent_path)
     .bind(&req.model)
     .bind(&req.user_id)
+    .bind(&user_message)
     .execute(&state.db)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("db insert: {e}")))?;
 
     let task_state = state.clone();
-    let user_message = req.user_message.unwrap_or_default();
     let model = req.model;
     let instructions = req.instructions;
     let workspace_id = req.workspace_id;
