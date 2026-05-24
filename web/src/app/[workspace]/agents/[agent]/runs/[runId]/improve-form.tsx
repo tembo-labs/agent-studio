@@ -105,7 +105,7 @@ function ResultBanner({ result }: { result: ImproveResult }) {
   return (
     <div className="border-sentiment-negative bg-[var(--color-input-error)] flex flex-col gap-1 rounded-lg border p-3 text-sm">
       <span className="text-sentiment-negative font-medium">
-        Couldn&apos;t create the session
+        Couldn&apos;t create the task
       </span>
       <span className="text-foreground whitespace-pre-wrap text-xs leading-5">
         {result.error}
