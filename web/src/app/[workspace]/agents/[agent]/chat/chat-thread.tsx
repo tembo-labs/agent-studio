@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { LocalTime } from "@/components/local-time";
+import { Markdown } from "@/components/markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { feedbackSubmitterLabel } from "@/lib/feedback-display";
@@ -221,9 +222,7 @@ function RunBubble({ run }: { run: ChatRun }) {
               {run.errorMessage ?? "Run failed."}
             </p>
           ) : (
-            <p className="text-foreground whitespace-pre-wrap text-sm leading-5">
-              {stripStopReason(run.output)}
-            </p>
+            <Markdown>{stripStopReason(run.output)}</Markdown>
           )}
         </div>
       </div>

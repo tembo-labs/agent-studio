@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
 import { LocalTime } from "@/components/local-time";
+import { Markdown } from "@/components/markdown";
 import { Section } from "@/components/section";
 import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
 import { listFeedbacksForRun } from "@/lib/feedbacks-api";
@@ -129,9 +130,9 @@ export default async function RunDetailPage({
           <p className="text-foreground-weak text-sm">Running…</p>
         )}
         {run.output && (
-          <pre className="bg-surface border-border text-foreground overflow-x-auto whitespace-pre-wrap rounded-lg border p-4 font-mono text-xs leading-5">
-            {stripStopReason(run.output)}
-          </pre>
+          <div className="bg-surface-raised border-border rounded-lg border p-4">
+            <Markdown>{stripStopReason(run.output)}</Markdown>
+          </div>
         )}
         {run.status === "failed" && run.errorMessage && (
           <FailedReason run={run} />
