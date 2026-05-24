@@ -4,6 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+import { DeleteAgentButton } from "./delete-agent-button";
 import {
   Card,
   CardContent,
@@ -99,6 +101,10 @@ export default async function AgentDetailPage({
               View source
             </a>
           </Button>
+          <DeleteAgentButton
+            workspaceSlug={workspace.slug}
+            agentName={agent.ok ? agent.spec.name : agentName}
+          />
           <SignOutButton />
         </div>
       </header>

@@ -5,6 +5,10 @@ import { notFound } from "next/navigation";
 
 import { getServerSession } from "@/lib/session";
 import {
+  restoreAgent,
+  type RestoreAgentError,
+} from "@/lib/workspace-agents";
+import {
   disconnectWorkspaceRepo,
   getWorkspaceBySlug,
   removeWorkspaceSecret,
@@ -75,6 +79,46 @@ export async function removeTemboApiKeyAction(
 export type DisconnectRepoFormState = {
   message?: string;
 };
+
+export type RestoreAgentFormState = {
+  message?: string;
+  error?: string;
+};
+
+const RESTORE_ERROR_MESSAGES: Record<RestoreAgentError, string> = {
+  "no-repo": "Connect a Git repository before restoring an agent.",
+  "not-found": "That deletion record no longer exists.",
+  "already-restored": "Already restored.",
+  "invalid-token":
+    "The workspace's stored GitHub token is no longer valid. Reconnect the repo in Settings.",
+  "path-exists":
+    "An agent with the same filename exists. Delete or rename the live one first.",
+  "branch-protected":
+    "The default branch is protected. Ask an admin to relax protections or use v0.2's chat-to-PR flow.",
+  "rate-limited":
+    "GitHub rate-limited that request. Try again in a few minutes.",
+  network: "Couldn't reach GitHub. Try again in a moment.",
+};
+
+export async function restoreAgentAction(
+  _prev: RestoreAgentFormState,
+  formData: FormData,
+): Promise<RestoreAgentFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const deletionId = String(formData.get("deletionId") ?? "");
+
+  const session = await getServerSession();
+  if (!session) return { error: "Not signed in." };
+
+  const workspace = await authorizeWorkspace(slug);
+  const result = await restoreAgent(workspace.id, session.user.id, deletionId);
+  if (!result.ok) {
+    return { error: RESTORE_ERROR_MESSAGES[result.error] };
+  }
+  revalidatePath(`/${slug}/settings`);
+  revalidatePath(`/${slug}`);
+  return { message: `Restored ${result.agentName}.` };
+}
 
 export async function disconnectRepoAction(
   _prev: DisconnectRepoFormState,

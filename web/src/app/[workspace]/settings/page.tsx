@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { getInstanceName } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
+import { listDeletedAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/workspace";
 
 import { DisconnectRepoForm } from "./disconnect-repo-form";
+import { RestoreAgentForm } from "./restore-agent-form";
 import { TemboApiKeyForm } from "./tembo-api-key-form";
 
 export const dynamic = "force-dynamic";
@@ -39,9 +41,10 @@ export default async function SettingsPage({
   const isMember = await userIsMember(workspace.id, session.user.id);
   if (!isMember) notFound();
 
-  const [preview, repo] = await Promise.all([
+  const [preview, repo, deletedAgents] = await Promise.all([
     getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
     getWorkspaceRepo(workspace.id),
+    listDeletedAgents(workspace.id),
   ]);
   const instanceName = getInstanceName();
 
@@ -114,6 +117,53 @@ export default async function SettingsPage({
                 Connect one now →
               </Link>
             </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="p-3">
+        <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
+          <CardTitle className="text-foreground-title text-base">
+            Deleted agents
+          </CardTitle>
+          <CardDescription>
+            Agents removed from{" "}
+            <span className="text-foreground font-medium">
+              {workspace.name}
+            </span>{" "}
+            stay listed here so you can restore them. Restore writes the file
+            back to the connected repo with a new commit; the deletion record
+            is preserved for audit.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-1 pb-1">
+          {deletedAgents.length === 0 ? (
+            <p className="text-foreground-weak text-sm">
+              No deleted agents.
+            </p>
+          ) : (
+            <ul className="divide-border flex flex-col divide-y">
+              {deletedAgents.map((d) => (
+                <li
+                  key={d.id}
+                  className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-foreground text-sm font-medium">
+                      {d.agentName}
+                    </span>
+                    <span className="text-foreground-muted text-xs">
+                      <code>{d.filePath}</code>
+                      <span> · deleted {formatDate(d.deletedAt)}</span>
+                    </span>
+                  </div>
+                  <RestoreAgentForm
+                    workspaceSlug={workspace.slug}
+                    deletionId={d.id}
+                  />
+                </li>
+              ))}
+            </ul>
           )}
         </CardContent>
       </Card>
