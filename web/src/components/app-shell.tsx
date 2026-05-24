@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { SignOutButton } from "@/components/sign-out-button";
 import { SidebarNavItem } from "@/components/sidebar-nav-item";
-import { POWERED_BY_HREF, getInstanceName } from "@/lib/config";
+import { getInstanceName } from "@/lib/config";
 import type { Workspace } from "@/lib/workspace";
 import { IconAgent, IconSettingsSliderHor } from "central-icons";
 
@@ -64,16 +64,8 @@ export function AppShell({ workspace, user, children }: Props) {
               </span>
             )}
           </div>
-          <div className="flex items-center justify-between gap-2">
+          <div>
             <SignOutButton />
-            <a
-              href={POWERED_BY_HREF}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="text-foreground-muted hover:text-foreground-weak text-[10px]"
-            >
-              powered by Tembo Agent Studio
-            </a>
           </div>
         </div>
       </aside>
