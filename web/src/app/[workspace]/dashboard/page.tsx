@@ -63,9 +63,14 @@ export default async function DashboardPage({
       <section className="flex flex-col gap-3">
         <h2 className="text-foreground text-sm font-medium">This week</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Merged" value={counts.merged} accent="green" />
+          {/* Submitted is the cumulative count of *all* feedback rows
+              created in the window, regardless of their current status —
+              a row that was submitted, opened a PR, and got merged still
+              counts here. The other three cards break that population
+              down by where it ended up. */}
+          <StatCard label="Submitted" value={counts.total} accent="gray" />
           <StatCard label="PR open" value={counts.pr_opened} accent="blue" />
-          <StatCard label="Submitted" value={counts.submitted} accent="gray" />
+          <StatCard label="Merged" value={counts.merged} accent="green" />
           <StatCard label="Closed" value={counts.closed} accent="red" />
         </div>
       </section>
