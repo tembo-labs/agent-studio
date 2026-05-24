@@ -27,7 +27,9 @@ export function AppShell({ workspace, user, children }: Props) {
   return (
     <div className="bg-surface flex min-h-screen">
       <aside className="bg-surface-secondary border-border flex w-60 shrink-0 flex-col border-r">
-        <div className="border-border flex flex-col gap-0.5 border-b px-3 py-4">
+        {/* py-3 matches the TopBar so the bottom borders line up across
+            the top of the app. */}
+        <div className="border-border flex flex-col gap-0.5 border-b px-3 py-3">
           <span className="text-foreground-muted text-[10px] font-medium uppercase tracking-widest">
             {instanceName}
           </span>
