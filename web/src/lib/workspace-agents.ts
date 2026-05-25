@@ -12,6 +12,7 @@ import {
   type Framework,
   type ParseAgentError,
 } from "@/lib/agent-format";
+import { guidanceFilesFor } from "@/lib/agent-guidance";
 import { db } from "@/lib/db";
 import {
   createFile,
@@ -226,6 +227,13 @@ async function commitAgentFile(
   };
   const path = `${AGENTS_DIR}/${FRAMEWORK_DIRS[framework]}/${filename}`;
 
+  // Make sure the AGENTS.md index + matching framework AGENT_GUIDE.md
+  // are present in the repo before the agent file lands. The Tembo
+  // Coding Agent reads them on each PR; without them, edits drift
+  // back toward the simpler-but-wrong shapes coding agents pick up
+  // from generic training data.
+  await ensureGuidanceFiles(token, ref, framework);
+
   const result = await createFile(token, ref, path, {
     content,
     message: commitMessage,
@@ -234,6 +242,28 @@ async function commitAgentFile(
     return { ok: false, error: result.error, detail: result.detail };
   }
   return { ok: true, filename, path, commitSha: result.commitSha };
+}
+
+// Best-effort guidance-file bootstrap. Idempotent: createFile returns
+// `path-exists` on a 422 which we treat as success (the file is
+// already there, possibly customer-edited; we don't overwrite).
+// Network/auth failures are swallowed — the agent commit is the
+// important step, and the guidance can be re-bootstrapped later.
+async function ensureGuidanceFiles(
+  token: string,
+  ref: RepoRef,
+  framework: Framework,
+): Promise<void> {
+  for (const file of guidanceFilesFor(framework)) {
+    try {
+      await createFile(token, ref, file.path, {
+        content: file.content,
+        message: `Add ${file.path} (TAS agent authoring guide)`,
+      });
+    } catch {
+      // ignore — guidance is a nice-to-have, not blocking
+    }
+  }
 }
 
 export async function createAgentFromTemplate(

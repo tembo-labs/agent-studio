@@ -6,12 +6,16 @@ import { db } from "@/lib/db";
 // runs, marking them succeeded/failed); the web layer reads for list +
 // detail pages. Both surfaces hit the same Postgres so this is safe.
 
+export type RunTrigger = "manual" | "schedule";
+
 export type RunSummary = {
   id: string;
   agentName: string;
   status: "queued" | "running" | "succeeded" | "failed";
   createdAt: Date;
   completedAt: Date | null;
+  trigger: RunTrigger;
+  automationId: string | null;
 };
 
 /**
@@ -30,9 +34,11 @@ export async function getLatestRunPerAgent(
     status: RunSummary["status"];
     created_at: Date;
     completed_at: Date | null;
+    trigger: RunTrigger;
+    automation_id: string | null;
   }>(
     `SELECT DISTINCT ON (agent_name)
-            id, agent_name, status, created_at, completed_at
+            id, agent_name, status, created_at, completed_at, trigger, automation_id
        FROM run
       WHERE workspace_id = $1 AND agent_name = ANY($2::text[])
       ORDER BY agent_name, created_at DESC`,
@@ -47,6 +53,8 @@ export async function getLatestRunPerAgent(
         status: r.status,
         createdAt: r.created_at,
         completedAt: r.completed_at,
+        trigger: r.trigger,
+        automationId: r.automation_id,
       },
     ]),
   );
@@ -165,8 +173,10 @@ export async function listRecentRunsForAgent(
     status: RunSummary["status"];
     created_at: Date;
     completed_at: Date | null;
+    trigger: RunTrigger;
+    automation_id: string | null;
   }>(
-    `SELECT id, agent_name, status, created_at, completed_at
+    `SELECT id, agent_name, status, created_at, completed_at, trigger, automation_id
        FROM run
       WHERE workspace_id = $1 AND agent_name = $2
       ORDER BY created_at DESC
@@ -179,5 +189,7 @@ export async function listRecentRunsForAgent(
     status: r.status,
     createdAt: r.created_at,
     completedAt: r.completed_at,
+    trigger: r.trigger,
+    automationId: r.automation_id,
   }));
 }

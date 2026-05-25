@@ -23,17 +23,19 @@ export type CreateRunInput = {
   agentName: string;
   agentPath: string;
   model: string;
-  instructions: string;
   userMessage?: string;
-  // Optional framework hint. Pydantic agents run through our direct
-  // Anthropic / OpenAI client. Cargo AI agents delegate to the
-  // bundled cargo-ai CLI on the api container; specJson must be
-  // populated for that path.
+  // Both frameworks now run as passthrough subprocess calls into the
+  // upstream tool — Pydantic agents through the bundled Python
+  // wrapper, Cargo AI agents through the bundled cargo-ai CLI. The
+  // runner needs the raw file contents and format for both.
   framework?: "pydantic-agentspec" | "cargo-ai";
-  specJson?: string;
+  specContent?: string;
+  specFormat?: "yaml" | "json";
 };
 
 export type CreateRunResponse = { runId: string };
+
+export type RunTrigger = "manual" | "schedule";
 
 export type RunRecord = {
   id: string;
@@ -50,6 +52,8 @@ export type RunRecord = {
   completedAt: string | null;
   tokensInput: number | null;
   tokensOutput: number | null;
+  trigger: RunTrigger;
+  automationId: string | null;
 };
 
 type ApiRunRecord = {
@@ -67,6 +71,8 @@ type ApiRunRecord = {
   completed_at: string | null;
   tokens_input: number | null;
   tokens_output: number | null;
+  trigger: RunTrigger;
+  automation_id: string | null;
 };
 
 function fromApi(r: ApiRunRecord): RunRecord {
@@ -85,6 +91,8 @@ function fromApi(r: ApiRunRecord): RunRecord {
     completedAt: r.completed_at,
     tokensInput: r.tokens_input,
     tokensOutput: r.tokens_output,
+    trigger: r.trigger,
+    automationId: r.automation_id,
   };
 }
 
@@ -102,10 +110,10 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
       agent_name: input.agentName,
       agent_path: input.agentPath,
       model: input.model,
-      instructions: input.instructions,
       user_message: input.userMessage ?? "",
       framework: input.framework,
-      spec_json: input.specJson,
+      spec_content: input.specContent,
+      spec_format: input.specFormat,
     }),
   });
   if (!res.ok) {

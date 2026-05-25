@@ -7,6 +7,11 @@ import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
+import {
+  listAutomationsForAgent,
+  type Automation,
+} from "@/lib/automations-api";
+import { nextFireAfter, validateCron } from "@/lib/cron";
 import { listRecentRunsForAgent, type RunSummary } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getAgentByName } from "@/lib/workspace-agents";
@@ -40,11 +45,10 @@ export default async function AgentDetailPage({
   const { agent, raw } = result;
   const canonicalName = agent.ok ? agent.spec.name : agentName;
 
-  const recentRuns = await listRecentRunsForAgent(
-    workspace.id,
-    canonicalName,
-    10,
-  );
+  const [recentRuns, automations] = await Promise.all([
+    listRecentRunsForAgent(workspace.id, canonicalName, 10),
+    listAutomationsForAgent(workspace.id, canonicalName),
+  ]);
 
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
 
@@ -113,6 +117,12 @@ export default async function AgentDetailPage({
       <hr className="border-[var(--color-border-weak)]" />
 
       <div className="flex flex-col gap-8">
+        <AutomationsSection
+          automations={automations}
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+        />
+
         <Section
           title="Recent runs"
           description={
@@ -174,6 +184,11 @@ function RecentRuns({
               <Badge variant={tone.variant} size="small">
                 {STATUS_LABELS[run.status]}
               </Badge>
+              {run.trigger === "schedule" && (
+                <Badge variant="blue" size="small">
+                  Scheduled
+                </Badge>
+              )}
               <LocalTime
                 iso={run.createdAt.toISOString()}
                 className="text-foreground-muted text-xs"
@@ -189,6 +204,94 @@ function RecentRuns({
         );
       })}
     </ul>
+  );
+}
+
+function AutomationsSection({
+  automations,
+  workspaceSlug,
+  agentName,
+}: {
+  automations: Automation[];
+  workspaceSlug: string;
+  agentName: string;
+}) {
+  // The "New automation" link is in the Section header (right side)
+  // so the affordance is visible even when the list is empty.
+  const newHref = `/${workspaceSlug}/automations/new?agent=${encodeURIComponent(agentName)}`;
+  return (
+    <Section
+      title="Automations"
+      description="Schedules that fire this agent on their own. Cron is UTC; times shown are local."
+      actions={
+        <Button asChild variant="secondary">
+          <Link href={newHref}>New automation</Link>
+        </Button>
+      }
+    >
+      {automations.length === 0 ? (
+        <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
+          No automations yet. Click <strong className="text-foreground">New
+          automation</strong> to schedule this agent.
+        </p>
+      ) : (
+        <ul className="divide-border flex flex-col divide-y border-y border-[var(--color-border)]">
+          {automations.map((a) => {
+            const preview = validateCron(a.cron);
+            const next = a.enabled ? nextFireAfter(a.cron, new Date()) : null;
+            return (
+              <li
+                key={a.id}
+                className="flex items-center justify-between gap-3 py-2"
+              >
+                <Link
+                  href={`/${workspaceSlug}/automations/${a.id}`}
+                  className="flex flex-1 min-w-0 items-center gap-3"
+                >
+                  {a.enabled ? (
+                    a.lastFireError ? (
+                      <Badge variant="red" size="small">
+                        Error
+                      </Badge>
+                    ) : (
+                      <Badge variant="green" size="small">
+                        On
+                      </Badge>
+                    )
+                  ) : (
+                    <Badge variant="gray" size="small">
+                      Off
+                    </Badge>
+                  )}
+                  <span className="text-foreground truncate text-sm font-medium">
+                    {a.name}
+                  </span>
+                  <span className="text-foreground-weak truncate text-xs">
+                    {preview.ok ? preview.humanReadable : a.cron}{" "}
+                    <span className="text-foreground-muted">(UTC)</span>
+                  </span>
+                </Link>
+                <span className="text-foreground-muted shrink-0 text-xs">
+                  {next ? (
+                    <>
+                      Next{" "}
+                      <LocalTime
+                        iso={next.toISOString()}
+                        className="text-foreground-weak"
+                      />
+                    </>
+                  ) : a.enabled ? (
+                    "—"
+                  ) : (
+                    "Paused"
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Section>
   );
 }
 

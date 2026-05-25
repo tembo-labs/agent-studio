@@ -20,6 +20,8 @@
     "central-icons": "npm:@central-icons-react/round-outlined-radius-2-stroke-2@^1.1.246",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cron-parser": "^5.5.0",
+    "cronstrue": "^3.14.0",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
     "pg": "^8.21.0",

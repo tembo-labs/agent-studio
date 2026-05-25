@@ -1,16 +1,15 @@
 //! The actual run task. Lifecycle:
 //!   queued → running → succeeded | failed
 //! Output and error_message are written back to the run row so the web
-//! poller can render them. Dispatches on the model's `provider:` prefix
-//! (anthropic | openai) so each provider's response shape is normalised
-//! into a common RunOutcome.
+//! poller can render them. Both supported frameworks (Pydantic AI,
+//! Cargo AI) run as passthrough subprocess calls into the upstream
+//! tool — see the per-framework modules for the wire details.
 
 use anyhow::{anyhow, Context};
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::providers::{anthropic, openai};
-use crate::runs::cargo_ai;
+use crate::runs::{cargo_ai, pydantic};
 use crate::workspace::{get_workspace_secret_plaintext, SecretKind};
 use crate::AppState;
 
@@ -20,15 +19,37 @@ pub enum Framework {
     CargoAi,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum SpecFormat {
+    Yaml,
+    Json,
+}
+
+impl SpecFormat {
+    fn as_pydantic(self) -> pydantic::SpecFormat {
+        match self {
+            SpecFormat::Yaml => pydantic::SpecFormat::Yaml,
+            SpecFormat::Json => pydantic::SpecFormat::Json,
+        }
+    }
+}
+
 pub struct RunContext {
     pub run_id: Uuid,
     pub workspace_id: Uuid,
+    /// `provider:model` (e.g. `openai:gpt-4o-mini`). Cargo AI needs
+    /// the split; Pydantic passthrough lets pydantic-ai parse the
+    /// model field straight out of the spec and only uses this for
+    /// run-row metadata.
     pub model: String,
-    pub instructions: String,
     pub user_message: String,
     pub framework: Framework,
-    /// Raw Cargo AI JSON. Required when framework is CargoAi.
-    pub spec_json: Option<String>,
+    /// Raw agent file content as it sits in the repo. Required for
+    /// both frameworks now that both are passthrough.
+    pub spec_content: Option<String>,
+    /// Spec content format — YAML or JSON. Drives Python wrapper's
+    /// --fmt flag (Pydantic) or selects the JSON parser (Cargo AI).
+    pub spec_format: SpecFormat,
 }
 
 struct RunOutcome {
@@ -36,32 +57,14 @@ struct RunOutcome {
     usage: Option<Usage>,
 }
 
-// Provider-neutral usage shape. Both anthropic::Usage and
-// openai::Usage normalise into this before crossing into the run
-// row so the column semantics ({tokens_input, tokens_output}) stay
-// consistent regardless of which provider produced them.
+// Provider-neutral usage shape. Both pydantic-ai's usage and any
+// future framework's normalise into this before crossing into the
+// run row so the column semantics ({tokens_input, tokens_output})
+// stay consistent regardless of who produced them.
 #[derive(Debug, Clone, Copy)]
 struct Usage {
     input_tokens: i32,
     output_tokens: i32,
-}
-
-impl From<anthropic::Usage> for Usage {
-    fn from(u: anthropic::Usage) -> Self {
-        Self {
-            input_tokens: u.input_tokens,
-            output_tokens: u.output_tokens,
-        }
-    }
-}
-
-impl From<openai::Usage> for Usage {
-    fn from(u: openai::Usage) -> Self {
-        Self {
-            input_tokens: u.input_tokens,
-            output_tokens: u.output_tokens,
-        }
-    }
 }
 
 /// Drive a single run from queued through to terminal state. Always
@@ -94,22 +97,20 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
 }
 
 async fn run_inner(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunOutcome> {
-    // Model format is `provider:model`, e.g. `anthropic:claude-sonnet-4-6`.
-    let (provider, model) = ctx
-        .model
-        .split_once(':')
-        .ok_or_else(|| anyhow!("agent's model field must be `provider:model` (got `{}`)", ctx.model))?;
-
     match ctx.framework {
-        Framework::CargoAi => run_cargo_ai(state, ctx, provider, model).await,
-        Framework::Pydantic => match provider {
-            "anthropic" => run_anthropic(state, ctx, model).await,
-            "openai" => run_openai(state, ctx, model).await,
-            other => Err(anyhow!(
-                "Provider `{other}` is not enabled in this TAS build. \
-                 Supported: `anthropic`, `openai`."
-            )),
-        },
+        Framework::CargoAi => {
+            // Cargo AI still needs the provider:model split to set
+            // its --server / --model CLI flags; pydantic-ai parses
+            // its own model field out of the spec.
+            let (provider, model) = ctx.model.split_once(':').ok_or_else(|| {
+                anyhow!(
+                    "agent's model field must be `provider:model` (got `{}`)",
+                    ctx.model
+                )
+            })?;
+            run_cargo_ai(state, ctx, provider, model).await
+        }
+        Framework::Pydantic => run_pydantic(state, ctx).await,
     }
 }
 
@@ -134,7 +135,7 @@ async fn run_cargo_ai(
     }
 
     let spec_json = ctx
-        .spec_json
+        .spec_content
         .as_deref()
         .ok_or_else(|| anyhow!("Cargo AI run is missing the agent's raw JSON"))?;
 
@@ -160,42 +161,19 @@ async fn run_cargo_ai(
     .await?;
 
     // cargo-ai writes the agent reply through a synthetic emit
-    // action (see cargo_ai::synthesize_emit_actions), so every
+    // action (see cargo_ai::synthesize_emit_action), so every
     // content line lands prefixed with `[Action N: _tas_emit_output] reply: …`.
-    // Strip that wrapping for the user-facing transcript and keep
-    // the raw stdout under a "cargo-ai trace" footer so operators
-    // can still debug. Token usage isn't currently surfaced by
-    // cargo-ai (queued as an upstream PR); we record None and the
-    // run page hides the "Consumed" row gracefully.
+    // Strip that wrapping for the user-facing transcript; raw stdout
+    // is still recoverable via docker logs if anything goes wrong.
+    // Token usage isn't currently surfaced by cargo-ai (queued as an
+    // upstream PR); we record None and the run page hides the
+    // "Consumed" row gracefully.
     let reply = extract_emit_reply(&result.stdout);
     let mut transcript = String::new();
     if !ctx.user_message.is_empty() {
         transcript.push_str("user> ");
         transcript.push_str(&ctx.user_message);
         transcript.push_str("\n\n");
-    }
-    // Only the truly-skipped drops surface in the transcript —
-    // the model never saw their output so the reply will reflect
-    // that. Partial drops (e.g. HTTP method/headers/body ignored
-    // but the URL still fetched) are intentionally suppressed:
-    // they add noise without value when the agent's answer is
-    // actually fine.
-    let skipped: Vec<&cargo_ai::DroppedAction> = result
-        .dropped_actions
-        .iter()
-        .filter(|d| d.severity == cargo_ai::DroppedSeverity::Skipped)
-        .collect();
-    if !skipped.is_empty() {
-        transcript.push_str("[warning] The v0.2 Cargo AI runtime only executes `type: \"llm\"` actions.\n");
-        transcript.push_str("The following non-LLM actions were skipped — the model didn't see their output:\n");
-        for d in skipped {
-            transcript.push_str("  - ");
-            transcript.push_str(&d.id);
-            transcript.push_str(" (");
-            transcript.push_str(&d.kind);
-            transcript.push_str(")\n");
-        }
-        transcript.push('\n');
     }
     if reply.trim().is_empty() {
         // Defensive: if the emit action didn't fire (older cargo-ai
@@ -216,93 +194,68 @@ async fn run_cargo_ai(
     })
 }
 
-async fn run_anthropic(
-    state: &AppState,
-    ctx: &RunContext,
-    model: &str,
-) -> anyhow::Result<RunOutcome> {
-    let api_key = get_workspace_secret_plaintext(
-        &state.db,
-        &state.encryption_key,
-        ctx.workspace_id,
-        SecretKind::AnthropicApiKey,
-    )
-    .await
-    .context(
-        "Couldn't load this workspace's Anthropic API key. \
-         Set it under Settings → Anthropic API key.",
-    )?;
+async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunOutcome> {
+    let spec_content = ctx
+        .spec_content
+        .as_deref()
+        .ok_or_else(|| anyhow!("Pydantic run is missing the agent's raw spec content"))?;
 
-    // The Anthropic Messages API requires at least one non-empty user
-    // turn. "Hello." is the most neutral starter we can send: it reads
-    // as a natural opening and lets the agent's instructions drive the
-    // reply, rather than the model commenting on the input itself.
-    // v0.3's rich HITL forms (US-0.3-01) are the right home for real
-    // structured input.
-    let user_message = if ctx.user_message.is_empty() {
-        "Hello."
-    } else {
-        ctx.user_message.as_str()
-    };
-
-    let result = anthropic::invoke(
-        &state.http,
-        &api_key,
-        anthropic::InvokeArgs {
-            model,
-            instructions: &ctx.instructions,
-            user_message,
-            max_tokens: 1024,
-        },
-    )
-    .await?;
-
-    let _ = result.stop_reason;
-    Ok(RunOutcome {
-        output: render_output(&ctx.user_message, &result.text),
-        usage: result.usage.map(Usage::from),
-    })
-}
-
-async fn run_openai(
-    state: &AppState,
-    ctx: &RunContext,
-    model: &str,
-) -> anyhow::Result<RunOutcome> {
-    let api_key = get_workspace_secret_plaintext(
+    // Load whichever provider keys the workspace has set. Either
+    // (or both) may be absent; pydantic-ai inside the subprocess
+    // looks up the env var matching the agent's `model:` field, and
+    // surfaces a clean "missing API key" error if its specific
+    // provider isn't wired up. Treating absent keys as None here
+    // means a workspace with only one provider configured can still
+    // run agents that point at that provider.
+    let openai_key = get_workspace_secret_plaintext(
         &state.db,
         &state.encryption_key,
         ctx.workspace_id,
         SecretKind::OpenAiApiKey,
     )
     .await
-    .context(
-        "Couldn't load this workspace's OpenAI API key. \
-         Set it under Settings → OpenAI API key.",
-    )?;
-
-    let user_message = if ctx.user_message.is_empty() {
-        "Hello."
-    } else {
-        ctx.user_message.as_str()
-    };
-
-    let result = openai::invoke(
-        &state.http,
-        &api_key,
-        openai::InvokeArgs {
-            model,
-            instructions: &ctx.instructions,
-            user_message,
-            max_tokens: 1024,
-        },
+    .ok();
+    let anthropic_key = get_workspace_secret_plaintext(
+        &state.db,
+        &state.encryption_key,
+        ctx.workspace_id,
+        SecretKind::AnthropicApiKey,
     )
+    .await
+    .ok();
+
+    if openai_key.is_none() && anthropic_key.is_none() {
+        // Pydantic-ai would fail inside the subprocess with a less
+        // friendly message; intercept here so the run row's error
+        // surface tells the customer exactly what to do.
+        return Err(anyhow!(
+            "No provider API keys set for this workspace. \
+             Add either an OpenAI or Anthropic API key under \
+             Settings → API keys before running an agent."
+        ));
+    }
+
+    let result = pydantic::invoke(pydantic::PydanticArgs {
+        spec_content,
+        spec_format: ctx.spec_format.as_pydantic(),
+        user_message: &ctx.user_message,
+        openai_api_key: openai_key.as_deref(),
+        anthropic_api_key: anthropic_key.as_deref(),
+    })
     .await?;
 
-    let _ = result.stop_reason;
+    let usage = result
+        .usage
+        .as_ref()
+        .and_then(pydantic::PydanticUsage::input_output)
+        .map(|(input, output)| Usage {
+            input_tokens: input,
+            output_tokens: output,
+        });
+
     Ok(RunOutcome {
-        output: render_output(&ctx.user_message, &result.text),
-        usage: result.usage.map(Usage::from),
+        output: render_output(&ctx.user_message, &result.output),
+        usage,
     })
 }
 

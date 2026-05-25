@@ -45,7 +45,6 @@ export type ParseAgentError =
   | "missing-name"
   | "missing-model"
   | "missing-instructions"
-  | "missing-actions"
   | "invalid-name";
 
 export type ParseAgentResult =
@@ -69,7 +68,8 @@ export function validateAgentName(name: string): boolean {
 /**
  * Dispatch on the parsed object's shape:
  *  - `instructions: string` → Pydantic AgentSpec
- *  - `actions: array`       → Cargo AI
+ *  - `agent_schema` object  → Cargo AI (native shape)
+ *  - `inputs` or `actions` array → Cargo AI (looser fallback)
  *  - otherwise              → unrecognized
  *
  * If a file happens to have both (someone wrote a hybrid), we prefer
@@ -79,8 +79,13 @@ function detectFramework(obj: Record<string, unknown>): Framework | null {
   const hasInstructions =
     typeof obj.instructions === "string" && obj.instructions.trim() !== "";
   if (hasInstructions) return "pydantic-agentspec";
-  const hasActions = Array.isArray(obj.actions);
-  if (hasActions) return "cargo-ai";
+  const hasAgentSchema =
+    obj.agent_schema !== undefined &&
+    obj.agent_schema !== null &&
+    typeof obj.agent_schema === "object" &&
+    !Array.isArray(obj.agent_schema);
+  if (hasAgentSchema) return "cargo-ai";
+  if (Array.isArray(obj.inputs) || Array.isArray(obj.actions)) return "cargo-ai";
   return null;
 }
 
@@ -105,12 +110,11 @@ function parseCargoAiSpec(
   obj: Record<string, unknown>,
   base: AgentSpecBase,
 ): ParseAgentResult | { spec: CargoAiSpec } {
-  if (!Array.isArray(obj.actions)) {
-    return { ok: false, error: "missing-actions" };
-  }
-  // Cargo AI's model placement varies (top-level vs `runtime_vars.model`);
-  // we accept either flat shape, with null as the honest "didn't find one"
-  // value so the UI renders "—" rather than guessing.
+  // The web layer's job is to extract `model` for run routing and pass
+  // the raw bytes through; cargo-ai itself validates the rest of the
+  // schema. Model placement varies (top-level vs `runtime_vars.model`);
+  // we accept either flat shape, with null as the honest "didn't find
+  // one" value so the UI renders "—" rather than guessing.
   let model: string | null = null;
   if (typeof obj.model === "string" && obj.model.trim()) {
     model = obj.model;
@@ -170,7 +174,7 @@ export function parseAgentContent(
       ok: false,
       error: "unrecognized-shape",
       detail:
-        "Not a recognized agent format. Pydantic AgentSpec needs `instructions`; Cargo AI needs an `actions` array.",
+        "Not a recognized agent format. Pydantic AgentSpec needs `instructions`; Cargo AI needs an `agent_schema` (or `inputs` / `actions`) array.",
     };
   }
 
@@ -203,57 +207,6 @@ export function parseAgentFile(
 // later if a customer asks.
 export const STARTER_DEFAULT_MODEL = "anthropic:claude-sonnet-4-6";
 
-// ── Cargo AI runtime extraction ────────────────────────────────────────
-//
-// The Rust runner takes a single (model, instructions, user_message)
-// tuple and calls the provider once. To make Cargo AI agents runnable
-// without building a full action-graph interpreter, the web layer
-// flattens a Cargo AI spec down to that shape:
-//   model         ← runtime_vars.model (or top-level `model`)
-//   instructions  ← concatenated prompts of every `type: "llm"` action
-//
-// This is intentionally a v0.1 simplification — JSON Logic branching,
-// non-llm action types, agent_schema validation, and multi-step run
-// orchestration all stay deferred to a richer Cargo AI runtime that
-// can land alongside the v0.3+ multi-framework slice.
-
-export type CargoAiRunnable = {
-  model: string;
-  instructions: string;
-};
-
-export type CargoAiRunnableError = "missing-model" | "no-llm-actions";
-
-export function extractCargoAiRunnable(
-  spec: CargoAiSpec,
-):
-  | { ok: true; runnable: CargoAiRunnable }
-  | { ok: false; error: CargoAiRunnableError } {
-  if (!spec.model) return { ok: false, error: "missing-model" };
-
-  const actions = spec.raw.actions;
-  if (!Array.isArray(actions)) return { ok: false, error: "no-llm-actions" };
-
-  const prompts: string[] = [];
-  for (const a of actions) {
-    if (
-      a &&
-      typeof a === "object" &&
-      !Array.isArray(a) &&
-      (a as Record<string, unknown>).type === "llm" &&
-      typeof (a as Record<string, unknown>).prompt === "string"
-    ) {
-      prompts.push((a as Record<string, unknown>).prompt as string);
-    }
-  }
-  if (prompts.length === 0) return { ok: false, error: "no-llm-actions" };
-
-  return {
-    ok: true,
-    runnable: { model: spec.model, instructions: prompts.join("\n\n") },
-  };
-}
-
 export function renderStarter(name: string): string {
   return `# Pydantic AI AgentSpec — see context/0.1/AGENT_FORMAT.md
 name: ${name}
@@ -267,14 +220,29 @@ model_settings:
 `;
 }
 
+// cargo-ai 0.3's strict schema version — kept in sync with the constant
+// in api/src/runs/cargo_ai.rs (which injects it if a file omits it).
+const CARGO_AI_SCHEMA_VERSION = "2026-03-03.r1";
+
+// cargo-ai 0.3 only ships an OpenAI provider; the Rust runner blocks
+// other providers with an explicit error. Once the upstream Anthropic
+// provider PR lands we can revert this to STARTER_DEFAULT_MODEL.
+const CARGO_AI_STARTER_MODEL = "openai:gpt-4o-mini";
+
 export function renderCargoStarter(name: string): string {
-  // Minimal-but-real Cargo AI JSON: parses cleanly under the v0.1
-  // parser (has `agent_schema` and `actions`), is runnable via the
-  // simplified Cargo runner (has runtime_vars.model + one llm action),
-  // and reads as something a customer would actually keep as a base.
+  // Minimal cargo-ai native shape: version + inputs + agent_schema +
+  // runtime_vars. No post-LLM actions[] — pure LLM agent. Customers
+  // add their own actions[] when they want exec/HTTP side-effects.
   const obj = {
     name,
     description: "Sample agent generated from the v0.1 starter template.",
+    version: CARGO_AI_SCHEMA_VERSION,
+    inputs: [
+      {
+        type: "text",
+        text: "You are a friendly agent. Greet the user warmly and answer briefly.",
+      },
+    ],
     agent_schema: {
       type: "object",
       properties: {
@@ -286,15 +254,8 @@ export function renderCargoStarter(name: string): string {
       required: ["reply"],
     },
     runtime_vars: {
-      model: STARTER_DEFAULT_MODEL,
+      model: CARGO_AI_STARTER_MODEL,
     },
-    actions: [
-      {
-        id: "respond",
-        type: "llm",
-        prompt: "You are a friendly agent. Greet the user warmly and answer briefly.",
-      },
-    ],
   };
   return `${JSON.stringify(obj, null, 2)}\n`;
 }

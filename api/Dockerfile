@@ -28,12 +28,28 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
+# python3 + pip are runtime deps because the Pydantic AI agent path
+# shells out to a small Python wrapper (api/scripts/run_pydantic.py)
+# that uses the real pydantic-ai library. Mirrors how cargo-ai is
+# installed as a bundled binary one stage up — both frameworks now
+# get their full power instead of a Rust-side hand-rolled subset.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates libssl3 curl \
+        python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/*
+
+# Install pydantic-ai into a venv so it doesn't fight Debian's
+# PEP-668 system-package lockdown. Pinned the same way cargo-ai is —
+# version bumps go through PR review so we can vet the changelog.
+ENV PYDANTIC_AI_VENV=/opt/pydantic-ai
+ENV PYDANTIC_AI_PY="${PYDANTIC_AI_VENV}/bin/python3"
+RUN python3 -m venv "${PYDANTIC_AI_VENV}" && \
+    "${PYDANTIC_AI_VENV}/bin/pip" install --no-cache-dir \
+        pydantic-ai==1.102.0 pyyaml==6.0.2
 
 COPY --from=builder /app/tas-api /usr/local/bin/tas-api
 COPY --from=builder /opt/cargo-ai/bin/cargo-ai /usr/local/bin/cargo-ai
+COPY scripts/run_pydantic.py /usr/local/bin/run_pydantic.py
 
 ENV API_BIND_ADDR=0.0.0.0:8080
 EXPOSE 8080

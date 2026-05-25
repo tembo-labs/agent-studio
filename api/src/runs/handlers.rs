@@ -23,22 +23,37 @@ pub struct CreateRunRequest {
     pub user_id: String,
     pub agent_name: String,
     pub agent_path: String,
+    /// `provider:model` (e.g. `openai:gpt-4o-mini`). Used by cargo-ai
+    /// to set CLI flags; for Pydantic it's saved to the run row for
+    /// the UI but the actual provider/model dispatch happens inside
+    /// pydantic-ai based on the spec.
     pub model: String,
-    pub instructions: String,
     /// Optional user message; v0.1 leaves it empty (US-0.1-06 ran for "empty input").
     #[serde(default)]
     pub user_message: Option<String>,
-    /// Agent framework. "pydantic-agentspec" runs through our direct
-    /// provider client; "cargo-ai" delegates to the bundled cargo-ai
-    /// CLI. Defaults to pydantic-agentspec when omitted to keep older
-    /// callers working.
+    /// Agent framework. Both supported frameworks ("pydantic-agentspec"
+    /// and "cargo-ai") run as passthrough subprocess calls into the
+    /// upstream tool. Defaults to "pydantic-agentspec" when omitted to
+    /// keep older callers working.
     #[serde(default)]
     pub framework: Option<String>,
-    /// Raw agent JSON. Required when framework=cargo-ai (we hand it to
-    /// cargo-ai). Ignored for pydantic-agentspec, where the
-    /// instructions field is already flattened.
+    /// Raw agent file content as it sits in the repo. Required for
+    /// both frameworks now.
     #[serde(default)]
-    pub spec_json: Option<String>,
+    pub spec_content: Option<String>,
+    /// Spec format — `"yaml"` or `"json"`. Defaults to "json" so
+    /// existing cargo-ai callers (which always send JSON) don't need
+    /// to change.
+    #[serde(default)]
+    pub spec_format: Option<String>,
+    /// Where the run came from. Defaults to "manual" so existing
+    /// callers (Run-now button, chat) don't need to change. The
+    /// scheduler passes "schedule" + automation_id when firing on
+    /// a cron.
+    #[serde(default)]
+    pub trigger: Option<String>,
+    #[serde(default)]
+    pub automation_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize)]
@@ -53,11 +68,24 @@ pub async fn create_run(
     let run_id = Uuid::new_v4();
 
     let user_message = req.user_message.unwrap_or_default();
+    // Reject unknown trigger values up front so we surface bad
+    // callers instead of silently coercing to 'manual'.
+    let trigger = match req.trigger.as_deref() {
+        None | Some("manual") => "manual",
+        Some("schedule") => "schedule",
+        Some(other) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("unknown trigger: {other}"),
+            ));
+        }
+    };
 
     sqlx::query(
         r#"INSERT INTO run
-            (id, workspace_id, agent_name, agent_path, model, status, created_by, user_message)
-            VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7)"#,
+            (id, workspace_id, agent_name, agent_path, model, status,
+             created_by, user_message, trigger, automation_id)
+            VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8, $9)"#,
     )
     .bind(run_id)
     .bind(req.workspace_id)
@@ -66,20 +94,33 @@ pub async fn create_run(
     .bind(&req.model)
     .bind(&req.user_id)
     .bind(&user_message)
+    .bind(trigger)
+    .bind(req.automation_id)
     .execute(&state.db)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("db insert: {e}")))?;
 
     let task_state = state.clone();
     let model = req.model;
-    let instructions = req.instructions;
     let workspace_id = req.workspace_id;
     let framework = req
         .framework
         .as_deref()
         .map(parse_framework)
         .unwrap_or(runner::Framework::Pydantic);
-    let spec_json = req.spec_json;
+    let spec_content = req.spec_content;
+    let spec_format = match req.spec_format.as_deref() {
+        Some("yaml") => runner::SpecFormat::Yaml,
+        // JSON is the default so cargo-ai callers (which never
+        // bothered with this field) keep working without changes.
+        None | Some("json") => runner::SpecFormat::Json,
+        Some(other) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("unknown spec_format: {other}"),
+            ));
+        }
+    };
 
     tokio::spawn(async move {
         runner::execute_run(
@@ -88,10 +129,10 @@ pub async fn create_run(
                 run_id,
                 workspace_id,
                 model,
-                instructions,
                 user_message,
                 framework,
-                spec_json,
+                spec_content,
+                spec_format,
             },
         )
         .await;
@@ -126,6 +167,8 @@ pub struct RunRecord {
     pub completed_at: Option<DateTime<Utc>>,
     pub tokens_input: Option<i32>,
     pub tokens_output: Option<i32>,
+    pub trigger: String,
+    pub automation_id: Option<Uuid>,
 }
 
 pub async fn get_run(
@@ -135,7 +178,8 @@ pub async fn get_run(
     let row: Option<RunRecord> = sqlx::query_as(
         r#"SELECT id, workspace_id, agent_name, agent_path, model, status,
                   output, error_message, created_by, created_at,
-                  started_at, completed_at, tokens_input, tokens_output
+                  started_at, completed_at, tokens_input, tokens_output,
+                  trigger, automation_id
              FROM run WHERE id = $1"#,
     )
     .bind(id)

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
@@ -74,6 +75,28 @@ export default async function RunDetailPage({
               Model
             </dt>
             <dd className="text-foreground">{run.model}</dd>
+          </div>
+          <div className="flex gap-3">
+            <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+              Trigger
+            </dt>
+            <dd className="text-foreground">
+              {run.trigger === "schedule" && run.automationId ? (
+                <>
+                  Scheduled —{" "}
+                  <Link
+                    href={`/${workspace.slug}/automations/${run.automationId}`}
+                    className="hover:underline"
+                  >
+                    view automation
+                  </Link>
+                </>
+              ) : run.trigger === "schedule" ? (
+                "Scheduled (automation deleted)"
+              ) : (
+                "Manual"
+              )}
+            </dd>
           </div>
           <div className="flex gap-3">
             <dt className="text-foreground-weak w-24 shrink-0 font-medium">

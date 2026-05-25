@@ -7,6 +7,7 @@ import { getInstanceName } from "@/lib/config";
 import type { Workspace } from "@/lib/workspace";
 import {
   IconAgent,
+  IconCalendarRepeat,
   IconChatBubbles,
   IconDashboardMiddle,
   IconSettingsSliderHor,
@@ -57,6 +58,11 @@ export function AppShell({ workspace, user, children }: Props) {
             label="Agents"
             icon={<IconAgent />}
             matchPrefix
+          />
+          <SidebarNavItem
+            href={`${home}/automations`}
+            label="Automations"
+            icon={<IconCalendarRepeat />}
           />
           <SidebarNavItem
             href={`${home}/improvements`}

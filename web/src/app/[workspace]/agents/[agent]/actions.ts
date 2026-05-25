@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 
-import { extractCargoAiRunnable } from "@/lib/agent-format";
 import { createRun } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
 import {
@@ -78,9 +77,9 @@ export async function runNowAction(
   const isMember = await userIsMember(workspace.id, session.user.id);
   if (!isMember) notFound();
 
-  // Pull the current agent definition off the repo. We pass model +
-  // instructions to the Rust API as plaintext rather than having Rust
-  // re-read GitHub — keeps the Rust surface focused on execution.
+  // Pull the current agent definition off the repo. Both frameworks
+  // are now passthrough — the runner gets the raw file bytes plus
+  // the format so the right subprocess wrapper can parse them.
   const found = await getAgentByName(workspace.id, agentName);
   if (!found || !found.agent.ok) {
     return {
@@ -90,38 +89,19 @@ export async function runNowAction(
     };
   }
   const spec = found.agent.spec;
+  const fileFormat = found.agent.format;
 
-  // Build the createRun payload depending on framework. Pydantic
-  // agents fly their instructions string directly to the runner.
-  // Cargo AI agents pass the raw JSON to the runner — the runner
-  // hands it to the bundled cargo-ai CLI, which executes the action
-  // graph end-to-end.
-  let model: string;
-  let instructions: string;
-  let specJson: string | undefined;
-  let framework: "pydantic-agentspec" | "cargo-ai";
-  if (spec.framework === "pydantic-agentspec") {
-    framework = "pydantic-agentspec";
-    model = spec.model;
-    instructions = spec.instructions;
-  } else {
-    framework = "cargo-ai";
-    const extracted = extractCargoAiRunnable(spec);
-    if (!extracted.ok) {
-      return {
-        error:
-          extracted.error === "missing-model"
-            ? "This Cargo AI agent has no model declared. Add `runtime_vars.model` (e.g. `openai:gpt-4o-mini`) and try again."
-            : "This Cargo AI agent has no `type: \"llm\"` actions with prompts — cargo-ai needs at least one to execute.",
-      };
-    }
-    model = extracted.runnable.model;
-    // Cargo-ai-side ignores `instructions`; we still send the joined
-    // prompt text so historical run rows remain readable if anything
-    // logs the request payload.
-    instructions = extracted.runnable.instructions;
-    specJson = found.raw;
+  const framework: "pydantic-agentspec" | "cargo-ai" =
+    spec.framework === "pydantic-agentspec" ? "pydantic-agentspec" : "cargo-ai";
+
+  if (framework === "cargo-ai" && !spec.model) {
+    return {
+      error:
+        "This Cargo AI agent has no model declared. Add `runtime_vars.model` (e.g. `openai:gpt-4o-mini`) and try again.",
+    };
   }
+
+  const model = spec.model ?? "";
 
   let runId: string;
   try {
@@ -131,9 +111,9 @@ export async function runNowAction(
       agentName: spec.name,
       agentPath: found.agent.path,
       model,
-      instructions,
       framework,
-      specJson,
+      specContent: found.raw,
+      specFormat: fileFormat,
     });
     runId = res.runId;
   } catch (err) {

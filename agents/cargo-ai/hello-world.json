@@ -1,6 +1,13 @@
 {
   "name": "hello-world-cargo",
-  "description": "Sample agent — Cargo AI JSON. A friendly greeter, parallel to hello-world.yaml.",
+  "description": "Sample agent — Cargo AI native shape. A friendly greeter, parallel to hello-world.yaml.",
+  "version": "2026-03-03.r1",
+  "inputs": [
+    {
+      "type": "text",
+      "text": "You are a friendly agent. Greet the user warmly and answer briefly."
+    }
+  ],
   "agent_schema": {
     "type": "object",
     "properties": {
@@ -12,13 +19,6 @@
     "required": ["greeting"]
   },
   "runtime_vars": {
-    "model": "anthropic:claude-sonnet-4-6"
-  },
-  "actions": [
-    {
-      "id": "greet",
-      "type": "llm",
-      "prompt": "You are a friendly agent. Greet the user warmly and answer briefly."
-    }
-  ]
+    "model": "openai:gpt-4o-mini"
+  }
 }

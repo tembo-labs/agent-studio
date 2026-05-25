@@ -2,7 +2,6 @@
 
 import { notFound } from "next/navigation";
 
-import { extractCargoAiRunnable } from "@/lib/agent-format";
 import {
   buildChatEditPrompt,
   createTemboTask,
@@ -165,33 +164,22 @@ export async function sendToAgentAction(args: {
   }
   const spec = agent.spec;
 
-  // Same dispatch the Run-now action uses — Pydantic agents pass
-  // their flattened instructions string; Cargo AI agents pass the
-  // raw JSON which the api then hands to the bundled cargo-ai CLI.
-  let model: string;
-  let instructions: string;
-  let specJson: string | undefined;
-  let framework: "pydantic-agentspec" | "cargo-ai";
-  if (spec.framework === "pydantic-agentspec") {
-    framework = "pydantic-agentspec";
-    model = spec.model;
-    instructions = spec.instructions;
-  } else {
-    framework = "cargo-ai";
-    const extracted = extractCargoAiRunnable(spec);
-    if (!extracted.ok) {
-      return {
-        ok: false,
-        error:
-          extracted.error === "missing-model"
-            ? "This Cargo AI agent has no model declared. Add runtime_vars.model and try again."
-            : "This Cargo AI agent has no type: \"llm\" actions with prompts — cargo-ai needs at least one.",
-      };
-    }
-    model = extracted.runnable.model;
-    instructions = extracted.runnable.instructions;
-    specJson = result.raw;
+  // Same dispatch the Run-now action uses — both frameworks pass
+  // the raw file bytes to the api, which hands them to the
+  // appropriate subprocess wrapper (cargo-ai CLI or pydantic-ai
+  // Python wrapper).
+  const framework: "pydantic-agentspec" | "cargo-ai" =
+    spec.framework === "pydantic-agentspec" ? "pydantic-agentspec" : "cargo-ai";
+
+  if (framework === "cargo-ai" && !spec.model) {
+    return {
+      ok: false,
+      error:
+        "This Cargo AI agent has no model declared. Add runtime_vars.model and try again.",
+    };
   }
+
+  const model = spec.model ?? "";
 
   try {
     const res = await createRun({
@@ -200,10 +188,10 @@ export async function sendToAgentAction(args: {
       agentName: spec.name,
       agentPath: agent.path,
       model,
-      instructions,
       userMessage: text,
       framework,
-      specJson,
+      specContent: result.raw,
+      specFormat: agent.format,
     });
     return { ok: true, runId: res.runId };
   } catch (err) {
