@@ -20,6 +20,6 @@ export const FRAMEWORKS = ["pydantic-agentspec", "cargo-ai"] as const;
 export type Framework = (typeof FRAMEWORKS)[number];
 
 export const FRAMEWORK_LABELS: Record<Framework, string> = {
-  "pydantic-agentspec": "Pydantic AgentSpec",
+  "pydantic-agentspec": "Pydantic",
   "cargo-ai": "Cargo AI",
 };

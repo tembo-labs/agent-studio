@@ -2,11 +2,7 @@ import "server-only";
 
 import {
   detectFormat,
-  parseAgentContent,
   parseAgentFile,
-  renderCargoStarter,
-  renderStarter,
-  validateAgentName,
   type AgentFileFormat,
   type AgentSpec,
   type Framework,
@@ -189,65 +185,6 @@ export async function getAgentByName(
   return { agent: match, raw: read.content };
 }
 
-export type CreateAgentError =
-  | "no-repo"
-  | "invalid-name"
-  | "name-taken"
-  | ParseAgentError
-  | GitHubFileError;
-
-export type CreateAgentResult =
-  | { ok: true; filename: string; path: string; commitSha: string }
-  | { ok: false; error: CreateAgentError; detail?: string };
-
-async function nameAlreadyExists(
-  workspaceId: string,
-  name: string,
-): Promise<boolean> {
-  const list = await listAgents(workspaceId);
-  if (!list.ok) return false;
-  return list.agents.some((a) => {
-    if (a.ok) return a.spec.name === name;
-    const base = a.filename.replace(/\.(yaml|yml|json)$/i, "");
-    return base === name;
-  });
-}
-
-async function commitAgentFile(
-  workspaceId: string,
-  framework: Framework,
-  filename: string,
-  content: string,
-  commitMessage: string,
-): Promise<CreateAgentResult> {
-  const repo = await getWorkspaceRepo(workspaceId);
-  if (!repo) return { ok: false, error: "no-repo" };
-
-  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
-  const ref: RepoRef = {
-    owner: repo.owner,
-    name: repo.name,
-    branch: repo.defaultBranch,
-  };
-  const path = `${AGENTS_DIR}/${FRAMEWORK_DIRS[framework]}/${filename}`;
-
-  // Make sure the AGENTS.md index + matching framework AGENT_GUIDE.md
-  // are present in the repo before the agent file lands. The Tembo
-  // Coding Agent reads them on each PR; without them, edits drift
-  // back toward the simpler-but-wrong shapes coding agents pick up
-  // from generic training data.
-  await ensureGuidanceFiles(token, ref, framework);
-
-  const result = await createFile(token, ref, path, {
-    content,
-    message: commitMessage,
-  });
-  if (!result.ok) {
-    return { ok: false, error: result.error, detail: result.detail };
-  }
-  return { ok: true, filename, path, commitSha: result.commitSha };
-}
-
 // Best-effort guidance-file bootstrap + refresh. For each guidance
 // file:
 //   - missing → create it
@@ -334,69 +271,6 @@ export async function refreshAllGuidanceFiles(
   await ensureGuidanceFiles(token, ref, "pydantic-agentspec");
   await ensureGuidanceFiles(token, ref, "cargo-ai");
   return { ok: true };
-}
-
-export async function createAgentFromTemplate(
-  workspaceId: string,
-  name: string,
-  framework: Framework,
-): Promise<CreateAgentResult> {
-  if (!validateAgentName(name)) {
-    return {
-      ok: false,
-      error: "invalid-name",
-      detail: "Use 2–64 chars, lowercase letters, digits, and hyphens.",
-    };
-  }
-  if (await nameAlreadyExists(workspaceId, name)) {
-    return {
-      ok: false,
-      error: "name-taken",
-      detail: "An agent with this name already exists in the repo.",
-    };
-  }
-  let content: string;
-  let filename: string;
-  if (framework === "pydantic-agentspec") {
-    content = renderStarter(name);
-    filename = `${name}.yaml`;
-  } else {
-    content = renderCargoStarter(name);
-    filename = `${name}.json`;
-  }
-  return commitAgentFile(
-    workspaceId,
-    framework,
-    filename,
-    content,
-    `Create agent: ${name} (from ${framework} starter template)`,
-  );
-}
-
-export async function createAgentFromContent(
-  workspaceId: string,
-  format: AgentFileFormat,
-  content: string,
-): Promise<CreateAgentResult> {
-  const parsed = parseAgentContent(content, format);
-  if (!parsed.ok) {
-    return { ok: false, error: parsed.error, detail: parsed.detail };
-  }
-  if (await nameAlreadyExists(workspaceId, parsed.spec.name)) {
-    return {
-      ok: false,
-      error: "name-taken",
-      detail: "An agent with this name already exists in the repo.",
-    };
-  }
-  const filename = `${parsed.spec.name}.${format === "yaml" ? "yaml" : "json"}`;
-  return commitAgentFile(
-    workspaceId,
-    parsed.spec.framework,
-    filename,
-    content,
-    `Create agent: ${parsed.spec.name}`,
-  );
 }
 
 // ── Delete + restore ─────────────────────────────────────────────────────

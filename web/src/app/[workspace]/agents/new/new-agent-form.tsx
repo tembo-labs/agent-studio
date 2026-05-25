@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,221 +12,156 @@ import {
 } from "@/lib/agent-framework";
 
 import {
-  createFromContentAction,
-  createFromTemplateAction,
-  type NewAgentFormState,
+  createFromChatAction,
+  type ChatCreateFormState,
 } from "./actions";
 
 const DEFAULT_FRAMEWORK: Framework = "pydantic-agentspec";
-
-const INITIAL: NewAgentFormState = {};
-
-type Tab = "template" | "paste";
-
-const SAMPLE_AGENTSPEC = `name: my-agent
-model: anthropic:claude-sonnet-4-6
-description: A short description of what this agent does.
-instructions: |
-  You are a helpful agent.
-  Be concise.
-`;
+const CHAT_INITIAL: ChatCreateFormState = {};
 
 export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
-  const [tab, setTab] = useState<Tab>("template");
-  const [templateState, templateAction, templatePending] = useActionState(
-    createFromTemplateAction,
-    INITIAL,
+  const [state, action, pending] = useActionState(
+    createFromChatAction,
+    CHAT_INITIAL,
   );
-  const [contentState, contentAction, contentPending] = useActionState(
-    createFromContentAction,
-    INITIAL,
-  );
+  // Cargo AI is an advanced option for porting existing assets; most
+  // new agents go through Pydantic. Hide the framework picker behind
+  // a small "Advanced" disclosure so the common case is name +
+  // description and nothing else.
+  const [advanced, setAdvanced] = useState(false);
+
+  if (state.success) {
+    const s = state.success;
+    return (
+      <div className="border-sentiment-positive bg-[var(--color-sentiment-positive-subtle)] flex flex-col gap-2 rounded-lg border p-4 text-sm">
+        <span className="text-foreground font-semibold">
+          PR requested for {s.agentName}
+        </span>
+        <p className="text-foreground-weak">
+          Tembo is opening a pull request at{" "}
+          <code className="bg-surface rounded px-1 py-0.5">{s.agentPath}</code>
+          . You can watch the Tembo session, and the PR status will appear on
+          the Improvements page once it's open.
+        </p>
+        <p className="text-foreground-weak text-xs">Status: {s.status}</p>
+        <div className="flex flex-wrap gap-3 pt-1">
+          <a
+            href={s.htmlUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-foreground text-sm font-medium hover:underline"
+          >
+            View Tembo session ↗
+          </a>
+          <a
+            href={`/${workspaceSlug}/improvements`}
+            className="text-foreground-weak hover:text-foreground text-sm"
+          >
+            Open Improvements →
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div
-        role="tablist"
-        className="bg-surface border-border inline-flex w-fit gap-1 rounded-lg border p-1"
-      >
-        <TabButton active={tab === "template"} onClick={() => setTab("template")}>
-          From template
-        </TabButton>
-        <TabButton active={tab === "paste"} onClick={() => setTab("paste")}>
-          Paste definition
-        </TabButton>
+    <form action={action} className="flex flex-col gap-3">
+      <input type="hidden" name="workspace" value={workspaceSlug} />
+      {/* Hidden framework default only when the advanced picker is
+          collapsed. When the picker is open it owns the field. */}
+      {!advanced && (
+        <input type="hidden" name="framework" value={DEFAULT_FRAMEWORK} />
+      )}
+
+      <div className="grid gap-1.5">
+        <Label htmlFor="chat-name" className="text-sm">
+          Agent name
+        </Label>
+        <Input
+          id="chat-name"
+          name="name"
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          required
+          minLength={2}
+          maxLength={64}
+          pattern="[a-z0-9]+(-[a-z0-9]+)*"
+          disabled={pending}
+          placeholder="inbox-triage"
+        />
+        <p className="text-foreground-muted text-sm">
+          Lowercase letters, digits, and hyphens. Becomes the filename and
+          the canonical agent name.
+        </p>
       </div>
 
-      {tab === "template" ? (
-        <form action={templateAction} className="flex flex-col gap-3">
-          <input type="hidden" name="workspace" value={workspaceSlug} />
-          <div className="grid gap-1.5">
-            <Label htmlFor="name" className="text-sm">
-              Agent name
-            </Label>
-            <Input
-              id="name"
-              name="name"
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              required
-              minLength={2}
-              maxLength={64}
-              pattern="[a-z0-9]+(-[a-z0-9]+)*"
-              disabled={templatePending}
-              placeholder="hello-world"
-            />
-            <p className="text-foreground-muted text-xs">
-              Lowercase letters, digits, and hyphens. Becomes the filename and
-              the canonical agent name.
-            </p>
-          </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="chat-description" className="text-sm">
+          What should the agent do?
+        </Label>
+        <textarea
+          id="chat-description"
+          name="description"
+          required
+          rows={8}
+          disabled={pending}
+          placeholder="Read incoming customer emails. Classify each one as billing, technical, or sales. Reply to billing emails with a link to the help center. Forward technical issues to the support inbox."
+          className="bg-input text-foreground-strong placeholder:text-foreground-weak hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled disabled:text-foreground-muted flex w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-2 px-3 text-sm leading-6 focus:outline-none transition-[background-color,box-shadow,color] duration-150 disabled:cursor-not-allowed resize-y"
+        />
+        <p className="text-foreground-muted text-sm">
+          Tembo will read this, write a new agent file in the canonical
+          framework shape, and open a pull request for your team to review.
+        </p>
+      </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="framework" className="text-sm">
-              Framework
-            </Label>
-            <select
-              id="framework"
-              name="framework"
-              defaultValue={DEFAULT_FRAMEWORK}
-              disabled={templatePending}
-              className="bg-input text-foreground-strong hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled flex h-7 w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-1 pr-1 pl-2 text-sm font-medium tracking-[-0.1px] focus:outline-none transition-[background-color,box-shadow,color] duration-150"
-            >
-              {FRAMEWORKS.map((f) => (
-                <option key={f} value={f}>
-                  {FRAMEWORK_LABELS[f]}
-                </option>
-              ))}
-            </select>
-            <p className="text-foreground-muted text-xs">
-              Pydantic AgentSpec emits a YAML file under{" "}
-              <code className="bg-surface rounded px-1 py-0.5">
-                agents/pydantic-agentspec/
-              </code>
-              . Cargo AI emits JSON under{" "}
-              <code className="bg-surface rounded px-1 py-0.5">
-                agents/cargo-ai/
-              </code>
-              .
-            </p>
-          </div>
-
-          {templateState.error && (
-            <p className="text-sentiment-negative text-sm" role="alert">
-              {templateState.error}
-            </p>
-          )}
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={templatePending}
-            className="mt-1 w-fit"
+      {advanced ? (
+        <div className="grid gap-1.5">
+          <Label htmlFor="chat-framework" className="text-sm">
+            Framework
+          </Label>
+          <select
+            id="chat-framework"
+            name="framework"
+            defaultValue={DEFAULT_FRAMEWORK}
+            disabled={pending}
+            className="bg-input text-foreground-strong hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled flex h-7 w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-1 pr-1 pl-2 text-sm font-medium tracking-[-0.1px] focus:outline-none transition-[background-color,box-shadow,color] duration-150"
           >
-            {templatePending ? "Committing…" : "Create agent"}
-          </Button>
-        </form>
+            {FRAMEWORKS.map((f) => (
+              <option key={f} value={f}>
+                {FRAMEWORK_LABELS[f]}
+              </option>
+            ))}
+          </select>
+          <p className="text-foreground-muted text-sm">
+            Default is Pydantic AgentSpec. Pick Cargo AI only when porting
+            existing Cargo AI assets.
+          </p>
+        </div>
       ) : (
-        <form action={contentAction} className="flex flex-col gap-3">
-          <input type="hidden" name="workspace" value={workspaceSlug} />
-
-          <fieldset
-            className="flex gap-3 text-sm"
-            disabled={contentPending}
-          >
-            <legend className="text-foreground text-sm font-medium">
-              Format
-            </legend>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="format"
-                value="yaml"
-                defaultChecked
-                className="accent-foreground"
-              />
-              YAML
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="format"
-                value="json"
-                className="accent-foreground"
-              />
-              JSON
-            </label>
-          </fieldset>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="content" className="text-sm">
-              Agent definition
-            </Label>
-            <textarea
-              id="content"
-              name="content"
-              required
-              rows={14}
-              spellCheck={false}
-              disabled={contentPending}
-              defaultValue={SAMPLE_AGENTSPEC}
-              className="bg-input text-foreground-strong placeholder:text-foreground-weak hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled disabled:text-foreground-muted flex w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-2 px-3 font-mono text-xs leading-5 focus:outline-none transition-[background-color,box-shadow,color] duration-150 disabled:cursor-not-allowed"
-            />
-            <p className="text-foreground-muted text-xs">
-              Framework is auto-detected from shape. <strong>Pydantic
-              AgentSpec</strong> needs{" "}
-              <code className="bg-surface rounded px-1 py-0.5">name</code>,{" "}
-              <code className="bg-surface rounded px-1 py-0.5">model</code>,{" "}
-              <code className="bg-surface rounded px-1 py-0.5">instructions</code>
-              . <strong>Cargo AI</strong> needs{" "}
-              <code className="bg-surface rounded px-1 py-0.5">name</code> and an{" "}
-              <code className="bg-surface rounded px-1 py-0.5">actions</code>{" "}
-              array. Other fields pass through unchanged.
-            </p>
-          </div>
-
-          {contentState.error && (
-            <p className="text-sentiment-negative text-sm" role="alert">
-              {contentState.error}
-            </p>
-          )}
-
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={contentPending}
-            className="mt-1 w-fit"
-          >
-            {contentPending ? "Committing…" : "Create agent"}
-          </Button>
-        </form>
+        <button
+          type="button"
+          onClick={() => setAdvanced(true)}
+          className="text-foreground-weak hover:text-foreground w-fit text-xs underline-offset-2 hover:underline"
+        >
+          Advanced: change framework
+        </button>
       )}
-    </div>
-  );
-}
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={
-        active
-          ? "bg-surface-raised text-foreground rounded-md px-3 py-1 text-sm font-medium shadow-[0_1px_2px_0_rgba(0,0,0,0.08)]"
-          : "text-foreground-weak hover:text-foreground rounded-md px-3 py-1 text-sm font-medium"
-      }
-    >
-      {children}
-    </button>
+      {state.error && (
+        <p className="text-sentiment-negative text-sm" role="alert">
+          {state.error}
+        </p>
+      )}
+
+      <Button
+        type="submit"
+        variant="primary"
+        disabled={pending}
+        className="mt-1 w-fit"
+      >
+        {pending ? "Asking Tembo…" : "Create"}
+      </Button>
+    </form>
   );
 }

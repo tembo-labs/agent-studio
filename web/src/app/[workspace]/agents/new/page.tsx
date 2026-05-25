@@ -34,16 +34,16 @@ export default async function NewAgentPage({
           New agent
         </h1>
         <p className="text-foreground-weak text-sm">
-          Pick a starter template or paste your own definition. The file is
-          committed directly to{" "}
+          Describe the agent in plain English. Tembo writes a valid agent
+          file and opens a pull request against{" "}
           <span className="text-foreground font-medium">
             github.com/{repo.owner}/{repo.name}
           </span>{" "}
           on{" "}
           <code className="bg-surface rounded px-1 py-0.5 text-xs">
             {repo.defaultBranch}
-          </code>
-          .
+          </code>{" "}
+          for your team to review.
         </p>
       </div>
 

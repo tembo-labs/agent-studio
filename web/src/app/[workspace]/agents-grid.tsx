@@ -33,6 +33,26 @@ export type GridAgent =
       filename: string;
       error: string;
       detail?: string;
+    }
+  | {
+      // Chat-to-create request whose PR hasn't merged yet. Rendered
+      // as a card with a dashed border alongside live agents so the
+      // user can track an in-flight new-agent request without
+      // navigating away from this page.
+      kind: "pending-create";
+      // Unique key for React (the improvement row id).
+      key: string;
+      // Intended agent name + path; once the PR merges, a normal
+      // agent card replaces this one because listAgents picks up
+      // the new file in the repo.
+      name: string;
+      path: string;
+      frameworkLabel: string;
+      createdAtIso: string;
+      status: "submitted" | "pr_opened";
+      temboTaskHtmlUrl: string | null;
+      prUrl: string | null;
+      prNumber: number | null;
     };
 
 type Props = {
@@ -47,10 +67,9 @@ export function AgentsGrid({ agents, newAgentHref }: Props) {
   const filtered = useMemo(() => {
     const q = deferred.trim().toLowerCase();
     if (!q) return agents;
-    return agents.filter((a) => {
-      const haystack = a.ok ? a.name : a.filename;
-      return haystack.toLowerCase().includes(q);
-    });
+    return agents.filter((a) =>
+      searchHaystack(a).toLowerCase().includes(q),
+    );
   }, [agents, deferred]);
 
   return (
@@ -88,7 +107,7 @@ export function AgentsGrid({ agents, newAgentHref }: Props) {
       ) : (
         <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((agent) => (
-            <li key={agent.path}>
+            <li key={gridKey(agent)}>
               <AgentCard agent={agent} />
             </li>
           ))}
@@ -98,7 +117,28 @@ export function AgentsGrid({ agents, newAgentHref }: Props) {
   );
 }
 
+type PendingCreate = Extract<GridAgent, { kind: "pending-create" }>;
+
+function isPendingCreate(a: GridAgent): a is PendingCreate {
+  return "kind" in a && a.kind === "pending-create";
+}
+
+function searchHaystack(a: GridAgent): string {
+  if (isPendingCreate(a)) return a.name;
+  if (a.ok) return a.name;
+  return a.filename;
+}
+
+function gridKey(a: GridAgent): string {
+  if (isPendingCreate(a)) return `pending:${a.key}`;
+  return a.path;
+}
+
 function AgentCard({ agent }: { agent: GridAgent }) {
+  if (isPendingCreate(agent)) {
+    return <PendingCreateCard agent={agent} />;
+  }
+
   if (!agent.ok) {
     return (
       <div className="bg-surface-raised border-border flex h-full flex-col gap-2 rounded-2xl border p-4">
@@ -148,6 +188,62 @@ function AgentCard({ agent }: { agent: GridAgent }) {
         </Badge>
       </div>
     </Link>
+  );
+}
+
+function PendingCreateCard({ agent }: { agent: PendingCreate }) {
+  // Dashed border to telegraph "not real yet". The card isn't a
+  // Link wrapper because the on-card targets (Tembo session, PR)
+  // are distinct external destinations, so they each get their own
+  // anchor. If neither is set we just show the in-flight state.
+  const statusLabel =
+    agent.status === "pr_opened" ? "PR open" : "Submitted";
+  return (
+    <div className="bg-surface-raised flex h-full flex-col gap-3 rounded-2xl border border-dashed border-[var(--color-border-strong)] p-4">
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-foreground text-sm font-semibold">
+          {agent.name}
+        </span>
+        <StatusDot tone="pending" label={statusLabel} />
+      </div>
+
+      <p className="text-foreground-weak text-xs leading-5">
+        Tembo is preparing this agent. It will appear here as a normal
+        agent once the pull request merges.
+      </p>
+
+      <div className="mt-auto flex flex-wrap items-center gap-1.5">
+        <Badge variant="gray" size="small">
+          {agent.frameworkLabel}
+        </Badge>
+        <Badge variant="gray" size="small">
+          Pending PR
+        </Badge>
+      </div>
+
+      <div className="flex flex-wrap gap-3 text-xs">
+        {agent.prUrl && agent.prNumber !== null ? (
+          <a
+            href={agent.prUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-foreground hover:underline"
+          >
+            PR #{agent.prNumber} ↗
+          </a>
+        ) : null}
+        {agent.temboTaskHtmlUrl ? (
+          <a
+            href={agent.temboTaskHtmlUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-foreground-weak hover:text-foreground hover:underline"
+          >
+            Tembo session ↗
+          </a>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

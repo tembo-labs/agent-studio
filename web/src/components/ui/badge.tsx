@@ -14,9 +14,9 @@ const badgeVariants = cva(
     defaultVariants: { size: "default", variant: "gray" },
     variants: {
       size: {
-        big: "h-7 px-1.5",
-        default: "h-6 px-1.5",
-        small: "h-5 px-1",
+        big: "h-7 px-3",
+        default: "h-6 px-2.5",
+        small: "h-5 px-2",
       },
       variant: {
         blue: "bg-category-blue text-foreground-category-blue [&_svg]:text-icon-category-blue",

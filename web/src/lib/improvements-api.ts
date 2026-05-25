@@ -10,16 +10,21 @@ import { db } from "@/lib/db";
 // (on /improvements visits) and patches pr_url / pr_state / status.
 
 export type ImprovementStatus = "submitted" | "pr_opened" | "merged" | "closed";
+export type ImprovementKind = "edit" | "create";
 
 export interface Improvement {
   id: string;
   workspaceId: string;
   // Null when the improvement came from a chat-to-edit thread (not
-  // anchored to a specific run).
+  // anchored to a specific run) or from chat-to-create.
   runId: string | null;
   agentName: string;
   agentPath: string;
   improvementText: string;
+  // "edit" = chat-to-edit / run-improve on an existing agent.
+  // "create" = chat-to-create — the agent file doesn't exist yet
+  // and lands on PR merge.
+  kind: ImprovementKind;
   temboTaskId: string | null;
   temboTaskHtmlUrl: string | null;
   prUrl: string | null;
@@ -40,6 +45,7 @@ type Row = {
   agent_name: string;
   agent_path: string;
   improvement_text: string;
+  kind: ImprovementKind;
   tembo_task_id: string | null;
   tembo_task_html_url: string | null;
   pr_url: string | null;
@@ -61,6 +67,7 @@ function rowToImprovement(r: Row): Improvement {
     agentName: r.agent_name,
     agentPath: r.agent_path,
     improvementText: r.improvement_text,
+    kind: r.kind,
     temboTaskId: r.tembo_task_id,
     temboTaskHtmlUrl: r.tembo_task_html_url,
     prUrl: r.pr_url,
@@ -80,7 +87,7 @@ function rowToImprovement(r: Row): Improvement {
 // the row visible if the user has been deleted.
 const COLUMNS = `
   i.id, i.workspace_id, i.run_id, i.agent_name, i.agent_path, i.improvement_text,
-  i.tembo_task_id, i.tembo_task_html_url, i.pr_url, i.pr_number, i.pr_state,
+  i.kind, i.tembo_task_id, i.tembo_task_html_url, i.pr_url, i.pr_number, i.pr_state,
   i.status, i.created_by,
   u.name AS created_by_name, u.email AS created_by_email,
   i.created_at, i.updated_at
@@ -93,14 +100,17 @@ export async function createImprovement(input: {
   agentName: string;
   agentPath: string;
   improvementText: string;
+  // Defaults to "edit" so legacy callers (chat-to-edit, run-improve)
+  // don't have to pass it explicitly.
+  kind?: ImprovementKind;
   userId: string;
 }): Promise<Improvement> {
   // INSERT into a CTE so we can re-SELECT with the user join applied,
   // matching the projection used everywhere else that returns Improvement.
   const res = await db.query<Row>(
     `WITH inserted AS (
-       INSERT INTO improvement (workspace_id, run_id, agent_name, agent_path, improvement_text, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
+       INSERT INTO improvement (workspace_id, run_id, agent_name, agent_path, improvement_text, kind, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *
      )
      SELECT ${COLUMNS}
@@ -112,10 +122,29 @@ export async function createImprovement(input: {
       input.agentName,
       input.agentPath,
       input.improvementText,
+      input.kind ?? "edit",
       input.userId,
     ],
   );
   return rowToImprovement(res.rows[0]);
+}
+
+// Pending chat-to-create rows for the Agents grid: kind='create' and
+// status not yet terminal. Used to render in-flight new-agent
+// requests as cards alongside live agents.
+export async function listPendingCreatesForWorkspace(
+  workspaceId: string,
+): Promise<Improvement[]> {
+  const res = await db.query<Row>(
+    `SELECT ${COLUMNS}
+     ${FROM_JOIN}
+     WHERE i.workspace_id = $1
+       AND i.kind = 'create'
+       AND i.status IN ('submitted', 'pr_opened')
+     ORDER BY i.created_at DESC`,
+    [workspaceId],
+  );
+  return res.rows.map(rowToImprovement);
 }
 
 export async function setImprovementTask(input: {

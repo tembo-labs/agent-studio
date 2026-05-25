@@ -202,6 +202,55 @@ function formatGuidanceFile(f: GuidanceFile): string[] {
   ];
 }
 
+// Build a chat-to-create prompt. The user has already chosen a name
+// and framework; the coding agent's job is to write a new agent
+// file at the canonical path for that framework, matching the
+// shape documented in the per-framework AGENT_GUIDE.md (refreshed
+// in Step 0 if needed). The marker contract is identical to the
+// other prompts so the PR scan correlates merged PRs back to the
+// improvement row.
+export function buildCreateAgentPrompt(args: {
+  agentName: string;
+  framework: Framework;
+  agentPath: string;
+  description: string;
+  improvementMarker: string;
+}): string {
+  const ext = args.framework === "cargo-ai" ? "JSON" : "YAML";
+  return [
+    buildGuidanceRefreshBlock(args.framework),
+    "",
+    "# Step 1 — Create the new agent file",
+    "",
+    `Create a new ${args.framework} agent at \`${args.agentPath}\`.`,
+    `The agent's canonical \`name\` field must be \`${args.agentName}\``,
+    `(matching the filename), and the file must be a valid ${ext}`,
+    `document conforming to the framework guide refreshed in Step 0.`,
+    "",
+    "Open a pull request with the new file (and any guidance refresh",
+    "from Step 0).",
+    "",
+    "IMPORTANT: Include this exact line on its own at the end of the pull",
+    "request description so the Tembo Agent Studio can correlate the PR",
+    "with the user's request:",
+    "",
+    args.improvementMarker,
+    "",
+    "## What the user wants the agent to do",
+    args.description.trim(),
+    "",
+    "## Notes",
+    "- Do not create the agent at any other path or under any other",
+    `  filename. The target is exactly \`${args.agentPath}\`.`,
+    "- Pick a sensible model + reasonable defaults if the user didn't",
+    "  specify; the canonical examples in the guide are a fine starting",
+    "  point.",
+    "- If the user's description is ambiguous, make a reasonable choice",
+    "  and call it out in the PR description so the reviewer can",
+    "  redirect.",
+  ].join("\n");
+}
+
 // Build a chat-to-edit prompt. No specific run is anchored; this is
 // the agent-level "I want to change X about this agent" path. Same
 // marker contract as the run-anchored variant so the same scanner
