@@ -15,9 +15,7 @@ export default async function OnboardingPage() {
   }
 
   const workspaces = await listWorkspacesForUser(session.user.id);
-  if (workspaces.length > 0) {
-    redirect(`/${workspaces[0].slug}`);
-  }
+  const isFirst = workspaces.length === 0;
 
   const instanceName = getInstanceName();
 
@@ -29,14 +27,16 @@ export default async function OnboardingPage() {
             {instanceName}
           </p>
           <h1 className="text-foreground-title text-lg font-medium">
-            Welcome, {session.user.name ?? session.user.email}
+            {isFirst
+              ? `Welcome, ${session.user.name ?? session.user.email}`
+              : "Create a workspace"}
           </h1>
           <p className="text-foreground-weak text-sm">
             A workspace pairs a Git repo and a Tembo API key with the team that
             uses them. You&apos;ll add those next.
           </p>
         </div>
-        <OnboardingForm />
+        <OnboardingForm isFirst={isFirst} />
       </div>
     </main>
   );

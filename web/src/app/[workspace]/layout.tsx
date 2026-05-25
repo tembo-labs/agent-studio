@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
+import {
+  getWorkspaceBySlug,
+  listWorkspacesForUser,
+  userIsMember,
+} from "@/lib/workspace";
 
 export async function generateMetadata({
   params,
@@ -39,8 +43,15 @@ export default async function WorkspaceLayout({
   const isMember = await userIsMember(workspace.id, session.user.id);
   if (!isMember) notFound();
 
+  const workspaces = await listWorkspacesForUser(session.user.id);
+  const switcherList = workspaces.map((w) => ({ slug: w.slug, name: w.name }));
+
   return (
-    <AppShell workspace={workspace} user={session.user}>
+    <AppShell
+      workspace={workspace}
+      workspaces={switcherList}
+      user={session.user}
+    >
       {children}
     </AppShell>
   );

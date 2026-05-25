@@ -1,8 +1,8 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { SidebarNavItem } from "@/components/sidebar-nav-item";
 import { UserMenu } from "@/components/user-menu";
+import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { getInstanceName } from "@/lib/config";
 import type { Workspace } from "@/lib/workspace";
 import {
@@ -23,11 +23,12 @@ import {
 
 type Props = {
   workspace: Workspace;
+  workspaces: { slug: string; name: string }[];
   user: { name?: string | null; email: string };
   children: ReactNode;
 };
 
-export function AppShell({ workspace, user, children }: Props) {
+export function AppShell({ workspace, workspaces, user, children }: Props) {
   const instanceName = getInstanceName();
   const home = `/${workspace.slug}`;
 
@@ -40,12 +41,10 @@ export function AppShell({ workspace, user, children }: Props) {
           <span className="text-foreground-muted text-[10px] font-medium uppercase tracking-widest">
             {instanceName}
           </span>
-          <Link
-            href={home}
-            className="text-foreground-title hover:text-foreground text-sm font-semibold leading-tight"
-          >
-            {workspace.name}
-          </Link>
+          <WorkspaceSwitcher
+            current={{ slug: workspace.slug, name: workspace.name }}
+            workspaces={workspaces}
+          />
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 px-2 pb-3 pt-6">

@@ -19,7 +19,7 @@ import {
 
 const INITIAL_STATE: OnboardingFormState = {};
 
-export function OnboardingForm() {
+export function OnboardingForm({ isFirst = true }: { isFirst?: boolean }) {
   const [state, formAction, pending] = useActionState(
     createWorkspaceAction,
     INITIAL_STATE,
@@ -29,7 +29,7 @@ export function OnboardingForm() {
     <Card className="w-full max-w-md p-3">
       <CardHeader className="px-1 pb-3 pt-1">
         <CardTitle className="text-foreground-title text-base">
-          Create your first workspace
+          {isFirst ? "Create your first workspace" : "New workspace"}
         </CardTitle>
       </CardHeader>
       <CardContent className="px-1 pb-1">
