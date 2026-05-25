@@ -7,51 +7,27 @@
 
 ## Overview
 
-Imagine your team has a handful of "AI assistants" — one answers customer
-email, one triages support tickets, one drafts internal reports. Today,
-those assistants probably live inside some vendor's website. Someone with a
-login edits a prompt. Nobody is sure what changed, when, or why. When the
-assistant says something embarrassing, nobody can rewind it. When a new
-team wants their own assistant, you start from zero.
+Tembo Agent Studio (TAS) is a self-hosted control plane for AI agents.
+Agent definitions live as files in a Git repository you own. Every change
+— whether an engineer typed it, a PM described it in chat, or an end user
+clicked "this is wrong" — flows through the same PR review your team
+already uses for code. Runs, audit logs, and identity stay inside your
+environment.
 
-**Tembo Agent Studio (TAS) is the control room for those assistants.**
+Agents are software. Most teams treat them as something else: prompts
+edited in vendor consoles, no diff, no review, no rewind. TAS lets agents
+inherit the discipline you already use for production code — version
+control, code review, audit logs, identity, RBAC.
 
-You run it inside your own walls. Your people log in with the same accounts
-they already use. The assistants themselves are described in plain files,
-stored in a Git repository **you own** — the same way you store the rest
-of your code. When someone wants to change how an assistant behaves, they
-describe it in chat. TAS turns that description into a pull request. Your
-team reviews the diff like any other change. When it's merged, the new
-behavior is live. When an end user clicks "this answer was wrong," that
-correction can become its own PR, too.
+**Principles**
 
-No black box. No console drift. No "what did this prompt look like last
-Tuesday?"
-
-## Vision
-
-Most teams treat agents like toys: clever demos that live outside the
-rules. The ones that try to make agents serious usually do it by ripping
-up the rules — bypassing review, hiding edits, locking definitions inside
-vendor SaaS, and calling the result "magic."
-
-We think that trade is unnecessary. Software engineering already solved
-most of these problems decades ago: version control, code review, audit
-logs, identity, role-based access. Agents don't need a parallel universe.
-They need to **inherit** the discipline you already use for production
-systems — and then go faster *because* of it, not in spite of it.
-
-That belief shapes every part of the product:
-
-1. **Git is the system of record.** Agent definitions live in a repository
-   you own.
-2. **Every change is reviewable.** Whether the author was an engineer in
-   their editor, a PM in chat, or an end user clicking "correct this" —
-   the artifact is a PR.
-3. **Adaptation is allowed; drift is governed.** Agents are allowed to
-   evolve. They are not allowed to evolve in ways you can't explain.
-4. **Self-hostable first.** Identity, data, and runtime stay inside your
-   environment.
+- **Git is the system of record.** Agent definitions live in your repo.
+- **Every change is a PR.** Human or AI author — the artifact is always a
+  reviewable diff.
+- **Adaptation is allowed; drift is governed.** Agents may evolve; they
+  may not evolve in ways you can't explain.
+- **Self-hostable first.** Identity, data, and runtime stay inside your
+  environment.
 
 ## Tembo integration
 
