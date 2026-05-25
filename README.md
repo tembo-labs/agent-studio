@@ -31,20 +31,13 @@ control, code review, audit logs, identity, RBAC.
 
 ## Tembo integration
 
-TAS is the control plane — identity, repos, runs, audits, policy. The
-authoring side — reading an agent definition, understanding what someone
-wants changed in plain English, writing a clean diff — is delegated to the
-[Tembo Coding Agent Platform](https://tembo.io). Plug in a Tembo API key
-in workspace settings and TAS can:
+TAS is the control plane. Authoring — turning a chat message into a
+diff — is delegated to the [Tembo Coding Agent Platform](https://tembo.io).
+Plug in a Tembo API key in workspace settings and TAS uses it to open
+PRs against your repo: new agents from chat, and "improve the agent"
+submissions from any run.
 
-- Generate a new agent from a chat description.
-- Take an "improve the agent" submission and open a targeted PR.
-- (Later phases) turn end-user corrections into candidate PRs, and
-  propose variants when two teams want incompatible behavior.
-
-TAS keeps the work governed; Tembo's coding agents do the diff writing.
-The two are designed together but the integration boundary is clean — TAS
-calls out to Tembo coding agents the way a CI system calls out to
+TAS calls out to Tembo coding agents the way a CI system calls out to
 compilers.
 
 ## Current state

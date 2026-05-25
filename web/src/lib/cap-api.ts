@@ -1,5 +1,16 @@
 import "server-only";
 
+import {
+  GUIDANCE_CARGO_AI_PATH,
+  GUIDANCE_INDEX_PATH,
+  GUIDANCE_PYDANTIC_PATH,
+  TAS_APP_VERSION,
+  TAS_GUIDANCE_VERSION,
+  guidanceFilesFor,
+  type GuidanceFile,
+} from "@/lib/agent-guidance";
+import type { Framework } from "@/lib/agent-framework";
+
 // Thin client for the Tembo Coding Agent Platform task API. The
 // hosted docs at https://docs.tembo.io/api/create-session call it
 // "session" but the live API (and the @tembo-io/sdk) use "task" —
@@ -100,6 +111,74 @@ export async function createTemboTask(args: {
   };
 }
 
+// Derive framework from the agent's repo path. Both callers
+// (chat-edit, run-improve) only have agentPath at the call site; the
+// framework is implicit in the directory. Falls back to pydantic for
+// any path we don't recognize — wrong guidance shipping is worse than
+// missing guidance, but pydantic is the canonical authoring format so
+// it's the safer default.
+function frameworkFromAgentPath(path: string): Framework {
+  if (path.startsWith("agents/cargo-ai/")) return "cargo-ai";
+  return "pydantic-agentspec";
+}
+
+// Step-0 block that the coding agent applies BEFORE the requested
+// change: refresh the per-framework guidance files in the repo to
+// match what TAS is shipping right now. The block carries both
+// version stamps + the canonical content for each guidance file so
+// the coding agent can diff against the on-disk version marker and
+// overwrite stale copies in the same PR. We only include the index
+// + the relevant framework's guide — the other framework's guide
+// stays out to save tokens, since these prompts target a specific
+// agent file.
+function buildGuidanceRefreshBlock(framework: Framework): string {
+  const files = guidanceFilesFor(framework);
+  const otherFrameworkPath =
+    framework === "cargo-ai" ? GUIDANCE_PYDANTIC_PATH : GUIDANCE_CARGO_AI_PATH;
+
+  return [
+    "# Step 0 — Refresh agent guidance (do this first)",
+    "",
+    `Tembo Agent Studio version: ${TAS_APP_VERSION}`,
+    `Guidance version (this prompt): ${TAS_GUIDANCE_VERSION}`,
+    "",
+    "The studio ships agent-authoring guidance into the customer's repo",
+    "under `agents/`. Each guidance file's first line is an HTML comment",
+    "of the form `<!-- tas-guidance-version: <hash> -->`.",
+    "",
+    "Before doing the requested change:",
+    "",
+    `1. Read the first line of each of these files (if they exist):`,
+    `   - \`${GUIDANCE_INDEX_PATH}\``,
+    `   - \`${files[1].path}\``,
+    `2. If a file is missing, or its version marker is not exactly`,
+    `   \`<!-- tas-guidance-version: ${TAS_GUIDANCE_VERSION} -->\`,`,
+    `   replace the file (or create it) with the canonical content`,
+    `   quoted below. Include the refresh in the same PR.`,
+    `3. If both files already match, skip the refresh and move on.`,
+    "",
+    `Leave \`${otherFrameworkPath}\` alone — this PR targets a`,
+    `${framework} agent and shouldn't touch the other framework's guide.`,
+    "",
+    ...files.flatMap((f) => formatGuidanceFile(f)),
+  ].join("\n");
+}
+
+function formatGuidanceFile(f: GuidanceFile): string[] {
+  // Fenced with backticks; the marker comment is part of the content
+  // string, so the canonical version-marker line appears at the top
+  // of the fence. The coding agent should write exactly what's
+  // inside the fence, marker line included, with no transformation.
+  return [
+    `## Canonical contents of \`${f.path}\``,
+    "",
+    "```",
+    f.content,
+    "```",
+    "",
+  ];
+}
+
 // Build a chat-to-edit prompt. No specific run is anchored; this is
 // the agent-level "I want to change X about this agent" path. Same
 // marker contract as the run-anchored variant so the same scanner
@@ -109,10 +188,16 @@ export function buildChatEditPrompt(args: {
   improvement: string;
   improvementMarker: string;
 }): string {
+  const framework = frameworkFromAgentPath(args.agentPath);
   return [
+    buildGuidanceRefreshBlock(framework),
+    "",
+    "# Step 1 — Requested change",
+    "",
     `Improve the agent defined at @${args.agentPath}.`,
     "",
-    "Open a pull request with the targeted change.",
+    "Open a pull request with the targeted change (and any guidance",
+    "refresh from Step 0).",
     "",
     "IMPORTANT: Include this exact line on its own at the end of the pull",
     "request description so the Tembo Agent Studio can correlate the PR",
@@ -139,14 +224,20 @@ export function buildImprovePrompt(args: {
   improvement: string;
   improvementMarker: string;
 }): string {
+  const framework = frameworkFromAgentPath(args.agentPath);
   const trimmedOutput = args.output.length > 4000
     ? args.output.slice(0, 4000) + "\n…[truncated]"
     : args.output;
 
   return [
+    buildGuidanceRefreshBlock(framework),
+    "",
+    "# Step 1 — Requested change",
+    "",
     `Improve the agent defined at @${args.agentPath}.`,
     "",
-    "Open a pull request with the targeted change.",
+    "Open a pull request with the targeted change (and any guidance",
+    "refresh from Step 0).",
     "",
     "IMPORTANT: Include this exact line on its own at the end of the pull",
     "request description so the Tembo Agent Studio can correlate the PR",

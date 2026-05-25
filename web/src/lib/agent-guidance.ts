@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import type { Framework } from "@/lib/agent-framework";
 
 // Guidance files dropped into the customer's repo alongside their
@@ -11,10 +13,13 @@ import type { Framework } from "@/lib/agent-framework";
 // they need to be visible to the coding agent at PR time, which is
 // running against the customer's checkout — not the studio. Living
 // in the repo also means customers can hand-edit them, just like
-// they hand-edit the agent files themselves. Updates from the
-// studio's side ship as new files in the starter template; existing
-// repos can opt in by re-running the bootstrap (TBD), or by letting
-// the coding agent suggest a guidance update in a PR.
+// they hand-edit the agent files themselves.
+//
+// Keeping them current across upgrades: every coding request the
+// studio sends carries TAS_APP_VERSION + TAS_GUIDANCE_VERSION plus
+// the canonical guidance content. The coding agent diffs against
+// the version markers on disk and refreshes any stale files in the
+// same PR as the requested change. See cap-api.ts → buildGuidanceBlock.
 //
 // Keep these files SHORT. The coding agent loads them into its
 // context every edit — every line costs tokens. Distill from
@@ -24,6 +29,12 @@ export type GuidanceFile = {
   path: string;
   content: string;
 };
+
+// Major.minor of the studio. Bump in lockstep with the v0.x phase
+// we're shipping; coding agents pass this through to PR bodies so
+// reviewers can spot if a PR was authored against a now-deprecated
+// TAS version.
+export const TAS_APP_VERSION = "0.2";
 
 const CARGO_AI_GUIDE: string = `# Cargo AI Agent Guide
 
@@ -387,24 +398,70 @@ agents/
     ├── hello-world.json
     └── …
 \`\`\`
+
+## Keeping this guide current
+
+Every coding request from TAS carries the studio's current guidance
+content plus a version marker. The first line of each file in this
+directory is an HTML comment of the form:
+
+\`\`\`
+<!-- tas-guidance-version: <hash> -->
+\`\`\`
+
+**Refresh-first protocol.** Before doing the requested change, the
+coding agent compares the version marker on each guidance file in
+the repo to the version sent by TAS. Any file that is missing or
+whose marker differs is overwritten with the canonical content from
+the prompt. The refresh lands in the same PR as the requested
+change.
+
+The studio's content is authoritative — hand edits to these files
+will not survive the next coding request.
 `;
 
+// Content-hash version. Any change to any of the three guide
+// strings above changes the hash; coding agents use this to detect
+// stale on-disk copies of these files in the customer's repo and
+// refresh them in-place during the same PR (see cap-api.ts).
+export const TAS_GUIDANCE_VERSION: string = createHash("sha256")
+  .update(AGENTS_INDEX)
+  .update("\0")
+  .update(CARGO_AI_GUIDE)
+  .update("\0")
+  .update(PYDANTIC_GUIDE)
+  .digest("hex")
+  .slice(0, 12);
+
+// HTML comment marker at the top of every committed guide file.
+// HTML so it's invisible in rendered markdown but easy to match
+// with a regex when checking for staleness.
+function withVersionMarker(content: string): string {
+  return `<!-- tas-guidance-version: ${TAS_GUIDANCE_VERSION} -->\n${content}`;
+}
+
+export const GUIDANCE_INDEX_PATH = "agents/AGENTS.md";
+export const GUIDANCE_PYDANTIC_PATH = "agents/pydantic-agentspec/AGENT_GUIDE.md";
+export const GUIDANCE_CARGO_AI_PATH = "agents/cargo-ai/AGENT_GUIDE.md";
+
 export function guidanceFilesFor(framework: Framework): GuidanceFile[] {
-  // Both files always land — the index lives at agents/AGENTS.md so
-  // it's visible regardless of which framework the customer started
-  // with, and each framework's per-directory guide lives under its
-  // own subdir. Idempotent on commit: if the file already exists at
-  // the same content we skip writing (handled by the caller).
-  const files: GuidanceFile[] = [{ path: "agents/AGENTS.md", content: AGENTS_INDEX }];
+  // The index lives at agents/AGENTS.md so it's visible regardless of
+  // which framework the customer started with; each framework's
+  // per-directory guide lives under its own subdir. Idempotent on
+  // commit: if the file already exists at the same content we skip
+  // writing (handled by the caller).
+  const files: GuidanceFile[] = [
+    { path: GUIDANCE_INDEX_PATH, content: withVersionMarker(AGENTS_INDEX) },
+  ];
   if (framework === "cargo-ai") {
     files.push({
-      path: "agents/cargo-ai/AGENT_GUIDE.md",
-      content: CARGO_AI_GUIDE,
+      path: GUIDANCE_CARGO_AI_PATH,
+      content: withVersionMarker(CARGO_AI_GUIDE),
     });
   } else {
     files.push({
-      path: "agents/pydantic-agentspec/AGENT_GUIDE.md",
-      content: PYDANTIC_GUIDE,
+      path: GUIDANCE_PYDANTIC_PATH,
+      content: withVersionMarker(PYDANTIC_GUIDE),
     });
   }
   return files;
@@ -415,11 +472,14 @@ export function guidanceFilesFor(framework: Framework): GuidanceFile[] {
  *  manual re-bootstrap, etc.). */
 export function allGuidanceFiles(): GuidanceFile[] {
   return [
-    { path: "agents/AGENTS.md", content: AGENTS_INDEX },
-    { path: "agents/cargo-ai/AGENT_GUIDE.md", content: CARGO_AI_GUIDE },
+    { path: GUIDANCE_INDEX_PATH, content: withVersionMarker(AGENTS_INDEX) },
     {
-      path: "agents/pydantic-agentspec/AGENT_GUIDE.md",
-      content: PYDANTIC_GUIDE,
+      path: GUIDANCE_CARGO_AI_PATH,
+      content: withVersionMarker(CARGO_AI_GUIDE),
+    },
+    {
+      path: GUIDANCE_PYDANTIC_PATH,
+      content: withVersionMarker(PYDANTIC_GUIDE),
     },
   ];
 }
