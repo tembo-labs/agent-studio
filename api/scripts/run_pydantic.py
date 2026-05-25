@@ -69,8 +69,45 @@ def usage_payload(usage_obj) -> dict:
     return out
 
 
+def build_agent(spec: dict) -> Agent:
+    """Construct a pydantic_ai.Agent from a TAS AgentSpec dict.
+
+    pydantic-ai 1.5.0 has no `Agent.from_spec` / `from_file` factory
+    (despite some upstream docs still referencing it), so we hand-map
+    the AgentSpec fields onto the Agent(...) constructor kwargs.
+
+    Out of scope for this MVP path:
+      - output_schema (would need to dynamically build a Pydantic
+        model from the JSON schema; defaulting to str output)
+      - capabilities (no general translation to builtin_tools yet)
+      - deps_schema (deps come from the caller; runtime supplies none)
+    """
+    model = spec.get("model")
+    if not isinstance(model, str) or not model.strip():
+        raise ValueError("AgentSpec is missing a non-empty `model` string")
+
+    kwargs = {}
+    instructions = spec.get("instructions")
+    if isinstance(instructions, str) and instructions.strip():
+        kwargs["instructions"] = instructions
+    name = spec.get("name")
+    if isinstance(name, str) and name.strip():
+        kwargs["name"] = name
+    model_settings = spec.get("model_settings")
+    if isinstance(model_settings, dict) and model_settings:
+        kwargs["model_settings"] = model_settings
+    retries = spec.get("retries")
+    if isinstance(retries, int):
+        kwargs["retries"] = retries
+    instrument = spec.get("instrument")
+    if isinstance(instrument, bool):
+        kwargs["instrument"] = instrument
+
+    return Agent(model, **kwargs)
+
+
 async def run(spec: dict, user_message: str) -> None:
-    agent = Agent.from_spec(spec)
+    agent = build_agent(spec)
     # run_sync would block the event loop; use the async path so
     # we play nicely with pydantic-ai's internals.
     result = await agent.run(user_message)
