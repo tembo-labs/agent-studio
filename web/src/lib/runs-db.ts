@@ -162,6 +162,128 @@ export async function countRunsForAgents(
   return Number(rows[0]?.n ?? 0);
 }
 
+// Workspace-wide run list with optional filters. Status / trigger
+// arrays use ANY() so an empty array means "no filter" via NULL
+// coalescing on the parameter; agentName is a scalar; search runs an
+// ILIKE on user_message + output. Pagination is cursor-by-created_at
+// (descending), passing the last seen createdAt as `before` for the
+// next page. limit is enforced server-side to keep queries cheap.
+
+export type RunListFilters = {
+  statuses?: RunSummary["status"][];
+  agentName?: string;
+  triggers?: RunTrigger[];
+  search?: string;
+};
+
+export type RunListItem = {
+  id: string;
+  agentName: string;
+  status: RunSummary["status"];
+  trigger: RunTrigger;
+  automationId: string | null;
+  createdAt: Date;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  // First slice of the user_message so the list row can preview the
+  // input without round-tripping to the run detail page. Empty when
+  // the run had no input (the manual "Run now" path).
+  userMessagePreview: string;
+};
+
+const LIST_RUNS_MAX_PAGE = 50;
+
+export async function listRunsForWorkspace(
+  workspaceId: string,
+  filters: RunListFilters,
+  options: { limit?: number; before?: Date } = {},
+): Promise<RunListItem[]> {
+  const limit = Math.min(Math.max(1, options.limit ?? LIST_RUNS_MAX_PAGE), LIST_RUNS_MAX_PAGE);
+  const params: unknown[] = [workspaceId];
+  // Track each filter as a SQL fragment that references positional
+  // placeholders we push into `params`. We build the WHERE in order
+  // so the query is deterministic + readable in pg logs.
+  const where: string[] = [`workspace_id = $1`];
+
+  if (filters.statuses && filters.statuses.length > 0) {
+    params.push(filters.statuses);
+    where.push(`status = ANY($${params.length}::text[])`);
+  }
+  if (filters.agentName && filters.agentName.trim()) {
+    params.push(filters.agentName.trim());
+    where.push(`agent_name = $${params.length}`);
+  }
+  if (filters.triggers && filters.triggers.length > 0) {
+    params.push(filters.triggers);
+    where.push(`trigger = ANY($${params.length}::text[])`);
+  }
+  if (filters.search && filters.search.trim()) {
+    // Single placeholder reused twice via a CTE-free OR; ILIKE on
+    // both user_message and output. Caller is expected to keep
+    // the search term short (~200 chars) — the UI input enforces
+    // that.
+    params.push(`%${filters.search.trim()}%`);
+    where.push(
+      `(user_message ILIKE $${params.length} OR output ILIKE $${params.length})`,
+    );
+  }
+  if (options.before) {
+    params.push(options.before);
+    where.push(`created_at < $${params.length}`);
+  }
+
+  params.push(limit);
+
+  const { rows } = await db.query<{
+    id: string;
+    agent_name: string;
+    status: RunSummary["status"];
+    trigger: RunTrigger;
+    automation_id: string | null;
+    created_at: Date;
+    started_at: Date | null;
+    completed_at: Date | null;
+    user_message: string;
+  }>(
+    `SELECT id, agent_name, status, trigger, automation_id,
+            created_at, started_at, completed_at, user_message
+       FROM run
+      WHERE ${where.join(" AND ")}
+      ORDER BY created_at DESC
+      LIMIT $${params.length}`,
+    params,
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    agentName: r.agent_name,
+    status: r.status,
+    trigger: r.trigger,
+    automationId: r.automation_id,
+    createdAt: r.created_at,
+    startedAt: r.started_at,
+    completedAt: r.completed_at,
+    userMessagePreview: (r.user_message ?? "").slice(0, 200),
+  }));
+}
+
+// Distinct agent names that have ever produced a run, scoped to a
+// workspace. Powers the agent picker on /runs so users only see
+// agents with history (not the full repo list, which can include
+// recently-created agents that haven't run).
+export async function listAgentNamesWithRunsForWorkspace(
+  workspaceId: string,
+): Promise<string[]> {
+  const { rows } = await db.query<{ agent_name: string }>(
+    `SELECT DISTINCT agent_name
+       FROM run
+      WHERE workspace_id = $1
+      ORDER BY agent_name ASC`,
+    [workspaceId],
+  );
+  return rows.map((r) => r.agent_name);
+}
+
 export async function listRecentRunsForAgent(
   workspaceId: string,
   agentName: string,

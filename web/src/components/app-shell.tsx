@@ -10,6 +10,7 @@ import {
   IconCalendarRepeat,
   IconChatBubbles,
   IconDashboardMiddle,
+  IconHistory,
   IconSettingsSliderHor,
 } from "central-icons";
 
@@ -63,6 +64,11 @@ export function AppShell({ workspace, user, children }: Props) {
             href={`${home}/automations`}
             label="Automations"
             icon={<IconCalendarRepeat />}
+          />
+          <SidebarNavItem
+            href={`${home}/runs`}
+            label="Runs"
+            icon={<IconHistory />}
           />
           <SidebarNavItem
             href={`${home}/improvements`}
