@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { getServerSession } from "@/lib/session";
 import {
+  refreshAllGuidanceFiles,
   restoreAgent,
   type RestoreAgentError,
 } from "@/lib/workspace-agents";
@@ -241,4 +242,33 @@ export async function disconnectRepoAction(
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
   return { message: "Repository disconnected." };
+}
+
+export type SyncGuidanceFormState = {
+  message?: string;
+  error?: string;
+};
+
+// Manual trigger for refreshAllGuidanceFiles. Used by the "Sync
+// agent guidance" button in Settings so a workspace whose agents
+// were hand-committed (and therefore never went through the agent-
+// creation bootstrap) can get the guidance files written in one
+// click. Idempotent — safe to click repeatedly.
+export async function syncGuidanceAction(
+  _prev: SyncGuidanceFormState,
+  formData: FormData,
+): Promise<SyncGuidanceFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const workspace = await authorizeWorkspace(slug);
+  const result = await refreshAllGuidanceFiles(workspace.id);
+  if (!result.ok) {
+    if (result.error === "no-repo") {
+      return { error: "Connect a Git repository first." };
+    }
+    return { error: result.error };
+  }
+  return {
+    message:
+      "Synced agents/AGENTS.md and the per-framework AGENT_GUIDE.md files. Check the repo for new commits.",
+  };
 }

@@ -361,6 +361,70 @@ model_settings:
 \`\`\`
 `;
 
+// Repo-root AGENTS.md — the conventional entry point coding agents
+// read first (OpenAI/Anthropic convention). TAS-managed: refresh on
+// drift, same semantics as the agents/ subdir guides. Customer
+// customizations live in ADDITIONAL_AGENT_INSTRUCTIONS.md, which TAS
+// creates once and never touches again.
+const ROOT_AGENTS_INDEX: string = `# Repository guide
+
+This repository holds agent definitions managed by **Tembo Agent
+Studio (TAS)**. TAS reads, runs, and (via the Tembo Coding Agent
+Platform) edits the files under \`agents/\`.
+
+## Where to look
+
+- \`agents/\` — agent definition files (YAML or JSON). Read
+  \`agents/AGENTS.md\` before editing anything here. Each framework
+  subfolder has its own \`AGENT_GUIDE.md\` with the canonical file
+  shape.
+- \`ADDITIONAL_AGENT_INSTRUCTIONS.md\` — project-specific instructions
+  the customer maintains. Always read this alongside the studio's
+  guidance; the two layer on top of each other.
+
+## TAS-managed files
+
+These files are owned by the studio and refreshed automatically on
+every coding-agent request. Hand edits won't survive:
+
+- \`AGENTS.md\` (this file)
+- \`agents/AGENTS.md\`
+- \`agents/pydantic-agentspec/AGENT_GUIDE.md\`
+- \`agents/cargo-ai/AGENT_GUIDE.md\`
+
+Each starts with a version marker:
+\`<!-- tas-guidance-version: <hash> -->\`. Don't change it.
+
+## Project-specific overrides
+
+To add conventions, constraints, or pointers that should layer on top
+of TAS defaults, edit \`ADDITIONAL_AGENT_INSTRUCTIONS.md\` instead of
+this file. That file is customer territory and TAS will never modify
+it.
+`;
+
+// Customer-managed customization slot. TAS creates this once with a
+// minimal starter, then leaves it alone forever. The coding agent
+// reads it alongside AGENTS.md so the customer can layer project-
+// specific instructions on top of the studio defaults without
+// having to fork the studio.
+const ADDITIONAL_INSTRUCTIONS_TEMPLATE: string = `# Additional agent instructions
+
+This file is **customer territory**. Add project-specific instructions
+for the Tembo Coding Agent here — they layer on top of the studio
+defaults in \`AGENTS.md\` and \`agents/AGENTS.md\`.
+
+TAS created this file once and will not modify it again. Edit freely.
+
+## Examples
+
+(Delete these once you have real content.)
+
+- "Prefer YAML over JSON for new agent files."
+- "Don't add new Cargo AI agents — we're consolidating on Pydantic."
+- "See \`docs/agent-review-policy.md\` for our PR review rules."
+`;
+
 const AGENTS_INDEX: string = `# Agent authoring guide for the Tembo Coding Agent
 
 This directory holds **agent definition files** — declarative
@@ -440,17 +504,32 @@ function withVersionMarker(content: string): string {
   return `<!-- tas-guidance-version: ${TAS_GUIDANCE_VERSION} -->\n${content}`;
 }
 
+export const GUIDANCE_ROOT_PATH = "AGENTS.md";
+export const GUIDANCE_ADDITIONAL_PATH = "ADDITIONAL_AGENT_INSTRUCTIONS.md";
 export const GUIDANCE_INDEX_PATH = "agents/AGENTS.md";
 export const GUIDANCE_PYDANTIC_PATH = "agents/pydantic-agentspec/AGENT_GUIDE.md";
 export const GUIDANCE_CARGO_AI_PATH = "agents/cargo-ai/AGENT_GUIDE.md";
 
+// Customer-managed instructions slot. Created once, never refreshed.
+// No version marker — TAS treats this file as opaque after first
+// write. Returned separately from guidanceFilesFor so the bootstrap
+// can take the create-only path on it.
+export function additionalInstructionsFile(): GuidanceFile {
+  return {
+    path: GUIDANCE_ADDITIONAL_PATH,
+    content: ADDITIONAL_INSTRUCTIONS_TEMPLATE,
+  };
+}
+
 export function guidanceFilesFor(framework: Framework): GuidanceFile[] {
-  // The index lives at agents/AGENTS.md so it's visible regardless of
-  // which framework the customer started with; each framework's
-  // per-directory guide lives under its own subdir. Idempotent on
-  // commit: if the file already exists at the same content we skip
-  // writing (handled by the caller).
+  // Root AGENTS.md + agents/AGENTS.md ship every time so the coding
+  // agent finds them whether it starts from the repo root or from
+  // the agents/ subdir. Each framework's per-directory guide lives
+  // under its own subdir. Idempotent on commit: if the file already
+  // exists at the same content we skip writing (handled by the
+  // caller).
   const files: GuidanceFile[] = [
+    { path: GUIDANCE_ROOT_PATH, content: withVersionMarker(ROOT_AGENTS_INDEX) },
     { path: GUIDANCE_INDEX_PATH, content: withVersionMarker(AGENTS_INDEX) },
   ];
   if (framework === "cargo-ai") {
@@ -467,11 +546,14 @@ export function guidanceFilesFor(framework: Framework): GuidanceFile[] {
   return files;
 }
 
-/** Both guides regardless of which framework triggered the bootstrap.
- *  Useful for a "write all guidance" path (workspace settings page,
- *  manual re-bootstrap, etc.). */
+/** All TAS-managed guides regardless of which framework triggered
+ *  the bootstrap. Useful for a "write all guidance" path (workspace
+ *  settings page, manual re-bootstrap, etc.). Does not include the
+ *  customer-managed ADDITIONAL_AGENT_INSTRUCTIONS.md — that's
+ *  bootstrapped separately via additionalInstructionsFile(). */
 export function allGuidanceFiles(): GuidanceFile[] {
   return [
+    { path: GUIDANCE_ROOT_PATH, content: withVersionMarker(ROOT_AGENTS_INDEX) },
     { path: GUIDANCE_INDEX_PATH, content: withVersionMarker(AGENTS_INDEX) },
     {
       path: GUIDANCE_CARGO_AI_PATH,

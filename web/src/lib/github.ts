@@ -278,6 +278,69 @@ export async function createFile(
   return { ok: true, commitSha: body.commit.sha };
 }
 
+export type UpdateFileResult =
+  | { ok: true; commitSha: string }
+  | { ok: false; error: GitHubFileError | "sha-mismatch"; detail?: string };
+
+/**
+ * PUT /repos/{o}/{r}/contents/{path} with the existing blob's `sha`,
+ * which is how GitHub distinguishes update from create on the same
+ * endpoint. The caller must supply the current sha (read it via
+ * readFile first); a stale sha returns 'sha-mismatch'.
+ */
+export async function updateFile(
+  token: string,
+  ref: RepoRef,
+  path: string,
+  args: { content: string; message: string; sha: string },
+): Promise<UpdateFileResult> {
+  const url = `https://api.github.com/repos/${ref.owner}/${ref.name}/contents/${encodePath(path)}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "PUT",
+      headers: { ...GITHUB_HEADERS(token), "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        message: args.message,
+        content: Buffer.from(args.content, "utf8").toString("base64"),
+        branch: ref.branch,
+        sha: args.sha,
+      }),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: "network",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+  if (res.status === 401) return { ok: false, error: "invalid-token" };
+  if (res.status === 404) return { ok: false, error: "not-found" };
+  if (res.status === 409) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, error: "sha-mismatch", detail: text };
+  }
+  if (res.status === 422) {
+    const text = await res.text();
+    if (/branch.*protected/i.test(text)) {
+      return { ok: false, error: "branch-protected", detail: text };
+    }
+    // 422 with no protection signal on update is usually a stale sha.
+    return { ok: false, error: "sha-mismatch", detail: text };
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return {
+      ok: false,
+      error: "network",
+      detail: `GitHub returned ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`,
+    };
+  }
+  const body = (await res.json()) as { commit: { sha: string } };
+  return { ok: true, commitSha: body.commit.sha };
+}
+
 export type DeleteFileResult =
   | { ok: true; commitSha: string }
   | { ok: false; error: GitHubFileError | "sha-mismatch"; detail?: string };

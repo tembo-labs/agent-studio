@@ -1,11 +1,14 @@
 import "server-only";
 
 import {
+  GUIDANCE_ADDITIONAL_PATH,
   GUIDANCE_CARGO_AI_PATH,
   GUIDANCE_INDEX_PATH,
   GUIDANCE_PYDANTIC_PATH,
+  GUIDANCE_ROOT_PATH,
   TAS_APP_VERSION,
   TAS_GUIDANCE_VERSION,
+  additionalInstructionsFile,
   guidanceFilesFor,
   type GuidanceFile,
 } from "@/lib/agent-guidance";
@@ -132,7 +135,11 @@ function frameworkFromAgentPath(path: string): Framework {
 // stays out to save tokens, since these prompts target a specific
 // agent file.
 function buildGuidanceRefreshBlock(framework: Framework): string {
-  const files = guidanceFilesFor(framework);
+  // guidanceFilesFor returns [root AGENTS.md, agents/AGENTS.md, framework guide]
+  // in that order. All three are TAS-managed and refresh on drift.
+  const tasManaged = guidanceFilesFor(framework);
+  const additional = additionalInstructionsFile();
+  const frameworkGuide = tasManaged[2];
   const otherFrameworkPath =
     framework === "cargo-ai" ? GUIDANCE_PYDANTIC_PATH : GUIDANCE_CARGO_AI_PATH;
 
@@ -142,25 +149,41 @@ function buildGuidanceRefreshBlock(framework: Framework): string {
     `Tembo Agent Studio version: ${TAS_APP_VERSION}`,
     `Guidance version (this prompt): ${TAS_GUIDANCE_VERSION}`,
     "",
-    "The studio ships agent-authoring guidance into the customer's repo",
-    "under `agents/`. Each guidance file's first line is an HTML comment",
-    "of the form `<!-- tas-guidance-version: <hash> -->`.",
+    "The studio ships agent-authoring guidance into the customer's repo.",
+    "TAS-managed files start their first line with an HTML comment of",
+    "the form `<!-- tas-guidance-version: <hash> -->`.",
     "",
     "Before doing the requested change:",
     "",
-    `1. Read the first line of each of these files (if they exist):`,
-    `   - \`${GUIDANCE_INDEX_PATH}\``,
-    `   - \`${files[1].path}\``,
-    `2. If a file is missing, or its version marker is not exactly`,
-    `   \`<!-- tas-guidance-version: ${TAS_GUIDANCE_VERSION} -->\`,`,
-    `   replace the file (or create it) with the canonical content`,
-    `   quoted below. Include the refresh in the same PR.`,
-    `3. If both files already match, skip the refresh and move on.`,
+    "**TAS-managed files (refresh on drift — overwrite if marker is",
+    "missing or stale):**",
+    "",
+    `- \`${GUIDANCE_ROOT_PATH}\``,
+    `- \`${GUIDANCE_INDEX_PATH}\``,
+    `- \`${frameworkGuide.path}\``,
+    "",
+    `For each: if missing, or the version marker on its first line is`,
+    `not exactly \`<!-- tas-guidance-version: ${TAS_GUIDANCE_VERSION} -->\`,`,
+    `replace the file with the canonical content quoted below.`,
+    "",
+    "**Customer-managed file (create only if missing — never overwrite):**",
+    "",
+    `- \`${GUIDANCE_ADDITIONAL_PATH}\``,
+    "",
+    `If \`${GUIDANCE_ADDITIONAL_PATH}\` does not exist, create it from`,
+    `the canonical starter quoted below. If it already exists, leave`,
+    `it alone — this file is the customer's project-specific override`,
+    `slot. Read its current contents and respect any instructions it`,
+    `contains when authoring the requested change.`,
+    "",
+    `Any guidance file change lands in the same PR as the requested`,
+    `change.`,
     "",
     `Leave \`${otherFrameworkPath}\` alone — this PR targets a`,
     `${framework} agent and shouldn't touch the other framework's guide.`,
     "",
-    ...files.flatMap((f) => formatGuidanceFile(f)),
+    ...tasManaged.flatMap((f) => formatGuidanceFile(f)),
+    ...formatGuidanceFile(additional),
   ].join("\n");
 }
 

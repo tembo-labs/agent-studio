@@ -16,6 +16,7 @@ import { DisconnectRepoForm } from "./disconnect-repo-form";
 import { FaviconPicker } from "./favicon-picker";
 import { RestoreAgentForm } from "./restore-agent-form";
 import { SecretKeyForm } from "./secret-key-form";
+import { SyncGuidanceForm } from "./sync-guidance-form";
 import { ThemeSettings } from "./theme-settings";
 
 export const dynamic = "force-dynamic";
@@ -117,6 +118,17 @@ export default async function SettingsPage({
               )}
             </Section>
           </div>
+
+        {repo && (
+          <div className="pb-5 pt-8">
+            <Section
+              title="Agent guidance"
+              description="Writes (or refreshes) agents/AGENTS.md and the per-framework AGENT_GUIDE.md files into the connected repo. These tell the Tembo Coding Agent how to write valid agent files. Safe to click repeatedly — it only commits when the files are missing or out of date."
+            >
+              <SyncGuidanceForm workspaceSlug={workspace.slug} />
+            </Section>
+          </div>
+        )}
 
         <div className="pb-5 pt-8">
             <Section

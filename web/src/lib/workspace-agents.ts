@@ -12,13 +12,17 @@ import {
   type Framework,
   type ParseAgentError,
 } from "@/lib/agent-format";
-import { guidanceFilesFor } from "@/lib/agent-guidance";
+import {
+  additionalInstructionsFile,
+  guidanceFilesFor,
+} from "@/lib/agent-guidance";
 import { db } from "@/lib/db";
 import {
   createFile,
   deleteFile,
   listDirectory,
   readFile,
+  updateFile,
   type GitHubFileError,
   type RepoRef,
 } from "@/lib/github";
@@ -244,26 +248,92 @@ async function commitAgentFile(
   return { ok: true, filename, path, commitSha: result.commitSha };
 }
 
-// Best-effort guidance-file bootstrap. Idempotent: createFile returns
-// `path-exists` on a 422 which we treat as success (the file is
-// already there, possibly customer-edited; we don't overwrite).
-// Network/auth failures are swallowed — the agent commit is the
-// important step, and the guidance can be re-bootstrapped later.
+// Best-effort guidance-file bootstrap + refresh. For each guidance
+// file:
+//   - missing → create it
+//   - present + content matches what TAS ships  → leave it alone
+//   - present + content differs (older TAS version, hand-edit drift)
+//     → update in place with a stamped commit message
+// Network/auth failures are swallowed so a hiccup never blocks the
+// agent commit; the refresh-first protocol in cap-api will catch
+// anything we miss here.
 async function ensureGuidanceFiles(
   token: string,
   ref: RepoRef,
   framework: Framework,
 ): Promise<void> {
+  // TAS-managed files (root AGENTS.md + agents/ subdir guides):
+  // refresh on content drift so a workspace stays current with the
+  // studio it's connected to.
   for (const file of guidanceFilesFor(framework)) {
     try {
-      await createFile(token, ref, file.path, {
+      const existing = await readFile(token, ref, file.path);
+      if (!existing.ok) {
+        if (existing.error === "not-found") {
+          await createFile(token, ref, file.path, {
+            content: file.content,
+            message: `Add ${file.path} (TAS agent authoring guide)`,
+          });
+        }
+        // network / invalid-token / etc. — skip, try again on the
+        // next agent commit
+        continue;
+      }
+      if (existing.content === file.content) continue;
+      await updateFile(token, ref, file.path, {
         content: file.content,
-        message: `Add ${file.path} (TAS agent authoring guide)`,
+        message: `Refresh ${file.path} (TAS agent authoring guide)`,
+        sha: existing.sha,
       });
     } catch {
       // ignore — guidance is a nice-to-have, not blocking
     }
   }
+
+  // Customer-managed file: created once with a starter template, then
+  // never touched again. This is where the customer adds project-
+  // specific overrides that layer on top of the TAS defaults.
+  await ensureAdditionalInstructionsFile(token, ref);
+}
+
+async function ensureAdditionalInstructionsFile(
+  token: string,
+  ref: RepoRef,
+): Promise<void> {
+  try {
+    const file = additionalInstructionsFile();
+    const existing = await readFile(token, ref, file.path);
+    if (existing.ok) return; // already exists; this file is customer-owned, never overwrite
+    if (existing.error !== "not-found") return; // network/auth — try again later
+    await createFile(token, ref, file.path, {
+      content: file.content,
+      message: `Add ${file.path} (TAS customization slot)`,
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+// Public form of the same bootstrap, runnable on demand (e.g. from
+// a "Sync guidance" button in workspace settings). Always writes
+// both frameworks' guides so a workspace using both gets fully
+// caught up in one call.
+export async function refreshAllGuidanceFiles(
+  workspaceId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const repo = await getWorkspaceRepo(workspaceId);
+  if (!repo) return { ok: false, error: "no-repo" };
+  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
+  const ref: RepoRef = {
+    owner: repo.owner,
+    name: repo.name,
+    branch: repo.defaultBranch,
+  };
+  // Run the per-framework path twice to cover both guides (the index
+  // is shared; idempotent skip handles it the second time).
+  await ensureGuidanceFiles(token, ref, "pydantic-agentspec");
+  await ensureGuidanceFiles(token, ref, "cargo-ai");
+  return { ok: true };
 }
 
 export async function createAgentFromTemplate(

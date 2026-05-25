@@ -1,0 +1,37 @@
+"use client";
+
+import { useActionState } from "react";
+
+import { Button } from "@/components/ui/button";
+
+import { syncGuidanceAction, type SyncGuidanceFormState } from "./actions";
+
+const INITIAL: SyncGuidanceFormState = {};
+
+export function SyncGuidanceForm({
+  workspaceSlug,
+}: {
+  workspaceSlug: string;
+}) {
+  const [state, formAction, pending] = useActionState(
+    syncGuidanceAction,
+    INITIAL,
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <form action={formAction}>
+        <input type="hidden" name="workspace" value={workspaceSlug} />
+        <Button type="submit" variant="secondary" disabled={pending}>
+          {pending ? "Syncing…" : "Sync agent guidance"}
+        </Button>
+      </form>
+      {state.message && (
+        <p className="text-foreground-weak text-xs">{state.message}</p>
+      )}
+      {state.error && (
+        <p className="text-sentiment-negative text-xs">{state.error}</p>
+      )}
+    </div>
+  );
+}
