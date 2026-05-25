@@ -1,36 +1,43 @@
-// Prior feedbacks submitted from this run. Rendered above the
+// Prior improvements submitted from this run. Rendered above the
 // Improve form on the run detail page so the user can see whether
-// their earlier feedback is in flight / has opened a PR / has been
-// merged — without having to click through to /feedbacks.
+// their earlier submission is in flight / has opened a PR / has been
+// merged — without having to click through to /improvements.
 
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
-import { feedbackSubmitterLabel } from "@/lib/feedback-display";
-import { type Feedback, type FeedbackStatus } from "@/lib/feedbacks-api";
+import { improvementSubmitterLabel } from "@/lib/improvement-display";
+import {
+  type Improvement,
+  type ImprovementStatus,
+} from "@/lib/improvements-api";
 
-export function FeedbackHistory({ feedbacks }: { feedbacks: Feedback[] }) {
-  if (feedbacks.length === 0) return null;
+export function ImprovementHistory({
+  improvements,
+}: {
+  improvements: Improvement[];
+}) {
+  if (improvements.length === 0) return null;
 
   return (
     <ul className="divide-border-weak flex flex-col divide-y rounded-lg border border-[var(--color-border-weak)] bg-surface-raised">
-      {feedbacks.map((f) => (
-        <li key={f.id} className="flex flex-col gap-1.5 px-3 py-2.5">
+      {improvements.map((i) => (
+        <li key={i.id} className="flex flex-col gap-1.5 px-3 py-2.5">
           <div className="flex items-start justify-between gap-3">
             <p className="text-foreground line-clamp-3 text-sm leading-5">
-              {f.feedbackText}
+              {i.improvementText}
             </p>
-            <StatusBadge status={f.status} />
+            <StatusBadge status={i.status} />
           </div>
           <div className="text-foreground-weak flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <span className="text-foreground font-medium">
-              {feedbackSubmitterLabel(f)}
+              {improvementSubmitterLabel(i)}
             </span>
             <span>
-              <LocalTime iso={f.createdAt.toISOString()} />
+              <LocalTime iso={i.createdAt.toISOString()} />
             </span>
-            {f.temboTaskHtmlUrl && (
+            {i.temboTaskHtmlUrl && (
               <a
-                href={f.temboTaskHtmlUrl}
+                href={i.temboTaskHtmlUrl}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="text-foreground hover:underline"
@@ -38,14 +45,14 @@ export function FeedbackHistory({ feedbacks }: { feedbacks: Feedback[] }) {
                 Tembo Session ↗
               </a>
             )}
-            {f.prUrl && (
+            {i.prUrl && (
               <a
-                href={f.prUrl}
+                href={i.prUrl}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="text-foreground hover:underline"
               >
-                PR #{f.prNumber} ↗
+                PR #{i.prNumber} ↗
               </a>
             )}
           </div>
@@ -55,7 +62,7 @@ export function FeedbackHistory({ feedbacks }: { feedbacks: Feedback[] }) {
   );
 }
 
-function StatusBadge({ status }: { status: FeedbackStatus }) {
+function StatusBadge({ status }: { status: ImprovementStatus }) {
   switch (status) {
     case "submitted":
       return (

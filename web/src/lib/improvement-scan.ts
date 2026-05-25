@@ -1,19 +1,19 @@
 import "server-only";
 
-// On-demand scan that asks GitHub for PRs containing our feedback
-// markers, then updates each matching feedback row's pr_url /
-// pr_state / status. Called when the user visits /<workspace>/
-// feedbacks. No webhook infra required — trades freshness for
-// simplicity. A real webhook can replace this without changing the
-// feedback table.
+// On-demand scan that asks GitHub for PRs containing our
+// improvement markers, then updates each matching improvement row's
+// pr_url / pr_state / status. Called when the user visits
+// /<workspace>/improvements. No webhook infra required — trades
+// freshness for simplicity. A real webhook can replace this without
+// changing the improvement table.
 
 import {
-  setFeedbackPr,
-  type Feedback,
-  type FeedbackStatus,
-  FEEDBACK_MARKER_PREFIX,
-  feedbackMarker,
-} from "@/lib/feedbacks-api";
+  setImprovementPr,
+  type Improvement,
+  type ImprovementStatus,
+  IMPROVEMENT_MARKER_PREFIX,
+  improvementMarker,
+} from "@/lib/improvements-api";
 import { getWorkspaceRepo, getWorkspaceSecretPlaintext } from "@/lib/workspace";
 
 interface GhSearchResult {
@@ -30,27 +30,27 @@ interface GhSearchResult {
   }>;
 }
 
-export async function scanFeedbacksForPRs(
+export async function scanImprovementsForPRs(
   workspaceId: string,
-  feedbacks: Feedback[],
-): Promise<Feedback[]> {
-  // Only feedbacks that haven't reached a terminal state need
+  improvements: Improvement[],
+): Promise<Improvement[]> {
+  // Only improvements that haven't reached a terminal state need
   // checking. "merged" + "closed" are final.
-  const open = feedbacks.filter(
-    (f) => f.status !== "merged" && f.status !== "closed",
+  const open = improvements.filter(
+    (i) => i.status !== "merged" && i.status !== "closed",
   );
-  if (open.length === 0) return feedbacks;
+  if (open.length === 0) return improvements;
 
   const repo = await getWorkspaceRepo(workspaceId);
-  if (!repo) return feedbacks;
+  if (!repo) return improvements;
   const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
-  if (!token) return feedbacks;
+  if (!token) return improvements;
 
   // GitHub's search API caps `in:body` queries by length. Ask for
   // ALL PRs in the repo that mention the marker prefix; we'll match
   // by id client-side. Capped at 100 results which is fine for a
   // dev-stage app.
-  const q = `repo:${repo.owner}/${repo.name} is:pr "${FEEDBACK_MARKER_PREFIX}" in:body`;
+  const q = `repo:${repo.owner}/${repo.name} is:pr "${IMPROVEMENT_MARKER_PREFIX}" in:body`;
   const url = `https://api.github.com/search/issues?q=${encodeURIComponent(q)}&per_page=100`;
 
   const res = await fetch(url, {
@@ -63,21 +63,25 @@ export async function scanFeedbacksForPRs(
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.log("[feedback-scan] github search failed", res.status, body.slice(0, 300));
-    return feedbacks;
+    console.log(
+      "[improvement-scan] github search failed",
+      res.status,
+      body.slice(0, 300),
+    );
+    return improvements;
   }
 
   const search = (await res.json()) as GhSearchResult;
 
-  // Build a quick lookup of feedback rows by id so we can match each
-  // PR back to its source feedback.
-  const byId = new Map(open.map((f) => [f.id, f]));
-  const updates = new Map<string, Feedback>();
+  // Build a quick lookup of improvement rows by id so we can match
+  // each PR back to its source improvement.
+  const byId = new Map(open.map((i) => [i.id, i]));
+  const updates = new Map<string, Improvement>();
 
   for (const pr of search.items) {
     const body = pr.body ?? "";
     for (const id of byId.keys()) {
-      if (!body.includes(feedbackMarker(id))) continue;
+      if (!body.includes(improvementMarker(id))) continue;
       const status = derivePrStatus(pr.state, pr.pull_request?.merged_at ?? null);
       const newState = derivePrState(pr.state, pr.pull_request?.merged_at ?? null);
       const existing = byId.get(id);
@@ -92,7 +96,7 @@ export async function scanFeedbacksForPRs(
         updates.set(id, existing);
         continue;
       }
-      await setFeedbackPr({
+      await setImprovementPr({
         id,
         prUrl: pr.html_url,
         prNumber: pr.number,
@@ -109,14 +113,14 @@ export async function scanFeedbacksForPRs(
     }
   }
 
-  // Return feedbacks with updated rows folded in.
-  return feedbacks.map((f) => updates.get(f.id) ?? f);
+  // Return improvements with updated rows folded in.
+  return improvements.map((i) => updates.get(i.id) ?? i);
 }
 
 function derivePrStatus(
   ghState: string,
   mergedAt: string | null,
-): FeedbackStatus {
+): ImprovementStatus {
   if (mergedAt) return "merged";
   if (ghState === "closed") return "closed";
   return "pr_opened";

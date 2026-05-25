@@ -9,10 +9,10 @@ import {
   type CapError,
 } from "@/lib/cap-api";
 import {
-  createFeedback,
-  feedbackMarker,
-  setFeedbackTask,
-} from "@/lib/feedbacks-api";
+  createImprovement,
+  improvementMarker,
+  setImprovementTask,
+} from "@/lib/improvements-api";
 import { createRun } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
 import {
@@ -26,7 +26,7 @@ import { getAgentByName } from "@/lib/workspace-agents";
 export type ChatSubmitResult =
   | {
       ok: true;
-      feedbackId: string;
+      improvementId: string;
       taskId: string;
       htmlUrl: string;
       status: string;
@@ -81,22 +81,22 @@ export async function chatSubmitAction(args: {
     };
   }
 
-  // Persist the feedback row before talking to Tembo so we own the
-  // id we embed in the prompt — runId is null because chat-to-edit
-  // is agent-level, not anchored to a run.
-  const row = await createFeedback({
+  // Persist the improvement row before talking to Tembo so we own
+  // the id we embed in the prompt — runId is null because chat-to-
+  // edit is agent-level, not anchored to a run.
+  const row = await createImprovement({
     workspaceId: workspace.id,
     runId: null,
     agentName: canonicalName,
     agentPath: agent.path,
-    feedbackText: text,
+    improvementText: text,
     userId: session.user.id,
   });
 
   const prompt = buildChatEditPrompt({
     agentPath: agent.path,
-    feedback: text,
-    feedbackMarker: feedbackMarker(row.id),
+    improvement: text,
+    improvementMarker: improvementMarker(row.id),
   });
 
   const res = await createTemboTask({
@@ -112,7 +112,7 @@ export async function chatSubmitAction(args: {
     return { ok: false, error: formatCapError(res.error) };
   }
 
-  await setFeedbackTask({
+  await setImprovementTask({
     id: row.id,
     temboTaskId: res.result.taskId,
     temboTaskHtmlUrl: res.result.htmlUrl,
@@ -120,7 +120,7 @@ export async function chatSubmitAction(args: {
 
   return {
     ok: true,
-    feedbackId: row.id,
+    improvementId: row.id,
     taskId: res.result.taskId,
     htmlUrl: res.result.htmlUrl,
     status: res.result.status,

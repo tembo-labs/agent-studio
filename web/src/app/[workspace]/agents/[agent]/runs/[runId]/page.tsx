@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
-import { listFeedbacksForRun } from "@/lib/feedbacks-api";
+import { scanImprovementsForPRs } from "@/lib/improvement-scan";
+import { listImprovementsForRun } from "@/lib/improvements-api";
 import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
 import { getRun, type RunRecord } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
@@ -33,11 +33,14 @@ export default async function RunDetailPage({
   // Defense against URL guessing for other workspaces' runs.
   if (run.workspaceId !== workspace.id) notFound();
 
-  // Inline feedback history. Scan refreshes pr_state for the few
+  // Inline improvement history. Scan refreshes pr_state for the few
   // open rows tied to this run — cheap because it's at most a
-  // handful of feedbacks per run, not the whole workspace.
-  const storedFeedbacks = await listFeedbacksForRun(run.id);
-  const feedbacks = await scanFeedbacksForPRs(workspace.id, storedFeedbacks);
+  // handful of improvements per run, not the whole workspace.
+  const storedImprovements = await listImprovementsForRun(run.id);
+  const improvements = await scanImprovementsForPRs(
+    workspace.id,
+    storedImprovements,
+  );
 
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;
   const totalTokens =
@@ -138,8 +141,8 @@ export default async function RunDetailPage({
         )}
       </Section>
 
-      {/* Hide the feedback section while the run is in flight — there's
-          nothing to feed back on yet, and the form pulling the eye away
+      {/* Hide the improvement section while the run is in flight — there's
+          nothing to improve on yet, and the form pulling the eye away
           from the streaming output feels wrong. Fade it in two seconds
           after the output settles so the user finishes reading first. */}
       {(run.status === "succeeded" || run.status === "failed") && (
@@ -148,7 +151,7 @@ export default async function RunDetailPage({
           <ImproveForm
             workspaceSlug={workspace.slug}
             runId={run.id}
-            feedbacks={feedbacks}
+            improvements={improvements}
           />
         </>
       )}

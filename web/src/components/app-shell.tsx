@@ -59,8 +59,8 @@ export function AppShell({ workspace, user, children }: Props) {
             matchPrefix
           />
           <SidebarNavItem
-            href={`${home}/feedbacks`}
-            label="Feedbacks"
+            href={`${home}/improvements`}
+            label="Improvements"
             icon={<IconChatBubbles />}
           />
           <SidebarNavItem

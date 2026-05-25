@@ -11,10 +11,11 @@
 //
 //   "Submit change request" → packages the message and ships it to
 //                             Tembo as a task → opens a PR for
-//                             review. Slow, rare. Creates a feedback
-//                             row tied to the agent (run_id=null).
+//                             review. Slow, rare. Creates an
+//                             improvement row tied to the agent
+//                             (run_id=null).
 //
-// The thread renders runs (conversation turns) and feedbacks
+// The thread renders runs (conversation turns) and improvements
 // (change requests) interleaved chronologically. Any in-flight run
 // (queued / running) triggers an auto-refresh so the agent's reply
 // lands without the user reloading.
@@ -25,8 +26,11 @@ import { useEffect, useState, useTransition } from "react";
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { feedbackSubmitterLabel } from "@/lib/feedback-display";
-import { type Feedback, type FeedbackStatus } from "@/lib/feedbacks-api";
+import { improvementSubmitterLabel } from "@/lib/improvement-display";
+import {
+  type Improvement,
+  type ImprovementStatus,
+} from "@/lib/improvements-api";
 import { type ChatRun } from "@/lib/runs-db";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +43,7 @@ import {
 
 export type ChatTurn =
   | { kind: "run"; createdAt: Date; run: ChatRun }
-  | { kind: "feedback"; createdAt: Date; feedback: Feedback };
+  | { kind: "improvement"; createdAt: Date; improvement: Improvement };
 
 export function ChatThread({
   workspaceSlug,
@@ -114,9 +118,9 @@ export function ChatThread({
                 run={t.run}
               />
             ) : (
-              <FeedbackBubble
-                key={`f:${t.feedback.id}`}
-                feedback={t.feedback}
+              <ImprovementBubble
+                key={`i:${t.improvement.id}`}
+                improvement={t.improvement}
                 workspaceSlug={workspaceSlug}
                 agentName={agentName}
               />
@@ -231,17 +235,17 @@ function RunBubble({ run }: { run: ChatRun }) {
   );
 }
 
-function FeedbackBubble({
-  feedback,
+function ImprovementBubble({
+  improvement,
   workspaceSlug,
   agentName,
 }: {
-  feedback: Feedback;
+  improvement: Improvement;
   workspaceSlug: string;
   agentName: string;
 }) {
-  const runHref = feedback.runId
-    ? `/${workspaceSlug}/agents/${encodeURIComponent(agentName)}/runs/${feedback.runId}`
+  const runHref = improvement.runId
+    ? `/${workspaceSlug}/agents/${encodeURIComponent(agentName)}/runs/${improvement.runId}`
     : null;
   return (
     <li className="flex flex-col gap-2">
@@ -255,11 +259,11 @@ function FeedbackBubble({
             </span>
           </div>
           <p className="whitespace-pre-wrap text-sm leading-5">
-            {feedback.feedbackText}
+            {improvement.improvementText}
           </p>
           <span className="text-foreground-on-accent/70 text-[10px]">
-            {feedbackSubmitterLabel(feedback)} ·{" "}
-            <LocalTime iso={feedback.createdAt.toISOString()} />
+            {improvementSubmitterLabel(improvement)} ·{" "}
+            <LocalTime iso={improvement.createdAt.toISOString()} />
             {runHref && (
               <>
                 {" · "}
@@ -280,20 +284,20 @@ function FeedbackBubble({
           )}
         >
           <div className="flex items-center gap-2">
-            <StatusBadge status={feedback.status} />
-            {feedback.prNumber && feedback.prUrl && (
+            <StatusBadge status={improvement.status} />
+            {improvement.prNumber && improvement.prUrl && (
               <a
-                href={feedback.prUrl}
+                href={improvement.prUrl}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="text-foreground text-xs font-medium hover:underline"
               >
-                PR #{feedback.prNumber} ↗
+                PR #{improvement.prNumber} ↗
               </a>
             )}
-            {feedback.temboTaskHtmlUrl && (
+            {improvement.temboTaskHtmlUrl && (
               <a
-                href={feedback.temboTaskHtmlUrl}
+                href={improvement.temboTaskHtmlUrl}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="text-foreground-weak text-xs hover:underline"
@@ -303,7 +307,7 @@ function FeedbackBubble({
             )}
           </div>
           <p className="text-foreground-weak text-xs leading-5">
-            {statusBlurb(feedback.status)}
+            {statusBlurb(improvement.status)}
           </p>
         </div>
       </div>
@@ -311,7 +315,7 @@ function FeedbackBubble({
   );
 }
 
-function statusBlurb(status: FeedbackStatus): string {
+function statusBlurb(status: ImprovementStatus): string {
   switch (status) {
     case "submitted":
       return "Sent to Tembo. Waiting for the coding agent to open a PR.";
@@ -324,7 +328,7 @@ function statusBlurb(status: FeedbackStatus): string {
   }
 }
 
-function StatusBadge({ status }: { status: FeedbackStatus }) {
+function StatusBadge({ status }: { status: ImprovementStatus }) {
   switch (status) {
     case "submitted":
       return (

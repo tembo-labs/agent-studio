@@ -12,7 +12,7 @@ const DEFAULT_TEMBO_API_URL = "https://api.tembo.io";
 export interface CreateTaskInput {
   // The plain-English prompt describing what should change in the
   // agent file. We build this from the run context + the user's
-  // feedback. CAP supports file tagging in the prompt.
+  // improvement request. CAP supports file tagging in the prompt.
   prompt: string;
   // Public GitHub URL of the workspace repo, e.g.
   // "https://github.com/owner/name". CAP locates the repo by URL.
@@ -106,8 +106,8 @@ export async function createTemboTask(args: {
 // works for both.
 export function buildChatEditPrompt(args: {
   agentPath: string;
-  feedback: string;
-  feedbackMarker: string;
+  improvement: string;
+  improvementMarker: string;
 }): string {
   return [
     `Improve the agent defined at @${args.agentPath}.`,
@@ -116,27 +116,28 @@ export function buildChatEditPrompt(args: {
     "",
     "IMPORTANT: Include this exact line on its own at the end of the pull",
     "request description so the Tembo Agent Studio can correlate the PR",
-    "with the user's feedback:",
+    "with the user's improvement request:",
     "",
-    args.feedbackMarker,
+    args.improvementMarker,
     "",
     "## Requested change",
-    args.feedback.trim(),
+    args.improvement.trim(),
   ].join("\n");
 }
 
 // Build the prompt we send to CAP from the run context + the user's
-// freeform feedback. We tag the agent file path so CAP knows which
-// file to edit; the run input/output give it the concrete failure to
-// fix; the feedback marker is what lets us later correlate the
-// merged PR back to the feedback row that triggered it.
+// freeform improvement request. We tag the agent file path so CAP
+// knows which file to edit; the run input/output give it the concrete
+// failure to fix; the improvement marker is what lets us later
+// correlate the merged PR back to the improvement row that triggered
+// it.
 export function buildImprovePrompt(args: {
   agentPath: string;
   model: string;
   userMessage: string;
   output: string;
-  feedback: string;
-  feedbackMarker: string;
+  improvement: string;
+  improvementMarker: string;
 }): string {
   const trimmedOutput = args.output.length > 4000
     ? args.output.slice(0, 4000) + "\n…[truncated]"
@@ -149,14 +150,14 @@ export function buildImprovePrompt(args: {
     "",
     "IMPORTANT: Include this exact line on its own at the end of the pull",
     "request description so the Tembo Agent Studio can correlate the PR",
-    "with the user's feedback:",
+    "with the user's improvement request:",
     "",
-    args.feedbackMarker,
+    args.improvementMarker,
     "",
-    "## Feedback from the user",
-    args.feedback.trim(),
+    "## Improvement requested by the user",
+    args.improvement.trim(),
     "",
-    "## Context: the run that prompted this feedback",
+    "## Context: the run that prompted this request",
     `- Model: ${args.model}`,
     `- User message: ${args.userMessage || "(empty)"}`,
     "",

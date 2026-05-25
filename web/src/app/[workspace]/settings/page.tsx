@@ -120,7 +120,7 @@ export default async function SettingsPage({
 
         <div className="pb-5 pt-8">
             <Section
-              title="Change delivery"
+              title="Improvements delivery"
               description="How edits from the Improve form ship to your repo. YOLO commits directly to the default branch and is coming in a later release."
             >
               <ChangeModeSetting />

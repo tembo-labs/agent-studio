@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
-import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
-import { listFeedbacksForAgent } from "@/lib/feedbacks-api";
+import { scanImprovementsForPRs } from "@/lib/improvement-scan";
+import { listImprovementsForAgent } from "@/lib/improvements-api";
 import { listChatRunsForAgent } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
@@ -32,12 +32,12 @@ export default async function AgentChatPage({
   const canonicalName = agent.ok ? agent.spec.name : agentName;
 
   const [stored, chatRuns] = await Promise.all([
-    listFeedbacksForAgent(workspace.id, canonicalName),
+    listImprovementsForAgent(workspace.id, canonicalName),
     listChatRunsForAgent(workspace.id, canonicalName),
   ]);
-  const feedbacks = await scanFeedbacksForPRs(workspace.id, stored);
+  const improvements = await scanImprovementsForPRs(workspace.id, stored);
 
-  // Merge runs + feedbacks into a single chronological turn list.
+  // Merge runs + improvements into a single chronological turn list.
   // Stable sort against created_at keeps "send" / "submit change"
   // ordering intuitive even when they fire in quick succession.
   const turns: ChatTurn[] = [
@@ -46,10 +46,10 @@ export default async function AgentChatPage({
       createdAt: run.createdAt,
       run,
     })),
-    ...feedbacks.map<ChatTurn>((feedback) => ({
-      kind: "feedback",
-      createdAt: feedback.createdAt,
-      feedback,
+    ...improvements.map<ChatTurn>((improvement) => ({
+      kind: "improvement",
+      createdAt: improvement.createdAt,
+      improvement,
     })),
   ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 

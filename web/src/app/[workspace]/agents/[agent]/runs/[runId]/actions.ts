@@ -8,10 +8,10 @@ import {
   type CapError,
 } from "@/lib/cap-api";
 import {
-  createFeedback,
-  feedbackMarker,
-  setFeedbackTask,
-} from "@/lib/feedbacks-api";
+  createImprovement,
+  improvementMarker,
+  setImprovementTask,
+} from "@/lib/improvements-api";
 import { getRun } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
 import {
@@ -24,7 +24,7 @@ import {
 export type ImproveResult =
   | {
       ok: true;
-      feedbackId: string;
+      improvementId: string;
       taskId: string;
       htmlUrl: string;
       status: string;
@@ -34,10 +34,10 @@ export type ImproveResult =
 export async function improveAgentAction(args: {
   workspaceSlug: string;
   runId: string;
-  feedback: string;
+  improvement: string;
 }): Promise<ImproveResult> {
-  const feedback = args.feedback.trim();
-  if (!feedback) {
+  const improvement = args.improvement.trim();
+  if (!improvement) {
     return { ok: false, error: "Tell us what to improve before submitting." };
   }
 
@@ -71,15 +71,15 @@ export async function improveAgentAction(args: {
     };
   }
 
-  // Persist the feedback row before talking to Tembo so we own the
-  // id we embed in the prompt — even if the CAP call fails the row
-  // exists with status='submitted' and we can retry later.
-  const row = await createFeedback({
+  // Persist the improvement row before talking to Tembo so we own
+  // the id we embed in the prompt — even if the CAP call fails the
+  // row exists with status='submitted' and we can retry later.
+  const row = await createImprovement({
     workspaceId: workspace.id,
     runId: run.id,
     agentName: run.agentName,
     agentPath: run.agentPath,
-    feedbackText: feedback,
+    improvementText: improvement,
     userId: session.user.id,
   });
 
@@ -88,8 +88,8 @@ export async function improveAgentAction(args: {
     model: run.model,
     userMessage: "", // Run record doesn't capture the user message separately from the prompt; revisit when chat lands.
     output: run.output,
-    feedback,
-    feedbackMarker: feedbackMarker(row.id),
+    improvement,
+    improvementMarker: improvementMarker(row.id),
   });
 
   const res = await createTemboTask({
@@ -105,7 +105,7 @@ export async function improveAgentAction(args: {
     return { ok: false, error: formatCapError(res.error) };
   }
 
-  await setFeedbackTask({
+  await setImprovementTask({
     id: row.id,
     temboTaskId: res.result.taskId,
     temboTaskHtmlUrl: res.result.htmlUrl,
@@ -113,7 +113,7 @@ export async function improveAgentAction(args: {
 
   return {
     ok: true,
-    feedbackId: row.id,
+    improvementId: row.id,
     taskId: res.result.taskId,
     htmlUrl: res.result.htmlUrl,
     status: res.result.status,

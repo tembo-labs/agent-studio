@@ -3,13 +3,13 @@ import { notFound } from "next/navigation";
 
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
-import { scanFeedbacksForPRs } from "@/lib/feedback-scan";
+import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import {
-  countFeedbacksSince,
-  listFeedbacks,
-  listOpenFeedbacks,
-  type FeedbackStatus,
-} from "@/lib/feedbacks-api";
+  countImprovementsSince,
+  listImprovements,
+  listOpenImprovements,
+  type ImprovementStatus,
+} from "@/lib/improvements-api";
 import {
   countRunsForAgents,
   countRunsForWorkspace,
@@ -41,23 +41,23 @@ export default async function DashboardPage({
 
   const since = new Date(Date.now() - WEEK_MS);
   // Refresh open PR statuses before reading counts so the headline
-  // numbers reflect reality. listOpenFeedbacks returns every non-
+  // numbers reflect reality. listOpenImprovements returns every non-
   // terminal row regardless of age — a six-week-old "PR opened" that
   // got merged yesterday still gets flipped to "merged" before we
   // count.
-  const open = await listOpenFeedbacks(workspace.id);
-  await scanFeedbacksForPRs(workspace.id, open);
+  const open = await listOpenImprovements(workspace.id);
+  await scanImprovementsForPRs(workspace.id, open);
 
   // Pull the data the two dashboard sections need in parallel.
-  //   - feedback counts + recent list drive the Feedback section
+  //   - improvement counts + recent list drive the Improvements section
   //   - listAgents + run aggregates drive the Agents section
   // listAgents hits GitHub once; the run aggregates are single SQL
   // queries each. We then derive the "active" set client-side as
   // the intersection of "ever ran" and "still in the repo".
   const [counts, recent, agentsResult, agentsWithRuns, totalRunsAllTime] =
     await Promise.all([
-      countFeedbacksSince(workspace.id, since),
-      listFeedbacks(workspace.id, 10),
+      countImprovementsSince(workspace.id, since),
+      listImprovements(workspace.id, 10),
       listAgents(workspace.id),
       listAgentNamesWithRuns(workspace.id),
       countRunsForWorkspace(workspace.id),
@@ -120,16 +120,16 @@ export default async function DashboardPage({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-foreground text-lg font-semibold">Feedback</h2>
+        <h2 className="text-foreground text-lg font-semibold">Improvements</h2>
         <h3 className="text-foreground-weak text-xs font-medium uppercase tracking-wide">
           This week
         </h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {/* Submitted is the cumulative count of *all* feedback rows
-              created in the window, regardless of their current status —
-              a row that was submitted, opened a PR, and got merged still
-              counts here. The other three cards break that population
-              down by where it ended up. */}
+          {/* Submitted is the cumulative count of *all* improvement
+              rows created in the window, regardless of their current
+              status — a row that was submitted, opened a PR, and got
+              merged still counts here. The other three cards break
+              that population down by where it ended up. */}
           <StatCard label="Submitted" value={counts.total} accent="gray" />
           <StatCard label="PR open" value={counts.pr_opened} accent="blue" />
           <StatCard label="Merged" value={counts.merged} accent="green" />
@@ -140,10 +140,10 @@ export default async function DashboardPage({
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between">
           <h3 className="text-foreground-weak text-xs font-medium uppercase tracking-wide">
-            Recent feedback
+            Recent improvements
           </h3>
           <Link
-            href={`/${workspace.slug}/feedbacks`}
+            href={`/${workspace.slug}/improvements`}
             className="text-foreground-weak hover:text-foreground text-xs"
           >
             View all →
@@ -151,17 +151,17 @@ export default async function DashboardPage({
         </div>
         {recent.length === 0 ? (
           <p className="text-foreground-weak text-sm">
-            No feedback yet. Open a run and use{" "}
+            No improvements yet. Open a run and use{" "}
             <em>Improve the Agent</em> to start one.
           </p>
         ) : (
           <ul className="border-border divide-border-weak divide-y rounded-lg border bg-surface-raised">
-            {recent.map((f) => {
-              const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(f.agentName)}`;
-              const runHref = `${agentHref}/runs/${f.runId}`;
+            {recent.map((i) => {
+              const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(i.agentName)}`;
+              const runHref = `${agentHref}/runs/${i.runId}`;
               return (
                 <li
-                  key={f.id}
+                  key={i.id}
                   className="flex items-start justify-between gap-4 px-3 py-2.5 text-sm"
                 >
                   <div className="flex min-w-0 flex-col gap-0.5">
@@ -170,25 +170,25 @@ export default async function DashboardPage({
                         href={agentHref}
                         className="text-foreground font-medium hover:underline"
                       >
-                        {f.agentName}
+                        {i.agentName}
                       </Link>
-                      <StatusBadge status={f.status} />
+                      <StatusBadge status={i.status} />
                     </div>
                     <p className="text-foreground-weak line-clamp-2 text-xs leading-5">
-                      {f.feedbackText}
+                      {i.improvementText}
                     </p>
                   </div>
                   <div className="text-foreground-weak flex shrink-0 flex-col items-end gap-1 text-xs">
                     <span>
-                      <LocalTime iso={f.createdAt.toISOString()} />
+                      <LocalTime iso={i.createdAt.toISOString()} />
                     </span>
                     <div className="flex gap-2">
                       <Link href={runHref} className="hover:underline">
                         Run
                       </Link>
-                      {f.prUrl && (
+                      {i.prUrl && (
                         <a
-                          href={f.prUrl}
+                          href={i.prUrl}
                           target="_blank"
                           rel="noreferrer noopener"
                           className="hover:underline"
@@ -237,7 +237,7 @@ const ACCENT_CLASS: Record<"green" | "blue" | "gray" | "red", string> = {
   red: "text-sentiment-negative",
 };
 
-function StatusBadge({ status }: { status: FeedbackStatus }) {
+function StatusBadge({ status }: { status: ImprovementStatus }) {
   switch (status) {
     case "submitted":
       return (
