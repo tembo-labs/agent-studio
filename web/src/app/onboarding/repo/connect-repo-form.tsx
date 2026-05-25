@@ -37,7 +37,7 @@ export function ConnectRepoForm({ workspaceSlug }: { workspaceSlug: string }) {
           disabled={pending}
           placeholder="github.com/owner/repo"
         />
-        <p className="text-foreground-muted text-xs">
+        <p className="text-foreground-muted text-sm">
           The repo where this workspace&apos;s agent definitions will live.
         </p>
       </div>
@@ -56,12 +56,57 @@ export function ConnectRepoForm({ workspaceSlug }: { workspaceSlug: string }) {
           disabled={pending}
           placeholder="ghp_… or github_pat_…"
         />
-        <p className="text-foreground-muted text-xs">
-          Needs read + write on this repo. Classic tokens want the{" "}
-          <code className="bg-surface rounded px-1 py-0.5">repo</code> scope;
-          fine-grained tokens want <em>Contents: read &amp; write</em>. Stored
-          encrypted at rest.
-        </p>
+        <div className="text-foreground-muted space-y-2 text-sm">
+          <p>Stored encrypted at rest. Needs read + write on this repo.</p>
+          <p>
+            <strong className="text-foreground-weak font-medium">
+              Don&apos;t have one yet?
+            </strong>{" "}
+            Create a fine-grained token at{" "}
+            <a
+              href="https://github.com/settings/personal-access-tokens/new"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-foreground-weak hover:text-foreground underline underline-offset-2"
+            >
+              github.com/settings/personal-access-tokens/new
+            </a>
+            :
+          </p>
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>
+              <strong className="text-foreground-weak font-medium">
+                Repository access
+              </strong>{" "}
+              → <em>Only select repositories</em> → pick this repo.
+            </li>
+            <li>
+              <strong className="text-foreground-weak font-medium">
+                Repository permissions
+              </strong>{" "}
+              →{" "}
+              <code className="bg-surface rounded px-1 py-0.5 text-xs">
+                Contents: Read and write
+              </code>
+              .
+            </li>
+            <li>Set an expiration that fits your org&apos;s policy, then generate.</li>
+          </ol>
+          <p>
+            Classic tokens work too — use{" "}
+            <a
+              href="https://github.com/settings/tokens/new"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-foreground-weak hover:text-foreground underline underline-offset-2"
+            >
+              github.com/settings/tokens/new
+            </a>{" "}
+            with the{" "}
+            <code className="bg-surface rounded px-1 py-0.5 text-xs">repo</code>{" "}
+            scope.
+          </p>
+        </div>
       </div>
 
       {state.error && (
