@@ -196,6 +196,46 @@ Governance personas (Compliance Stakeholder, Org Admin) live in [v0.4 (Governanc
 
 ---
 
+## US-0.3-13b — HITL pause/resume
+
+**As an** Operator, **I want** an agent to be able to pause for human input on a step and resume once a human responds, **so that** sensitive steps stay in human control. *Originally [v0.2 US-06](../0.2/USER_STORIES.md#us-02-06--basic-hitl-pauseresume-moved-to-v03); moved here so pause/resume ships in lockstep with rich forms ([US-0.3-01](#us-03-01--rich-hitl-forms)) instead of as a basic v0.2 surface that v0.3 immediately rewrites.*
+
+**Acceptance Criteria**
+- A run can enter a `paused` state on a step that requests human input. The pause prompt + the form schema the operator should fill out are persisted on the run.
+- Resumed runs continue from the same step with the structured human response available in run state.
+- A paused run survives a TAS restart and remains resumable.
+- Default auto-cancel for paused runs is 24h, configurable per agent.
+- The paused run appears in the per-workspace tasks inbox ([US-0.3-07](#us-03-07--human-tasks-inbox)) with the form ready to fill.
+
+---
+
+## US-0.3-14 — Connect a third-party system via OAuth
+
+**As a** Workspace Admin, **I want** to connect a third-party system (e.g. Gmail, Slack, Notion) once per workspace and have agents use that connection without re-prompting, **so that** agents can read from / write to external systems with my consent and no per-run auth dance.
+
+**Acceptance Criteria**
+- Available connections are declared as data: `connections/<name>.yaml` in the workspace repo. Each file specifies the authorize URL, token URL, scopes, client-id/secret env names, and (where applicable) an MCP server URL the runner wires up at exec time.
+- Workspace settings exposes a "Connections" tab listing every declared connection with a "Connect / Disconnect" affordance.
+- The OAuth flow is the standard 2.0 + PKCE dance for the common case; named handlers (`google`, `slack`, `microsoft`) cover providers with documented deviations from the spec.
+- Access tokens and refresh tokens are stored encrypted in `workspace_secret` using the existing AES-GCM master key.
+- A background job refreshes tokens before expiry so connections survive past the 1-hour-ish default access-token TTL.
+- Agent files declare which connections they need (`connections: [gmail]`); the agent detail page surfaces missing connections with an actionable "Connect →" call to action and disables Run-now until the connection exists.
+
+---
+
+## US-0.3-15 — Event-driven trigger (webhook)
+
+**As an** Ops Lead, **I want** to attach an agent to a webhook event from a connected system (e.g. GitHub PR opened, Stripe payment failed, Slack mention) instead of a cron schedule, **so that** the agent fires in response to real activity. *Originally [v0.2 US-08](../0.2/USER_STORIES.md#us-02-08--event-driven-trigger-moved-to-v03); moved here because it depends on the [Connections](#us-03-14--connect-a-third-party-system-via-oauth) substrate.*
+
+**Acceptance Criteria**
+- Webhook receiver at `/api/hooks/<workspace>/<connection>` with per-workspace HMAC-SHA256 signature verification (secret stored in `workspace_secret`).
+- An automation row can carry `trigger_kind = 'event'` plus an event filter (JSONLogic against the event payload).
+- A run produced by an event trigger appears in the run list with `trigger='event'` and a link back to the originating payload (e.g. PR number, Stripe event id).
+- The trigger surface in the agent list and topology map renders the trigger as a single human-readable string (`"Every 5 min"`, `"On PR open"`, `"Manual"`) — the underlying cron expression or event filter is not exposed to read-only views.
+- Replays + drops: duplicate events (matching event id within a configurable window) are deduplicated; unmatched payloads return 204 with no run.
+
+---
+
 ## Stretch (Considered, Deferred)
 
 - AV scanning on file uploads — pilot-feedback bucket.

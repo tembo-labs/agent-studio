@@ -23,7 +23,8 @@ authoring before runs are solid.
 
 ## [Phase 0.2 — Authoring velocity](./context/0.2/) · *Chat to PR*
 
-> **In progress.** See [`CHANGELOG.md`](./CHANGELOG.md) for what has landed.
+> **Shipped May 2026.** See [`CHANGELOG.md`](./CHANGELOG.md) for the
+> full list of what landed.
 
 Build the loop that lets a non-engineer change an agent without an
 engineering queue. They describe the change in chat; a Tembo coding agent

@@ -42,8 +42,8 @@ compilers.
 
 ## Current state
 
-Today (v0.2, in progress on top of the v0.1 foundation shipped in May
-2026) you can:
+Today (v0.2 shipped May 2026 on top of the v0.1 foundation from earlier in
+the month) you can:
 
 - Self-host the whole stack via `docker compose up`.
 - Sign in with Google and connect a GitHub repository as the workspace's

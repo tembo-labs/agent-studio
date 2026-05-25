@@ -68,15 +68,9 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 
 ---
 
-## US-0.2-06 — Basic HITL pause/resume
+## US-0.2-06 — Basic HITL pause/resume *(moved to v0.3)*
 
-**As an** Operator, **I want** an agent to be able to pause for human input and resume from a simple UI, **so that** sensitive steps stay in human control.
-
-**Acceptance Criteria**
-- A paused run shows the pause prompt and a free-text response (or confirmation) action.
-- Resumed runs continue from the same step with the human response available in run state.
-- A paused run survives a TAS restart and remains pausable.
-- Default auto-cancel for paused runs is 24h, configurable per agent.
+Originally scoped as a "basic" pause + free-text resume in v0.2, with v0.3 adding rich forms on top. **Moved to [v0.3](../0.3/)** because splitting HITL across two phases meant v0.3 would have to immediately rewrite the v0.2 surface. Better to ship one cohesive HITL story (pause/resume + rich forms) in v0.3 — see v0.3's HITL stories.
 
 ---
 
@@ -90,16 +84,9 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 
 ---
 
-## US-0.2-08 — Event-driven trigger ("On PR open" and friends)
+## US-0.2-08 — Event-driven trigger *(moved to v0.3)*
 
-**As an** Ops Lead, **I want** to attach an agent to an event in a connected system (e.g. "on PR open", "on incoming webhook") instead of a cron schedule, **so that** the agent fires in response to real activity rather than on a fixed wall-clock cadence.
-
-**Acceptance Criteria**
-- An agent's trigger may be one of `manual`, `schedule` (cron, [US-0.2-05](#us-02-05--recurring-schedules)), or `event` (event source + filter).
-- At least one event source ships in v0.2: `github` with the `pull_request.opened` event. Additional sources are open questions for v0.3.
-- The event trigger is configurable per agent and respects the same per-agent PR policy ([US-0.2-03](#us-02-03--per-agent-pr-policy)) for any change to its trigger configuration.
-- A run produced by an event trigger appears in the run list with a `trigger=event` indicator and a link back to the originating event payload (e.g. PR number).
-- The trigger surface in the agent list and topology map renders the trigger as a single human-readable string (`"Every 5 min"`, `"On PR open"`, `"Manual"`) — the underlying cron expression or event filter is not exposed to read-only views.
+Originally scoped for v0.2 with `github.pull_request.opened` as the seed event source. **Moved to [v0.3](../0.3/)** because real event triggers depend on a generic **Connections** concept (per-workspace OAuth tokens, webhook signing secrets, signature verification) that v0.3 owns. Building event triggers in v0.2 against a one-off github-only path would create a snowflake the v0.3 work would have to unpick. See `v0.3` user stories for the proper shape.
 
 ---
 
@@ -108,4 +95,3 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 - Rich HITL forms with conditional fields and uploads — explicitly v0.3.
 - Behavioral diff or test-coverage signals on the PR — v0.3 open question.
 - Cross-repo agent edits — past v0.4 unless a customer blocks on it.
-- A library of event sources beyond `github` (Slack messages, inbound email, generic webhook) — promising; gather pilot signal before v0.3 promotes any of them.

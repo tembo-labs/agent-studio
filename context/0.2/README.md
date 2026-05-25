@@ -28,7 +28,7 @@ v0.2 introduces **chat-to-PR authoring**:
 
 Organizations choose the trust level per agent: **review-required** for anything customer-facing, **YOLO auto-merge on green CI** for low-stakes internal automations.
 
-This phase also adds **basic scheduling** (cron-like recurrence) and **basic HITL pause/resume** so the authored agents have somewhere to go.
+This phase also adds **basic scheduling** (cron-like recurrence) so the authored agents have somewhere to go. *(HITL pause/resume was originally scoped for v0.2 too; moved to [v0.3](../0.3/) where it merges cleanly with the rich-HITL-forms work.)*
 
 ## What Ships in v0.2
 
@@ -36,7 +36,7 @@ This phase also adds **basic scheduling** (cron-like recurrence) and **basic HIT
 - **Chat-to-edit.** "Change behavior Y in the inbox-triage agent" → targeted diff PR.
 - **PR policy control.** Per-agent and per-workspace defaults: review-required vs auto-merge-on-green.
 - **Basic recurring schedules.** Cron expressions on a per-agent basis.
-- **Basic HITL pause/resume.** An agent can pause for human input on a step; a UI lets a human resume with a one-line response or a confirmation.
+- *(Moved to [v0.3](../0.3/): basic HITL pause/resume. Merged into the rich-HITL-forms scope so we don't ship a v0.2-shaped pause/resume that v0.3 has to immediately rewrite.)*
 
 ## Out of Scope for v0.2
 
@@ -57,7 +57,6 @@ Convert conversational intent into governed source updates **without** asking no
 - **PR creation.** Standard repo provider APIs (GitHub at v0.2; GitLab/self-hosted on the v0.3 open-questions list).
 - **Policy enforcement.** Auto-merge only triggers on green CI **and** when the policy allows it for that agent. There is no global override that bypasses an agent's own setting.
 - **Schedules.** Workspace-scoped scheduler; runs go through the same execution path as manual runs, just with a different trigger.
-- **HITL pause/resume.** Pauses persist across restarts. A paused run holds resources only as configured; default is a 24h auto-cancel with notification.
 
 ## Customer Quote (Drafted)
 
@@ -73,8 +72,8 @@ Because the PR is the entire reason a non-engineer's change is safe to merge. Di
 ### Is YOLO auto-merge mandatory?
 No, and we expect most regulated customers to keep it off for customer-facing agents. It's there for internal-only automations where review friction outweighs review value.
 
-### What does "basic" HITL mean?
-A pause step + a free-text or confirmation resume. v0.3 adds conditional fields, file uploads, and previews. If you need those at v0.2, the workaround is to put a link in the pause message and resume after the user does the work elsewhere.
+### Where did HITL pause/resume go?
+Moved to [v0.3](../0.3/). The original v0.2 plan was a "basic" pause step + free-text resume, with v0.3 adding rich forms on top. Splitting it across two phases meant v0.3 would have to immediately rewrite the v0.2 surface — so we now ship one cohesive HITL story in v0.3.
 
 ### Can users still edit definitions directly in the repo?
 Yes. Chat is one authoring path; a direct PR from an engineer is another. Both flow through the same review policy.
@@ -87,7 +86,7 @@ The PR is opened with a clear "I could not complete this — here's what I tried
 - [ ] A non-engineer can produce a merged PR end-to-end from a chat session without engineering intervention, at least once per pilot customer.
 - [ ] Auto-merge policy works correctly on at least one regulated customer's repo with their CODEOWNERS rules.
 - [ ] Median time from "user describes change in chat" to "PR opened" is under 5 minutes for typical small edits.
-- [ ] Scheduled runs and HITL pause/resume both work across a TAS restart.
+- [ ] Scheduled runs survive a TAS restart.
 
 ## Open Questions Before v0.3
 
@@ -95,6 +94,6 @@ The PR is opened with a clear "I could not complete this — here's what I tried
 - What additional review signals (test coverage, lint, behavioral diff) should we surface on the PR before v0.3 governance lands?
 - Should chat sessions themselves be persisted as part of the audit trail, or only the PR they produce?
 - How do we communicate to a chat user that their request crosses a high-risk threshold and needs a human review even under YOLO policy?
-- Event triggers ship in v0.2 with `github.pull_request.opened` ([US-0.2-08](./USER_STORIES.md#us-02-08--event-driven-trigger-on-pr-open-and-friends)). Which additional event sources are worth promoting to v0.2 vs. left for v0.3 (e.g. Slack mentions, inbound email, generic webhook)?
+- *(Resolved — moved to v0.3.)* Event-driven triggers were originally scoped for v0.2 with `github.pull_request.opened` as the seed source. Moved to [v0.3](../0.3/) because real event triggers depend on a generic **Connections** concept (per-workspace OAuth tokens, webhook signing secrets, signature verification) — and Connections is a v0.3+ deliverable. Building event triggers in v0.2 against a one-off github-only path would create a snowflake that the v0.3 work would have to unpick.
 - The agent list and topology map render an agent's trigger as a single human-readable string ("Every 5 min", "On PR open"). Where is this string computed — at write time when the cron / event filter is saved, or at render time? (Affects how we handle malformed cron strings and renamed event sources.)
 - The v0.3 mockup launches the chat-to-PR loop from a per-agent modal. Does v0.2 need to ship the global chat surface and the per-agent entry point simultaneously, or is the per-agent surface acceptable as v0.3?

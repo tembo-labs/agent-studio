@@ -17,11 +17,12 @@ Without these, the v0.2 authoring win is real but the operator experience around
 
 v0.3 is the operational-surface release. It adds five interlocking capabilities, all targeted at *day two*:
 
-1. **Rich HITL forms.** Multi-field forms with conditional logic, file uploads, image/PDF preview, validation, and structured response persistence — plus a set of pre-built archetypes for the workflows we actually see (email, deal review, social outreach, scheduling, content approval).
+1. **HITL pause/resume + rich forms.** Agents can pause for human input on a step; a UI lets a human resume with a structured response. The form layer supports multi-field structure, conditional logic, file uploads, image/PDF preview, validation, and structured response persistence — plus a set of pre-built archetypes for the workflows we actually see (email, deal review, social outreach, scheduling, content approval). *Pause/resume was originally [v0.2 US-06](../0.2/USER_STORIES.md#us-02-06--basic-hitl-pauseresume-moved-to-v03); moved here so we ship one cohesive HITL story instead of a basic v0.2 surface that v0.3 immediately replaces.*
 2. **Per-agent operational dashboards.** Run history, revision history, active human tasks, error trends, and SLA-relevant counters per agent — built so that triage starts on one screen, not in raw logs.
 3. **Workspace-wide triage surfaces.** A growth dashboard, an agent inventory, a tasks inbox, a topology map, and a log explorer — all scoped to the workspace, all reading from the same source of truth as the per-agent views.
-4. **A per-agent chat configuration entry point.** The v0.2 chat-to-PR loop is reachable from every agent's detail page, with the agent identity already in context.
-5. **Failure investigation in three clicks.** A failed run reaches its triggering revision, the most recent human action, and similar past failures without leaving the page.
+4. **Connections + event triggers.** A generic OAuth + token-storage framework so an agent can read from / write to third-party systems (Gmail, Slack, Notion, GitHub) — plus event-driven triggers (webhook receivers with signature verification) so agents fire on real activity, not just a cron. *Originally [v0.2 US-08](../0.2/USER_STORIES.md#us-02-08--event-driven-trigger-moved-to-v03); moved here because event triggers depend on the Connections substrate.*
+5. **A per-agent chat configuration entry point.** The v0.2 chat-to-PR loop is reachable from every agent's detail page, with the agent identity already in context.
+6. **Failure investigation in three clicks.** A failed run reaches its triggering revision, the most recent human action, and similar past failures without leaving the page.
 
 ## What Ships in v0.3
 
@@ -31,6 +32,8 @@ v0.3 is the operational-surface release. It adds five interlocking capabilities,
 - **Agent inventory + topology map + tasks inbox + log explorer.** Workspace-scoped triage surfaces that share the agent state model — no separate "map config" or "inbox config" to drift.
 - **Failure investigation surface.** From a failed run, surface the last human action, the most recent agent change, and similar past failures — without leaving the page.
 - **Per-agent chat configuration modal.** The v0.2 chat-to-PR authoring loop is launchable from every agent's detail page, with the agent already in context.
+- **Connections framework.** Data-driven OAuth: each provider declared in `connections/*.yaml` in the workspace repo (authorize URL, token URL, scopes, client-id/secret env names, MCP server URL). Generic OAuth 2.0 + PKCE flow handles authorize → callback → token + refresh-token storage encrypted in `workspace_secret`. A small set of named handlers (`google`, `slack`, `microsoft`) covers the non-standard outliers.
+- **Event triggers.** A webhook receiver at `/api/hooks/:workspace/:connection` with HMAC-SHA256 signature verification using a per-workspace secret. An agent's automation row gains `trigger_kind = 'event'` plus an event filter (event source + filter expression). A run fired from an event lands with `trigger='event'` and a link back to the originating payload.
 
 ## Out of Scope for v0.3
 

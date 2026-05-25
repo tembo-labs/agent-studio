@@ -67,6 +67,9 @@ export async function runNowAction(
 ): Promise<RunNowFormState> {
   const slug = String(formData.get("workspace") ?? "");
   const agentName = String(formData.get("agent") ?? "");
+  // Optional user input. Empty preserves the prior behavior (a "no
+  // input" run that just exercises the agent's instructions).
+  const userMessage = String(formData.get("user_message") ?? "");
 
   const session = await getServerSession();
   if (!session) notFound();
@@ -114,6 +117,7 @@ export async function runNowAction(
       framework,
       specContent: found.raw,
       specFormat: fileFormat,
+      userMessage,
     });
     runId = res.runId;
   } catch (err) {
