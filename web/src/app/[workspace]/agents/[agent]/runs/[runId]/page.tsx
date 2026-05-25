@@ -11,6 +11,7 @@ import { getRun, type RunRecord } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
 
+import { CopyOutputButton } from "./copy-output-button";
 import { ImproveForm } from "./improve-form";
 import { RunPoller } from "./run-poller";
 
@@ -155,9 +156,14 @@ export default async function RunDetailPage({
           <p className="text-foreground-weak text-sm">Running…</p>
         )}
         {run.output && (
-          <pre className="bg-surface-raised border-border text-foreground overflow-x-auto whitespace-pre-wrap rounded-lg border p-4 text-sm leading-6">
-            {stripStopReason(run.output)}
-          </pre>
+          <div className="bg-surface-raised border-border group relative overflow-hidden rounded-lg border">
+            <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+              <CopyOutputButton text={stripStopReason(run.output)} />
+            </div>
+            <pre className="text-foreground overflow-x-auto whitespace-pre-wrap p-4 text-sm leading-6">
+              {stripStopReason(run.output)}
+            </pre>
+          </div>
         )}
         {run.status === "failed" && run.errorMessage && (
           <FailedReason run={run} />
