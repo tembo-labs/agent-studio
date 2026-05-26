@@ -22,19 +22,49 @@ import { Composio } from "@composio/core";
 // Composio isolates connections across workspaces sharing one key
 // (and isn't security-critical because the API key is the boundary).
 
-// Toolkits surfaced in v0.3 basic mode. Composio supports hundreds
-// more; we widen this list as authoring guidance + agent patterns
-// catch up. Each slug is what Composio knows it as.
-export const COMPOSIO_TOOLKITS = ["slack", "googlesheets"] as const;
-export type ComposioToolkit = (typeof COMPOSIO_TOOLKITS)[number];
+// Composio toolkit identifiers are free-form strings — whatever
+// Composio's catalog uses (slack, googlesheets, gmail, notion,
+// github, …). TAS doesn't maintain an allowlist; agents declare
+// what they need in `connections:`, the Settings UI surfaces a
+// Connect button for each, and Composio's API rejects unknown
+// slugs at link time. Older versions of this file pinned the list
+// to a v0.3 starter set; that constraint actively blocked Tembo
+// from inventing new connections for legitimate use cases (e.g.
+// an agent that reads email needed `gmail`).
+export type ComposioToolkit = string;
 
-export const COMPOSIO_TOOLKIT_LABELS: Record<ComposioToolkit, string> = {
+// Curated display labels for the toolkits we surface most often.
+// Falls back to a title-cased slug for anything not in the table
+// (see toolkitLabel below).
+const COMPOSIO_TOOLKIT_LABEL_OVERRIDES: Record<string, string> = {
   slack: "Slack",
   googlesheets: "Google Sheets",
+  gmail: "Gmail",
+  googlecalendar: "Google Calendar",
+  googledrive: "Google Drive",
+  googledocs: "Google Docs",
+  notion: "Notion",
+  github: "GitHub",
+  linear: "Linear",
+  hubspot: "HubSpot",
+  salesforce: "Salesforce",
+  airtable: "Airtable",
+  asana: "Asana",
+  jira: "Jira",
 };
 
-export function isComposioToolkit(v: string): v is ComposioToolkit {
-  return (COMPOSIO_TOOLKITS as readonly string[]).includes(v);
+export function toolkitLabel(slug: string): string {
+  const override = COMPOSIO_TOOLKIT_LABEL_OVERRIDES[slug.toLowerCase()];
+  if (override) return override;
+  // Fallback: title-case the slug. "gmail" → "Gmail", "google_sheets"
+  // → "Google Sheets". Composio slugs are usually lowercase + no
+  // separator, so this is approximate; users can ask us to add an
+  // override entry if a slug renders ugly.
+  return slug
+    .split(/[_\-\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function makeClient(apiKey: string): Composio {

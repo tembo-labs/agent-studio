@@ -1,10 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getPublicOrigin } from "@/lib/config";
-import {
-  initiateConnection,
-  isComposioToolkit,
-} from "@/lib/composio";
+import { initiateConnection } from "@/lib/composio";
 import { signComposioState } from "@/lib/oauth-state";
 import { getServerSession } from "@/lib/session";
 import {
@@ -55,13 +52,16 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (!isComposioToolkit(toolkitRaw)) {
+  // Validate shape only — Composio's catalog decides what's a real
+  // toolkit. We let the SDK reject unknowns at link time with its
+  // own error, which is more informative than a stale local list.
+  const toolkit = toolkitRaw.trim().toLowerCase();
+  if (!/^[a-z0-9_-]+$/.test(toolkit)) {
     return NextResponse.json(
-      { error: `unsupported toolkit: ${toolkitRaw}` },
+      { error: `bad toolkit slug shape: ${toolkitRaw}` },
       { status: 400 },
     );
   }
-  const toolkit = toolkitRaw;
 
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) {

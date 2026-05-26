@@ -3,13 +3,10 @@ import { notFound } from "next/navigation";
 
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import {
-  isComposioToolkit,
-  type ComposioToolkit,
-} from "@/lib/composio";
+import { type ComposioToolkit } from "@/lib/composio";
 import { listComposioConnectionsForWorkspace } from "@/lib/composio-connections";
 import { getServerSession } from "@/lib/session";
-import { listDeletedAgents } from "@/lib/workspace-agents";
+import { listAgents, listDeletedAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
@@ -57,6 +54,7 @@ export default async function SettingsPage({
     repo,
     deletedAgents,
     composioConnections,
+    agentsListing,
   ] = await Promise.all([
     getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
     getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
@@ -65,7 +63,26 @@ export default async function SettingsPage({
     getWorkspaceRepo(workspace.id),
     listDeletedAgents(workspace.id),
     listComposioConnectionsForWorkspace(workspace.id),
+    listAgents(workspace.id),
   ]);
+
+  // Toolkits the workspace's agents declare via `connections:` —
+  // that's what populates the Connections section, not a hardcoded
+  // allowlist. Tolerated to fail (no repo, broken auth, etc.) so
+  // Settings still renders without the dynamic list when the agents
+  // can't be loaded; the section just shows an empty state.
+  const declaredToolkits: string[] = (() => {
+    if (!agentsListing.ok) return [];
+    const slugs = new Set<string>();
+    for (const a of agentsListing.agents) {
+      if (!a.ok) continue;
+      if (a.spec.framework !== "pydantic-agentspec") continue;
+      for (const slug of a.spec.connections) {
+        if (slug) slugs.add(slug.trim().toLowerCase());
+      }
+    }
+    return [...slugs];
+  })();
 
   // Composio callback bounces us here with ?composio=<toolkit>&result=ok|error.
   // We render an inline banner so the user sees a confirmation without
@@ -74,7 +91,8 @@ export default async function SettingsPage({
   const resultParam = typeof sp.result === "string" ? sp.result : undefined;
   const detailParam = typeof sp.detail === "string" ? sp.detail : undefined;
   const composioBanner =
-    composioParam && isComposioToolkit(composioParam) &&
+    composioParam &&
+    /^[a-z0-9_-]+$/.test(composioParam) &&
     (resultParam === "ok" || resultParam === "error")
       ? {
           toolkit: composioParam as ComposioToolkit,
@@ -183,6 +201,7 @@ export default async function SettingsPage({
             <ComposioConnectionsSection
               workspaceSlug={workspace.slug}
               connections={composioConnections}
+              declaredToolkits={declaredToolkits}
               composioEnabled={Boolean(composioPreview)}
               banner={composioBanner}
             />

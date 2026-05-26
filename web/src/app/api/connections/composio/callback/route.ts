@@ -1,10 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getPublicOrigin } from "@/lib/config";
-import {
-  findLatestActiveConnection,
-  isComposioToolkit,
-} from "@/lib/composio";
+import { findLatestActiveConnection } from "@/lib/composio";
 import { saveComposioConnection } from "@/lib/composio-connections";
 import { verifyComposioState } from "@/lib/oauth-state";
 import { getServerSession } from "@/lib/session";
@@ -56,12 +53,9 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (!isComposioToolkit(payload.toolkit)) {
-    return NextResponse.json(
-      { error: `state references unknown toolkit ${payload.toolkit}` },
-      { status: 400 },
-    );
-  }
+  // No allowlist check — TAS accepts any toolkit slug Composio
+  // accepted at link initiation. The state's signed payload is the
+  // trust boundary.
 
   const isMember = await userIsMember(payload.workspaceId, session.user.id);
   if (!isMember) {

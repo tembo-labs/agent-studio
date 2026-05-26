@@ -379,9 +379,15 @@ connections:
 Both forms can mix in the same file. A toolkit without an explicit
 tool list defaults to the loose behavior for that toolkit.
 
-Supported toolkit slugs in v0.3: \`slack\`, \`googlesheets\`. The
-list will widen as TAS surfaces more toolkits in Settings →
-Connections.
+**Toolkit slugs** are whatever Composio uses. Common ones:
+\`slack\`, \`gmail\`, \`googlesheets\`, \`googlecalendar\`,
+\`googledocs\`, \`googledrive\`, \`notion\`, \`github\`, \`linear\`,
+\`hubspot\`, \`salesforce\`, \`airtable\`, \`asana\`, \`jira\`. The
+full catalog (hundreds) lives at
+https://composio.dev/toolkits — anything there is reachable. TAS
+doesn't maintain an allowlist; declare whatever the agent needs.
+The user will see a Connect button for each declared toolkit under
+Settings → Connections.
 
 Studio rules:
 
