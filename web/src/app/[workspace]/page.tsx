@@ -19,10 +19,15 @@ export const dynamic = "force-dynamic";
 
 export default async function WorkspacePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspace: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { workspace: slug } = await params;
+  const sp = await searchParams;
+  const deletedAgentName =
+    typeof sp.deleted === "string" ? sp.deleted : null;
 
   const session = await getServerSession();
   if (!session) notFound();
@@ -67,33 +72,42 @@ export default async function WorkspacePage({
   const liveNames = new Set(validNames);
 
   const gridAgents: GridAgent[] = agentsResult.ok
-    ? agentsResult.agents.map((a): GridAgent => {
-        if (!a.ok) {
+    ? agentsResult.agents
+        // Defensive filter against the GitHub fetch cache returning
+        // a just-deleted file. ?deleted=<name> arrives via the post-
+        // delete redirect (see deleteAgentAction); even if the next
+        // listAgents call hasn't picked up the deletion yet, we hide
+        // the row so the user gets immediate visual confirmation.
+        .filter((a) =>
+          deletedAgentName && a.ok ? a.spec.name !== deletedAgentName : true,
+        )
+        .map((a): GridAgent => {
+          if (!a.ok) {
+            return {
+              ok: false,
+              path: a.path,
+              filename: a.filename,
+              error: a.error,
+              detail: a.detail,
+            };
+          }
+          const lastRun = latestRuns.get(a.spec.name) ?? null;
           return {
-            ok: false,
+            ok: true,
             path: a.path,
             filename: a.filename,
-            error: a.error,
-            detail: a.detail,
+            name: a.spec.name,
+            frameworkLabel: FRAMEWORK_LABELS[a.spec.framework],
+            model: a.spec.model ?? null,
+            detailHref: `/${workspace.slug}/agents/${encodeURIComponent(a.spec.name)}`,
+            lastRun: lastRun
+              ? {
+                  status: lastRun.status,
+                  createdAtIso: lastRun.createdAt.toISOString(),
+                }
+              : null,
           };
-        }
-        const lastRun = latestRuns.get(a.spec.name) ?? null;
-        return {
-          ok: true,
-          path: a.path,
-          filename: a.filename,
-          name: a.spec.name,
-          frameworkLabel: FRAMEWORK_LABELS[a.spec.framework],
-          model: a.spec.model ?? null,
-          detailHref: `/${workspace.slug}/agents/${encodeURIComponent(a.spec.name)}`,
-          lastRun: lastRun
-            ? {
-                status: lastRun.status,
-                createdAtIso: lastRun.createdAt.toISOString(),
-              }
-            : null,
-        };
-      })
+        })
     : [];
 
   // Prepend pending creates so they appear at the start of the grid —
@@ -126,6 +140,25 @@ export default async function WorkspacePage({
       </div>
 
       <hr className="border-[var(--color-border-weak)]" />
+
+      {deletedAgentName && (
+        <div className="border-sentiment-positive bg-[var(--color-sentiment-positive-subtle)] rounded-lg border px-3 py-2 text-sm">
+          <span className="text-foreground">
+            Deleted{" "}
+            <code className="bg-surface rounded px-1 py-0.5 text-xs">
+              {deletedAgentName}
+            </code>
+            . The file&apos;s gone from the repo; restore it from{" "}
+            <Link
+              href={`/${workspace.slug}/settings`}
+              className="text-foreground underline underline-offset-2"
+            >
+              Settings → Deleted agents
+            </Link>{" "}
+            if you change your mind.
+          </span>
+        </div>
+      )}
 
       {!apiKeyPreview && (
         <div className="bg-surface-raised border-border flex flex-col gap-2 rounded-lg border p-4">

@@ -351,46 +351,52 @@ Sheets, etc.). Each entry is a Composio toolkit slug. The Studio
 exposes the corresponding tools to the agent via an MCP toolset
 that the workspace's authorized Composio connections back.
 
-**Loose form** — gives the agent access to every tool in the
-toolkit. The model uses Composio's search meta-tool to find the
-right action at run time. Reasonable when an agent might need any
-of a toolkit's actions; **expensive when it really only uses one
-or two** (the model still pays for the discovery round trip).
+**Use the named-slot + narrow-tools form for every connection.**
+This is the canonical shape — it disambiguates which account the
+agent targets (so users can hold multiple Gmails / Slacks / etc.)
+and turns on the \`DIRECT_TOOLS\` preset so only the declared tool
+schemas land in the model's context (~10× cheaper input tokens
+per run vs the loose path's search-and-execute dance).
 
 \`\`\`yaml
 connections:
+  - gmail:
+      name: default
+      tools: [GMAIL_SEND_EMAIL]
+  - googlesheets:
+      name: default
+      tools: [GOOGLESHEETS_BATCH_GET]
+\`\`\`
+
+\`name: default\` is what a single-account workspace uses; pick
+something descriptive like \`work\` / \`personal\` / \`customer-support\`
+when the user holds multiple accounts of the same toolkit. Tool
+slugs come from each toolkit's page on
+https://composio.dev/toolkits (UPPER_SNAKE_CASE).
+
+**Shorter forms** that resolve to the same shape (use sparingly —
+prefer the explicit form above so future readers can grok the file
+without learning shortcut rules):
+
+\`\`\`yaml
+connections:
+  # Loose — all tools, default slot. The model has to discover
+  # actions via meta-tools at run time. Token cost is higher.
   - slack
-  - googlesheets
-\`\`\`
 
-**Narrow form** — declare exactly the tool slugs the agent calls.
-The Studio uses Composio's \`DIRECT_TOOLS\` preset, preloads only
-those schemas, and skips the discovery round trip. Significantly
-cheaper per run, and the model knows what tool to call without
-guessing. Prefer this when the agent's job is well-defined (e.g.
-"read this sheet and post to this channel").
-
-\`\`\`yaml
-connections:
+  # Narrow tools, default slot. Same DIRECT_TOOLS path as above.
   - slack: [SLACK_SEND_MESSAGE]
-  - googlesheets: [GOOGLESHEETS_BATCH_GET]
-\`\`\`
 
-**Named slots** — when the agent needs to disambiguate which of a
-user's multiple accounts to use (e.g. work vs personal Gmail), add
-a \`name\` field. Names are slug-ish strings the user picks when
-authorizing; "default" is reserved for the first connection of a
-type.
-
-\`\`\`yaml
-connections:
+  # Named slot, loose tools.
   - gmail: { name: work }
-  - gmail: { name: personal, tools: [GMAIL_SEND_EMAIL] }
+
+  # Verbose form — same as the canonical form above, single line.
+  - { type: slack, name: alt, tools: [SLACK_SEND_MESSAGE] }
 \`\`\`
 
-All three forms can mix in the same file. Anything without an
-explicit name uses the \`default\` slot for that user; anything
-without an explicit tools list runs in loose mode for that slot.
+Forms can mix in the same file. Anything without an explicit name
+uses the \`default\` slot for that user; anything without an
+explicit tools list runs in loose mode for that slot.
 
 **Toolkit slugs** are whatever Composio uses. Common ones:
 \`slack\`, \`gmail\`, \`googlesheets\`, \`googlecalendar\`,
