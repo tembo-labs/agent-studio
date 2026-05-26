@@ -245,15 +245,51 @@ output_schema:
   the filename (\`name: foo\` → \`foo.yaml\`). 2–64 chars, lowercase,
   digits, hyphens.
 - **\`model\`** (required) — format \`provider:model\`. Examples:
-  \`anthropic:claude-sonnet-4-6\`, \`openai:gpt-4o-mini\`,
-  \`openai:gpt-5.2\`. The provider's API key must be set under
-  the workspace's Settings → API keys.
+  \`anthropic:claude-opus-4-7\`, \`anthropic:claude-sonnet-4-6\`,
+  \`openai:gpt-5.2\`, \`openai:gpt-4o-mini\`. The provider's API key
+  must be set under the workspace's Settings → API keys. See
+  *Choosing a model* below for which to pick.
 - **\`description\`** (optional) — one-line summary. Shows in the
   TAS agent list.
 - **\`instructions\`** (required by TAS) — system prompt as a string
   or block scalar. Pydantic AI accepts a list of strings too, but
   TAS's parser currently only handles a single string. Use \`|\` for
   multi-line.
+
+### Choosing a model
+
+Model choice is a cost/reliability tradeoff. Default playbook:
+
+- **First-run + iterating: start on \`anthropic:claude-opus-4-7\`
+  for any agent that calls tools** (i.e. declares \`connections:\`).
+  Tool-using agents need to decide when to act without follow-up
+  questions, and lower-tier models (Sonnet, GPT-4o-mini) tend to
+  hedge — replying "would you like me to…" instead of executing.
+  Opus is more decisive out of the box, which makes it easier to
+  prove the agent works before you optimise.
+- **Once the agent runs reliably on Opus, try downgrading.**
+  \`anthropic:claude-sonnet-4-6\` is ~5× cheaper input, ~5× cheaper
+  output. Sonnet usually works fine when:
+    - the agent uses the narrow \`connections:\` form (so the model
+      sees specific tool slugs, not a search dance);
+    - the \`instructions:\` are imperative ("when invoked, do X")
+      rather than descriptive ("you can help with X");
+    - the agent has a single well-defined job rather than a vague
+      "be a helpful assistant about Y" role.
+  If Sonnet hedges on tool calls, go back to Opus and don't fight it.
+- **No tools? Sonnet is the right starting point** — the hedging
+  problem only shows up with tool use.
+- **OpenAI alternatives**: \`openai:gpt-5.2\` is roughly Opus-tier
+  for tool-use reliability; \`openai:gpt-4o-mini\` and
+  \`openai:gpt-4.1-mini\` are roughly Sonnet-tier. The Anthropic /
+  OpenAI choice is a separate axis from the tier — pick based on
+  which provider key the workspace has + which provider your team
+  is already auditing for governance.
+
+The runtime tracks \`tokens_input\`, \`tokens_output\`, and
+\`cost_usd\` per run, so the downgrade decision is a measurement,
+not a guess: run a handful of times on Opus, look at the Runs page
+Cost column, then try Sonnet and compare side-by-side.
 
 ### model_settings
 
