@@ -118,22 +118,28 @@ export function AppShell({
                 return (
                   <div
                     key={`${m.toolkit}:${m.agentName}:${i}`}
-                    className="flex items-center gap-2 rounded-md px-2 py-2 bg-[var(--color-sentiment-caution-subtle)]"
+                    className="flex items-start gap-2 rounded-md px-2 py-2 bg-[var(--color-sentiment-caution-subtle)]"
                   >
                     <IconExclamationTriangle
                       size={14}
-                      className="shrink-0 text-[var(--color-icon-sentiment-caution)]"
+                      className="mt-0.5 shrink-0 text-[var(--color-icon-sentiment-caution)]"
                     />
-                    <span className="min-w-0 flex-1 text-xs leading-tight text-[var(--color-foreground-sentiment-caution)]">
-                      <span className="font-semibold">
-                        {toolkitLabel(m.toolkit)}
-                      </span>{" "}
-                      for{" "}
-                      <span className="font-semibold">{m.agentName}</span>
-                    </span>
-                    <Button asChild variant="orange" size="small">
-                      <Link href={authorizeHref}>Connect</Link>
-                    </Button>
+                    {/* Stacked text + button so long agent or toolkit
+                        names wrap naturally instead of squeezing the
+                        action chip. Button aligns with the text on
+                        the left rather than the row edge. */}
+                    <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+                      <span className="text-xs leading-tight text-[var(--color-foreground-sentiment-caution)]">
+                        <span className="font-semibold">
+                          {toolkitLabel(m.toolkit)}
+                        </span>{" "}
+                        for{" "}
+                        <span className="font-semibold">{m.agentName}</span>
+                      </span>
+                      <Button asChild variant="orange" size="small">
+                        <Link href={authorizeHref}>Connect</Link>
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
