@@ -1,8 +1,10 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { SidebarNavItem } from "@/components/sidebar-nav-item";
 import { UserMenu } from "@/components/user-menu";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
+import { toolkitLabel } from "@/lib/composio";
 import { getInstanceName } from "@/lib/config";
 import type { Workspace } from "@/lib/workspace";
 import {
@@ -10,6 +12,7 @@ import {
   IconCalendarRepeat,
   IconChatBubbles,
   IconDashboardMiddle,
+  IconExclamationTriangle,
   IconHistory,
   IconSettingsSliderHor,
 } from "central-icons";
@@ -21,16 +24,35 @@ import {
 // no mobile drawer, no keyboard shortcuts) — those can land later
 // once we have routes that justify the surface area.
 
+type MissingConnection = {
+  toolkit: string;
+  agentName: string;
+};
+
 type Props = {
   workspace: Workspace;
   workspaces: { slug: string; name: string }[];
   user: { name?: string | null; email: string };
+  /**
+   * (toolkit, agent) pairs where an agent in this workspace declared
+   * a Composio toolkit the workspace hasn't authorized. Rendered as
+   * a list of "Connect X for Y" alerts in the sidebar — clicking
+   * jumps to Settings → Connections so the user can authorize.
+   */
+  missingConnections: MissingConnection[];
   children: ReactNode;
 };
 
-export function AppShell({ workspace, workspaces, user, children }: Props) {
+export function AppShell({
+  workspace,
+  workspaces,
+  user,
+  missingConnections,
+  children,
+}: Props) {
   const instanceName = getInstanceName();
   const home = `/${workspace.slug}`;
+  const settingsConnectionsHref = `${home}/settings#connections`;
 
   return (
     <div className="bg-surface flex min-h-screen">
@@ -80,6 +102,36 @@ export function AppShell({ workspace, workspaces, user, children }: Props) {
             icon={<IconSettingsSliderHor />}
           />
         </nav>
+
+        {missingConnections.length > 0 && (
+          <div className="border-border flex flex-col gap-1 border-t px-2 py-2">
+            <span className="text-foreground-muted px-2 pb-1 text-[10px] font-medium uppercase tracking-widest">
+              Action needed
+            </span>
+            {missingConnections.map((m, i) => (
+              <Link
+                key={`${m.toolkit}:${m.agentName}:${i}`}
+                href={settingsConnectionsHref}
+                className="hover:bg-interactive-state-hover group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors"
+              >
+                <IconExclamationTriangle
+                  size={14}
+                  className="mt-0.5 shrink-0 text-[var(--color-icon-sentiment-caution)]"
+                />
+                <span className="text-foreground-weak group-hover:text-foreground text-xs leading-tight">
+                  Connect{" "}
+                  <span className="text-foreground font-medium">
+                    {toolkitLabel(m.toolkit)}
+                  </span>{" "}
+                  for{" "}
+                  <span className="text-foreground font-medium">
+                    {m.agentName}
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
 
         <div className="border-border border-t px-2 py-2">
           <UserMenu name={user.name ?? null} email={user.email} />
