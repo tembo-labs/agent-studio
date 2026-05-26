@@ -45,6 +45,21 @@ pub struct PydanticArgs<'a> {
     pub openai_api_key: Option<&'a str>,
     /// Workspace's Anthropic API key, if set.
     pub anthropic_api_key: Option<&'a str>,
+    /// Workspace's Composio API key, if set. Surfaced to the Python
+    /// wrapper as `TAS_COMPOSIO_API_KEY`; the wrapper only uses it
+    /// when the agent's spec declares `connections:`.
+    pub composio_api_key: Option<&'a str>,
+    /// The Composio `user_id` to scope connections under. We use
+    /// the workspace UUID — Composio's per-user isolation is the
+    /// boundary between workspaces sharing one Composio key.
+    /// Surfaced as `TAS_COMPOSIO_USER_ID`.
+    pub composio_user_id: Option<&'a str>,
+    /// JSON-encoded `{toolkit_slug: composio_connection_id}` map for
+    /// the workspace's ACTIVE composio connections. Surfaced as
+    /// `TAS_COMPOSIO_CONNECTED_ACCOUNTS`. Without this the runtime
+    /// session reports the connections as inactive even though the
+    /// workspace authorized them.
+    pub composio_connected_accounts_json: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -120,6 +135,17 @@ pub async fn invoke(args: PydanticArgs<'_>) -> anyhow::Result<PydanticResult> {
     }
     if let Some(k) = args.anthropic_api_key {
         cmd.env("ANTHROPIC_API_KEY", k);
+    }
+    // Composio creds — only used by the wrapper when the agent's
+    // spec declares `connections:`. Always set both vars together
+    // (workspace_id has no value to the wrapper without the API key)
+    // or skip both.
+    if let (Some(key), Some(uid)) = (args.composio_api_key, args.composio_user_id) {
+        cmd.env("TAS_COMPOSIO_API_KEY", key);
+        cmd.env("TAS_COMPOSIO_USER_ID", uid);
+    }
+    if let Some(accounts_json) = args.composio_connected_accounts_json {
+        cmd.env("TAS_COMPOSIO_CONNECTED_ACCOUNTS", accounts_json);
     }
 
     let mut child = cmd.spawn().context("failed to spawn pydantic-ai wrapper")?;

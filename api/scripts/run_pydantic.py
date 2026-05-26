@@ -10,6 +10,12 @@ caller sets before spawn (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.).
 pydantic-ai picks them up from the provider's SDK conventionally —
 no constructor wiring needed.
 
+Composio connections: when the spec declares `connections:` and
+TAS_COMPOSIO_API_KEY + TAS_COMPOSIO_USER_ID are present in the
+environment, we ask Composio for a Tool Router session scoped to the
+declared toolkits and attach it to the Agent as an MCP toolset.
+That's how slack / google-sheets / etc. become callable.
+
 stdout protocol: free-form agent output, followed by a single
 sentinel line `__TAS_USAGE__:{...json...}` carrying usage counts
 when pydantic-ai reports them. The Rust runner strips the
@@ -22,6 +28,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 import traceback
 
@@ -69,12 +76,153 @@ def usage_payload(usage_obj) -> dict:
     return out
 
 
-def build_agent(spec: dict) -> Agent:
+def parse_connections(spec: dict) -> list[tuple[str, list[str]]]:
+    """Extract the `connections:` list from the spec.
+
+    Returns `[(toolkit_slug, [tool_slug, …])]`. An empty tool list
+    means "all tools from this toolkit" (loose mode — model uses
+    search/execute meta-tools at runtime). A non-empty list narrows
+    the session to exactly those tools, which lets us preload them
+    via DIRECT_TOOLS and skip the search dance entirely (much
+    cheaper per run).
+
+    Accepted shapes (all generate the same parsed output):
+
+        # Loose — all tools from the toolkit
+        connections:
+          - slack
+          - googlesheets
+
+        # Narrow — explicit tool slugs per toolkit
+        connections:
+          - slack:
+              tools: [SLACK_SEND_MESSAGE]
+          - googlesheets:
+              tools: [GOOGLESHEETS_BATCH_GET]
+
+        # Compact narrow form
+        connections:
+          - slack: [SLACK_SEND_MESSAGE]
+          - googlesheets: [GOOGLESHEETS_BATCH_GET]
+    """
+    raw = spec.get("connections")
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError(
+            "`connections:` must be a list of toolkit slugs "
+            "(e.g. `connections: [slack, googlesheets]`)"
+        )
+    out: list[tuple[str, list[str]]] = []
+    for item in raw:
+        if isinstance(item, str):
+            out.append((item.strip(), []))
+            continue
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"`connections:` entry must be a string or object, "
+                f"got {type(item).__name__}"
+            )
+        if len(item) == 1:
+            # Compact form: `{slack: [SLACK_SEND_MESSAGE]}` or
+            # `{slack: {tools: [SLACK_SEND_MESSAGE]}}`.
+            slug, body = next(iter(item.items()))
+            tools = _coerce_tools_value(body)
+            out.append((str(slug).strip(), tools))
+            continue
+        # Verbose form: `{type: slack, tools: [...]}`.
+        slug = item.get("type") or item.get("toolkit") or item.get("name")
+        if not isinstance(slug, str):
+            raise ValueError(
+                f"`connections:` entry has no toolkit slug: {item!r}"
+            )
+        tools = _coerce_tools_value(item.get("tools"))
+        out.append((slug.strip(), tools))
+    return [(slug, tools) for (slug, tools) in out if slug]
+
+
+def _coerce_tools_value(value) -> list[str]:
+    """Accept either a raw list (compact form) or a dict with a
+    `tools:` key (verbose form). Anything else means "all tools"."""
+    if isinstance(value, list):
+        return [str(t).strip() for t in value if isinstance(t, str) and t.strip()]
+    if isinstance(value, dict):
+        inner = value.get("tools")
+        if isinstance(inner, list):
+            return [str(t).strip() for t in inner if isinstance(t, str) and t.strip()]
+    return []
+
+
+COMPOSIO_TOOL_USE_PREAMBLE_LOOSE = """\
+You are an automated agent running inside Tembo Agent Studio. \
+This run was triggered by a user or a schedule — it is not an \
+interactive chat. When you reply, your message goes into a run log \
+the user reviews later; nobody is on the other end to answer \
+follow-up questions in real time.
+
+You have these Composio tool-router meta-tools available:
+
+- `COMPOSIO_SEARCH_TOOLS` — find specific tools by natural-language \
+description.
+- `COMPOSIO_GET_TOOL_SCHEMAS` — fetch the input schema for one or more \
+tool slugs.
+- `COMPOSIO_MULTI_EXECUTE_TOOL` — invoke one or more tools.
+
+Authorized toolkits for this agent: {toolkits}. The workspace has \
+already authorized these connections; do not ask the user to authorize \
+anything.
+
+Default behaviour: read your agent instructions below, search for the \
+tools you need, execute them, and reply with a short summary of what \
+happened. Treat any user message (including an empty one) as "go do \
+the job"; the instructions below tell you what the job is.
+
+--- Agent instructions ---
+"""
+
+COMPOSIO_TOOL_USE_PREAMBLE_DIRECT = """\
+You are an automated agent running inside Tembo Agent Studio. \
+This run was triggered by a user or a schedule — it is not an \
+interactive chat. When you reply, your message goes into a run log \
+the user reviews later; nobody is on the other end to answer \
+follow-up questions in real time.
+
+The tools you need are already attached to this session — call them \
+directly by name.
+
+Authorized toolkits for this agent: {toolkits}. The workspace has \
+already authorized these connections; do not ask the user to authorize \
+anything.
+
+Default behaviour: read your agent instructions below, call the \
+attached tools to do the job, and reply with a short summary of what \
+happened. Treat any user message (including an empty one) as "go do \
+the job"; the instructions below tell you what the job is.
+
+--- Agent instructions ---
+"""
+
+
+def build_agent(
+    spec: dict,
+    toolsets: list | None = None,
+    connections: list[str] | None = None,
+    direct_tools: bool = False,
+) -> Agent:
     """Construct a pydantic_ai.Agent from a TAS AgentSpec dict.
 
-    pydantic-ai 1.5.0 has no `Agent.from_spec` / `from_file` factory
+    pydantic-ai 1.x has no `Agent.from_spec` / `from_file` factory
     (despite some upstream docs still referencing it), so we hand-map
     the AgentSpec fields onto the Agent(...) constructor kwargs.
+
+    `toolsets` is the Composio MCP toolset list when the agent
+    declared `connections:`; otherwise None (no tools). When
+    connections are present, we prepend an explanatory preamble to
+    the agent's instructions so the model knows the Composio meta
+    tools exist and how to use them — without this, models tend to
+    hedge ("just say the word") because the agent's own
+    instructions reference services in natural language and the
+    model can't connect them to the tool surface.
 
     Out of scope for this MVP path:
       - output_schema (would need to dynamically build a Pydantic
@@ -89,7 +237,16 @@ def build_agent(spec: dict) -> Agent:
     kwargs = {}
     instructions = spec.get("instructions")
     if isinstance(instructions, str) and instructions.strip():
-        kwargs["instructions"] = instructions
+        if connections:
+            template = (
+                COMPOSIO_TOOL_USE_PREAMBLE_DIRECT
+                if direct_tools
+                else COMPOSIO_TOOL_USE_PREAMBLE_LOOSE
+            )
+            preamble = template.format(toolkits=", ".join(connections))
+            kwargs["instructions"] = preamble + instructions
+        else:
+            kwargs["instructions"] = instructions
     name = spec.get("name")
     if isinstance(name, str) and name.strip():
         kwargs["name"] = name
@@ -102,20 +259,162 @@ def build_agent(spec: dict) -> Agent:
     instrument = spec.get("instrument")
     if isinstance(instrument, bool):
         kwargs["instrument"] = instrument
+    if toolsets:
+        kwargs["toolsets"] = toolsets
 
     return Agent(model, **kwargs)
 
 
+def build_composio_toolset(connections: list[tuple[str, list[str]]]):
+    """Create a Composio Tool Router session for the declared toolkits
+    and wrap it in an MCPServerStreamableHTTP so pydantic-ai can call
+    the tools.
+
+    Returns `(mcp, used_direct_tools)`. `used_direct_tools` is True
+    when every declared toolkit narrowed its tool list — in that case
+    we use the DIRECT_TOOLS preset, preload only those tool schemas,
+    and skip the search/execute meta-tools entirely (much cheaper per
+    run). Otherwise we fall back to the default Tool Router with the
+    search + multi-execute meta-tools (cheap input context, but the
+    model spends extra round trips discovering tools).
+
+    Returns `(None, False)` when `connections` is empty.
+    """
+    if not connections:
+        return (None, False)
+
+    api_key = os.environ.get("TAS_COMPOSIO_API_KEY")
+    user_id = os.environ.get("TAS_COMPOSIO_USER_ID")
+    if not api_key:
+        raise ValueError(
+            "Agent declares `connections:` but no Composio API key is "
+            "set for this workspace. Add it under Settings → Composio API key."
+        )
+    if not user_id:
+        raise ValueError(
+            "Agent declares `connections:` but the Composio user_id was "
+            "not provided by the runner (TAS_COMPOSIO_USER_ID missing)."
+        )
+
+    # Imports are deferred so workspaces that never use connections
+    # don't pay the import cost (and so a broken composio install
+    # doesn't crash agents that don't need it).
+    from composio import Composio
+    from pydantic_ai.mcp import MCPServerStreamableHTTP
+
+    # The Rust runner pre-resolves the workspace's active connections
+    # from workspace_composio_connection and ships them as a JSON map
+    # `{toolkit_slug: composio_connection_id}`. Composio's Tool Router
+    # session does NOT auto-discover the user's active connections
+    # when manage_connections=False — passing `connected_accounts`
+    # explicitly is what makes them show up as is_active in the
+    # session and therefore exposes their tools to the agent.
+    accounts_json = os.environ.get("TAS_COMPOSIO_CONNECTED_ACCOUNTS")
+    connected_accounts: dict[str, str] = {}
+    if accounts_json:
+        try:
+            parsed = json.loads(accounts_json)
+            if isinstance(parsed, dict):
+                connected_accounts = {
+                    str(k): str(v) for k, v in parsed.items() if isinstance(v, str)
+                }
+        except json.JSONDecodeError:
+            pass
+    toolkit_slugs = [slug for (slug, _) in connections]
+    missing = [t for t in toolkit_slugs if t not in connected_accounts]
+    if missing:
+        raise ValueError(
+            "Agent declares connections "
+            f"{missing!r} but the workspace has no active Composio "
+            "connection for them. Authorize them under Settings → "
+            "Connections and try again."
+        )
+
+    # Narrowed tools per toolkit — only included when the agent
+    # specified explicit slugs. When all toolkits are narrowed we
+    # also flip to DIRECT_TOOLS so only those schemas land in the
+    # model's context (no search/execute meta-tools, no extra round
+    # trip).
+    tools_param: dict[str, list[str]] = {
+        slug: tools for (slug, tools) in connections if tools
+    }
+    all_narrowed = bool(connections) and all(bool(tools) for (_, tools) in connections)
+
+    composio = Composio(api_key=api_key)
+    create_kwargs: dict = {
+        "user_id": user_id,
+        "toolkits": toolkit_slugs,
+        "connected_accounts": {t: connected_accounts[t] for t in toolkit_slugs},
+        "manage_connections": False,
+        "workbench": {"enable": False},
+    }
+    if tools_param:
+        create_kwargs["tools"] = tools_param
+    if all_narrowed:
+        from composio import SESSION_PRESET_DIRECT_TOOLS
+        create_kwargs["session_preset"] = SESSION_PRESET_DIRECT_TOOLS
+
+    session = composio.create(**create_kwargs)
+    mcp = MCPServerStreamableHTTP(
+        session.mcp.url,
+        headers={"x-api-key": api_key},
+    )
+    return (mcp, all_narrowed)
+
+
 async def run(spec: dict, user_message: str) -> None:
-    agent = build_agent(spec)
-    # run_sync would block the event loop; use the async path so
-    # we play nicely with pydantic-ai's internals.
-    result = await agent.run(user_message)
-    # `.output` is the model's structured result (string for default
-    # output_type=str, or a pydantic model otherwise). str() coerces
-    # the model case into something readable for the run row;
-    # downstream we can route structured output through a sentinel
-    # if a customer asks for it.
+    connections = parse_connections(spec)
+    toolsets: list = []
+    mcp, used_direct_tools = build_composio_toolset(connections)
+    if mcp is not None:
+        toolsets.append(mcp)
+
+    # Preamble framing differs between DIRECT_TOOLS (tools attached
+    # by name) and loose mode (model has to discover via meta-tools).
+    # Both variants share the "act, don't chat" instructions because
+    # Sonnet-tier models will hedge regardless of which path they're
+    # on without explicit imperative framing.
+    preamble_toolkits = (
+        [slug for (slug, _) in connections] if mcp is not None else None
+    )
+    agent = build_agent(
+        spec,
+        toolsets=toolsets or None,
+        connections=preamble_toolkits,
+        direct_tools=used_direct_tools,
+    )
+
+    # MCP toolsets are async context managers — pydantic-ai keeps the
+    # connection to Composio's MCP server alive for the duration of
+    # the run, then tears it down on exit.
+    if toolsets:
+        async with agent:
+            # Diagnostic: list the tools pydantic-ai actually exposes
+            # to the model after the MCP context is entered. Lands in
+            # the api container logs so we can tell from the outside
+            # whether the model had tools available at all when it
+            # decided to hedge.
+            try:
+                tool_names: list[str] = []
+                for ts in toolsets:
+                    if hasattr(ts, "list_tools"):
+                        listed = await ts.list_tools()
+                        for t in listed:
+                            name = getattr(t, "name", None) or (
+                                t.get("name") if isinstance(t, dict) else None
+                            )
+                            if name:
+                                tool_names.append(name)
+                sys.stderr.write(
+                    f"[tas] MCP toolset exposes {len(tool_names)} tools: "
+                    f"{tool_names[:10]}{'…' if len(tool_names) > 10 else ''}\n"
+                )
+            except Exception as e:
+                sys.stderr.write(f"[tas] list_tools probe failed: {e}\n")
+            result = await agent.run(user_message)
+    else:
+        result = await agent.run(user_message)
+
     sys.stdout.write(str(result.output))
     sys.stdout.write("\n")
     usage = usage_payload(getattr(result, "usage", None))
@@ -146,10 +445,17 @@ def main() -> int:
         sys.stderr.write(f"failed to parse spec: {e}\n")
         return 2
 
-    # Pydantic AI's run loop wants a non-empty prompt. Match the
-    # Rust-side default we used to use for the hand-rolled path so
-    # behavior doesn't shift for existing agents.
-    prompt = args.user_message if args.user_message else "Hello."
+    # Pydantic AI's run loop wants a non-empty prompt. When the user
+    # didn't supply one (manual "Run now" with empty dialog, or a
+    # scheduled automation that has no input message), send a
+    # directive instead of "Hello." — models treat "Hello." as an
+    # invitation to greet and chat. A neutral execution directive
+    # nudges them to read their instructions and act.
+    prompt = (
+        args.user_message
+        if args.user_message
+        else "Execute the job described in your instructions."
+    )
 
     try:
         asyncio.run(run(spec, prompt))

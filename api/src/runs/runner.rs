@@ -10,7 +10,9 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::runs::{cargo_ai, pydantic};
-use crate::workspace::{get_workspace_secret_plaintext, SecretKind};
+use crate::workspace::{
+    get_workspace_secret_plaintext, list_active_composio_connections, SecretKind,
+};
 use crate::AppState;
 
 #[derive(Debug, Clone, Copy)]
@@ -80,8 +82,14 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
 
     match run_inner(state, &ctx).await {
         Ok(outcome) => {
-            if let Err(e) =
-                mark_succeeded(state, ctx.run_id, &outcome.output, outcome.usage).await
+            if let Err(e) = mark_succeeded(
+                state,
+                ctx.run_id,
+                &outcome.output,
+                outcome.usage,
+                &ctx.model,
+            )
+            .await
             {
                 tracing::error!(run_id = %ctx.run_id, ?e, "mark_succeeded failed");
             }
@@ -223,6 +231,40 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
     )
     .await
     .ok();
+    // Composio key is optional — only needed if the agent's spec
+    // declares `connections:`. The Python wrapper enforces the
+    // "needed but missing" case with a clearer error than we could
+    // here without parsing the spec twice.
+    let composio_key = get_workspace_secret_plaintext(
+        &state.db,
+        &state.encryption_key,
+        ctx.workspace_id,
+        SecretKind::ComposioApiKey,
+    )
+    .await
+    .ok();
+    let composio_user_id = ctx.workspace_id.to_string();
+    // Pre-resolved `{toolkit_slug: composio_connection_id}` map for
+    // the workspace's ACTIVE composio connections. Composio's Tool
+    // Router session needs these passed explicitly when
+    // manage_connections=false; otherwise it sees them as inactive
+    // even though the user authorized them.
+    let composio_connected_accounts_json: Option<String> = if composio_key.is_some() {
+        let pairs = list_active_composio_connections(&state.db, ctx.workspace_id)
+            .await
+            .unwrap_or_default();
+        if pairs.is_empty() {
+            None
+        } else {
+            let map: serde_json::Map<String, serde_json::Value> = pairs
+                .into_iter()
+                .map(|(slug, id)| (slug, serde_json::Value::String(id)))
+                .collect();
+            Some(serde_json::Value::Object(map).to_string())
+        }
+    } else {
+        None
+    };
 
     if openai_key.is_none() && anthropic_key.is_none() {
         // Pydantic-ai would fail inside the subprocess with a less
@@ -241,6 +283,9 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
         user_message: &ctx.user_message,
         openai_api_key: openai_key.as_deref(),
         anthropic_api_key: anthropic_key.as_deref(),
+        composio_api_key: composio_key.as_deref(),
+        composio_user_id: composio_key.as_ref().map(|_| composio_user_id.as_str()),
+        composio_connected_accounts_json: composio_connected_accounts_json.as_deref(),
     })
     .await?;
 
@@ -327,20 +372,30 @@ async fn mark_succeeded(
     run_id: Uuid,
     output: &str,
     usage: Option<Usage>,
+    model: &str,
 ) -> anyhow::Result<()> {
     let (tokens_in, tokens_out) = match usage {
         Some(u) => (Some(u.input_tokens), Some(u.output_tokens)),
         None => (None, None),
     };
+    // Persist the cost estimate now, with the model + tokens
+    // already in hand, so the runs-list UI doesn't have to map
+    // model→rate on every render. None when usage is missing
+    // (cargo-ai) or the model isn't in our pricing table.
+    let cost_usd: Option<f64> = match (tokens_in, tokens_out) {
+        (Some(i), Some(o)) => crate::pricing::estimate_run_cost(model, i, o),
+        _ => None,
+    };
     sqlx::query(
         "UPDATE run SET status = 'succeeded', output = $1, completed_at = $2, \
-                        tokens_input = $3, tokens_output = $4 \
-                  WHERE id = $5",
+                        tokens_input = $3, tokens_output = $4, cost_usd = $5 \
+                  WHERE id = $6",
     )
     .bind(output)
     .bind(Utc::now())
     .bind(tokens_in)
     .bind(tokens_out)
+    .bind(cost_usd)
     .bind(run_id)
     .execute(&state.db)
     .await?;

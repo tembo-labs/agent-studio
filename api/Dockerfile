@@ -43,9 +43,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # version bumps go through PR review so we can vet the changelog.
 ENV PYDANTIC_AI_VENV=/opt/pydantic-ai
 ENV PYDANTIC_AI_PY="${PYDANTIC_AI_VENV}/bin/python3"
+# `[mcp]` pulls in the MCP client deps so MCPServerStreamableHTTP is
+# available — that's how Composio exposes its toolkits to pydantic-ai
+# at run time. `composio` is the Python SDK we use to spin up a
+# Composio session keyed by workspace + toolkit list and read the
+# MCP URL back. composio is unpinned for now while the SDK is still
+# stabilising; rev-up via PR once we want a known version.
 RUN python3 -m venv "${PYDANTIC_AI_VENV}" && \
     "${PYDANTIC_AI_VENV}/bin/pip" install --no-cache-dir \
-        pydantic-ai==1.102.0 pyyaml==6.0.2
+        'pydantic-ai[mcp]==1.102.0' pyyaml==6.0.2 composio
 
 COPY --from=builder /app/tas-api /usr/local/bin/tas-api
 COPY --from=builder /opt/cargo-ai/bin/cargo-ai /usr/local/bin/cargo-ai
