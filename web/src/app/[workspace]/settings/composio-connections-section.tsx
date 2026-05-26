@@ -2,12 +2,10 @@ import Link from "next/link";
 
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import {
-  COMPOSIO_TOOLKIT_LABEL_OVERRIDES,
-  toolkitLabel,
-} from "@/lib/composio";
+import { toolkitLabel, type CatalogToolkit } from "@/lib/composio";
 import { type WorkspaceComposioConnection } from "@/lib/composio-connections";
 
+import { ToolkitPicker } from "../connections/toolkit-picker";
 import { DisconnectComposioConnectionForm } from "./disconnect-composio-connection-form";
 
 // Settings → Connections (basic mode, Composio-backed, per-user).
@@ -27,6 +25,8 @@ type Props = {
   connections: WorkspaceComposioConnection[];
   /** (toolkit, name) pairs declared by agents in the connected repo. */
   declaredSlots: { toolkit: string; name: string }[];
+  /** Full Composio toolkit catalog for the "Add another" picker. */
+  catalog: CatalogToolkit[];
   composioEnabled: boolean;
   banner?: {
     toolkit: string;
@@ -41,6 +41,7 @@ export function ComposioConnectionsSection({
   workspaceSlug,
   connections,
   declaredSlots,
+  catalog,
   composioEnabled,
   banner,
 }: Props) {
@@ -150,7 +151,10 @@ export function ComposioConnectionsSection({
         )}
 
         {composioEnabled && (
-          <AddAnotherConnectionForm workspaceSlug={workspaceSlug} />
+          <AddAnotherConnectionForm
+            workspaceSlug={workspaceSlug}
+            catalog={catalog}
+          />
         )}
       </div>
     </Section>
@@ -161,13 +165,16 @@ export function ComposioConnectionsSection({
  * Pre-authorize a named connection slot without waiting on an agent
  * to declare it. The same /api/connections/composio/authorize route
  * the row-level "Connect" buttons use — this just lets the user
- * supply an ad-hoc (toolkit, name) pair. Plain HTML form, no JS
- * needed; the route handles shape validation.
+ * supply an ad-hoc (toolkit, name) pair. Form submits GET to the
+ * authorize route; toolkit picker is a client component that
+ * filters Composio's catalog.
  */
 function AddAnotherConnectionForm({
   workspaceSlug,
+  catalog,
 }: {
   workspaceSlug: string;
+  catalog: CatalogToolkit[];
 }) {
   return (
     <form
@@ -188,37 +195,14 @@ function AddAnotherConnectionForm({
         </span>
       </div>
       <div className="flex flex-wrap items-end gap-2">
-        <div className="flex min-w-[140px] flex-1 flex-col gap-1">
+        <div className="flex min-w-[200px] flex-1 flex-col gap-1">
           <label
             htmlFor="add-toolkit"
             className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
           >
             Toolkit
           </label>
-          {/* Datalist gives autocomplete from the curated label list
-              while still accepting any Composio slug — datalist
-              entries are suggestions, not constraints. */}
-          <input
-            id="add-toolkit"
-            name="toolkit"
-            type="text"
-            required
-            pattern="[a-z0-9_-]+"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="gmail"
-            list="composio-toolkit-suggestions"
-            className="bg-input border-border text-foreground rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)]"
-          />
-          <datalist id="composio-toolkit-suggestions">
-            {Object.entries(COMPOSIO_TOOLKIT_LABEL_OVERRIDES).map(
-              ([slug, label]) => (
-                <option key={slug} value={slug}>
-                  {label}
-                </option>
-              ),
-            )}
-          </datalist>
+          <ToolkitPicker fieldName="toolkit" catalog={catalog} />
         </div>
         <div className="flex min-w-[140px] flex-1 flex-col gap-1">
           <label

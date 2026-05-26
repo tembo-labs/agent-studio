@@ -10,6 +10,7 @@ import { getInstanceName } from "@/lib/config";
 import type { Workspace } from "@/lib/workspace";
 import {
   IconAgent,
+  IconApiConnection,
   IconCalendarRepeat,
   IconChatBubbles,
   IconDashboardMiddle,
@@ -103,6 +104,11 @@ export function AppShell({
             href={`${home}/improvements`}
             label="Improvements"
             icon={<IconChatBubbles />}
+          />
+          <SidebarNavItem
+            href={`${home}/connections`}
+            label="Connections"
+            icon={<IconApiConnection />}
           />
           <SidebarNavItem
             href={`${home}/settings`}

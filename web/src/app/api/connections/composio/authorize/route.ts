@@ -20,7 +20,7 @@ import {
 // The Composio API key is workspace-scoped — we fetch it from
 // workspace_secret here and pass through to the SDK wrapper.
 
-function settingsErrorRedirect(
+function connectionsErrorRedirect(
   _request: NextRequest,
   slug: string,
   toolkit: string,
@@ -30,11 +30,10 @@ function settingsErrorRedirect(
   // lands on the canonical host — docker bind-address drift can
   // otherwise leave them on 0.0.0.0:3000 where the session cookie
   // (bound to localhost) isn't sent and the workspace 404s.
-  const target = new URL(`/${slug}/settings`, getPublicOrigin());
+  const target = new URL(`/${slug}/connections`, getPublicOrigin());
   target.searchParams.set("composio", toolkit);
   target.searchParams.set("result", "error");
   target.searchParams.set("detail", detail.slice(0, 200));
-  target.hash = "connections";
   return NextResponse.redirect(target, 302);
 }
 
@@ -90,7 +89,7 @@ export async function GET(request: NextRequest) {
   // error instead of letting the SDK throw later.
   const preview = await getWorkspaceSecretPreview(workspace.id, "composio_api_key");
   if (!preview) {
-    return settingsErrorRedirect(
+    return connectionsErrorRedirect(
       request,
       workspace.slug,
       toolkit,
@@ -124,7 +123,7 @@ export async function GET(request: NextRequest) {
       callbackUrl: callbackUrl.toString(),
     });
   } catch (err) {
-    return settingsErrorRedirect(
+    return connectionsErrorRedirect(
       request,
       workspace.slug,
       toolkit,
@@ -133,7 +132,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (!link.redirectUrl) {
-    return settingsErrorRedirect(
+    return connectionsErrorRedirect(
       request,
       workspace.slug,
       toolkit,

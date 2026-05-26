@@ -3,10 +3,8 @@ import { notFound } from "next/navigation";
 
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import { type ComposioToolkit } from "@/lib/composio";
-import { listConnectionsForUser } from "@/lib/composio-connections";
 import { getServerSession } from "@/lib/session";
-import { listAgents, listDeletedAgents } from "@/lib/workspace-agents";
+import { listDeletedAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
@@ -14,7 +12,6 @@ import {
 } from "@/lib/workspace";
 
 import { ChangeModeSetting } from "./change-mode-setting";
-import { ComposioConnectionsSection } from "./composio-connections-section";
 import { DisconnectRepoForm } from "./disconnect-repo-form";
 import { FaviconPicker } from "./favicon-picker";
 import { RestoreAgentForm } from "./restore-agent-form";
@@ -22,6 +19,11 @@ import { SecretKeyForm } from "./secret-key-form";
 import { SyncGuidanceForm } from "./sync-guidance-form";
 import { ThemeSettings } from "./theme-settings";
 
+// Per-user Composio Connections live at /<workspace>/connections —
+// they're a personal action surface, not workspace config. The
+// workspace-level Composio API key form below stays in Settings
+// because it's a workspace credential like Tembo/Anthropic/OpenAI.
+//
 // Phase A's TAS-owned ConnectionsSection (./connections-section.tsx,
 // ./disconnect-connection-form.tsx, lib/connections.ts, and the
 // /api/connections/{slack,google} OAuth route handlers) is kept in
@@ -46,6 +48,9 @@ export default async function SettingsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
+  // Composio connections + the workspace's agents now live behind
+  // their own route at /<workspace>/connections — no need to fetch
+  // them on Settings anymore.
   const [
     temboPreview,
     anthropicPreview,
@@ -53,8 +58,6 @@ export default async function SettingsPage({
     composioPreview,
     repo,
     deletedAgents,
-    composioConnections,
-    agentsListing,
   ] = await Promise.all([
     getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
     getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
@@ -62,51 +65,11 @@ export default async function SettingsPage({
     getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
     getWorkspaceRepo(workspace.id),
     listDeletedAgents(workspace.id),
-    listConnectionsForUser(workspace.id, session.user.id),
-    listAgents(workspace.id),
   ]);
-
-  // Toolkits + slot names the workspace's agents declare. Drives the
-  // Connections section: each (toolkit, name) pair an agent wants
-  // gets surfaced for authorization by the current user. Tolerated
-  // to fail (no repo, broken auth, …) — the section shows an empty
-  // state in that case.
-  const declaredSlots: { toolkit: string; name: string }[] = (() => {
-    if (!agentsListing.ok) return [];
-    const seen = new Set<string>();
-    const out: { toolkit: string; name: string }[] = [];
-    for (const a of agentsListing.agents) {
-      if (!a.ok) continue;
-      if (a.spec.framework !== "pydantic-agentspec") continue;
-      for (const conn of a.spec.connections) {
-        const toolkit = conn.toolkit.trim().toLowerCase();
-        const name = conn.name.trim().toLowerCase() || "default";
-        if (!toolkit) continue;
-        const key = `${toolkit}:${name}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ toolkit, name });
-      }
-    }
-    return out;
-  })();
-
-  // Composio callback bounces us here with ?composio=<toolkit>&result=ok|error.
-  // We render an inline banner so the user sees a confirmation without
-  // an extra page hop.
-  const composioParam = typeof sp.composio === "string" ? sp.composio : undefined;
-  const resultParam = typeof sp.result === "string" ? sp.result : undefined;
-  const detailParam = typeof sp.detail === "string" ? sp.detail : undefined;
-  const composioBanner =
-    composioParam &&
-    /^[a-z0-9_-]+$/.test(composioParam) &&
-    (resultParam === "ok" || resultParam === "error")
-      ? {
-          toolkit: composioParam as ComposioToolkit,
-          result: resultParam as "ok" | "error",
-          detail: detailParam,
-        }
-      : undefined;
+  // sp is currently unused on Settings — keep it as a typed
+  // parameter so future ?banner=… style flows can land without
+  // re-plumbing the page signature.
+  void sp;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
@@ -205,21 +168,18 @@ export default async function SettingsPage({
           </div>
 
         <div className="pb-5 pt-8">
-            <ComposioConnectionsSection
-              workspaceSlug={workspace.slug}
-              connections={composioConnections}
-              declaredSlots={declaredSlots}
-              composioEnabled={Boolean(composioPreview)}
-              banner={composioBanner}
-            />
-          </div>
-
-        <div className="pb-5 pt-8">
             <Section
               title="Composio API key"
               description={
                 <>
-                  Required for the Connections section above. Get one at{" "}
+                  Workspace-level credential for the{" "}
+                  <Link
+                    href={`/${workspace.slug}/connections`}
+                    className="text-foreground underline underline-offset-2"
+                  >
+                    Connections
+                  </Link>{" "}
+                  page. Get one at{" "}
                   <a
                     href="https://app.composio.dev/developers"
                     target="_blank"
@@ -228,8 +188,7 @@ export default async function SettingsPage({
                   >
                     app.composio.dev/developers
                   </a>
-                  . Workspace-scoped — different teams can use separate Composio
-                  accounts.
+                  .
                 </>
               }
             >

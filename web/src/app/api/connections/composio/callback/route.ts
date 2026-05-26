@@ -13,11 +13,13 @@ import {
 
 // Composio finishes its OAuth dance and 302s the user back here. We
 // don't get the new connection's id directly — instead we ask Composio
-// for the latest ACTIVE connection for (userId=workspaceId, toolkit)
-// and cache that. Idempotent: if the user clicks "Reconnect" the
-// upsert in saveComposioConnection just replaces the previous row.
+// for the latest ACTIVE connection for (userId, toolkit) (with userId
+// resolved from the signed state, not request.session) and cache that.
+// Idempotent: if the user clicks "Reconnect" the upsert in
+// saveComposioConnection just replaces the previous row for that
+// (workspace, user, toolkit, name) slot.
 
-function backToSettings(
+function backToConnections(
   _request: NextRequest,
   slug: string,
   toolkit: string,
@@ -28,11 +30,10 @@ function backToSettings(
   // landing is on the canonical host even if Composio bounces the
   // browser to a request.url that resolved to 0.0.0.0 inside the
   // container.
-  const target = new URL(`/${slug}/settings`, getPublicOrigin());
+  const target = new URL(`/${slug}/connections`, getPublicOrigin());
   target.searchParams.set("composio", toolkit);
   target.searchParams.set("result", status);
   if (detail) target.searchParams.set("detail", detail.slice(0, 200));
-  target.hash = "connections";
   return NextResponse.redirect(target, 302);
 }
 
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
     "composio_api_key",
   );
   if (!preview) {
-    return backToSettings(
+    return backToConnections(
       request,
       payload.workspaceSlug,
       payload.toolkit,
@@ -85,7 +86,7 @@ export async function GET(request: NextRequest) {
 
   const composioError = request.nextUrl.searchParams.get("error");
   if (composioError) {
-    return backToSettings(
+    return backToConnections(
       request,
       payload.workspaceSlug,
       payload.toolkit,
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
   // be owned by whoever is currently logged in (and that should be
   // the same person who clicked Connect in the same browser tab).
   if (session.user.id !== payload.userId) {
-    return backToSettings(
+    return backToConnections(
       request,
       payload.workspaceSlug,
       payload.toolkit,
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
       toolkit: payload.toolkit,
     });
   } catch (err) {
-    return backToSettings(
+    return backToConnections(
       request,
       payload.workspaceSlug,
       payload.toolkit,
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (!latest) {
-    return backToSettings(
+    return backToConnections(
       request,
       payload.workspaceSlug,
       payload.toolkit,
@@ -147,5 +148,10 @@ export async function GET(request: NextRequest) {
     metadata: {},
   });
 
-  return backToSettings(request, payload.workspaceSlug, payload.toolkit, "ok");
+  return backToConnections(
+    request,
+    payload.workspaceSlug,
+    payload.toolkit,
+    "ok",
+  );
 }

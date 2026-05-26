@@ -224,6 +224,66 @@ export async function findLatestActiveConnection(args: {
   };
 }
 
+export type CatalogToolkit = {
+  slug: string;
+  /** Display name from Composio (e.g. "Google Sheets"). */
+  name: string;
+};
+
+// Small in-process cache so the Connections page doesn't pay 1-3
+// round trips to Composio on every render. Keyed by apiKey since
+// different workspaces' Composio accounts may have different
+// custom-toolkit visibility. 5-minute TTL is generous — the
+// catalog updates roughly monthly and is otherwise stable.
+const TOOLKIT_CATALOG_TTL_MS = 5 * 60 * 1000;
+const _toolkitCatalogCache = new Map<
+  string,
+  { value: CatalogToolkit[]; expiresAt: number }
+>();
+
+/**
+ * Fetch Composio's full toolkit catalog (alphabetized). Paginates
+ * up to ~5 pages of 500 to cover the catalog without looping
+ * forever on a buggy response. Returns [] on failure — callers
+ * treat that as "datalist is empty, fall back to free-text entry."
+ */
+export async function listAllToolkits(
+  apiKey: string,
+): Promise<CatalogToolkit[]> {
+  const now = Date.now();
+  const cached = _toolkitCatalogCache.get(apiKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.value;
+  }
+  try {
+    const c = makeClient(apiKey);
+    const out: CatalogToolkit[] = [];
+    let cursor: string | undefined = undefined;
+    for (let page = 0; page < 5; page++) {
+      // `toolkits.get` is overloaded (slug → single, params → list).
+      // Cast to the list-shape so TS picks the right branch.
+      const res = (await c.toolkits.get({
+        sortBy: "alphabetically",
+        managedBy: "all",
+        cursor,
+        limit: 500,
+      })) as { items?: { slug?: string; name?: string }[]; nextCursor?: string };
+      for (const t of res.items ?? []) {
+        if (t.slug) out.push({ slug: t.slug, name: t.name ?? t.slug });
+      }
+      cursor = res.nextCursor ?? undefined;
+      if (!cursor) break;
+    }
+    _toolkitCatalogCache.set(apiKey, {
+      value: out,
+      expiresAt: now + TOOLKIT_CATALOG_TTL_MS,
+    });
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Revoke + delete a connection on Composio's side. Boolean return so
  * the caller can still drop the local row even if the remote revoke
