@@ -161,6 +161,63 @@ export async function saveComposioConnection(args: {
   return rowToConnection(rows[0]);
 }
 
+export type RenameComposioConnectionError =
+  | "bad-name-shape"
+  | "name-taken"
+  | "not-found";
+
+export type RenameComposioConnectionResult =
+  | { ok: true }
+  | { ok: false; error: RenameComposioConnectionError };
+
+/**
+ * Rename the slot identifier on an existing connection. Returns
+ * `name-taken` when the user already holds another connection with
+ * the same (toolkit, new-name) tuple, `bad-name-shape` when the
+ * name fails the slug regex, `not-found` when the row id doesn't
+ * belong to the workspace. Composio's side isn't touched — the
+ * connected_account_id is the durable identifier; `name` is purely
+ * a TAS-local label.
+ *
+ * Caller is responsible for surfacing the side effect: any agent
+ * file referencing the old name will fail at run time until its
+ * `connections:` field is updated.
+ */
+export async function renameComposioConnection(
+  workspaceId: string,
+  connectionId: string,
+  newName: string,
+): Promise<RenameComposioConnectionResult> {
+  const normalized = newName.trim().toLowerCase();
+  if (!/^[a-z0-9_-]+$/.test(normalized)) {
+    return { ok: false, error: "bad-name-shape" };
+  }
+  // Look up the existing row so we know its toolkit + user and can
+  // do the uniqueness check before attempting the UPDATE (postgres
+  // would return a 23505 on conflict, but a pre-check yields a
+  // nicer error code).
+  const existing = await getComposioConnectionById(workspaceId, connectionId);
+  if (!existing) return { ok: false, error: "not-found" };
+  if (existing.name === normalized) return { ok: true }; // no-op rename
+  const { rowCount: collision } = await db.query(
+    `SELECT 1 FROM workspace_composio_connection
+       WHERE workspace_id = $1 AND user_id = $2
+         AND toolkit_slug = $3 AND name = $4 AND id <> $5
+       LIMIT 1`,
+    [workspaceId, existing.userId, existing.toolkit, normalized, connectionId],
+  );
+  if ((collision ?? 0) > 0) {
+    return { ok: false, error: "name-taken" };
+  }
+  await db.query(
+    `UPDATE workspace_composio_connection
+        SET name = $2, updated_at = NOW()
+      WHERE id = $1`,
+    [connectionId, normalized],
+  );
+  return { ok: true };
+}
+
 export async function deleteComposioConnection(
   workspaceId: string,
   id: string,

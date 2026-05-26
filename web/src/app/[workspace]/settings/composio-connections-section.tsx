@@ -7,6 +7,7 @@ import { type WorkspaceComposioConnection } from "@/lib/composio-connections";
 
 import { ToolkitPicker } from "../connections/toolkit-picker";
 import { DisconnectComposioConnectionForm } from "./disconnect-composio-connection-form";
+import { RenameComposioConnectionForm } from "./rename-composio-connection-form";
 
 // Settings → Connections (basic mode, Composio-backed, per-user).
 //
@@ -320,6 +321,13 @@ function ComposioConnectionRow({
           >
             {connection ? "Reconnect" : "Connect"}
           </Link>
+        )}
+        {connection && (
+          <RenameComposioConnectionForm
+            workspaceSlug={workspaceSlug}
+            connectionId={connection.id}
+            currentName={connection.name}
+          />
         )}
         {connection && (
           <DisconnectComposioConnectionForm

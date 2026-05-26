@@ -7,6 +7,7 @@ import { deleteRemoteConnection } from "@/lib/composio";
 import {
   deleteComposioConnection,
   getComposioConnectionById,
+  renameComposioConnection,
 } from "@/lib/composio-connections";
 import { deleteConnection } from "@/lib/connections";
 import { getServerSession } from "@/lib/session";
@@ -326,7 +327,56 @@ export async function disconnectComposioConnectionAction(
   await deleteComposioConnection(workspace.id, connectionId);
 
   revalidatePath(`/${slug}/settings`);
+  revalidatePath(`/${slug}/connections`);
   return { message: "Connection removed." };
+}
+
+export type RenameComposioConnectionFormState = {
+  message?: string;
+  error?: string;
+};
+
+/**
+ * Rename a Composio connection slot. Updates only TAS's local
+ * `name` column; Composio doesn't know about it. The caller is
+ * responsible for telling the user that agent specs referencing
+ * the old name need updating in lockstep.
+ */
+export async function renameComposioConnectionAction(
+  _prev: RenameComposioConnectionFormState,
+  formData: FormData,
+): Promise<RenameComposioConnectionFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const connectionId = String(formData.get("connectionId") ?? "");
+  const newName = String(formData.get("newName") ?? "");
+  if (!connectionId) return { error: "Missing connection id." };
+
+  const workspace = await authorizeWorkspace(slug);
+  const result = await renameComposioConnection(
+    workspace.id,
+    connectionId,
+    newName,
+  );
+  if (!result.ok) {
+    switch (result.error) {
+      case "bad-name-shape":
+        return {
+          error:
+            "Use lowercase letters, digits, hyphens, or underscores only (e.g. work, customer-support).",
+        };
+      case "name-taken":
+        return {
+          error:
+            "You already have a connection of this toolkit with that name — pick a different one.",
+        };
+      case "not-found":
+        return { error: "Connection not found." };
+    }
+  }
+
+  revalidatePath(`/${slug}/settings`);
+  revalidatePath(`/${slug}/connections`);
+  return { message: "Renamed." };
 }
 
 export type SyncGuidanceFormState = {
