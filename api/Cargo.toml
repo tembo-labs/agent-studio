@@ -24,6 +24,8 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 aes-gcm = "0.10"
 base64 = "0.22"
+regex = "1"
+once_cell = "1"
 
 [profile.release]
 lto = "thin"

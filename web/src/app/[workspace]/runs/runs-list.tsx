@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { formatCurrency } from "@/lib/pricing";
 
 import { loadRunsAction } from "./actions";
 import type { LoadedRun } from "./shape";
@@ -134,6 +135,17 @@ export function RunsList({ workspaceSlug, agentNames, initial }: Props) {
     return max;
   }, [rows]);
 
+  // Same idea for cost — scale the Cost cell's background bar against
+  // the highest cost in view. Runs without a recorded cost contribute
+  // nothing (cost shows as "—").
+  const maxCostUsd = useMemo(() => {
+    let max = 0;
+    for (const r of rows) {
+      if (r.costUsd !== null && r.costUsd > max) max = r.costUsd;
+    }
+    return max;
+  }, [rows]);
+
   // Stable agent options array (incl. "All agents" sentinel).
   const agentOptions = useMemo(
     () => [
@@ -229,6 +241,7 @@ export function RunsList({ workspaceSlug, agentNames, initial }: Props) {
                 <th className="px-3 py-2 text-left font-medium">Input</th>
                 <th className="px-3 py-2 text-left font-medium">Queued</th>
                 <th className="px-3 py-2 text-left font-medium">Duration</th>
+                <th className="px-3 py-2 text-left font-medium">Cost</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border-weak)]">
@@ -238,6 +251,7 @@ export function RunsList({ workspaceSlug, agentNames, initial }: Props) {
                   run={r}
                   workspaceSlug={workspaceSlug}
                   maxDurationMs={maxDurationMs}
+                  maxCostUsd={maxCostUsd}
                   onNavigate={(href) => router.push(href)}
                 />
               ))}
@@ -266,11 +280,13 @@ function RunRow({
   run,
   workspaceSlug,
   maxDurationMs,
+  maxCostUsd,
   onNavigate,
 }: {
   run: LoadedRun;
   workspaceSlug: string;
   maxDurationMs: number;
+  maxCostUsd: number;
   onNavigate: (href: string) => void;
 }) {
   const agentHref = `/${workspaceSlug}/agents/${encodeURIComponent(run.agentName)}`;
@@ -329,6 +345,22 @@ function RunRow({
           </>
         ) : run.startedAt ? (
           <span>Running</span>
+        ) : (
+          <span className="text-foreground-muted">—</span>
+        )}
+      </td>
+      <td className="text-foreground-weak relative px-3 py-2 align-top text-xs">
+        {run.costUsd !== null && maxCostUsd > 0 ? (
+          <>
+            <span
+              aria-hidden
+              className="bg-interactive-state-hover absolute inset-y-1 left-1 rounded-sm"
+              style={{
+                width: `calc(${Math.max(2, (run.costUsd / maxCostUsd) * 100)}% - 8px)`,
+              }}
+            />
+            <span className="relative">{formatCurrency(run.costUsd)}</span>
+          </>
         ) : (
           <span className="text-foreground-muted">—</span>
         )}

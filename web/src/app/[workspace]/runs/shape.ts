@@ -26,5 +26,6 @@ export function toLoaded(r: RunListItem): LoadedRun {
     startedAt: r.startedAt ? r.startedAt.toISOString() : null,
     completedAt: r.completedAt ? r.completedAt.toISOString() : null,
     userMessagePreview: r.userMessagePreview,
+    costUsd: r.costUsd,
   };
 }

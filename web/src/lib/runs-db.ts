@@ -189,6 +189,12 @@ export type RunListItem = {
   // input without round-tripping to the run detail page. Empty when
   // the run had no input (the manual "Run now" path).
   userMessagePreview: string;
+  // Estimated USD cost — computed + persisted by the Rust runner at
+  // mark_succeeded time so the UI doesn't recompute every render.
+  // Null for: runs that pre-date the column, frameworks that don't
+  // report token usage (cargo-ai today), or models not in the
+  // pricing table.
+  costUsd: number | null;
 };
 
 const LIST_RUNS_MAX_PAGE = 50;
@@ -244,9 +250,13 @@ export async function listRunsForWorkspace(
     started_at: Date | null;
     completed_at: Date | null;
     user_message: string;
+    // pg returns NUMERIC as a string by default to preserve precision.
+    // Parse on the way out.
+    cost_usd: string | null;
   }>(
     `SELECT id, agent_name, status, trigger, automation_id,
-            created_at, started_at, completed_at, user_message
+            created_at, started_at, completed_at, user_message,
+            cost_usd
        FROM run
       WHERE ${where.join(" AND ")}
       ORDER BY created_at DESC
@@ -264,6 +274,7 @@ export async function listRunsForWorkspace(
     startedAt: r.started_at,
     completedAt: r.completed_at,
     userMessagePreview: (r.user_message ?? "").slice(0, 200),
+    costUsd: r.cost_usd === null ? null : Number(r.cost_usd),
   }));
 }
 
