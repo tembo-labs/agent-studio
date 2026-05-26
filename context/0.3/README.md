@@ -24,7 +24,49 @@ v0.3 is the operational-surface release. It adds five interlocking capabilities,
 5. **A per-agent chat configuration entry point.** The v0.2 chat-to-PR loop is reachable from every agent's detail page, with the agent identity already in context.
 6. **Failure investigation in three clicks.** A failed run reaches its triggering revision, the most recent human action, and similar past failures without leaving the page.
 
-## What Ships in v0.3
+## Shipped (so far)
+
+> **Status:** In flight. The list below tracks what has landed on
+> `main` since v0.2; it diverges from the original "What Ships in
+> v0.3" plan below because Connections turned out to be a
+> substrate-shaped piece of work that ate the phase. The plan stays
+> documented as written so future readers can see what shifted.
+
+- **Composio-backed Connections substrate.** ~1,043-toolkit
+  catalog (Slack, Gmail, Google Sheets, Notion, GitHub, etc.)
+  authorized per-user-per-workspace via Composio's hosted OAuth.
+  Agent specs reference connections by `(toolkit, name)` slot;
+  the canonical form is named slot + narrow tools list. Connections
+  is a top-level sidenav surface (separate from Settings).
+- **Per-agent operational dashboard.** Health header, four
+  stat tiles (Runs / Success rate / Spend / Avg duration over
+  30d), daily-trend bar with success / failure overlay, top-5
+  grouped failure prefixes with links to example runs.
+- **Pydantic-AI runtime pipe.** Python wrapper materializes a
+  Composio session from the spec's `connections:` field and
+  attaches it to the agent as an MCP toolset.
+- **Persisted run cost.** `run.cost_usd` populated at
+  `mark_succeeded` time; Cost column on the Runs page with
+  bar-chart visualization.
+- **Multi-workspace.** Sidebar switcher, last-visited workspace
+  landing, automation "Run as" owner picker for the per-user
+  connections model.
+- **Sidebar action-needed alerts.** "Connect {toolkit} for
+  {agent}" when a repo agent declares a slot the current user
+  hasn't authorized.
+
+## Deferred from the v0.3 plan (→ v0.3+)
+
+- **HITL pause/resume + rich forms** — originally a v0.3 anchor;
+  the Connections substrate ate the phase. Lands next.
+- **Workspace-wide triage surfaces** (agent inventory, topology
+  map, tasks inbox, log explorer) — per-agent dashboard
+  shipped; the workspace-wide cousins follow.
+- **Event triggers** (US-0.2-08, moved into v0.3) — Connections
+  substrate is now in place; webhook receiver + event
+  filtering land next.
+
+## What Ships in v0.3 (original plan)
 
 - **Form schema renderer.** Conditional field visibility, file upload with size and MIME limits, image/PDF preview, required-field validation.
 - **Rich HITL task archetypes.** Pre-built form templates for email, deal review, social outreach, scheduling, and content approval — all renderable from the schema DSL.
@@ -34,6 +76,15 @@ v0.3 is the operational-surface release. It adds five interlocking capabilities,
 - **Per-agent chat configuration modal.** The v0.2 chat-to-PR authoring loop is launchable from every agent's detail page, with the agent already in context.
 - **Connections framework.** Data-driven OAuth: each provider declared in `connections/*.yaml` in the workspace repo (authorize URL, token URL, scopes, client-id/secret env names, MCP server URL). Generic OAuth 2.0 + PKCE flow handles authorize → callback → token + refresh-token storage encrypted in `workspace_secret`. A small set of named handlers (`google`, `slack`, `microsoft`) covers the non-standard outliers.
 - **Event triggers.** A webhook receiver at `/api/hooks/:workspace/:connection` with HMAC-SHA256 signature verification using a per-workspace secret. An agent's automation row gains `trigger_kind = 'event'` plus an event filter (event source + filter expression). A run fired from an event lands with `trigger='event'` and a link back to the originating payload.
+
+> **Note (2026-05-26):** The Connections shape actually shipped is
+> Composio-backed, not the TAS-owned OAuth-per-provider framework
+> described above. The TAS-owned substrate was prototyped first and
+> lives dormant in the codebase (`lib/connections.ts`,
+> `lib/oauth-state.ts`, `api/connections/{slack,google}/*`) for a
+> potential v0.4 "advanced mode." Composio won on time-to-ship and
+> catalog breadth (~1,043 toolkits vs hand-registering OAuth apps
+> per provider).
 
 ## Out of Scope for v0.3
 
