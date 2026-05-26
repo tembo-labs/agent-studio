@@ -228,6 +228,12 @@ export type CatalogToolkit = {
   slug: string;
   /** Display name from Composio (e.g. "Google Sheets"). */
   name: string;
+  /**
+   * Toolkit logo URL from Composio (e.g.
+   * `https://logos.composio.dev/api/gmail`). Null if the response
+   * didn't carry one — UI falls back to no-icon rendering.
+   */
+  logo: string | null;
 };
 
 // Small in-process cache so the Connections page doesn't pay 1-3
@@ -267,9 +273,26 @@ export async function listAllToolkits(
         managedBy: "all",
         cursor,
         limit: 500,
-      })) as { items?: { slug?: string; name?: string }[]; nextCursor?: string };
+      })) as {
+        items?: {
+          slug?: string;
+          name?: string;
+          meta?: { logo?: string };
+          logo?: string;
+        }[];
+        nextCursor?: string;
+      };
       for (const t of res.items ?? []) {
-        if (t.slug) out.push({ slug: t.slug, name: t.name ?? t.slug });
+        if (t.slug) {
+          // SDK has shifted the logo location across versions —
+          // top-level on some, under `meta` on others. Read both.
+          const logo = t.logo ?? t.meta?.logo ?? null;
+          out.push({
+            slug: t.slug,
+            name: t.name ?? t.slug,
+            logo,
+          });
+        }
       }
       cursor = res.nextCursor ?? undefined;
       if (!cursor) break;

@@ -135,11 +135,29 @@ export function ToolkitPicker({
               onMouseEnter={() => setHighlightIndex(i)}
               className={
                 i === highlightIndex
-                  ? "bg-interactive-state-hover flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1.5"
-                  : "flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1.5"
+                  ? "bg-interactive-state-hover flex cursor-pointer items-center gap-2 px-2 py-1.5"
+                  : "flex cursor-pointer items-center gap-2 px-2 py-1.5"
               }
             >
-              <span className="text-foreground truncate text-sm">
+              {/* Logo from Composio's catalog. <img> instead of
+                  next/image so we don't need to whitelist
+                  logos.composio.dev in next.config — these are
+                  small icons, optimization isn't critical. */}
+              {t.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={t.logo}
+                  alt=""
+                  aria-hidden
+                  className="bg-surface h-4 w-4 shrink-0 rounded-sm object-contain"
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className="bg-surface h-4 w-4 shrink-0 rounded-sm"
+                />
+              )}
+              <span className="text-foreground min-w-0 flex-1 truncate text-sm">
                 {t.name}
               </span>
               <span className="text-foreground-muted shrink-0 font-mono text-xs">

@@ -53,7 +53,10 @@ export default async function ConnectionsPage({
   const catalog: CatalogToolkit[] = composioPreview
     ? await getWorkspaceSecretPlaintext(workspace.id, "composio_api_key")
         .then((apiKey) => listAllToolkits(apiKey))
-        .catch(() => [])
+        .catch((e) => {
+          console.error("[connections] listAllToolkits failed:", e);
+          return [];
+        })
     : [];
 
   // Same shape ComposioConnectionsSection expects — pairs declared by

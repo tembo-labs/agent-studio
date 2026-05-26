@@ -50,6 +50,13 @@ export function ComposioConnectionsSection({
   for (const c of connections) {
     ownedSlots.set(`${c.toolkit}:${c.name}`, c);
   }
+  // Slug → logo URL lookup so each row can render the toolkit's
+  // logo from Composio's catalog. Empty when the catalog hasn't
+  // loaded (no API key, fetch failed); rows fall back to no icon.
+  const logoBySlug = new Map<string, string>();
+  for (const t of catalog) {
+    if (t.logo) logoBySlug.set(t.slug, t.logo);
+  }
 
   // Union of declared + owned slots, sorted so unfulfilled-declared
   // pairs surface first (they're the actionable ones), then owned,
@@ -142,6 +149,7 @@ export function ComposioConnectionsSection({
                 key={key}
                 toolkit={slot.toolkit}
                 name={slot.name}
+                logoUrl={logoBySlug.get(slot.toolkit) ?? null}
                 workspaceSlug={workspaceSlug}
                 connection={ownedSlots.get(key)}
                 enabled={composioEnabled}
@@ -238,12 +246,14 @@ function AddAnotherConnectionForm({
 function ComposioConnectionRow({
   toolkit,
   name,
+  logoUrl,
   workspaceSlug,
   connection,
   enabled,
 }: {
   toolkit: string;
   name: string;
+  logoUrl: string | null;
   workspaceSlug: string;
   connection: WorkspaceComposioConnection | undefined;
   enabled: boolean;
@@ -276,13 +286,31 @@ function ComposioConnectionRow({
 
   return (
     <div className="bg-surface border-border flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-      <div className="flex min-w-0 flex-col">
-        <span className="text-foreground text-sm font-medium">
-          {toolkitLabel(toolkit)}
-        </span>
-        <span className="text-foreground-muted truncate text-xs">
-          {subtitle}
-        </span>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {logoUrl ? (
+          // Plain <img> to skip Next.js Image host-whitelist config;
+          // these are small icons where optimization isn't critical.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
+            alt=""
+            aria-hidden
+            className="bg-surface-raised h-7 w-7 shrink-0 rounded-md object-contain p-1"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="bg-surface-raised h-7 w-7 shrink-0 rounded-md"
+          />
+        )}
+        <div className="flex min-w-0 flex-col">
+          <span className="text-foreground text-sm font-medium">
+            {toolkitLabel(toolkit)}
+          </span>
+          <span className="text-foreground-muted truncate text-xs">
+            {subtitle}
+          </span>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         {enabled && (
