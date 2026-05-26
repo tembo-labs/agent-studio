@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { SidebarNavItem } from "@/components/sidebar-nav-item";
+import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { toolkitLabel } from "@/lib/composio";
@@ -60,8 +61,10 @@ export function AppShell({
           regardless of how tall the content gets. Inner nav scrolls
           on overflow rather than pushing the footer off-screen. */}
       <aside className="bg-surface-secondary border-border sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r">
-        {/* py-3 matches the TopBar height; no bottom border — extra
-            whitespace before the nav block does the visual separation. */}
+        {/* py-3 matches the TopBar height. Whitespace, not borders,
+            does the visual separation between sections — keeps the
+            sidebar quieter so the Action needed cards (when present)
+            land as the loudest thing in the rail. */}
         <div className="flex flex-col gap-0.5 px-3 py-3">
           <span className="text-foreground-muted text-[10px] font-medium uppercase tracking-widest">
             {instanceName}
@@ -104,46 +107,41 @@ export function AppShell({
             label="Settings"
             icon={<IconSettingsSliderHor />}
           />
+
+          {missingConnections.length > 0 && (
+            <div className="mt-6 flex flex-col gap-1.5">
+              <span className="text-foreground-muted px-2 text-[10px] font-medium uppercase tracking-widest">
+                Action needed
+              </span>
+              {missingConnections.map((m, i) => {
+                const authorizeHref = `/api/connections/composio/authorize?workspace=${encodeURIComponent(workspace.slug)}&toolkit=${encodeURIComponent(m.toolkit)}`;
+                return (
+                  <div
+                    key={`${m.toolkit}:${m.agentName}:${i}`}
+                    className="flex items-center gap-2 rounded-md px-2 py-2 bg-[var(--color-sentiment-caution-subtle)]"
+                  >
+                    <IconExclamationTriangle
+                      size={14}
+                      className="shrink-0 text-[var(--color-icon-sentiment-caution)]"
+                    />
+                    <span className="min-w-0 flex-1 text-xs leading-tight text-[var(--color-foreground-sentiment-caution)]">
+                      <span className="font-semibold">
+                        {toolkitLabel(m.toolkit)}
+                      </span>{" "}
+                      for{" "}
+                      <span className="font-semibold">{m.agentName}</span>
+                    </span>
+                    <Button asChild variant="orange" size="small">
+                      <Link href={authorizeHref}>Connect</Link>
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </nav>
 
-        {missingConnections.length > 0 && (
-          <div className="border-border flex flex-col gap-1 border-t px-2 pb-2 pt-1.5">
-            <span className="text-foreground-muted px-2 text-[10px] font-medium uppercase tracking-widest">
-              Action needed
-            </span>
-            {missingConnections.map((m, i) => {
-              const authorizeHref = `/api/connections/composio/authorize?workspace=${encodeURIComponent(workspace.slug)}&toolkit=${encodeURIComponent(m.toolkit)}`;
-              return (
-                <div
-                  key={`${m.toolkit}:${m.agentName}:${i}`}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5"
-                >
-                  <IconExclamationTriangle
-                    size={14}
-                    className="shrink-0 text-[var(--color-icon-sentiment-caution)]"
-                  />
-                  <span className="text-foreground-weak min-w-0 flex-1 text-xs leading-tight">
-                    <span className="text-foreground font-medium">
-                      {toolkitLabel(m.toolkit)}
-                    </span>{" "}
-                    for{" "}
-                    <span className="text-foreground font-medium">
-                      {m.agentName}
-                    </span>
-                  </span>
-                  <Link
-                    href={authorizeHref}
-                    className="text-foreground hover:text-foreground-title shrink-0 text-xs font-medium hover:underline"
-                  >
-                    Connect
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="border-border border-t px-2 py-2">
+        <div className="px-2 py-2">
           <UserMenu name={user.name ?? null} email={user.email} />
         </div>
       </aside>
