@@ -145,8 +145,93 @@ export function ComposioConnectionsSection({
             );
           })
         )}
+
+        {composioEnabled && (
+          <AddAnotherConnectionForm workspaceSlug={workspaceSlug} />
+        )}
       </div>
     </Section>
+  );
+}
+
+/**
+ * Pre-authorize a named connection slot without waiting on an agent
+ * to declare it. The same /api/connections/composio/authorize route
+ * the row-level "Connect" buttons use — this just lets the user
+ * supply an ad-hoc (toolkit, name) pair. Plain HTML form, no JS
+ * needed; the route handles shape validation.
+ */
+function AddAnotherConnectionForm({
+  workspaceSlug,
+}: {
+  workspaceSlug: string;
+}) {
+  return (
+    <form
+      action="/api/connections/composio/authorize"
+      method="get"
+      className="bg-surface border-border flex flex-col gap-2 rounded-lg border border-dashed px-3 py-3"
+    >
+      <input type="hidden" name="workspace" value={workspaceSlug} />
+      <div className="flex flex-col gap-0.5">
+        <span className="text-foreground text-sm font-medium">
+          Add another connection
+        </span>
+        <span className="text-foreground-muted text-xs">
+          Pre-authorize a toolkit before an agent declares it, or attach a
+          second account of a toolkit you already use (e.g. a second Gmail).
+          Name distinguishes the slot when you have more than one of a
+          toolkit.
+        </span>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex min-w-[140px] flex-1 flex-col gap-1">
+          <label
+            htmlFor="add-toolkit"
+            className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
+          >
+            Toolkit
+          </label>
+          <input
+            id="add-toolkit"
+            name="toolkit"
+            type="text"
+            required
+            pattern="[a-z0-9_-]+"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="gmail"
+            className="bg-input border-border text-foreground rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)]"
+          />
+        </div>
+        <div className="flex min-w-[140px] flex-1 flex-col gap-1">
+          <label
+            htmlFor="add-name"
+            className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
+          >
+            Name
+          </label>
+          <input
+            id="add-name"
+            name="name"
+            type="text"
+            required
+            pattern="[a-z0-9_-]+"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="work"
+            defaultValue="default"
+            className="bg-input border-border text-foreground rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)]"
+          />
+        </div>
+        <button
+          type="submit"
+          className="bg-[#EB7500] text-[#FFFFFF]/92 hover:bg-[#FF9933] rounded-md px-3 py-1.5 text-sm font-medium shadow-[0_0_0_1px_#AF4C00,0_-1px_2px_0_rgba(255,255,255,0.12)_inset,0_1px_2px_0_rgba(255,255,255,0.16)_inset]"
+        >
+          Connect
+        </button>
+      </div>
+    </form>
   );
 }
 
