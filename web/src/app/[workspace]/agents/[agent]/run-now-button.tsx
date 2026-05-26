@@ -33,10 +33,20 @@ type Props = {
 export function RunNowButton({ workspaceSlug, agentName }: Props) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(runNowAction, INITIAL);
+  // Controlled — React 19's useActionState resets uncontrolled fields
+  // after each submission, including the returned-error path. Reset
+  // when the dialog closes so reopening starts fresh.
+  const [userMessage, setUserMessage] = useState("");
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setUserMessage("");
+        }}
+      >
         <AlertDialogTrigger asChild>
           <Button variant="primary" disabled={pending}>
             {pending ? "Queueing…" : "Run now"}
@@ -60,6 +70,8 @@ export function RunNowButton({ workspaceSlug, agentName }: Props) {
               disabled={pending}
               autoFocus
               placeholder="What should the agent do for this run?"
+              value={userMessage}
+              onChange={(e) => setUserMessage(e.target.value)}
               className="bg-input text-foreground-strong placeholder:text-foreground-weak hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled flex w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-2 px-3 text-sm leading-6 focus:outline-none transition-[background-color,box-shadow,color] duration-150 resize-y"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

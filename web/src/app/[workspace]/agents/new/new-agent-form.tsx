@@ -29,6 +29,14 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
   // a small "Advanced" disclosure so the common case is name +
   // description and nothing else.
   const [advanced, setAdvanced] = useState(false);
+  // Controlled inputs — React 19's useActionState resets uncontrolled
+  // form fields after each submission completes, including the
+  // returned-error path. Holding the values in state preserves the
+  // user's input when the action returns an error and the form
+  // re-renders.
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [framework, setFramework] = useState<Framework>(DEFAULT_FRAMEWORK);
 
   if (state.success) {
     const s = state.success;
@@ -41,7 +49,7 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
           Tembo is opening a pull request at{" "}
           <code className="bg-surface rounded px-1 py-0.5">{s.agentPath}</code>
           . You can watch the Tembo session, and the PR status will appear on
-          the Improvements page once it's open.
+          the Improvements page once it&apos;s open.
         </p>
         <p className="text-foreground-weak text-xs">Status: {s.status}</p>
         <div className="flex flex-wrap gap-3 pt-1">
@@ -67,10 +75,11 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
   return (
     <form action={action} className="flex flex-col gap-3">
       <input type="hidden" name="workspace" value={workspaceSlug} />
-      {/* Hidden framework default only when the advanced picker is
-          collapsed. When the picker is open it owns the field. */}
+      {/* Hidden framework field carries the controlled framework state
+          when the picker is collapsed. When the picker is open the
+          <select> below owns the field. */}
       {!advanced && (
-        <input type="hidden" name="framework" value={DEFAULT_FRAMEWORK} />
+        <input type="hidden" name="framework" value={framework} />
       )}
 
       <div className="grid gap-1.5">
@@ -89,6 +98,8 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
           pattern="[a-z0-9]+(-[a-z0-9]+)*"
           disabled={pending}
           placeholder="inbox-triage"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
         />
         <p className="text-foreground-muted text-sm">
           Lowercase letters, digits, and hyphens. Becomes the filename and
@@ -107,6 +118,8 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
           rows={8}
           disabled={pending}
           placeholder="Read incoming customer emails. Classify each one as billing, technical, or sales. Reply to billing emails with a link to the help center. Forward technical issues to the support inbox."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           className="bg-input text-foreground-strong placeholder:text-foreground-weak hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled disabled:text-foreground-muted flex w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-2 px-3 text-sm leading-6 focus:outline-none transition-[background-color,box-shadow,color] duration-150 disabled:cursor-not-allowed resize-y"
         />
         <p className="text-foreground-muted text-sm">
@@ -123,7 +136,8 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
           <select
             id="chat-framework"
             name="framework"
-            defaultValue={DEFAULT_FRAMEWORK}
+            value={framework}
+            onChange={(e) => setFramework(e.target.value as Framework)}
             disabled={pending}
             className="bg-input text-foreground-strong hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled flex h-7 w-full min-w-0 rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-1 pr-1 pl-2 text-sm font-medium tracking-[-0.1px] focus:outline-none transition-[background-color,box-shadow,color] duration-150"
           >

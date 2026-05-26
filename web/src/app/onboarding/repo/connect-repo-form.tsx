@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,11 @@ export function ConnectRepoForm({ workspaceSlug }: { workspaceSlug: string }) {
     connectRepoAction,
     INITIAL,
   );
+  // React 19's useActionState resets uncontrolled fields after every
+  // submission. Controlled inputs preserve the user's repo and token
+  // across error re-renders so they don't have to re-paste either.
+  const [repo, setRepo] = useState("");
+  const [token, setToken] = useState("");
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
@@ -36,6 +41,8 @@ export function ConnectRepoForm({ workspaceSlug }: { workspaceSlug: string }) {
           required
           disabled={pending}
           placeholder="github.com/owner/repo"
+          value={repo}
+          onChange={(e) => setRepo(e.target.value)}
         />
         <p className="text-foreground-muted text-sm">
           The repo where this workspace&apos;s agent definitions will live.
@@ -55,6 +62,8 @@ export function ConnectRepoForm({ workspaceSlug }: { workspaceSlug: string }) {
           required
           disabled={pending}
           placeholder="ghp_… or github_pat_…"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
         />
         <div className="text-foreground-muted space-y-2 text-sm">
           <p>Stored encrypted at rest. Needs read + write on this repo.</p>

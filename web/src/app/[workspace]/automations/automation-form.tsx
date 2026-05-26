@@ -48,7 +48,14 @@ export function AutomationForm({
   const action = mode === "create" ? createAutomationAction : updateAutomationAction;
   const [state, formAction, pending] = useActionState(action, INITIAL);
 
+  // Controlled — React 19's useActionState resets uncontrolled fields
+  // after each submission, including the returned-error path.
+  // Cron is already controlled for the live preview.
+  const [name, setName] = useState(defaults?.name ?? "");
+  const [agentName, setAgentName] = useState(defaults?.agentName ?? "");
   const [cron, setCron] = useState(defaults?.cron ?? "0 9 * * 1-5");
+  const [inputMessage, setInputMessage] = useState(defaults?.inputMessage ?? "");
+  const [enabled, setEnabled] = useState(defaults?.enabled ?? true);
   const preview = useMemo(() => validateCron(cron), [cron]);
 
   return (
@@ -71,7 +78,8 @@ export function AutomationForm({
           autoComplete="off"
           spellCheck={false}
           disabled={pending}
-          defaultValue={defaults?.name ?? ""}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           placeholder="Daily inbox sweep"
         />
         {state.fieldErrors?.name && (
@@ -88,7 +96,8 @@ export function AutomationForm({
           name="agent"
           required
           disabled={pending}
-          defaultValue={defaults?.agentName ?? ""}
+          value={agentName}
+          onChange={(e) => setAgentName(e.target.value)}
           className="bg-surface border-border text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)] rounded-md border px-3 py-2 text-sm leading-6"
         >
           <option value="" disabled>
@@ -141,7 +150,8 @@ export function AutomationForm({
           name="input_message"
           rows={3}
           disabled={pending}
-          defaultValue={defaults?.inputMessage ?? ""}
+          value={inputMessage}
+          onChange={(e) => setInputMessage(e.target.value)}
           placeholder="Anything the agent should treat as the user's prompt for the run."
           className="bg-surface border-border text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)] rounded-md border px-3 py-2 text-sm leading-6 resize-y"
         />
@@ -151,7 +161,8 @@ export function AutomationForm({
         <input
           type="checkbox"
           name="enabled"
-          defaultChecked={defaults?.enabled ?? true}
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
           disabled={pending}
           className="h-4 w-4"
         />

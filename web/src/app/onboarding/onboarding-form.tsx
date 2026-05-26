@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,10 @@ export function OnboardingForm({ isFirst = true }: { isFirst?: boolean }) {
     createWorkspaceAction,
     INITIAL_STATE,
   );
+  // React 19's useActionState resets uncontrolled fields after every
+  // submission (success or returned-error). Holding the value in
+  // state keeps the user's typed input across error re-renders.
+  const [name, setName] = useState("");
 
   return (
     <Card className="w-full max-w-md p-3">
@@ -46,6 +50,8 @@ export function OnboardingForm({ isFirst = true }: { isFirst?: boolean }) {
               autoComplete="off"
               required
               disabled={pending}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
             <p className="text-foreground-muted text-xs">
               We&apos;ll use this to derive your workspace URL (e.g.{" "}
