@@ -6,6 +6,7 @@ import { getServerSession } from "@/lib/session";
 import {
   getWorkspaceBySlug,
   listWorkspacesForUser,
+  touchWorkspaceLastVisited,
   userIsMember,
 } from "@/lib/workspace";
 
@@ -42,6 +43,10 @@ export default async function WorkspaceLayout({
 
   const isMember = await userIsMember(workspace.id, session.user.id);
   if (!isMember) notFound();
+
+  // Fire-and-forget last-visited bump so the "/" landing redirect
+  // returns the user here next session. Doesn't block render.
+  void touchWorkspaceLastVisited(workspace.id, session.user.id);
 
   const workspaces = await listWorkspacesForUser(session.user.id);
   const switcherList = workspaces.map((w) => ({ slug: w.slug, name: w.name }));
