@@ -236,12 +236,19 @@ export type CatalogToolkit = {
   logo: string | null;
 };
 
-// Small in-process cache so the Connections page doesn't pay 1-3
-// round trips to Composio on every render. Keyed by apiKey since
+// In-process cache so the Connections page doesn't pay several
+// round trips to Composio per render. Keyed by apiKey since
 // different workspaces' Composio accounts may have different
-// custom-toolkit visibility. 5-minute TTL is generous — the
-// catalog updates roughly monthly and is otherwise stable.
-const TOOLKIT_CATALOG_TTL_MS = 5 * 60 * 1000;
+// custom-toolkit visibility. 1-hour TTL — the catalog updates
+// roughly monthly, and the first visitor pays a few hundred ms
+// to paginate the full list once; everyone else for the next
+// hour gets it free.
+//
+// The cache is per-process (no Redis / disk), so container
+// restarts force a refresh. That's fine: misclick → restart →
+// stale state purged. Add a write-through later if catalog
+// freshness becomes an active concern.
+const TOOLKIT_CATALOG_TTL_MS = 60 * 60 * 1000;
 const _toolkitCatalogCache = new Map<
   string,
   { value: CatalogToolkit[]; expiresAt: number }
@@ -263,40 +270,60 @@ export async function listAllToolkits(
   }
   try {
     const c = makeClient(apiKey);
-    const out: CatalogToolkit[] = [];
+    // @composio/core's high-level `toolkits.get()` flattens the
+    // paged response to an array — pagination metadata is lost,
+    // capping us at ~one page. Hit the underlying Stainless
+    // client directly so we can walk `next_cursor` until exhausted.
+    const rawClient = (
+      c as unknown as {
+        client: {
+          toolkits: {
+            list: (params: {
+              sort_by?: string;
+              managed_by?: string;
+              cursor?: string;
+              limit?: number;
+            }) => Promise<{
+              items?: Array<Record<string, unknown>>;
+              next_cursor?: string | null;
+            }>;
+          };
+        };
+      }
+    ).client;
+    const all: Array<Record<string, unknown>> = [];
     let cursor: string | undefined = undefined;
-    for (let page = 0; page < 5; page++) {
-      const res = (await c.toolkits.get({
-        sortBy: "alphabetically",
-        managedBy: "all",
+    for (let page = 0; page < 10; page++) {
+      const res = await rawClient.toolkits.list({
+        sort_by: "alphabetically",
+        managed_by: "all",
         cursor,
         limit: 500,
-      })) as {
-        items?: Array<Record<string, unknown>>;
-        nextCursor?: string;
-      };
-      for (const raw of res.items ?? []) {
-        const slug = typeof raw.slug === "string" ? raw.slug : null;
-        const name = typeof raw.name === "string" ? raw.name : null;
-        // SDK has shifted the logo location across versions — top-
-        // level on some, under `meta` on others. Read both shapes.
-        const topLogo = typeof raw.logo === "string" ? raw.logo : null;
-        const metaLogo =
-          raw.meta &&
-          typeof raw.meta === "object" &&
-          typeof (raw.meta as Record<string, unknown>).logo === "string"
-            ? ((raw.meta as Record<string, unknown>).logo as string)
-            : null;
-        if (slug) {
-          out.push({
-            slug,
-            name: name ?? slug,
-            logo: topLogo ?? metaLogo,
-          });
-        }
-      }
-      cursor = res.nextCursor ?? undefined;
+      });
+      for (const t of res.items ?? []) all.push(t);
+      cursor = res.next_cursor ?? undefined;
       if (!cursor) break;
+    }
+    const out: CatalogToolkit[] = [];
+    for (const t of all) {
+      const slug = typeof t.slug === "string" ? t.slug : null;
+      const name = typeof t.name === "string" ? t.name : null;
+      // Logo is under `meta.logo` after the SDK transform; older
+      // SDK versions had it at the top level. Try both.
+      const topLogo = typeof t.logo === "string" ? t.logo : null;
+      const metaLogo =
+        t.meta &&
+        typeof t.meta === "object" &&
+        typeof (t.meta as Record<string, unknown>).logo === "string"
+          ? ((t.meta as Record<string, unknown>).logo as string)
+          : null;
+      if (slug) {
+        out.push({
+          slug,
+          name: name ?? slug,
+          logo: topLogo ?? metaLogo,
+        });
+      }
     }
     _toolkitCatalogCache.set(apiKey, {
       value: out,
