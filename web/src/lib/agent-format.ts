@@ -20,16 +20,29 @@ type AgentSpecBase = {
   raw: Record<string, unknown>;
 };
 
+export type AgentConnection = {
+  /** Composio toolkit slug, e.g. "gmail", "slack". */
+  toolkit: string;
+  /**
+   * Named connection slot — disambiguates when a user has multiple
+   * accounts of the same toolkit (e.g. "work" vs "personal" Gmail).
+   * Defaults to "default" when the spec uses the loose `- gmail`
+   * form.
+   */
+  name: string;
+};
+
 export type PydanticAgentSpec = AgentSpecBase & {
   framework: "pydantic-agentspec";
   model: string;
   instructions: string;
   /**
-   * Composio toolkit slugs this agent depends on at run time. Empty
-   * list when the agent doesn't need external services. Resolved by
-   * the runner via the workspace's Composio API key.
+   * External services this agent depends on at run time. Each entry
+   * resolves at run time to a Composio connection owned by the user
+   * the run is acting as (manual = requesting user; scheduled =
+   * automation.owner_user_id).
    */
-  connections: string[];
+  connections: AgentConnection[];
 };
 
 export type CargoAiSpec = AgentSpecBase & {
@@ -120,37 +133,67 @@ function parsePydanticSpec(
 }
 
 /**
- * Extract `connections:` as a list of toolkit slug strings. Accepts:
+ * Extract `connections:` as a list of {toolkit, name} pairs.
+ * Accepted shapes (loose → most explicit):
  *
- *   - `[slack, googlesheets]`                     (loose)
- *   - `[{type: slack}, {type: googlesheets}]`     (verbose)
- *   - `[{slack: [SLACK_SEND_MESSAGE]}, …]`        (compact, narrow tools)
- *   - `[{slack: {tools: [...]}}, …]`              (verbose, narrow tools)
+ *   connections: [slack, googlesheets]
+ *     → [{toolkit: "slack", name: "default"},
+ *        {toolkit: "googlesheets", name: "default"}]
  *
- * The agents grid only needs toolkit slugs, so we collapse all of
- * the above to a slug list. The runner does the strict tool-list
- * parsing.
+ *   connections: [{slack: [SLACK_SEND_MESSAGE]}]
+ *     → [{toolkit: "slack", name: "default"}]    (tools dropped — the
+ *                                                 runner reads them)
+ *
+ *   connections: [{slack: {tools: [...]}}]
+ *     → same as above
+ *
+ *   connections:
+ *     - gmail: { name: "work" }
+ *     - gmail: { name: "personal", tools: [...] }
+ *     → two pairs, both toolkit gmail, names "work" and "personal".
+ *
+ *   connections: [{type: slack, name: "alt"}]
+ *     → [{toolkit: "slack", name: "alt"}]    (verbose form)
+ *
+ * The runner uses the named slot to look up the right
+ * workspace_composio_connection row at run time. Malformed entries
+ * are dropped — the runner does the strict validation.
  */
-function parseConnectionsField(raw: unknown): string[] {
+function parseConnectionsField(raw: unknown): AgentConnection[] {
   if (!Array.isArray(raw)) return [];
-  const out: string[] = [];
+  const out: AgentConnection[] = [];
   for (const item of raw) {
     if (typeof item === "string" && item.trim()) {
-      out.push(item.trim());
+      out.push({ toolkit: item.trim(), name: "default" });
       continue;
     }
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
-    const slug = o.type ?? o.toolkit ?? o.name;
+
+    // Verbose form: { type|toolkit: "slack", name?: "alt" }
+    const slug = o.type ?? o.toolkit;
     if (typeof slug === "string" && slug.trim()) {
-      out.push(slug.trim());
+      const name =
+        typeof o.name === "string" && o.name.trim() ? o.name.trim() : "default";
+      out.push({ toolkit: slug.trim(), name });
       continue;
     }
-    // Compact form: single-key dict where the key IS the toolkit slug
-    // and the value is its narrowed tools.
+
+    // Compact form: single-key dict where the key IS the toolkit slug.
+    // Value can be: list of tool slugs (narrow tools, no name), or
+    // a dict carrying { name, tools }.
     const keys = Object.keys(o);
     if (keys.length === 1 && keys[0].trim()) {
-      out.push(keys[0].trim());
+      const toolkit = keys[0].trim();
+      const body = o[keys[0]];
+      let name = "default";
+      if (body && typeof body === "object" && !Array.isArray(body)) {
+        const b = body as Record<string, unknown>;
+        if (typeof b.name === "string" && b.name.trim()) {
+          name = b.name.trim();
+        }
+      }
+      out.push({ toolkit, name });
     }
   }
   return out;

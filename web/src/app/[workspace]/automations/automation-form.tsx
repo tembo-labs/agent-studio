@@ -26,9 +26,20 @@ type AgentChoice = {
   name: string;
 };
 
+type MemberChoice = {
+  /** TAS user id — written into automation.owner_user_id. */
+  id: string;
+  /** Display label (name or email). */
+  label: string;
+};
+
 type CommonProps = {
   workspaceSlug: string;
   agents: AgentChoice[];
+  /** Workspace members for the "Run as" picker. */
+  members: MemberChoice[];
+  /** The current session user — picker defaults to this on Create. */
+  currentUserId: string;
   defaults?: {
     id?: string;
     name?: string;
@@ -36,12 +47,15 @@ type CommonProps = {
     cron?: string;
     inputMessage?: string;
     enabled?: boolean;
+    ownerUserId?: string;
   };
 };
 
 export function AutomationForm({
   workspaceSlug,
   agents,
+  members,
+  currentUserId,
   defaults,
   mode,
 }: CommonProps & { mode: "create" | "edit" }) {
@@ -56,6 +70,9 @@ export function AutomationForm({
   const [cron, setCron] = useState(defaults?.cron ?? "0 9 * * 1-5");
   const [inputMessage, setInputMessage] = useState(defaults?.inputMessage ?? "");
   const [enabled, setEnabled] = useState(defaults?.enabled ?? true);
+  const [ownerUserId, setOwnerUserId] = useState(
+    defaults?.ownerUserId ?? currentUserId,
+  );
   const preview = useMemo(() => validateCron(cron), [cron]);
 
   return (
@@ -155,6 +172,34 @@ export function AutomationForm({
           placeholder="Anything the agent should treat as the user's prompt for the run."
           className="bg-surface border-border text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)] rounded-md border px-3 py-2 text-sm leading-6 resize-y"
         />
+      </div>
+
+      <div className="grid gap-1.5">
+        <Label htmlFor="owner_user_id" className="text-sm">
+          Run as
+        </Label>
+        <select
+          id="owner_user_id"
+          name="owner_user_id"
+          required
+          disabled={pending}
+          value={ownerUserId}
+          onChange={(e) => setOwnerUserId(e.target.value)}
+          className="bg-surface border-border text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)] rounded-md border px-3 py-2 text-sm leading-6"
+        >
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+              {m.id === currentUserId ? " (you)" : ""}
+            </option>
+          ))}
+        </select>
+        <p className="text-foreground-muted text-xs">
+          Scheduled runs use this user&apos;s Composio connections. If the
+          agent declares a toolkit this user hasn&apos;t authorized, the run
+          fails — pick someone who has the connections you need (or
+          authorize them yourself).
+        </p>
       </div>
 
       <label className="flex items-center gap-2 text-sm">

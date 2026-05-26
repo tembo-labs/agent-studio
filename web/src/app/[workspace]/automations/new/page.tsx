@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug } from "@/lib/workspace";
+import { getWorkspaceBySlug, listWorkspaceMembers } from "@/lib/workspace";
 import { listAgents } from "@/lib/workspace-agents";
 
 import { AutomationForm } from "../automation-form";
@@ -27,12 +27,19 @@ export default async function NewAutomationPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const result = await listAgents(workspace.id);
+  const [result, memberRows] = await Promise.all([
+    listAgents(workspace.id),
+    listWorkspaceMembers(workspace.id),
+  ]);
   // Only valid, parsed agents can be scheduled — broken files can't
   // describe a runnable model.
   const agents = result.ok
     ? result.agents.filter((a) => a.ok).map((a) => ({ name: a.spec.name }))
     : [];
+  const members = memberRows.map((m) => ({
+    id: m.userId,
+    label: m.name ?? m.email,
+  }));
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
@@ -52,6 +59,8 @@ export default async function NewAutomationPage({
       <AutomationForm
         workspaceSlug={slug}
         agents={agents}
+        members={members}
+        currentUserId={session.user.id}
         defaults={prefillAgent ? { agentName: prefillAgent } : undefined}
         mode="create"
       />

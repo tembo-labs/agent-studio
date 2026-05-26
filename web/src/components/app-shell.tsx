@@ -27,6 +27,8 @@ import {
 
 type MissingConnection = {
   toolkit: string;
+  /** Named slot — "default" or a user-chosen alias like "work". */
+  name: string;
   agentName: string;
 };
 
@@ -114,25 +116,33 @@ export function AppShell({
                 Action needed
               </span>
               {missingConnections.map((m, i) => {
-                const authorizeHref = `/api/connections/composio/authorize?workspace=${encodeURIComponent(workspace.slug)}&toolkit=${encodeURIComponent(m.toolkit)}`;
+                const params = new URLSearchParams({
+                  workspace: workspace.slug,
+                  toolkit: m.toolkit,
+                });
+                if (m.name && m.name !== "default") {
+                  params.set("name", m.name);
+                }
+                const authorizeHref = `/api/connections/composio/authorize?${params.toString()}`;
+                // Show "Gmail (work)" when the slot has a custom name
+                // so the user can tell which Gmail account the agent
+                // wants — otherwise just the toolkit label.
+                const labelWithSlot =
+                  m.name && m.name !== "default"
+                    ? `${toolkitLabel(m.toolkit)} (${m.name})`
+                    : toolkitLabel(m.toolkit);
                 return (
                   <div
-                    key={`${m.toolkit}:${m.agentName}:${i}`}
+                    key={`${m.toolkit}:${m.name}:${m.agentName}:${i}`}
                     className="flex items-start gap-2 rounded-md px-2 py-2 bg-[var(--color-sentiment-caution-subtle)]"
                   >
                     <IconExclamationTriangle
                       size={14}
                       className="mt-0.5 shrink-0 text-[var(--color-icon-sentiment-caution)]"
                     />
-                    {/* Stacked text + button so long agent or toolkit
-                        names wrap naturally instead of squeezing the
-                        action chip. Button aligns with the text on
-                        the left rather than the row edge. */}
                     <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
                       <span className="text-xs leading-tight text-[var(--color-foreground-sentiment-caution)]">
-                        <span className="font-semibold">
-                          {toolkitLabel(m.toolkit)}
-                        </span>{" "}
+                        <span className="font-semibold">{labelWithSlot}</span>{" "}
                         for{" "}
                         <span className="font-semibold">{m.agentName}</span>
                       </span>

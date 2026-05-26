@@ -76,34 +76,35 @@ def usage_payload(usage_obj) -> dict:
     return out
 
 
-def parse_connections(spec: dict) -> list[tuple[str, list[str]]]:
-    """Extract the `connections:` list from the spec.
+def parse_connections(spec: dict) -> list[tuple[str, str, list[str]]]:
+    """Extract `connections:` as `[(toolkit, name, [tool_slug, …])]`.
 
-    Returns `[(toolkit_slug, [tool_slug, …])]`. An empty tool list
-    means "all tools from this toolkit" (loose mode — model uses
-    search/execute meta-tools at runtime). A non-empty list narrows
-    the session to exactly those tools, which lets us preload them
-    via DIRECT_TOOLS and skip the search dance entirely (much
-    cheaper per run).
+    `name` is the user-scoped slot ("default", "work", "personal")
+    that determines which workspace_composio_connection row backs
+    the slot at run time. An empty tool list means "all tools from
+    this toolkit"; a non-empty list narrows the Composio session
+    to exactly those tools.
 
-    Accepted shapes (all generate the same parsed output):
+    Accepted shapes (loose → most explicit):
 
-        # Loose — all tools from the toolkit
+        # Loose — slot defaults to "default"
         connections:
           - slack
           - googlesheets
 
-        # Narrow — explicit tool slugs per toolkit
-        connections:
-          - slack:
-              tools: [SLACK_SEND_MESSAGE]
-          - googlesheets:
-              tools: [GOOGLESHEETS_BATCH_GET]
-
-        # Compact narrow form
+        # Narrow tools, default slot
         connections:
           - slack: [SLACK_SEND_MESSAGE]
-          - googlesheets: [GOOGLESHEETS_BATCH_GET]
+          - googlesheets: { tools: [GOOGLESHEETS_BATCH_GET] }
+
+        # Named slot
+        connections:
+          - gmail: { name: work }
+          - gmail: { name: personal, tools: [GMAIL_SEND_EMAIL] }
+
+        # Verbose form
+        connections:
+          - { type: slack, name: alt, tools: [SLACK_SEND_MESSAGE] }
     """
     raw = spec.get("connections")
     if raw is None:
@@ -113,32 +114,41 @@ def parse_connections(spec: dict) -> list[tuple[str, list[str]]]:
             "`connections:` must be a list of toolkit slugs "
             "(e.g. `connections: [slack, googlesheets]`)"
         )
-    out: list[tuple[str, list[str]]] = []
+    out: list[tuple[str, str, list[str]]] = []
     for item in raw:
         if isinstance(item, str):
-            out.append((item.strip(), []))
+            out.append((item.strip(), "default", []))
             continue
         if not isinstance(item, dict):
             raise ValueError(
                 f"`connections:` entry must be a string or object, "
                 f"got {type(item).__name__}"
             )
-        if len(item) == 1:
-            # Compact form: `{slack: [SLACK_SEND_MESSAGE]}` or
-            # `{slack: {tools: [SLACK_SEND_MESSAGE]}}`.
-            slug, body = next(iter(item.items()))
-            tools = _coerce_tools_value(body)
-            out.append((str(slug).strip(), tools))
-            continue
-        # Verbose form: `{type: slack, tools: [...]}`.
-        slug = item.get("type") or item.get("toolkit") or item.get("name")
-        if not isinstance(slug, str):
-            raise ValueError(
-                f"`connections:` entry has no toolkit slug: {item!r}"
+        # Verbose form: `{type: slack, name: alt, tools: [...]}`.
+        slug_from_verbose = item.get("type") or item.get("toolkit")
+        if isinstance(slug_from_verbose, str):
+            name = (
+                str(item.get("name")).strip().lower()
+                if isinstance(item.get("name"), str) and item.get("name").strip()
+                else "default"
             )
-        tools = _coerce_tools_value(item.get("tools"))
-        out.append((slug.strip(), tools))
-    return [(slug, tools) for (slug, tools) in out if slug]
+            tools = _coerce_tools_value(item.get("tools"))
+            out.append((slug_from_verbose.strip(), name, tools))
+            continue
+        # Compact form: `{slack: [...]}` or `{slack: {name, tools}}`.
+        if len(item) == 1:
+            slug, body = next(iter(item.items()))
+            name = "default"
+            if isinstance(body, dict):
+                if isinstance(body.get("name"), str) and body.get("name").strip():
+                    name = body["name"].strip().lower()
+            tools = _coerce_tools_value(body)
+            out.append((str(slug).strip(), name, tools))
+            continue
+        raise ValueError(
+            f"`connections:` entry has no toolkit slug: {item!r}"
+        )
+    return [(slug, name, tools) for (slug, name, tools) in out if slug]
 
 
 def _coerce_tools_value(value) -> list[str]:
@@ -265,7 +275,7 @@ def build_agent(
     return Agent(model, **kwargs)
 
 
-def build_composio_toolset(connections: list[tuple[str, list[str]]]):
+def build_composio_toolset(connections: list[tuple[str, str, list[str]]]):
     """Create a Composio Tool Router session for the declared toolkits
     and wrap it in an MCPServerStreamableHTTP so pydantic-ai can call
     the tools.
@@ -309,42 +319,61 @@ def build_composio_toolset(connections: list[tuple[str, list[str]]]):
     # when manage_connections=False — passing `connected_accounts`
     # explicitly is what makes them show up as is_active in the
     # session and therefore exposes their tools to the agent.
+    # Rust runner ships the nested map `{toolkit: {name: connection_id}}`.
+    # Each declared (toolkit, name) slot resolves to a specific
+    # connection_id below. Composio's Tool Router needs the explicit
+    # connected_accounts pass when manage_connections=false; otherwise
+    # the session reports the toolkits inactive even when the user
+    # authorized them.
     accounts_json = os.environ.get("TAS_COMPOSIO_CONNECTED_ACCOUNTS")
-    connected_accounts: dict[str, str] = {}
+    nested: dict[str, dict[str, str]] = {}
     if accounts_json:
         try:
             parsed = json.loads(accounts_json)
             if isinstance(parsed, dict):
-                connected_accounts = {
-                    str(k): str(v) for k, v in parsed.items() if isinstance(v, str)
-                }
+                for tk, inner in parsed.items():
+                    if isinstance(inner, dict):
+                        nested[str(tk)] = {
+                            str(k): str(v)
+                            for k, v in inner.items()
+                            if isinstance(v, str)
+                        }
         except json.JSONDecodeError:
             pass
-    toolkit_slugs = [slug for (slug, _) in connections]
-    missing = [t for t in toolkit_slugs if t not in connected_accounts]
+
+    resolved: dict[str, str] = {}
+    missing: list[str] = []
+    for (toolkit, name, _tools) in connections:
+        cid = nested.get(toolkit, {}).get(name)
+        if cid is None:
+            slot_label = toolkit if name == "default" else f"{toolkit}/{name}"
+            missing.append(slot_label)
+        else:
+            resolved[toolkit] = cid
     if missing:
         raise ValueError(
             "Agent declares connections "
-            f"{missing!r} but the workspace has no active Composio "
-            "connection for them. Authorize them under Settings → "
-            "Connections and try again."
+            f"{missing!r} but the run's acting user has no active "
+            "Composio connection for them. Authorize them under "
+            "Settings → Connections and try again."
         )
 
     # Narrowed tools per toolkit — only included when the agent
-    # specified explicit slugs. When all toolkits are narrowed we
-    # also flip to DIRECT_TOOLS so only those schemas land in the
-    # model's context (no search/execute meta-tools, no extra round
-    # trip).
+    # specified explicit slugs. When every slot is narrowed we flip
+    # to DIRECT_TOOLS so only those schemas land in the model's
+    # context (no search/execute meta-tools, no extra round trip).
     tools_param: dict[str, list[str]] = {
-        slug: tools for (slug, tools) in connections if tools
+        toolkit: tools for (toolkit, _name, tools) in connections if tools
     }
-    all_narrowed = bool(connections) and all(bool(tools) for (_, tools) in connections)
+    all_narrowed = bool(connections) and all(
+        bool(tools) for (_, _, tools) in connections
+    )
 
     composio = Composio(api_key=api_key)
     create_kwargs: dict = {
         "user_id": user_id,
-        "toolkits": toolkit_slugs,
-        "connected_accounts": {t: connected_accounts[t] for t in toolkit_slugs},
+        "toolkits": sorted({tk for (tk, _, _) in connections}),
+        "connected_accounts": resolved,
         "manage_connections": False,
         "workbench": {"enable": False},
     }
@@ -375,7 +404,9 @@ async def run(spec: dict, user_message: str) -> None:
     # Sonnet-tier models will hedge regardless of which path they're
     # on without explicit imperative framing.
     preamble_toolkits = (
-        [slug for (slug, _) in connections] if mcp is not None else None
+        sorted({slug for (slug, _name, _tools) in connections})
+        if mcp is not None
+        else None
     )
     agent = build_agent(
         spec,

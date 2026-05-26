@@ -2,68 +2,80 @@ import Link from "next/link";
 
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import { toolkitLabel, type ComposioToolkit } from "@/lib/composio";
+import { toolkitLabel } from "@/lib/composio";
 import { type WorkspaceComposioConnection } from "@/lib/composio-connections";
 
 import { DisconnectComposioConnectionForm } from "./disconnect-composio-connection-form";
 
-// Settings → Connections (basic mode, Composio-backed).
+// Settings → Connections (basic mode, Composio-backed, per-user).
 //
-// Distinct from `ConnectionsSection` (Phase A, TAS-owned OAuth) which
-// stays in the codebase for the future "advanced mode" but isn't
-// rendered today. v0.3 ships only Composio.
+// Each row is a (toolkit, name) slot — declared by an agent in the
+// repo or already authorized by the current user. Two truths drive
+// the list: what's already authorized by the current user (from the
+// DB) and what's declared by the workspace's agents (from the repo
+// scan in page.tsx). The union becomes the rendered set.
 //
-// The toolkit list is data-driven: callers pass `declaredToolkits`
-// — every Composio slug referenced by any agent in the connected
-// repo. We union those with the workspace's existing connections so
-// the section also shows authorized-but-no-longer-used toolkits
-// (with a hint that they're idle), and surfaces a Connect affordance
-// for declared-but-not-yet-authorized ones. This is what lets Tembo
-// invent new toolkits in agent files without a TAS code change.
+// The Phase A TAS-owned ConnectionsSection stays in the codebase as
+// the future "advanced mode" surface; v0.3 only ships Composio.
 
 type Props = {
   workspaceSlug: string;
+  /** Connections owned by the current session user, in this workspace. */
   connections: WorkspaceComposioConnection[];
-  /** Toolkit slugs declared by agents in the connected repo. */
-  declaredToolkits: string[];
+  /** (toolkit, name) pairs declared by agents in the connected repo. */
+  declaredSlots: { toolkit: string; name: string }[];
   composioEnabled: boolean;
   banner?: {
-    toolkit: ComposioToolkit;
+    toolkit: string;
     result: "ok" | "error";
     detail?: string;
   };
 };
 
+type SlotKey = string; // `${toolkit}:${name}`
+
 export function ComposioConnectionsSection({
   workspaceSlug,
   connections,
-  declaredToolkits,
+  declaredSlots,
   composioEnabled,
   banner,
 }: Props) {
-  const byToolkit = new Map(connections.map((c) => [c.toolkit, c]));
+  // Index of slot → connection the current user has.
+  const ownedSlots = new Map<SlotKey, WorkspaceComposioConnection>();
+  for (const c of connections) {
+    ownedSlots.set(`${c.toolkit}:${c.name}`, c);
+  }
 
-  // Sort: connected first, then declared-but-not-connected (so the
-  // user sees what they still need to authorize), then anything else.
-  // Dedup case-insensitively on slug.
-  const declared = new Set(
-    declaredToolkits.map((t) => t.trim().toLowerCase()).filter(Boolean),
-  );
-  const allSlugs = new Set<string>([
-    ...connections.map((c) => c.toolkit),
-    ...declared,
-  ]);
-  const rows = [...allSlugs].sort((a, b) => {
-    const aConn = byToolkit.has(a) ? 0 : 1;
-    const bConn = byToolkit.has(b) ? 0 : 1;
-    if (aConn !== bConn) return aConn - bConn;
-    return a.localeCompare(b);
+  // Union of declared + owned slots, sorted so unfulfilled-declared
+  // pairs surface first (they're the actionable ones), then owned,
+  // then by name.
+  const allSlots: { toolkit: string; name: string }[] = [];
+  const seen = new Set<SlotKey>();
+  for (const s of declaredSlots) {
+    const key = `${s.toolkit}:${s.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    allSlots.push(s);
+  }
+  for (const c of connections) {
+    const key = `${c.toolkit}:${c.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    allSlots.push({ toolkit: c.toolkit, name: c.name });
+  }
+  allSlots.sort((a, b) => {
+    const aOwned = ownedSlots.has(`${a.toolkit}:${a.name}`) ? 1 : 0;
+    const bOwned = ownedSlots.has(`${b.toolkit}:${b.name}`) ? 1 : 0;
+    if (aOwned !== bOwned) return aOwned - bOwned;
+    if (a.toolkit !== b.toolkit) return a.toolkit.localeCompare(b.toolkit);
+    return a.name.localeCompare(b.name);
   });
 
   return (
     <Section
-      title="Connections"
-      description="External services this workspace's agents can call at run time. The list below is driven by the agents in your connected repo — declare a toolkit in an agent's `connections:` field and it shows up here. Powered by Composio; credentials live in Composio's vault."
+      title="Your connections"
+      description="External services you've authorized for agents in this workspace. Connections are per-user — other workspace members authorize their own. The list below is driven by the agents in your connected repo plus anything you've connected on top."
     >
       <div id="connections" className="flex flex-col gap-3">
         {!composioEnabled && (
@@ -109,7 +121,7 @@ export function ComposioConnectionsSection({
           </div>
         )}
 
-        {rows.length === 0 ? (
+        {allSlots.length === 0 ? (
           <p className="text-foreground-weak text-sm">
             No agents in this workspace declare a{" "}
             <code className="bg-surface rounded px-1 py-0.5 text-xs">
@@ -119,16 +131,19 @@ export function ComposioConnectionsSection({
             here for you to authorize.
           </p>
         ) : (
-          rows.map((toolkit) => (
-            <ComposioConnectionRow
-              key={toolkit}
-              toolkit={toolkit}
-              workspaceSlug={workspaceSlug}
-              connection={byToolkit.get(toolkit)}
-              declared={declared.has(toolkit)}
-              enabled={composioEnabled}
-            />
-          ))
+          allSlots.map((slot) => {
+            const key = `${slot.toolkit}:${slot.name}`;
+            return (
+              <ComposioConnectionRow
+                key={key}
+                toolkit={slot.toolkit}
+                name={slot.name}
+                workspaceSlug={workspaceSlug}
+                connection={ownedSlots.get(key)}
+                enabled={composioEnabled}
+              />
+            );
+          })
         )}
       </div>
     </Section>
@@ -137,41 +152,36 @@ export function ComposioConnectionsSection({
 
 function ComposioConnectionRow({
   toolkit,
+  name,
   workspaceSlug,
   connection,
-  declared,
   enabled,
 }: {
-  toolkit: ComposioToolkit;
+  toolkit: string;
+  name: string;
   workspaceSlug: string;
   connection: WorkspaceComposioConnection | undefined;
-  declared: boolean;
   enabled: boolean;
 }) {
-  const label = toolkitLabel(toolkit);
-  const authorizeHref = `/api/connections/composio/authorize?workspace=${encodeURIComponent(workspaceSlug)}&toolkit=${encodeURIComponent(toolkit)}`;
+  const label =
+    name === "default"
+      ? toolkitLabel(toolkit)
+      : `${toolkitLabel(toolkit)} (${name})`;
 
-  // Three states the user actually cares about:
-  //   - Connected + declared: green path, "Reconnect / Disconnect"
-  //   - Connected + not declared: "Idle — no agent uses this yet"
-  //   - Declared + not connected: "Authorize" call to action
+  const params = new URLSearchParams({
+    workspace: workspaceSlug,
+    toolkit,
+  });
+  if (name !== "default") params.set("name", name);
+  const authorizeHref = `/api/connections/composio/authorize?${params.toString()}`;
+
   const subtitle = connection
-    ? declared
-      ? (
-          <>
-            Status: {connection.status} · updated{" "}
-            <LocalTime iso={connection.updatedAt.toISOString()} />
-          </>
-        )
-      : (
-          <>
-            Idle — no agent in this repo references{" "}
-            <code className="bg-surface rounded px-1 py-0.5 text-xs">
-              {toolkit}
-            </code>
-            . Safe to disconnect.
-          </>
-        )
+    ? (
+        <>
+          Status: {connection.status} · updated{" "}
+          <LocalTime iso={connection.updatedAt.toISOString()} />
+        </>
+      )
     : enabled
       ? "Declared by an agent in this repo. Authorize to enable runs."
       : "Set the Composio API key below first.";

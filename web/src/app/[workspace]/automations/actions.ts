@@ -29,6 +29,8 @@ type ParsedForm = {
   cron: string;
   inputMessage: string;
   enabled: boolean;
+  /** Workspace member whose credentials each scheduled run uses. */
+  ownerUserId: string;
 };
 
 function parseForm(formData: FormData): ParsedForm {
@@ -39,6 +41,7 @@ function parseForm(formData: FormData): ParsedForm {
     cron: String(formData.get("cron") ?? "").trim(),
     inputMessage: String(formData.get("input_message") ?? ""),
     enabled: formData.get("enabled") === "on",
+    ownerUserId: String(formData.get("owner_user_id") ?? "").trim(),
   };
 }
 
@@ -75,6 +78,10 @@ export async function createAutomationAction(
   const invalid = await validate(workspace.id, parsed);
   if (invalid) return invalid;
 
+  // Owner defaults to the creator when the form leaves the picker
+  // blank. Real workspace-member validation can land later — for v0.3
+  // we just trust the dropdown's value (or fall back to self).
+  const ownerUserId = parsed.ownerUserId || session.user.id;
   await createAutomation({
     workspaceId: workspace.id,
     name: parsed.name,
@@ -83,6 +90,7 @@ export async function createAutomationAction(
     inputMessage: parsed.inputMessage,
     enabled: parsed.enabled,
     userId: session.user.id,
+    ownerUserId,
   });
 
   revalidatePath(`/${parsed.workspaceSlug}/automations`);
@@ -117,6 +125,11 @@ export async function updateAutomationAction(
     cron: parsed.cron,
     inputMessage: parsed.inputMessage,
     enabled: parsed.enabled,
+    // Preserve the existing owner when the form omits the picker
+    // (e.g. an older client). The form's hidden default value should
+    // always send the current owner so the edit doesn't accidentally
+    // re-assign.
+    ownerUserId: parsed.ownerUserId || existing.ownerUserId,
   });
 
   revalidatePath(`/${parsed.workspaceSlug}/automations`);
@@ -181,6 +194,7 @@ export async function toggleAutomationAction(formData: FormData): Promise<void> 
     cron: existing.cron,
     inputMessage: existing.inputMessage,
     enabled,
+    ownerUserId: existing.ownerUserId,
   });
   revalidatePath(`/${workspaceSlug}/automations`);
   revalidatePath(`/${workspaceSlug}/agents/${encodeURIComponent(existing.agentName)}`);

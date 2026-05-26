@@ -121,6 +121,39 @@ export async function getWorkspaceBySlug(
   return rows[0] ? rowToWorkspace(rows[0]) : null;
 }
 
+export type WorkspaceMember = {
+  userId: string;
+  name: string | null;
+  email: string;
+};
+
+/**
+ * List the (userId, name, email) of every member of a workspace.
+ * Used by the automation "Run as" picker; tolerable to be a small
+ * query since member counts are <100 in practice.
+ */
+export async function listWorkspaceMembers(
+  workspaceId: string,
+): Promise<WorkspaceMember[]> {
+  const { rows } = await db.query<{
+    user_id: string;
+    name: string | null;
+    email: string;
+  }>(
+    `SELECT m.user_id, u.name, u.email
+       FROM workspace_member m
+       JOIN "user" u ON u.id = m.user_id
+      WHERE m.workspace_id = $1
+      ORDER BY COALESCE(u.name, u.email) ASC`,
+    [workspaceId],
+  );
+  return rows.map((r) => ({
+    userId: r.user_id,
+    name: r.name,
+    email: r.email,
+  }));
+}
+
 export async function userIsMember(
   workspaceId: string,
   userId: string,

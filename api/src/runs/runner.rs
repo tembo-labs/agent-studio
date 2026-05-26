@@ -39,6 +39,11 @@ impl SpecFormat {
 pub struct RunContext {
     pub run_id: Uuid,
     pub workspace_id: Uuid,
+    /// The user this run acts as for credential lookups (manual
+    /// runs = the requesting user; scheduled runs = the automation's
+    /// owner_user_id). Drives which Composio connections the
+    /// Pydantic wrapper attaches to the agent's session.
+    pub acting_user_id: String,
     /// `provider:model` (e.g. `openai:gpt-4o-mini`). Cargo AI needs
     /// the split; Pydantic passthrough lets pydantic-ai parse the
     /// model field straight out of the spec and only uses this for
@@ -243,24 +248,44 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
     )
     .await
     .ok();
-    let composio_user_id = ctx.workspace_id.to_string();
-    // Pre-resolved `{toolkit_slug: composio_connection_id}` map for
-    // the workspace's ACTIVE composio connections. Composio's Tool
-    // Router session needs these passed explicitly when
-    // manage_connections=false; otherwise it sees them as inactive
-    // even though the user authorized them.
+    // Composio user_id we pass through is the composite
+    // `${workspace_id}:${acting_user_id}` so Composio's vault stays
+    // isolated per (workspace, user) — mirrors what the web side
+    // hands to composio.connectedAccounts.link.
+    let composio_user_id =
+        format!("{}:{}", ctx.workspace_id, ctx.acting_user_id);
+    // Pre-resolved nested `{toolkit_slug: {name: connection_id}}`
+    // map for the acting user's ACTIVE composio connections.
+    // Composio's Tool Router session needs the explicit
+    // connection_id per declared slot when manage_connections=false;
+    // otherwise sessions report the toolkits as inactive even when
+    // the user authorized them.
     let composio_connected_accounts_json: Option<String> = if composio_key.is_some() {
-        let pairs = list_active_composio_connections(&state.db, ctx.workspace_id)
-            .await
-            .unwrap_or_default();
-        if pairs.is_empty() {
+        let triples = list_active_composio_connections(
+            &state.db,
+            ctx.workspace_id,
+            &ctx.acting_user_id,
+        )
+        .await
+        .unwrap_or_default();
+        if triples.is_empty() {
             None
         } else {
-            let map: serde_json::Map<String, serde_json::Value> = pairs
-                .into_iter()
-                .map(|(slug, id)| (slug, serde_json::Value::String(id)))
-                .collect();
-            Some(serde_json::Value::Object(map).to_string())
+            let mut by_toolkit: std::collections::BTreeMap<
+                String,
+                serde_json::Map<String, serde_json::Value>,
+            > = std::collections::BTreeMap::new();
+            for (toolkit, name, id) in triples {
+                by_toolkit
+                    .entry(toolkit)
+                    .or_default()
+                    .insert(name, serde_json::Value::String(id));
+            }
+            let mut top = serde_json::Map::new();
+            for (toolkit, inner) in by_toolkit {
+                top.insert(toolkit, serde_json::Value::Object(inner));
+            }
+            Some(serde_json::Value::Object(top).to_string())
         }
     } else {
         None

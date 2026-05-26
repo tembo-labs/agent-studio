@@ -94,11 +94,26 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Session user must match the user who initiated the link —
+  // signed state proves provenance, but the new connection should
+  // be owned by whoever is currently logged in (and that should be
+  // the same person who clicked Connect in the same browser tab).
+  if (session.user.id !== payload.userId) {
+    return backToSettings(
+      request,
+      payload.workspaceSlug,
+      payload.toolkit,
+      "error",
+      "Session user changed during OAuth flow.",
+    );
+  }
+
   let latest;
   try {
     latest = await findLatestActiveConnection({
       apiKey,
       workspaceId: payload.workspaceId,
+      userId: payload.userId,
       toolkit: payload.toolkit,
     });
   } catch (err) {
@@ -123,12 +138,13 @@ export async function GET(request: NextRequest) {
 
   await saveComposioConnection({
     workspaceId: payload.workspaceId,
+    userId: payload.userId,
     toolkit: payload.toolkit,
+    name: payload.connectionName,
     composioConnectionId: latest.connectedAccountId,
     authConfigId: latest.authConfigId,
     status: latest.status,
     metadata: {},
-    userId: session.user.id,
   });
 
   return backToSettings(request, payload.workspaceSlug, payload.toolkit, "ok");

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { getAutomation } from "@/lib/automations-api";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug } from "@/lib/workspace";
+import { getWorkspaceBySlug, listWorkspaceMembers } from "@/lib/workspace";
 import { listAgents } from "@/lib/workspace-agents";
 
 import { AutomationForm } from "../automation-form";
@@ -27,10 +27,17 @@ export default async function EditAutomationPage({
   const automation = await getAutomation(id);
   if (!automation || automation.workspaceId !== workspace.id) notFound();
 
-  const result = await listAgents(workspace.id);
+  const [result, memberRows] = await Promise.all([
+    listAgents(workspace.id),
+    listWorkspaceMembers(workspace.id),
+  ]);
   const agents = result.ok
     ? result.agents.filter((a) => a.ok).map((a) => ({ name: a.spec.name }))
     : [];
+  const members = memberRows.map((m) => ({
+    id: m.userId,
+    label: m.name ?? m.email,
+  }));
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
@@ -46,6 +53,8 @@ export default async function EditAutomationPage({
       <AutomationForm
         workspaceSlug={slug}
         agents={agents}
+        members={members}
+        currentUserId={session.user.id}
         defaults={{
           id: automation.id,
           name: automation.name,
@@ -53,6 +62,7 @@ export default async function EditAutomationPage({
           cron: automation.cron,
           inputMessage: automation.inputMessage,
           enabled: automation.enabled,
+          ownerUserId: automation.ownerUserId,
         }}
         mode="edit"
       />

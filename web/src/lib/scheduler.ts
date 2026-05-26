@@ -144,7 +144,11 @@ async function maybeFire(a: Automation, now: Date) {
     cache: "no-store",
     body: JSON.stringify({
       workspace_id: a.workspaceId,
-      user_id: a.createdBy,
+      // Scheduled runs act as the automation's owner (per migration
+      // 0023). The owner's credentials are what the Composio session
+      // looks up; defaults to createdBy when an automation is
+      // created and can be reassigned from the form.
+      user_id: a.ownerUserId,
       agent_name: spec.name,
       agent_path: resolved.agent.path,
       model,

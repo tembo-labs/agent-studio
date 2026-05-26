@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
-import { listComposioConnectionsForWorkspace } from "@/lib/composio-connections";
+import { listConnectionsForUser } from "@/lib/composio-connections";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
 import {
@@ -51,35 +51,44 @@ export default async function WorkspaceLayout({
   void touchWorkspaceLastVisited(workspace.id, session.user.id);
 
   // Compute "Connect X for agent Y" alerts the sidebar surfaces when
-  // an agent declares a Composio toolkit the workspace hasn't
-  // authorized yet. Without this, users on /agents or /runs would
-  // only discover the gap when an agent fails to run.
+  // an agent declares a Composio toolkit the CURRENT user hasn't
+  // authorized yet. Connections are now per-user (migration 0022),
+  // so each member sees their own gaps — not the workspace's. Lets
+  // a new team member know exactly which toolkits they need to
+  // authorize themselves vs which their team has already covered.
   //
-  // Both fetches are tolerated to fail (no repo connected, invalid
-  // GitHub token, Composio query error) — the sidebar just drops
-  // the alerts section in that case rather than blocking page render.
-  const [workspaces, agentsListing, composioConnections] = await Promise.all([
+  // Both fetches are tolerated to fail (no repo, invalid GitHub
+  // token, Composio query error) — the sidebar drops the alerts
+  // section in that case rather than blocking page render.
+  const [workspaces, agentsListing, myConnections] = await Promise.all([
     listWorkspacesForUser(session.user.id),
     listAgents(workspace.id).catch(() => null),
-    listComposioConnectionsForWorkspace(workspace.id).catch(() => []),
+    listConnectionsForUser(workspace.id, session.user.id).catch(() => []),
   ]);
   const switcherList = workspaces.map((w) => ({ slug: w.slug, name: w.name }));
-  const activeToolkits = new Set(
-    composioConnections
+  // Set of `${toolkit}:${name}` the current user holds ACTIVE.
+  const mySlots = new Set(
+    myConnections
       .filter((c) => c.status === "ACTIVE")
-      .map((c) => c.toolkit),
+      .map((c) => `${c.toolkit}:${c.name}`),
   );
-  const missingConnections: { toolkit: string; agentName: string }[] = [];
+  const missingConnections: {
+    toolkit: string;
+    name: string;
+    agentName: string;
+  }[] = [];
   if (agentsListing && agentsListing.ok) {
     for (const a of agentsListing.agents) {
       if (!a.ok) continue;
       if (a.spec.framework !== "pydantic-agentspec") continue;
-      for (const slug of a.spec.connections) {
-        const normalized = slug.trim().toLowerCase();
-        if (!normalized) continue;
-        if (!activeToolkits.has(normalized)) {
+      for (const conn of a.spec.connections) {
+        const toolkit = conn.toolkit.trim().toLowerCase();
+        const name = conn.name.trim().toLowerCase() || "default";
+        if (!toolkit) continue;
+        if (!mySlots.has(`${toolkit}:${name}`)) {
           missingConnections.push({
-            toolkit: normalized,
+            toolkit,
+            name,
             agentName: a.spec.name,
           });
         }

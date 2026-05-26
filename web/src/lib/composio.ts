@@ -18,9 +18,18 @@ import { Composio } from "@composio/core";
 // here takes `apiKey` explicitly — callers fetch it once via
 // `getWorkspaceSecretPlaintext` and pass it through.
 //
-// The Composio `user_id` we pass is the workspace UUID — that's how
-// Composio isolates connections across workspaces sharing one key
-// (and isn't security-critical because the API key is the boundary).
+// Composio's `user_id` is now `${workspaceId}:${userId}` — a
+// composite. Connections are per-user (each workspace member
+// authorizes their own toolkits), so the isolation boundary is
+// (workspace, user), not just workspace. Including the workspaceId
+// keeps Composio's vault from leaking across workspaces even when
+// the same TAS user is a member of more than one.
+//
+// Each TAS workspace_composio_connection row also carries a `name`
+// ("default", "work", "personal") so a user can attach multiple
+// Gmail accounts and the agent's `connections:` field disambiguates
+// by name. The connection's Composio-side connected_account_id is
+// what we cache locally.
 
 // Composio toolkit identifiers are free-form strings — whatever
 // Composio's catalog uses (slack, googlesheets, gmail, notion,
@@ -69,6 +78,16 @@ export function toolkitLabel(slug: string): string {
 
 function makeClient(apiKey: string): Composio {
   return new Composio({ apiKey });
+}
+
+/**
+ * Compose the Composio user_id we hand to the SDK from our
+ * (workspaceId, userId) pair. Composite-keying with the workspace
+ * ensures one TAS user who belongs to multiple workspaces keeps
+ * their connections cleanly separated on Composio's side.
+ */
+export function composioUserId(workspaceId: string, userId: string): string {
+  return `${workspaceId}:${userId}`;
 }
 
 /**
@@ -126,6 +145,7 @@ export type ComposioLinkResult = {
 export async function initiateConnection(args: {
   apiKey: string;
   workspaceId: string;
+  userId: string;
   toolkit: ComposioToolkit;
   callbackUrl: string;
 }): Promise<ComposioLinkResult> {
@@ -134,7 +154,8 @@ export async function initiateConnection(args: {
     args.toolkit,
   );
   const c = makeClient(args.apiKey);
-  const req = await c.connectedAccounts.link(args.workspaceId, authConfigId, {
+  const composioUid = composioUserId(args.workspaceId, args.userId);
+  const req = await c.connectedAccounts.link(composioUid, authConfigId, {
     callbackUrl: args.callbackUrl,
     allowMultiple: true,
   });
@@ -179,11 +200,13 @@ export type LatestConnection = {
 export async function findLatestActiveConnection(args: {
   apiKey: string;
   workspaceId: string;
+  userId: string;
   toolkit: ComposioToolkit;
 }): Promise<LatestConnection | null> {
   const c = makeClient(args.apiKey);
+  const composioUid = composioUserId(args.workspaceId, args.userId);
   const list = await c.connectedAccounts.list({
-    userIds: [args.workspaceId],
+    userIds: [composioUid],
     toolkitSlugs: [args.toolkit],
     statuses: ["ACTIVE"],
     limit: 5,

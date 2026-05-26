@@ -376,8 +376,21 @@ connections:
   - googlesheets: [GOOGLESHEETS_BATCH_GET]
 \`\`\`
 
-Both forms can mix in the same file. A toolkit without an explicit
-tool list defaults to the loose behavior for that toolkit.
+**Named slots** — when the agent needs to disambiguate which of a
+user's multiple accounts to use (e.g. work vs personal Gmail), add
+a \`name\` field. Names are slug-ish strings the user picks when
+authorizing; "default" is reserved for the first connection of a
+type.
+
+\`\`\`yaml
+connections:
+  - gmail: { name: work }
+  - gmail: { name: personal, tools: [GMAIL_SEND_EMAIL] }
+\`\`\`
+
+All three forms can mix in the same file. Anything without an
+explicit name uses the \`default\` slot for that user; anything
+without an explicit tools list runs in loose mode for that slot.
 
 **Toolkit slugs** are whatever Composio uses. Common ones:
 \`slack\`, \`gmail\`, \`googlesheets\`, \`googlecalendar\`,
@@ -391,9 +404,15 @@ Settings → Connections.
 
 Studio rules:
 
-- **Authorize first, declare second.** The workspace must have
-  authorized each toolkit under Settings → Connections before a
-  run; the runner fails fast otherwise.
+- **Connections are per-user.** Every workspace member authorizes
+  their own toolkits. A manual "Run now" uses the requesting user's
+  connections; a scheduled automation uses its **Run as** owner's
+  connections (set on the automation form, defaults to whoever
+  created it). The runner fails fast if the acting user hasn't
+  authorized a declared toolkit + name.
+- **Authorize first, declare second.** Once an agent declares a
+  toolkit, every member who'll run it sees a "Connect X for Y"
+  alert in their sidebar until they authorize.
 - **No credentials in the file.** The agent file declares *which*
   toolkits it needs; the actual OAuth tokens live in Composio's
   vault, scoped per workspace.

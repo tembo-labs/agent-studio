@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
 import { type ComposioToolkit } from "@/lib/composio";
-import { listComposioConnectionsForWorkspace } from "@/lib/composio-connections";
+import { listConnectionsForUser } from "@/lib/composio-connections";
 import { getServerSession } from "@/lib/session";
 import { listAgents, listDeletedAgents } from "@/lib/workspace-agents";
 import {
@@ -62,26 +62,33 @@ export default async function SettingsPage({
     getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
     getWorkspaceRepo(workspace.id),
     listDeletedAgents(workspace.id),
-    listComposioConnectionsForWorkspace(workspace.id),
+    listConnectionsForUser(workspace.id, session.user.id),
     listAgents(workspace.id),
   ]);
 
-  // Toolkits the workspace's agents declare via `connections:` —
-  // that's what populates the Connections section, not a hardcoded
-  // allowlist. Tolerated to fail (no repo, broken auth, etc.) so
-  // Settings still renders without the dynamic list when the agents
-  // can't be loaded; the section just shows an empty state.
-  const declaredToolkits: string[] = (() => {
+  // Toolkits + slot names the workspace's agents declare. Drives the
+  // Connections section: each (toolkit, name) pair an agent wants
+  // gets surfaced for authorization by the current user. Tolerated
+  // to fail (no repo, broken auth, …) — the section shows an empty
+  // state in that case.
+  const declaredSlots: { toolkit: string; name: string }[] = (() => {
     if (!agentsListing.ok) return [];
-    const slugs = new Set<string>();
+    const seen = new Set<string>();
+    const out: { toolkit: string; name: string }[] = [];
     for (const a of agentsListing.agents) {
       if (!a.ok) continue;
       if (a.spec.framework !== "pydantic-agentspec") continue;
-      for (const slug of a.spec.connections) {
-        if (slug) slugs.add(slug.trim().toLowerCase());
+      for (const conn of a.spec.connections) {
+        const toolkit = conn.toolkit.trim().toLowerCase();
+        const name = conn.name.trim().toLowerCase() || "default";
+        if (!toolkit) continue;
+        const key = `${toolkit}:${name}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ toolkit, name });
       }
     }
-    return [...slugs];
+    return out;
   })();
 
   // Composio callback bounces us here with ?composio=<toolkit>&result=ok|error.
@@ -201,7 +208,7 @@ export default async function SettingsPage({
             <ComposioConnectionsSection
               workspaceSlug={workspace.slug}
               connections={composioConnections}
-              declaredToolkits={declaredToolkits}
+              declaredSlots={declaredSlots}
               composioEnabled={Boolean(composioPreview)}
               banner={composioBanner}
             />

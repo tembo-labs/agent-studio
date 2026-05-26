@@ -68,6 +68,7 @@ pub async fn create_run(
     let run_id = Uuid::new_v4();
 
     let user_message = req.user_message.unwrap_or_default();
+    let acting_user_id = req.user_id;
     // Reject unknown trigger values up front so we surface bad
     // callers instead of silently coercing to 'manual'.
     let trigger = match req.trigger.as_deref() {
@@ -92,7 +93,7 @@ pub async fn create_run(
     .bind(&req.agent_name)
     .bind(&req.agent_path)
     .bind(&req.model)
-    .bind(&req.user_id)
+    .bind(&acting_user_id)
     .bind(&user_message)
     .bind(trigger)
     .bind(req.automation_id)
@@ -128,6 +129,7 @@ pub async fn create_run(
             runner::RunContext {
                 run_id,
                 workspace_id,
+                acting_user_id,
                 model,
                 user_message,
                 framework,

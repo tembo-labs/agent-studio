@@ -62,6 +62,18 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
+  // Named slot for multi-account toolkits. Defaults to "default";
+  // user picks a custom name via the Settings "Connect another"
+  // flow. Constrain to a slug-ish charset so it round-trips through
+  // URLs cleanly and matches the agent-spec parser expectations.
+  const nameRaw = request.nextUrl.searchParams.get("name") ?? "default";
+  const connectionName = nameRaw.trim().toLowerCase();
+  if (!/^[a-z0-9_-]+$/.test(connectionName)) {
+    return NextResponse.json(
+      { error: `bad connection name shape: ${nameRaw}` },
+      { status: 400 },
+    );
+  }
 
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) {
@@ -93,7 +105,9 @@ export async function GET(request: NextRequest) {
   const state = signComposioState({
     workspaceId: workspace.id,
     workspaceSlug: workspace.slug,
+    userId: session.user.id,
     toolkit,
+    connectionName,
   });
   const callbackUrl = new URL(
     `${getPublicOrigin()}/api/connections/composio/callback`,
@@ -105,6 +119,7 @@ export async function GET(request: NextRequest) {
     link = await initiateConnection({
       apiKey,
       workspaceId: workspace.id,
+      userId: session.user.id,
       toolkit,
       callbackUrl: callbackUrl.toString(),
     });

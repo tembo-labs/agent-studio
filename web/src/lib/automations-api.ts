@@ -24,6 +24,15 @@ export interface Automation {
   createdBy: string;
   createdByName: string | null;
   createdByEmail: string | null;
+  /**
+   * User whose credentials a scheduled run uses. Defaults to
+   * createdBy when an automation is created; owner can be reassigned
+   * via the form. Connections are per-user (migration 0022) so
+   * scheduled runs need an explicit "as whom" answer.
+   */
+  ownerUserId: string;
+  ownerUserName: string | null;
+  ownerUserEmail: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,6 +50,9 @@ type Row = {
   created_by: string;
   created_by_name: string | null;
   created_by_email: string | null;
+  owner_user_id: string;
+  owner_user_name: string | null;
+  owner_user_email: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -59,6 +71,9 @@ function rowToAutomation(r: Row): Automation {
     createdBy: r.created_by,
     createdByName: r.created_by_name,
     createdByEmail: r.created_by_email,
+    ownerUserId: r.owner_user_id,
+    ownerUserName: r.owner_user_name,
+    ownerUserEmail: r.owner_user_email,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -68,9 +83,13 @@ const COLUMNS = `
   a.id, a.workspace_id, a.name, a.agent_name, a.cron, a.input_message,
   a.enabled, a.last_fired_at, a.last_fire_error, a.created_by,
   u.name AS created_by_name, u.email AS created_by_email,
+  a.owner_user_id,
+  o.name AS owner_user_name, o.email AS owner_user_email,
   a.created_at, a.updated_at
 `;
-const FROM_JOIN = `FROM automation a LEFT JOIN "user" u ON u.id = a.created_by`;
+const FROM_JOIN = `FROM automation a
+  LEFT JOIN "user" u ON u.id = a.created_by
+  LEFT JOIN "user" o ON o.id = a.owner_user_id`;
 
 export async function createAutomation(input: {
   workspaceId: string;
@@ -80,17 +99,20 @@ export async function createAutomation(input: {
   inputMessage: string;
   enabled: boolean;
   userId: string;
+  /** Owner whose credentials each scheduled run uses. Defaults to userId. */
+  ownerUserId?: string;
 }): Promise<Automation> {
   const res = await db.query<Row>(
     `WITH inserted AS (
        INSERT INTO automation
-         (workspace_id, name, agent_name, cron, input_message, enabled, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (workspace_id, name, agent_name, cron, input_message, enabled, created_by, owner_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *
      )
      SELECT ${COLUMNS}
      FROM inserted a
-     LEFT JOIN "user" u ON u.id = a.created_by`,
+     LEFT JOIN "user" u ON u.id = a.created_by
+     LEFT JOIN "user" o ON o.id = a.owner_user_id`,
     [
       input.workspaceId,
       input.name,
@@ -99,6 +121,7 @@ export async function createAutomation(input: {
       input.inputMessage,
       input.enabled,
       input.userId,
+      input.ownerUserId ?? input.userId,
     ],
   );
   return rowToAutomation(res.rows[0]);
@@ -111,6 +134,7 @@ export async function updateAutomation(input: {
   cron: string;
   inputMessage: string;
   enabled: boolean;
+  ownerUserId: string;
 }): Promise<Automation> {
   // Reset last_fire_error on edit so a fix to a broken cron doesn't
   // leave a stale red badge on the row. last_fired_at is intentionally
@@ -119,13 +143,15 @@ export async function updateAutomation(input: {
     `WITH updated AS (
        UPDATE automation
        SET name = $2, agent_name = $3, cron = $4, input_message = $5,
-           enabled = $6, last_fire_error = NULL, updated_at = NOW()
+           enabled = $6, owner_user_id = $7,
+           last_fire_error = NULL, updated_at = NOW()
        WHERE id = $1
        RETURNING *
      )
      SELECT ${COLUMNS}
      FROM updated a
-     LEFT JOIN "user" u ON u.id = a.created_by`,
+     LEFT JOIN "user" u ON u.id = a.created_by
+     LEFT JOIN "user" o ON o.id = a.owner_user_id`,
     [
       input.id,
       input.name,
@@ -133,6 +159,7 @@ export async function updateAutomation(input: {
       input.cron,
       input.inputMessage,
       input.enabled,
+      input.ownerUserId,
     ],
   );
   return rowToAutomation(res.rows[0]);

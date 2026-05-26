@@ -103,7 +103,11 @@ function isStatePayload(value: unknown): value is OAuthStatePayload {
 export type ComposioStatePayload = {
   workspaceId: string;
   workspaceSlug: string;
+  /** Owner of the connection (the user who clicked Connect). */
+  userId: string;
   toolkit: string;
+  /** Workspace-scoped name slot for the connection (e.g. "default", "work"). */
+  connectionName: string;
   nonce: string;
 };
 
@@ -148,7 +152,9 @@ function isComposioStatePayload(value: unknown): value is ComposioStatePayload {
   return (
     typeof v.workspaceId === "string" &&
     typeof v.workspaceSlug === "string" &&
+    typeof v.userId === "string" &&
     typeof v.toolkit === "string" &&
+    typeof v.connectionName === "string" &&
     typeof v.nonce === "string"
   );
 }
