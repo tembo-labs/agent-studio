@@ -313,7 +313,13 @@ function ComposioConnectionRow({
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        {connection && (
+          <DisconnectComposioConnectionForm
+            workspaceSlug={workspaceSlug}
+            connectionId={connection.id}
+          />
+        )}
         {enabled && (
           <Link
             href={authorizeHref}
@@ -327,12 +333,6 @@ function ComposioConnectionRow({
             workspaceSlug={workspaceSlug}
             connectionId={connection.id}
             currentName={connection.name}
-          />
-        )}
-        {connection && (
-          <DisconnectComposioConnectionForm
-            workspaceSlug={workspaceSlug}
-            connectionId={connection.id}
           />
         )}
       </div>

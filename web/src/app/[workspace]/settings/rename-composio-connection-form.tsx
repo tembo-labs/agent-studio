@@ -47,7 +47,7 @@ export function RenameComposioConnectionForm({
           setValue(currentName);
           setEditing(true);
         }}
-        className="text-foreground-weak hover:text-foreground text-xs font-medium hover:underline"
+        className="text-foreground hover:text-foreground-title text-sm font-medium hover:underline"
       >
         Rename
       </button>
