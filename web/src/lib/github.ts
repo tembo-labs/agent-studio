@@ -1,5 +1,7 @@
 import "server-only";
 
+import { updateTag } from "next/cache";
+
 // Accept the forms a user is likely to paste:
 //   https://github.com/owner/repo
 //   https://github.com/owner/repo.git
@@ -123,6 +125,26 @@ const GITHUB_HEADERS = (token: string) => ({
 
 export type RepoRef = { owner: string; name: string; branch: string };
 
+// Next.js fetch cache key — every read of this repo's tree shares
+// the same tag, so a single revalidateTag call after a write
+// invalidates everything cached for that repo. The branch is part
+// of the tag because reads include a `?ref=` querystring and a
+// branch switch should not see stale content from the old branch.
+//
+// Caching read calls (and not writes) cuts the GitHub round trip
+// for listAgents from "every workspace page load" to "once per 60s
+// per repo per process", which is what the sidebar missing-
+// connections scan needs to be cheap.
+export function repoCacheTag(ref: RepoRef): string {
+  return `gh:${ref.owner}/${ref.name}@${ref.branch}`;
+}
+
+// 60s is the cache TTL we apply to read-side fetches. Short enough
+// that drift after a manual repo edit is bounded; long enough that
+// sidebar-rendering on every page load doesn't pay one round trip
+// per agent per page.
+const READ_CACHE_TTL_SECONDS = 60;
+
 export type GitHubFileError =
   | "invalid-token"
   | "not-found"
@@ -159,7 +181,13 @@ export async function listDirectory(
   const url = `https://api.github.com/repos/${ref.owner}/${ref.name}/contents/${encodePath(path)}?ref=${encodeURIComponent(ref.branch)}`;
   let res: Response;
   try {
-    res = await fetch(url, { headers: GITHUB_HEADERS(token), cache: "no-store" });
+    res = await fetch(url, {
+      headers: GITHUB_HEADERS(token),
+      next: {
+        revalidate: READ_CACHE_TTL_SECONDS,
+        tags: [repoCacheTag(ref)],
+      },
+    });
   } catch (err) {
     return {
       ok: false,
@@ -199,7 +227,13 @@ export async function readFile(
   const url = `https://api.github.com/repos/${ref.owner}/${ref.name}/contents/${encodePath(path)}?ref=${encodeURIComponent(ref.branch)}`;
   let res: Response;
   try {
-    res = await fetch(url, { headers: GITHUB_HEADERS(token), cache: "no-store" });
+    res = await fetch(url, {
+      headers: GITHUB_HEADERS(token),
+      next: {
+        revalidate: READ_CACHE_TTL_SECONDS,
+        tags: [repoCacheTag(ref)],
+      },
+    });
   } catch (err) {
     return {
       ok: false,
@@ -275,6 +309,12 @@ export async function createFile(
     };
   }
   const body = (await res.json()) as { commit: { sha: string } };
+  // Bust any cached reads of this repo so the next listAgents
+  // pageload sees the newly-created file immediately. `updateTag`
+  // is the Next.js 16 read-your-own-writes API; safe outside server
+  // actions too (returns undefined and no-ops if there's nothing to
+  // invalidate).
+  updateTag(repoCacheTag(ref));
   return { ok: true, commitSha: body.commit.sha };
 }
 
@@ -338,6 +378,7 @@ export async function updateFile(
     };
   }
   const body = (await res.json()) as { commit: { sha: string } };
+  updateTag(repoCacheTag(ref));
   return { ok: true, commitSha: body.commit.sha };
 }
 
@@ -395,6 +436,7 @@ export async function deleteFile(
     };
   }
   const body = (await res.json()) as { commit: { sha: string } };
+  updateTag(repoCacheTag(ref));
   return { ok: true, commitSha: body.commit.sha };
 }
 
