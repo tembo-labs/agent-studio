@@ -202,52 +202,52 @@ function formatGuidanceFile(f: GuidanceFile): string[] {
   ];
 }
 
-// Build a chat-to-create prompt. The user has already chosen a name
-// and framework; the coding agent's job is to write a new agent
-// file at the canonical path for that framework, matching the
-// shape documented in the per-framework AGENT_GUIDE.md (refreshed
-// in Step 0 if needed). The marker contract is identical to the
-// other prompts so the PR scan correlates merged PRs back to the
+// Build a chat-to-create prompt. Pass the user's description through
+// verbatim and point Tembo CAP at the repo's checked-in guides for
+// path/shape conventions. We assume external-service connections
+// already exist — TAS bootstraps those separately, so the coding
+// agent shouldn't scaffold provider config in the same PR. The
+// marker line is the one piece of TAS scaffolding kept — without
+// it the PR scanner can't correlate the merged PR back to the
 // improvement row.
 export function buildCreateAgentPrompt(args: {
-  agentName: string;
   framework: Framework;
+  agentName: string;
   agentPath: string;
   description: string;
   improvementMarker: string;
 }): string {
-  const ext = args.framework === "cargo-ai" ? "JSON" : "YAML";
+  const frameworkGuide =
+    args.framework === "cargo-ai" ? GUIDANCE_CARGO_AI_PATH : GUIDANCE_PYDANTIC_PATH;
   return [
-    buildGuidanceRefreshBlock(args.framework),
+    `Create an agent at \`${args.agentPath}\` named \`${args.agentName}\` using these docs in the connected repo as your guide:`,
     "",
-    "# Step 1 — Create the new agent file",
+    `- \`${GUIDANCE_ROOT_PATH}\` — repo conventions`,
+    `- \`${GUIDANCE_INDEX_PATH}\` — agent layout and per-framework directories`,
+    `- \`${frameworkGuide}\` — framework-specific shape and patterns`,
+    `- \`${GUIDANCE_ADDITIONAL_PATH}\` — any customer-specific overrides (read if present)`,
     "",
-    `Create a new ${args.framework} agent at \`${args.agentPath}\`.`,
-    `The agent's canonical \`name\` field must be \`${args.agentName}\``,
-    `(matching the filename), and the file must be a valid ${ext}`,
-    `document conforming to the framework guide refreshed in Step 0.`,
+    `The agent's \`name:\` field must be exactly \`${args.agentName}\` (matching the filename). Don't put the file anywhere other than \`${args.agentPath}\`.`,
     "",
-    "Open a pull request with the new file (and any guidance refresh",
-    "from Step 0).",
+    "If the agent needs to call external services (Slack, Google Sheets,",
+    "etc.), declare them via the `connections:` field — see the framework",
+    "guide's \"connections\" section for the supported toolkit slugs.",
+    "Assume the workspace has already authorized each declared toolkit in",
+    "Settings → Connections; the runtime injects the corresponding tools.",
+    "Don't scaffold provider SDK config, environment variables, or",
+    "credential plumbing in the agent file.",
+    "",
+    "---",
+    "",
+    args.description.trim(),
+    "",
+    "---",
     "",
     "IMPORTANT: Include this exact line on its own at the end of the pull",
     "request description so the Tembo Agent Studio can correlate the PR",
     "with the user's request:",
     "",
     args.improvementMarker,
-    "",
-    "## What the user wants the agent to do",
-    args.description.trim(),
-    "",
-    "## Notes",
-    "- Do not create the agent at any other path or under any other",
-    `  filename. The target is exactly \`${args.agentPath}\`.`,
-    "- Pick a sensible model + reasonable defaults if the user didn't",
-    "  specify; the canonical examples in the guide are a fine starting",
-    "  point.",
-    "- If the user's description is ambiguous, make a reasonable choice",
-    "  and call it out in the PR description so the reviewer can",
-    "  redirect.",
   ].join("\n");
 }
 

@@ -125,8 +125,8 @@ export async function createFromChatAction(
   });
 
   const prompt = buildCreateAgentPrompt({
-    agentName: name,
     framework,
+    agentName: name,
     agentPath,
     description,
     improvementMarker: improvementMarker(row.id),

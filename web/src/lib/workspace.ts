@@ -13,7 +13,8 @@ export type WorkspaceSecretKind =
   | "tembo_api_key"
   | "github_pat"
   | "anthropic_api_key"
-  | "openai_api_key";
+  | "openai_api_key"
+  | "composio_api_key";
 
 // Single source of truth lives in @/lib/favicon-constants (client-safe).
 // Re-exported here so server-side callers don't need to know.
@@ -70,15 +71,41 @@ const WORKSPACE_COLUMNS =
   "id, name, slug, created_by, created_at, updated_at, favicon_kind";
 
 export async function listWorkspacesForUser(userId: string): Promise<Workspace[]> {
+  // Order by recency-of-last-visit so the "/" redirect lands on
+  // wherever the user was last. NULLS LAST keeps never-visited
+  // workspaces below visited ones; ties fall back to creation order
+  // for stability.
   const { rows } = await db.query<WorkspaceRow>(
     `SELECT w.id, w.name, w.slug, w.created_by, w.created_at, w.updated_at, w.favicon_kind
        FROM workspace w
        JOIN workspace_member m ON m.workspace_id = w.id
       WHERE m.user_id = $1
-      ORDER BY w.created_at ASC`,
+      ORDER BY m.last_visited_at DESC NULLS LAST, w.created_at ASC`,
     [userId],
   );
   return rows.map(rowToWorkspace);
+}
+
+/**
+ * Bump the (workspace_id, user_id) row's last_visited_at to NOW().
+ * Fire-and-forget — called from the workspace layout on every
+ * request, but failures here mustn't break page rendering. Safe to
+ * race; the row update is atomic.
+ */
+export async function touchWorkspaceLastVisited(
+  workspaceId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    await db.query(
+      `UPDATE workspace_member
+          SET last_visited_at = NOW()
+        WHERE workspace_id = $1 AND user_id = $2`,
+      [workspaceId, userId],
+    );
+  } catch {
+    // Non-fatal: the row stays stale until the next successful visit.
+  }
 }
 
 export async function getWorkspaceBySlug(

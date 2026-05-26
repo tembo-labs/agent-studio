@@ -308,6 +308,57 @@ Common capabilities:
   supported).
 - \`FileSearch\` — provider-native file retrieval.
 
+### connections
+
+External services this agent calls at run time (Slack, Google
+Sheets, etc.). Each entry is a Composio toolkit slug. The Studio
+exposes the corresponding tools to the agent via an MCP toolset
+that the workspace's authorized Composio connections back.
+
+**Loose form** — gives the agent access to every tool in the
+toolkit. The model uses Composio's search meta-tool to find the
+right action at run time. Reasonable when an agent might need any
+of a toolkit's actions; **expensive when it really only uses one
+or two** (the model still pays for the discovery round trip).
+
+\`\`\`yaml
+connections:
+  - slack
+  - googlesheets
+\`\`\`
+
+**Narrow form** — declare exactly the tool slugs the agent calls.
+The Studio uses Composio's \`DIRECT_TOOLS\` preset, preloads only
+those schemas, and skips the discovery round trip. Significantly
+cheaper per run, and the model knows what tool to call without
+guessing. Prefer this when the agent's job is well-defined (e.g.
+"read this sheet and post to this channel").
+
+\`\`\`yaml
+connections:
+  - slack: [SLACK_SEND_MESSAGE]
+  - googlesheets: [GOOGLESHEETS_BATCH_GET]
+\`\`\`
+
+Both forms can mix in the same file. A toolkit without an explicit
+tool list defaults to the loose behavior for that toolkit.
+
+Supported toolkit slugs in v0.3: \`slack\`, \`googlesheets\`. The
+list will widen as TAS surfaces more toolkits in Settings →
+Connections.
+
+Studio rules:
+
+- **Authorize first, declare second.** The workspace must have
+  authorized each toolkit under Settings → Connections before a
+  run; the runner fails fast otherwise.
+- **No credentials in the file.** The agent file declares *which*
+  toolkits it needs; the actual OAuth tokens live in Composio's
+  vault, scoped per workspace.
+- **Slugs are case-sensitive.** Toolkit slugs are lowercase
+  (\`googlesheets\`, not \`google-sheets\`). Tool slugs are
+  uppercase (\`SLACK_SEND_MESSAGE\`).
+
 ### retries
 
 Integer or struct. Default behavior is provider-determined. Set

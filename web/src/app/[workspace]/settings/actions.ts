@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
+import { deleteRemoteConnection } from "@/lib/composio";
+import {
+  deleteComposioConnection,
+  getComposioConnectionById,
+} from "@/lib/composio-connections";
+import { deleteConnection } from "@/lib/connections";
 import { getServerSession } from "@/lib/session";
 import {
   refreshAllGuidanceFiles,
@@ -13,6 +19,8 @@ import {
   DEFAULT_FAVICON_KINDS,
   disconnectWorkspaceRepo,
   getWorkspaceBySlug,
+  getWorkspaceSecretPlaintext,
+  getWorkspaceSecretPreview,
   removeWorkspaceSecret,
   setFaviconCustom,
   setFaviconDefault,
@@ -29,20 +37,22 @@ import {
 // keys through this surface only.
 type SettingsKind = Extract<
   WorkspaceSecretKind,
-  "tembo_api_key" | "anthropic_api_key" | "openai_api_key"
+  "tembo_api_key" | "anthropic_api_key" | "openai_api_key" | "composio_api_key"
 >;
 
 const SETTINGS_KIND_LABELS: Record<SettingsKind, string> = {
   tembo_api_key: "Tembo API key",
   anthropic_api_key: "Anthropic API key",
   openai_api_key: "OpenAI API key",
+  composio_api_key: "Composio API key",
 };
 
 function isSettingsKind(v: string): v is SettingsKind {
   return (
     v === "tembo_api_key" ||
     v === "anthropic_api_key" ||
-    v === "openai_api_key"
+    v === "openai_api_key" ||
+    v === "composio_api_key"
   );
 }
 
@@ -242,6 +252,79 @@ export async function disconnectRepoAction(
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
   return { message: "Repository disconnected." };
+}
+
+export type DisconnectConnectionFormState = {
+  message?: string;
+  error?: string;
+};
+
+export async function disconnectConnectionAction(
+  _prev: DisconnectConnectionFormState,
+  formData: FormData,
+): Promise<DisconnectConnectionFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const connectionId = String(formData.get("connectionId") ?? "");
+  if (!connectionId) {
+    return { error: "Missing connection id." };
+  }
+
+  const workspace = await authorizeWorkspace(slug);
+  const ok = await deleteConnection(workspace.id, connectionId);
+  if (!ok) {
+    return { error: "Connection not found." };
+  }
+
+  revalidatePath(`/${slug}/settings`);
+  return { message: "Connection removed." };
+}
+
+export type DisconnectComposioConnectionFormState = {
+  message?: string;
+  error?: string;
+};
+
+/**
+ * Disconnect a Composio-managed connection. We try to revoke it
+ * on Composio's side first, then drop the local cache row. If the
+ * remote revoke fails (key removed, Composio down, etc.) we still
+ * drop the local row — a stale orphan in Composio is harmless; the
+ * user expects the in-app state to reflect what they just clicked.
+ */
+export async function disconnectComposioConnectionAction(
+  _prev: DisconnectComposioConnectionFormState,
+  formData: FormData,
+): Promise<DisconnectComposioConnectionFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const connectionId = String(formData.get("connectionId") ?? "");
+  if (!connectionId) {
+    return { error: "Missing connection id." };
+  }
+
+  const workspace = await authorizeWorkspace(slug);
+  const row = await getComposioConnectionById(workspace.id, connectionId);
+  if (!row) {
+    return { error: "Connection not found." };
+  }
+
+  // Best-effort remote revoke. Needs the workspace's Composio key;
+  // if the workspace already removed it we skip the remote step and
+  // just clean up locally.
+  const preview = await getWorkspaceSecretPreview(workspace.id, "composio_api_key");
+  if (preview) {
+    const apiKey = await getWorkspaceSecretPlaintext(
+      workspace.id,
+      "composio_api_key",
+    );
+    await deleteRemoteConnection({
+      apiKey,
+      connectedAccountId: row.composioConnectionId,
+    });
+  }
+  await deleteComposioConnection(workspace.id, connectionId);
+
+  revalidatePath(`/${slug}/settings`);
+  return { message: "Connection removed." };
 }
 
 export type SyncGuidanceFormState = {

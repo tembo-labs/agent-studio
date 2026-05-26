@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
+import {
+  isComposioToolkit,
+  type ComposioToolkit,
+} from "@/lib/composio";
+import { listComposioConnectionsForWorkspace } from "@/lib/composio-connections";
 import { getServerSession } from "@/lib/session";
 import { listDeletedAgents } from "@/lib/workspace-agents";
 import {
@@ -12,6 +17,7 @@ import {
 } from "@/lib/workspace";
 
 import { ChangeModeSetting } from "./change-mode-setting";
+import { ComposioConnectionsSection } from "./composio-connections-section";
 import { DisconnectRepoForm } from "./disconnect-repo-form";
 import { FaviconPicker } from "./favicon-picker";
 import { RestoreAgentForm } from "./restore-agent-form";
@@ -19,14 +25,23 @@ import { SecretKeyForm } from "./secret-key-form";
 import { SyncGuidanceForm } from "./sync-guidance-form";
 import { ThemeSettings } from "./theme-settings";
 
+// Phase A's TAS-owned ConnectionsSection (./connections-section.tsx,
+// ./disconnect-connection-form.tsx, lib/connections.ts, and the
+// /api/connections/{slack,google} OAuth route handlers) is kept in
+// the repo for the future "advanced mode" but intentionally not
+// imported here — v0.3 ships only the Composio-backed basic mode.
+
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspace: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { workspace: slug } = await params;
+  const sp = await searchParams;
 
   const session = await getServerSession();
   if (!session) notFound();
@@ -34,14 +49,39 @@ export default async function SettingsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const [temboPreview, anthropicPreview, openaiPreview, repo, deletedAgents] =
-    await Promise.all([
-      getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
-      getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
-      getWorkspaceSecretPreview(workspace.id, "openai_api_key"),
-      getWorkspaceRepo(workspace.id),
-      listDeletedAgents(workspace.id),
-    ]);
+  const [
+    temboPreview,
+    anthropicPreview,
+    openaiPreview,
+    composioPreview,
+    repo,
+    deletedAgents,
+    composioConnections,
+  ] = await Promise.all([
+    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
+    getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
+    getWorkspaceSecretPreview(workspace.id, "openai_api_key"),
+    getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
+    getWorkspaceRepo(workspace.id),
+    listDeletedAgents(workspace.id),
+    listComposioConnectionsForWorkspace(workspace.id),
+  ]);
+
+  // Composio callback bounces us here with ?composio=<toolkit>&result=ok|error.
+  // We render an inline banner so the user sees a confirmation without
+  // an extra page hop.
+  const composioParam = typeof sp.composio === "string" ? sp.composio : undefined;
+  const resultParam = typeof sp.result === "string" ? sp.result : undefined;
+  const detailParam = typeof sp.detail === "string" ? sp.detail : undefined;
+  const composioBanner =
+    composioParam && isComposioToolkit(composioParam) &&
+    (resultParam === "ok" || resultParam === "error")
+      ? {
+          toolkit: composioParam as ComposioToolkit,
+          result: resultParam as "ok" | "error",
+          detail: detailParam,
+        }
+      : undefined;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
@@ -136,6 +176,52 @@ export default async function SettingsPage({
               description="How edits from the Improve form ship to your repo. YOLO commits directly to the default branch and is coming in a later release."
             >
               <ChangeModeSetting />
+            </Section>
+          </div>
+
+        <div className="pb-5 pt-8">
+            <ComposioConnectionsSection
+              workspaceSlug={workspace.slug}
+              connections={composioConnections}
+              composioEnabled={Boolean(composioPreview)}
+              banner={composioBanner}
+            />
+          </div>
+
+        <div className="pb-5 pt-8">
+            <Section
+              title="Composio API key"
+              description={
+                <>
+                  Required for the Connections section above. Get one at{" "}
+                  <a
+                    href="https://app.composio.dev/developers"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-foreground underline underline-offset-2"
+                  >
+                    app.composio.dev/developers
+                  </a>
+                  . Workspace-scoped — different teams can use separate Composio
+                  accounts.
+                </>
+              }
+            >
+              <SecretKeyForm
+                workspaceSlug={workspace.slug}
+                kind="composio_api_key"
+                label="Composio API key"
+                placeholder="ak_…"
+                maskedPrefix="ak_"
+                preview={
+                  composioPreview
+                    ? {
+                        last4: composioPreview.last4,
+                        updatedAt: composioPreview.updatedAt.toISOString(),
+                      }
+                    : null
+                }
+              />
             </Section>
           </div>
 

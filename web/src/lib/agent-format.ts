@@ -24,6 +24,12 @@ export type PydanticAgentSpec = AgentSpecBase & {
   framework: "pydantic-agentspec";
   model: string;
   instructions: string;
+  /**
+   * Composio toolkit slugs this agent depends on at run time. Empty
+   * list when the agent doesn't need external services. Resolved by
+   * the runner via the workspace's Composio API key.
+   */
+  connections: string[];
 };
 
 export type CargoAiSpec = AgentSpecBase & {
@@ -101,9 +107,53 @@ function parsePydanticSpec(
   if (typeof instructions !== "string" || !instructions.trim()) {
     return { ok: false, error: "missing-instructions" };
   }
+  const connections = parseConnectionsField(obj.connections);
   return {
-    spec: { ...base, framework: "pydantic-agentspec", model, instructions },
+    spec: {
+      ...base,
+      framework: "pydantic-agentspec",
+      model,
+      instructions,
+      connections,
+    },
   };
+}
+
+/**
+ * Extract `connections:` as a list of toolkit slug strings. Accepts:
+ *
+ *   - `[slack, googlesheets]`                     (loose)
+ *   - `[{type: slack}, {type: googlesheets}]`     (verbose)
+ *   - `[{slack: [SLACK_SEND_MESSAGE]}, …]`        (compact, narrow tools)
+ *   - `[{slack: {tools: [...]}}, …]`              (verbose, narrow tools)
+ *
+ * The agents grid only needs toolkit slugs, so we collapse all of
+ * the above to a slug list. The runner does the strict tool-list
+ * parsing.
+ */
+function parseConnectionsField(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item === "string" && item.trim()) {
+      out.push(item.trim());
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const slug = o.type ?? o.toolkit ?? o.name;
+    if (typeof slug === "string" && slug.trim()) {
+      out.push(slug.trim());
+      continue;
+    }
+    // Compact form: single-key dict where the key IS the toolkit slug
+    // and the value is its narrowed tools.
+    const keys = Object.keys(o);
+    if (keys.length === 1 && keys[0].trim()) {
+      out.push(keys[0].trim());
+    }
+  }
+  return out;
 }
 
 function parseCargoAiSpec(
