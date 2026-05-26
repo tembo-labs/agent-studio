@@ -295,6 +295,152 @@ export async function listAgentNamesWithRunsForWorkspace(
   return rows.map((r) => r.agent_name);
 }
 
+// ── Operational dashboard aggregations ──────────────────────────────
+//
+// These feed the per-agent dashboard at /<workspace>/agents/<name>.
+// All scoped to (workspace_id, agent_name) and the last 30 days so
+// queries stay cheap and stats reflect "recent" behavior rather
+// than lifetime totals (which would mask new failures behind old
+// successes once an agent has been around for a while).
+
+export type AgentStats30d = {
+  totalRuns: number;
+  succeeded: number;
+  failed: number;
+  /** Sum of cost_usd over the window, in USD. Null tokens count as 0. */
+  totalCostUsd: number;
+  /** Mean (completed_at - started_at), in ms, for runs that completed. */
+  avgDurationMs: number | null;
+};
+
+export async function getAgentStats30d(
+  workspaceId: string,
+  agentName: string,
+): Promise<AgentStats30d> {
+  const { rows } = await db.query<{
+    total_runs: string;
+    succeeded: string;
+    failed: string;
+    total_cost_usd: string | null;
+    avg_duration_ms: string | null;
+  }>(
+    `SELECT
+        COUNT(*)::TEXT                                            AS total_runs,
+        COUNT(*) FILTER (WHERE status = 'succeeded')::TEXT        AS succeeded,
+        COUNT(*) FILTER (WHERE status = 'failed')::TEXT           AS failed,
+        COALESCE(SUM(cost_usd), 0)::TEXT                          AS total_cost_usd,
+        ROUND(AVG(EXTRACT(EPOCH FROM (completed_at - started_at))
+                    * 1000) FILTER (WHERE completed_at IS NOT NULL
+                                      AND started_at IS NOT NULL))::TEXT
+                                                                  AS avg_duration_ms
+       FROM run
+      WHERE workspace_id = $1 AND agent_name = $2
+        AND created_at >= NOW() - INTERVAL '30 days'`,
+    [workspaceId, agentName],
+  );
+  const r = rows[0];
+  return {
+    totalRuns: Number(r.total_runs ?? "0"),
+    succeeded: Number(r.succeeded ?? "0"),
+    failed: Number(r.failed ?? "0"),
+    totalCostUsd: Number(r.total_cost_usd ?? "0"),
+    avgDurationMs: r.avg_duration_ms ? Number(r.avg_duration_ms) : null,
+  };
+}
+
+export type AgentDailyRunCount = {
+  /** Calendar date in UTC, YYYY-MM-DD. */
+  day: string;
+  succeeded: number;
+  failed: number;
+  other: number;
+};
+
+/**
+ * Daily run counts for the last 30 days, bucketed by `date_trunc('day',
+ * created_at)` in UTC. Days with zero runs are NOT returned — callers
+ * fill the gaps when rendering the trend bar so the visualisation
+ * stays a fixed-width "last 30 days" regardless of activity sparsity.
+ */
+export async function getAgentDailyRuns30d(
+  workspaceId: string,
+  agentName: string,
+): Promise<AgentDailyRunCount[]> {
+  const { rows } = await db.query<{
+    day: Date;
+    succeeded: string;
+    failed: string;
+    other: string;
+  }>(
+    `SELECT
+        date_trunc('day', created_at)                                AS day,
+        COUNT(*) FILTER (WHERE status = 'succeeded')::TEXT           AS succeeded,
+        COUNT(*) FILTER (WHERE status = 'failed')::TEXT              AS failed,
+        COUNT(*) FILTER (WHERE status NOT IN ('succeeded','failed'))::TEXT
+                                                                     AS other
+       FROM run
+      WHERE workspace_id = $1 AND agent_name = $2
+        AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY day
+      ORDER BY day ASC`,
+    [workspaceId, agentName],
+  );
+  return rows.map((r) => ({
+    day: r.day.toISOString().slice(0, 10),
+    succeeded: Number(r.succeeded),
+    failed: Number(r.failed),
+    other: Number(r.other),
+  }));
+}
+
+export type AgentFailureGroup = {
+  /** First 120 chars of error_message, used as the grouping key. */
+  errorPrefix: string;
+  occurrences: number;
+  lastSeen: Date;
+  /** One example run id so the user can click through to the full row. */
+  exampleRunId: string;
+};
+
+/**
+ * Top-K failure prefixes from the last 30 days for one agent.
+ * Groups by SUBSTRING(error_message FROM 1 FOR 120) so different
+ * verbose tails of the same root cause collapse into one row.
+ */
+export async function listAgentFailureGroups30d(
+  workspaceId: string,
+  agentName: string,
+  limit = 5,
+): Promise<AgentFailureGroup[]> {
+  const { rows } = await db.query<{
+    error_prefix: string;
+    occurrences: string;
+    last_seen: Date;
+    example_run_id: string;
+  }>(
+    `SELECT
+        SUBSTRING(COALESCE(error_message, '(no error message)')
+                   FROM 1 FOR 120)                                  AS error_prefix,
+        COUNT(*)::TEXT                                              AS occurrences,
+        MAX(created_at)                                             AS last_seen,
+        (ARRAY_AGG(id ORDER BY created_at DESC))[1]                 AS example_run_id
+       FROM run
+      WHERE workspace_id = $1 AND agent_name = $2
+        AND status = 'failed'
+        AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY error_prefix
+      ORDER BY occurrences DESC, last_seen DESC
+      LIMIT $3`,
+    [workspaceId, agentName, limit],
+  );
+  return rows.map((r) => ({
+    errorPrefix: r.error_prefix,
+    occurrences: Number(r.occurrences),
+    lastSeen: r.last_seen,
+    exampleRunId: r.example_run_id,
+  }));
+}
+
 export async function listRecentRunsForAgent(
   workspaceId: string,
   agentName: string,

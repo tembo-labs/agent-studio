@@ -12,11 +12,18 @@ import {
   type Automation,
 } from "@/lib/automations-api";
 import { nextFireAfter, validateCron } from "@/lib/cron";
-import { listRecentRunsForAgent, type RunSummary } from "@/lib/runs-db";
+import {
+  getAgentDailyRuns30d,
+  getAgentStats30d,
+  listAgentFailureGroups30d,
+  listRecentRunsForAgent,
+  type RunSummary,
+} from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getAgentByName } from "@/lib/workspace-agents";
 import { getWorkspaceBySlug, getWorkspaceRepo } from "@/lib/workspace";
 
+import { AgentDashboard } from "./agent-dashboard";
 import { DeleteAgentButton } from "./delete-agent-button";
 import { RunNowButton } from "./run-now-button";
 
@@ -45,9 +52,12 @@ export default async function AgentDetailPage({
   const { agent, raw } = result;
   const canonicalName = agent.ok ? agent.spec.name : agentName;
 
-  const [recentRuns, automations] = await Promise.all([
+  const [recentRuns, automations, stats, daily, failures] = await Promise.all([
     listRecentRunsForAgent(workspace.id, canonicalName, 10),
     listAutomationsForAgent(workspace.id, canonicalName),
+    getAgentStats30d(workspace.id, canonicalName),
+    getAgentDailyRuns30d(workspace.id, canonicalName),
+    listAgentFailureGroups30d(workspace.id, canonicalName, 5),
   ]);
 
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
@@ -117,6 +127,14 @@ export default async function AgentDetailPage({
       <hr className="border-[var(--color-border-weak)]" />
 
       <div className="flex flex-col gap-8">
+        <AgentDashboard
+          stats={stats}
+          daily={daily}
+          failures={failures}
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+        />
+
         <AutomationsSection
           automations={automations}
           workspaceSlug={workspace.slug}
