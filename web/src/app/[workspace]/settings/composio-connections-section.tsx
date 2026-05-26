@@ -2,7 +2,10 @@ import Link from "next/link";
 
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import { toolkitLabel } from "@/lib/composio";
+import {
+  COMPOSIO_TOOLKIT_LABEL_OVERRIDES,
+  toolkitLabel,
+} from "@/lib/composio";
 import { type WorkspaceComposioConnection } from "@/lib/composio-connections";
 
 import { DisconnectComposioConnectionForm } from "./disconnect-composio-connection-form";
@@ -192,6 +195,9 @@ function AddAnotherConnectionForm({
           >
             Toolkit
           </label>
+          {/* Datalist gives autocomplete from the curated label list
+              while still accepting any Composio slug — datalist
+              entries are suggestions, not constraints. */}
           <input
             id="add-toolkit"
             name="toolkit"
@@ -201,8 +207,18 @@ function AddAnotherConnectionForm({
             autoComplete="off"
             spellCheck={false}
             placeholder="gmail"
+            list="composio-toolkit-suggestions"
             className="bg-input border-border text-foreground rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)]"
           />
+          <datalist id="composio-toolkit-suggestions">
+            {Object.entries(COMPOSIO_TOOLKIT_LABEL_OVERRIDES).map(
+              ([slug, label]) => (
+                <option key={slug} value={slug}>
+                  {label}
+                </option>
+              ),
+            )}
+          </datalist>
         </div>
         <div className="flex min-w-[140px] flex-1 flex-col gap-1">
           <label
@@ -248,11 +264,6 @@ function ComposioConnectionRow({
   connection: WorkspaceComposioConnection | undefined;
   enabled: boolean;
 }) {
-  const label =
-    name === "default"
-      ? toolkitLabel(toolkit)
-      : `${toolkitLabel(toolkit)} (${name})`;
-
   const params = new URLSearchParams({
     workspace: workspaceSlug,
     toolkit,
@@ -260,21 +271,31 @@ function ComposioConnectionRow({
   if (name !== "default") params.set("name", name);
   const authorizeHref = `/api/connections/composio/authorize?${params.toString()}`;
 
-  const subtitle = connection
-    ? (
-        <>
-          Status: {connection.status} · updated{" "}
-          <LocalTime iso={connection.updatedAt.toISOString()} />
-        </>
-      )
-    : enabled
-      ? "Declared by an agent in this repo. Authorize to enable runs."
-      : "Set the Composio API key below first.";
+  // Status line — always shows the slot name (incl. "default") so
+  // users with multiple slots can tell which is which at a glance.
+  const subtitle = connection ? (
+    <>
+      <span className="text-foreground-weak font-medium">{name}</span>
+      <span> · </span>
+      Status: {connection.status} · updated{" "}
+      <LocalTime iso={connection.updatedAt.toISOString()} />
+    </>
+  ) : enabled ? (
+    <>
+      <span className="text-foreground-weak font-medium">{name}</span>
+      <span> · </span>
+      Declared by an agent in this repo. Authorize to enable runs.
+    </>
+  ) : (
+    "Set the Composio API key below first."
+  );
 
   return (
     <div className="bg-surface border-border flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
       <div className="flex min-w-0 flex-col">
-        <span className="text-foreground text-sm font-medium">{label}</span>
+        <span className="text-foreground text-sm font-medium">
+          {toolkitLabel(toolkit)}
+        </span>
         <span className="text-foreground-muted truncate text-xs">
           {subtitle}
         </span>

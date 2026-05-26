@@ -44,8 +44,10 @@ export type ComposioToolkit = string;
 
 // Curated display labels for the toolkits we surface most often.
 // Falls back to a title-cased slug for anything not in the table
-// (see toolkitLabel below).
-const COMPOSIO_TOOLKIT_LABEL_OVERRIDES: Record<string, string> = {
+// (see toolkitLabel below). Exported so the Settings → Connections
+// "Add another" form can populate its toolkit autocomplete from the
+// same source of truth.
+export const COMPOSIO_TOOLKIT_LABEL_OVERRIDES: Record<string, string> = {
   slack: "Slack",
   googlesheets: "Google Sheets",
   gmail: "Gmail",
