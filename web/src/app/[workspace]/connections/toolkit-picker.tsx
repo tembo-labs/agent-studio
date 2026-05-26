@@ -45,14 +45,12 @@ export function ToolkitPicker({
 
   const filtered = useMemo(() => {
     const q = value.trim().toLowerCase();
-    if (!q) return catalog.slice(0, 200); // cap so the DOM stays small
-    return catalog
-      .filter(
-        (t) =>
-          t.slug.toLowerCase().includes(q) ||
-          t.name.toLowerCase().includes(q),
-      )
-      .slice(0, 200);
+    if (!q) return catalog; // show everything; the popover scrolls
+    return catalog.filter(
+      (t) =>
+        t.slug.toLowerCase().includes(q) ||
+        t.name.toLowerCase().includes(q),
+    );
   }, [catalog, value]);
 
   useEffect(() => {

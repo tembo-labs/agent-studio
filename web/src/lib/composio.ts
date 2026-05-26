@@ -291,9 +291,12 @@ export async function listAllToolkits(
         };
       }
     ).client;
+    // Composio's catalog is ~1,000+ toolkits in three pages at
+    // limit=500 (verified). Cap at 20 pages defensively in case a
+    // future SDK regression sends us an infinite next_cursor loop.
     const all: Array<Record<string, unknown>> = [];
     let cursor: string | undefined = undefined;
-    for (let page = 0; page < 10; page++) {
+    for (let page = 0; page < 20; page++) {
       const res = await rawClient.toolkits.list({
         sort_by: "alphabetically",
         managed_by: "all",
