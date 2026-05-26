@@ -266,31 +266,32 @@ export async function listAllToolkits(
     const out: CatalogToolkit[] = [];
     let cursor: string | undefined = undefined;
     for (let page = 0; page < 5; page++) {
-      // `toolkits.get` is overloaded (slug → single, params → list).
-      // Cast to the list-shape so TS picks the right branch.
       const res = (await c.toolkits.get({
         sortBy: "alphabetically",
         managedBy: "all",
         cursor,
         limit: 500,
       })) as {
-        items?: {
-          slug?: string;
-          name?: string;
-          meta?: { logo?: string };
-          logo?: string;
-        }[];
+        items?: Array<Record<string, unknown>>;
         nextCursor?: string;
       };
-      for (const t of res.items ?? []) {
-        if (t.slug) {
-          // SDK has shifted the logo location across versions —
-          // top-level on some, under `meta` on others. Read both.
-          const logo = t.logo ?? t.meta?.logo ?? null;
+      for (const raw of res.items ?? []) {
+        const slug = typeof raw.slug === "string" ? raw.slug : null;
+        const name = typeof raw.name === "string" ? raw.name : null;
+        // SDK has shifted the logo location across versions — top-
+        // level on some, under `meta` on others. Read both shapes.
+        const topLogo = typeof raw.logo === "string" ? raw.logo : null;
+        const metaLogo =
+          raw.meta &&
+          typeof raw.meta === "object" &&
+          typeof (raw.meta as Record<string, unknown>).logo === "string"
+            ? ((raw.meta as Record<string, unknown>).logo as string)
+            : null;
+        if (slug) {
           out.push({
-            slug: t.slug,
-            name: t.name ?? t.slug,
-            logo,
+            slug,
+            name: name ?? slug,
+            logo: topLogo ?? metaLogo,
           });
         }
       }
@@ -302,7 +303,15 @@ export async function listAllToolkits(
       expiresAt: now + TOOLKIT_CATALOG_TTL_MS,
     });
     return out;
-  } catch {
+  } catch (e) {
+    // Stays as a one-line warn so a bad/wrong workspace Composio key
+    // surfaces in container logs (silent failures stranded a user on
+    // an empty picker once already). Cause carries the HTTP body.
+    const err = e as Error & { cause?: unknown };
+    console.warn(
+      `[composio] listAllToolkits failed: ${err.message}`,
+      err.cause ? { cause: err.cause } : undefined,
+    );
     return [];
   }
 }

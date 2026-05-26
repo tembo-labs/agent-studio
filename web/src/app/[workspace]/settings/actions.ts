@@ -73,6 +73,8 @@ function saveErrorMessage(
       return `That key looks too short to be a ${label}.`;
     case "too-long":
       return `That key is longer than we expected. Double-check what you pasted.`;
+    case "bad-prefix":
+      return `That doesn't look like a ${label} — check that you copied the whole key from the provider's developer console.`;
   }
 }
 

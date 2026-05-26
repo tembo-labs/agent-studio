@@ -363,11 +363,24 @@ export async function getWorkspaceSecretPlaintext(
 export type SetWorkspaceSecretError =
   | "empty"
   | "too-short"
-  | "too-long";
+  | "too-long"
+  | "bad-prefix";
 
 export type SetWorkspaceSecretResult =
   | { ok: true }
   | { ok: false; error: SetWorkspaceSecretError };
+
+// Per-provider prefix sniffs. Cheap shape check that catches the
+// most common misclick (pasting an error page or unrelated text
+// into the form). We never reject on prefix mismatch alone for
+// providers we don't have a known prefix for — the rates change
+// across plans/SKUs and locking that down would create more
+// false-negative pain than it prevents.
+const SECRET_PREFIXES: Partial<Record<WorkspaceSecretKind, string[]>> = {
+  composio_api_key: ["ak_"],
+  anthropic_api_key: ["sk-ant-"],
+  openai_api_key: ["sk-"],
+};
 
 export async function setWorkspaceSecret(
   workspaceId: string,
@@ -380,6 +393,13 @@ export async function setWorkspaceSecret(
   // still tolerating whatever format Tembo issues today vs tomorrow.
   if (trimmed.length < 16) return { ok: false, error: "too-short" };
   if (trimmed.length > 512) return { ok: false, error: "too-long" };
+  const expectedPrefixes = SECRET_PREFIXES[kind];
+  if (
+    expectedPrefixes &&
+    !expectedPrefixes.some((p) => trimmed.startsWith(p))
+  ) {
+    return { ok: false, error: "bad-prefix" };
+  }
 
   const ciphertext = encryptSecret(trimmed);
   await db.query(
