@@ -215,7 +215,10 @@ function FailedReason({
   const failureGroupsHref = `/${workspaceSlug}/agents/${encodeURIComponent(run.agentName)}#failures`;
 
   return (
-    <div className="mt-3 flex flex-col gap-2 rounded-lg border border-[var(--color-sentiment-negative)] bg-[var(--color-input-error)] p-3 text-sm">
+    <div className="group relative mt-3 flex flex-col gap-2 overflow-hidden rounded-lg border border-[var(--color-sentiment-negative)] bg-[var(--color-input-error)] p-3 text-sm">
+      <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+        <CopyOutputButton text={run.errorMessage ?? ""} />
+      </div>
       <span className="text-sentiment-negative font-medium">
         Failure reason
       </span>
