@@ -4,7 +4,7 @@ All notable changes to Tembo Agent Studio. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
 match the phase numbers in [`ROADMAP.md`](./ROADMAP.md).
 
-## [v0.3] — Operational surface — in progress
+## [v0.3] — Operational surface — shipped May 2026
 
 The day-two surface. Agents reach external services through a real
 substrate (no more "the model knows how to write Slack messages but
@@ -77,6 +77,47 @@ out to make room for Connections, which ate the phase honestly.
   for 60s tagged per repo via Next.js fetch tags. Writes
   (`createFile` / `updateFile` / `deleteFile`) bust the tag via
   `updateTag`. Cuts the sidebar-driven scan cost.
+- **Event triggers (Composio-backed).** New `workspace_trigger`
+  table binds a Composio trigger instance to an agent + owning
+  user + connection slot. Per-workspace webhook endpoint at
+  `/api/hooks/composio/{slug}` HMAC-verifies the inbound payload
+  (`composio_webhook_secret` stored alongside the API key),
+  resolves the trigger row, and enqueues a run with
+  `trigger='event'`. Per-agent Triggers section on the detail
+  page renders the list + a create form that takes a Composio
+  trigger slug, a connection, and a JSON config. Event-driven
+  runs show a purple **Event** badge on the workspace Runs page
+  and the run-detail header.
+- **Agent inventory.** Workspace landing page is now a sortable
+  table (Status / Name / Framework / Model / Runs 30d / Success
+  / Last run) instead of a card grid. Facet pills filter by
+  Active / Idle / Error / Pending / Invalid with live counts;
+  free-text search across name. Pending creates + invalid agent
+  files render inline as their own rows.
+- **Workspace dashboard.** `/<workspace>/dashboard` now mirrors
+  the per-agent dashboard shape: health header banded by 30d
+  failure rate, four stat tiles (Runs / Success rate / Spend /
+  Avg duration), 30-day daily-trend bar, and a "Top failing
+  agents (30d)" rollup with click-through to the latest failing
+  run. Improvements counts + recent list stay below as
+  secondary context.
+- **Log explorer (on `/runs`).** Search predicate extended to
+  ILIKE across `error_message` in addition to user_message +
+  output. Failed rows surface a two-line error excerpt inline
+  so triage scans don't require a click. `/runs` now reads
+  `status` / `trigger` / `agent` / `q` from URL search params
+  so deep links land prefiltered.
+- **Failure-aware sidebar alerts.** "Action needed" rail now
+  surfaces agents with at least one failure in the last 24h
+  ("Agent X failed N× in 24h → Open") above the missing-
+  connection alerts. Capped at five so a broken workspace
+  can't shove the rail off-screen.
+- **Failure investigation links on run detail.** Failed-run
+  detail page now offers two jumps: "Find similar runs →"
+  (deep-links into `/runs` filtered to the agent + status=failed
+  + error-prefix search) and "View {agent} failure groups →"
+  (anchored deep link into the per-agent dashboard's grouped
+  failures section).
 
 ### Changed
 - **Create-agent prompt slimmed and rebuilt around Connections.**
@@ -118,15 +159,20 @@ out to make room for Connections, which ate the phase honestly.
   was pasted.
 
 ### Scope moves
-- **HITL pause/resume + rich forms → v0.3+.** Originally a v0.3
-  anchor; the Connections substrate ate the phase honestly.
-  Once Connections settles, rich HITL is the natural next bite.
-- **Workspace-wide triage surfaces (agent inventory, topology map,
-  tasks inbox, log explorer) → v0.3+.** Per-agent dashboard
-  ships in v0.3; the workspace-wide cousins follow.
-- **Event triggers (US-0.2-08, moved into v0.3) → v0.3+.** The
-  Connections substrate they depended on is now in place;
-  webhook receiver + event filtering land next.
+- **HITL pause/resume + rich forms → v0.4.** Originally a v0.3
+  anchor; the Connections substrate ate the phase, and the
+  remaining v0.3 work (workspace-wide triage surfaces + failure
+  investigation) landed in its place. HITL is the next major
+  substrate piece and anchors v0.4.
+- **Workspace-wide triage surfaces → mostly shipped, residuals
+  to v0.4.** Agent inventory ✓, workspace dashboard ✓, log
+  explorer (extended `/runs`) ✓, failure-aware sidebar ✓.
+  Topology map + tasks inbox land in v0.4 (tasks inbox depends
+  on HITL anyway).
+- **Event-trigger form polish → v0.3+.** Trigger slugs are
+  currently entered as free text (linked to Composio's catalog).
+  Schema-driven per-trigger config forms (pulled from
+  `getTriggerType`'s `config` schema) land in a later iteration.
 
 ## [v0.2] — Authoring velocity — shipped May 2026
 

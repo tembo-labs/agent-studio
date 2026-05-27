@@ -99,12 +99,12 @@ export function ComposioConnectionsSection({
               </strong>{" "}
               below to enable connections. Get a key at{" "}
               <a
-                href="https://app.composio.dev/developers"
+                href="https://dashboard.composio.dev"
                 target="_blank"
                 rel="noreferrer noopener"
                 className="text-foreground underline underline-offset-2"
               >
-                app.composio.dev/developers
+                dashboard.composio.dev
               </a>
               .
             </span>

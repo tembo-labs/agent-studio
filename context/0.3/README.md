@@ -24,13 +24,14 @@ v0.3 is the operational-surface release. It adds five interlocking capabilities,
 5. **A per-agent chat configuration entry point.** The v0.2 chat-to-PR loop is reachable from every agent's detail page, with the agent identity already in context.
 6. **Failure investigation in three clicks.** A failed run reaches its triggering revision, the most recent human action, and similar past failures without leaving the page.
 
-## Shipped (so far)
+## Shipped
 
-> **Status:** In flight. The list below tracks what has landed on
-> `main` since v0.2; it diverges from the original "What Ships in
-> v0.3" plan below because Connections turned out to be a
-> substrate-shaped piece of work that ate the phase. The plan stays
-> documented as written so future readers can see what shifted.
+> **Status:** Shipped May 2026. The list below diverges from the
+> original "What Ships in v0.3" plan below because Connections turned
+> out to be a substrate-shaped piece of work that ate the phase, and
+> HITL — the original v0.3 anchor — moved to v0.4 in its place. The
+> plan stays documented as written so future readers can see what
+> shifted.
 
 - **Composio-backed Connections substrate.** ~1,043-toolkit
   catalog (Slack, Gmail, Google Sheets, Notion, GitHub, etc.)
@@ -54,17 +55,39 @@ v0.3 is the operational-surface release. It adds five interlocking capabilities,
 - **Sidebar action-needed alerts.** "Connect {toolkit} for
   {agent}" when a repo agent declares a slot the current user
   hasn't authorized.
+- **Event triggers (Composio webhooks).** Per-agent Triggers
+  section binds a Composio trigger instance (Gmail new message,
+  Slack new mention, GitHub PR opened, …) to an agent + owning
+  user + connection slot. Per-workspace webhook endpoint
+  HMAC-verifies the inbound payload and queues a run with
+  `trigger='event'`. Event runs show a purple **Event** badge.
+- **Agent inventory.** Workspace landing page is a sortable
+  table with facet pills (Active / Idle / Error / Pending /
+  Invalid) and free-text search, replacing the card grid.
+- **Workspace dashboard.** Mirrors the per-agent dashboard
+  shape: health header, four stat tiles, 30-day trend bar,
+  top-failing-agents rollup. Improvements counts + recent
+  list stay below as secondary context.
+- **Log explorer.** `/runs` search now hits `error_message`
+  alongside input/output; failed rows surface their error text
+  inline; filters are URL-driven so deep links land prefiltered.
+- **Failure-aware sidebar.** "Action needed" rail surfaces
+  agents that failed in the last 24h alongside the
+  missing-connection alerts.
+- **Failure investigation links.** Failed-run detail page
+  offers "Find similar runs →" (deep-linked /runs filter) and
+  "View {agent} failure groups →" (anchored deep link into
+  the per-agent dashboard).
 
-## Deferred from the v0.3 plan (→ v0.3+)
+## Deferred from the v0.3 plan (→ v0.4)
 
-- **HITL pause/resume + rich forms** — originally a v0.3 anchor;
-  the Connections substrate ate the phase. Lands next.
-- **Workspace-wide triage surfaces** (agent inventory, topology
-  map, tasks inbox, log explorer) — per-agent dashboard
-  shipped; the workspace-wide cousins follow.
-- **Event triggers** (US-0.2-08, moved into v0.3) — Connections
-  substrate is now in place; webhook receiver + event
-  filtering land next.
+- **HITL pause/resume + rich forms** — originally the v0.3
+  anchor; the Connections substrate ate the phase and the
+  remaining triage work landed in its place. HITL is the next
+  major substrate piece and anchors v0.4.
+- **Topology map + tasks inbox** — the workspace-wide cousins
+  to the inventory/dashboard that didn't fit; tasks inbox
+  depends on HITL anyway.
 
 ## What Ships in v0.3 (original plan)
 

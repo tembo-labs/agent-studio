@@ -84,3 +84,7 @@ The phase tag is whatever phase is in flight per
   same PR.** Internal callers can change in lockstep.
 - **No `--no-verify`** and no skipping hooks on commit. If a hook
   fails, fix the underlying issue.
+- **Don't estimate how long tasks will take.** No "half a day,"
+  "~hour," "multi-day" framing when proposing work. Describe the
+  shape and scope of a task (what changes, what depends on what)
+  and let the human decide whether to take it on.

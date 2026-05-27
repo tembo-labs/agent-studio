@@ -34,11 +34,16 @@ The PR is the contract — even when the author wasn't human.
 
 ## [Phase 0.3 — Operational surface](./context/0.3/) · *Forms and dashboards*
 
-Build the day-to-day surface that fast authoring demands. Rich
-human-in-the-loop forms (uploads, conditional fields, validation) so a
-reviewer can do real work, not just click "approve." Per-agent operational
-dashboards so when something misbehaves at 2am, the triage answer is one
-screen, not four hours of log spelunking.
+> **Shipped May 2026.** See [`CHANGELOG.md`](./CHANGELOG.md) for the
+> full list of what landed.
+
+Build the day-to-day surface that fast authoring demands. Per-agent
+operational dashboards so when something misbehaves at 2am, the triage
+answer is one screen, not four hours of log spelunking. The
+human-in-the-loop forms slice of v0.3 anchored on a substrate
+larger than the phase could absorb and moved to v0.4 — see the
+"Deferred from the v0.3 plan" section in the phase
+[`README.md`](./context/0.3/) for the full set of carve-outs.
 
 ## [Phase 0.4 — Governance depth](./context/0.4/) · *Audit and access*
 
