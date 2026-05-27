@@ -394,4 +394,3 @@ export async function deleteTriggerAction(
   return SIMPLE_EMPTY;
 }
 
-export const TRIGGER_FORM_INITIAL = TRIGGER_FORM_EMPTY;

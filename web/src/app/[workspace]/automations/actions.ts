@@ -257,4 +257,3 @@ export async function toggleAutomationAction(formData: FormData): Promise<void> 
   revalidatePath(`/${workspaceSlug}/agents/${encodeURIComponent(existing.agentName)}`);
 }
 
-export const AUTOMATION_FORM_EMPTY = EMPTY;
