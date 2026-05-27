@@ -42,10 +42,11 @@ compilers.
 
 ## Current state
 
-Today (v0.2 shipped May 2026 on top of the v0.1 foundation from earlier in
-the month) you can:
+Today you can:
 
-- Self-host the whole stack via `docker compose up`.
+- Self-host the whole stack via `docker compose up`, or deploy the
+  web tier on Vercel and the api tier on a long-lived host — see
+  [`guides/VERCEL_DEPLOY.md`](./guides/VERCEL_DEPLOY.md).
 - Sign in with Google and connect a GitHub repository as the workspace's
   source of truth.
 - List, create, edit (via chat-to-PR), and run agents in two frameworks —
@@ -56,12 +57,27 @@ the month) you can:
 - Submit "Improve the Agent" feedback from any run — TAS hands it to
   Tembo, opens a PR, and correlates the merged PR back to your submission
   so you can see the status from the dashboard.
-- Schedule agents to run on a cron via **Automations**, with each
-  scheduled run linked back to the automation that fired it.
-- Inspect token usage and approximate cost on every run.
+- Schedule agents to run on a cron via **Automations**, or fire them from
+  external events via Composio-backed **Triggers** (Gmail messages, Slack
+  mentions, GitHub PR events, ~1,000 toolkits).
+- Authorize external services per-user (Slack, Gmail, Google Sheets,
+  Notion, GitHub, …) and reference them by named slot from an agent's
+  `connections:` field.
+- Read a per-agent operational dashboard (30-day health, success rate,
+  spend, failure groups) and a workspace-wide dashboard that rolls up
+  the same shape across all agents.
+- Inspect every change with the **Audit** timeline — append-only,
+  filterable by source / actor / agent / time, exportable as JSON.
+- Manage workspace members with three roles (workspace_admin / operator
+  / viewer) enforced at the API layer.
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for the full list of what's landed,
 and [`ROADMAP.md`](./ROADMAP.md) for where it's headed.
+
+## Guides
+
+- [`guides/VERCEL_DEPLOY.md`](./guides/VERCEL_DEPLOY.md) — deploy the web
+  tier on Vercel with the api on Fly/Render and managed Postgres.
 
 ## Repository layout
 

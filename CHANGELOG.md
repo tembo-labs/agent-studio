@@ -4,6 +4,52 @@ All notable changes to Tembo Agent Studio. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
 match the phase numbers in [`ROADMAP.md`](./ROADMAP.md).
 
+## [v0.4] — Governance depth — in progress
+
+### Added
+- **Immutable audit changelog (US-0.4-01).** Append-only
+  `audit_event` table records actor / when / source / target /
+  payload for the event types that don't already live in another
+  table (secret rotations, connection authorize/disconnect/rename,
+  automation lifecycle, trigger lifecycle, agent delete/restore,
+  repo disconnect). The unified timeline reads explicit writes
+  UNION'd with derived projections of `run` + `improvement` (both
+  already event-shaped), so v0.3 emitters needed zero
+  re-instrumentation. Workspace-wide `/<workspace>/audit` page
+  with source / actor / agent / time-window filters (URL-driven,
+  deep-linkable). Per-agent Timeline section on the agent detail
+  page with click-through to the full history. New `Audit`
+  sidenav item.
+- **Audit JSON export (US-0.4-04).** "Export JSON →" affordance
+  on the audit page (honors current filter set) and the per-agent
+  Timeline (scoped to that agent). Envelope carries the filter
+  snapshot + truncated flag alongside the rows. Export is itself
+  audited (`kind=audit.exported`). Capped at 10,000 rows per
+  download — streaming to a SIEM is the v0.5 open question per
+  the story carve-out.
+- **RBAC (US-0.4-02).** Three workspace-scoped roles —
+  workspace_admin, operator, viewer — with a strict hierarchy.
+  `lib/rbac.ts` + `lib/auth-server.ts` centralize the policy
+  layer; every mutating server action and OAuth route now
+  funnels through `authorizeWorkspace(slug, minRole)` and
+  returns DENIED_MESSAGE on insufficient role. Role assignments
+  are themselves audited (`source=policy_change`,
+  `kind=member.added | member.role_changed | member.removed`).
+  New Settings → Members section with role picker, add-by-email,
+  and remove affordances (workspace_admin only); last-admin
+  demotion is blocked in the DB helper. UI affordance hiding
+  (New agent, Run now, Delete agent, Chat-to-edit) keys off the
+  current user's role; server enforcement remains the contract.
+  Org-admin tier deferred until there are concrete cross-workspace
+  endpoints to gate on it.
+
+### Scope moves
+- **API-level deny test in CI → v0.4+.** The v0.4-02 AC asks for
+  CI-verified API enforcement. The policy unit
+  (`web/scripts/rbac-policy.test.mjs`) covers the role-ordering
+  invariant; an HTTP-level integration deny test is deferred
+  until we set up a session-aware test harness.
+
 ## [v0.3] — Operational surface — shipped May 2026
 
 The day-two surface. Agents reach external services through a real
