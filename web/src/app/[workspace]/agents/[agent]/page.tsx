@@ -11,6 +11,7 @@ import {
   listAutomationsForAgent,
   type Automation,
 } from "@/lib/automations-api";
+import { listConnectionsForUser } from "@/lib/composio-connections";
 import { nextFireAfter, validateCron } from "@/lib/cron";
 import {
   getAgentDailyRuns30d,
@@ -20,12 +21,18 @@ import {
   type RunSummary,
 } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
+import { listTriggersForAgent } from "@/lib/triggers-db";
 import { getAgentByName } from "@/lib/workspace-agents";
-import { getWorkspaceBySlug, getWorkspaceRepo } from "@/lib/workspace";
+import {
+  getWorkspaceBySlug,
+  getWorkspaceRepo,
+  getWorkspaceSecretPreview,
+} from "@/lib/workspace";
 
 import { AgentDashboard } from "./agent-dashboard";
 import { DeleteAgentButton } from "./delete-agent-button";
 import { RunNowButton } from "./run-now-button";
+import { TriggersSection } from "./triggers-section";
 
 export const dynamic = "force-dynamic";
 
@@ -52,12 +59,26 @@ export default async function AgentDetailPage({
   const { agent, raw } = result;
   const canonicalName = agent.ok ? agent.spec.name : agentName;
 
-  const [recentRuns, automations, stats, daily, failures] = await Promise.all([
+  const [
+    recentRuns,
+    automations,
+    stats,
+    daily,
+    failures,
+    triggers,
+    myConnections,
+    composioApiKeyPreview,
+    composioWebhookSecretPreview,
+  ] = await Promise.all([
     listRecentRunsForAgent(workspace.id, canonicalName, 10),
     listAutomationsForAgent(workspace.id, canonicalName),
     getAgentStats30d(workspace.id, canonicalName),
     getAgentDailyRuns30d(workspace.id, canonicalName),
     listAgentFailureGroups30d(workspace.id, canonicalName, 5),
+    listTriggersForAgent(workspace.id, canonicalName),
+    listConnectionsForUser(workspace.id, session.user.id),
+    getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
+    getWorkspaceSecretPreview(workspace.id, "composio_webhook_secret"),
   ]);
 
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
@@ -135,6 +156,15 @@ export default async function AgentDetailPage({
           agentName={canonicalName}
         />
 
+        <TriggersSection
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+          triggers={triggers}
+          myConnections={myConnections}
+          composioApiKeyConfigured={!!composioApiKeyPreview}
+          webhookSecretConfigured={!!composioWebhookSecretPreview}
+        />
+
         <AutomationsSection
           automations={automations}
           workspaceSlug={workspace.slug}
@@ -205,6 +235,11 @@ function RecentRuns({
               {run.trigger === "schedule" && (
                 <Badge variant="blue" size="small">
                   Scheduled
+                </Badge>
+              )}
+              {run.trigger === "event" && (
+                <Badge variant="purple" size="small">
+                  Event
                 </Badge>
               )}
               <LocalTime

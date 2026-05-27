@@ -74,6 +74,7 @@ pub async fn create_run(
     let trigger = match req.trigger.as_deref() {
         None | Some("manual") => "manual",
         Some("schedule") => "schedule",
+        Some("event") => "event",
         Some(other) => {
             return Err((
                 StatusCode::BAD_REQUEST,

@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 // runs, marking them succeeded/failed); the web layer reads for list +
 // detail pages. Both surfaces hit the same Postgres so this is safe.
 
-export type RunTrigger = "manual" | "schedule";
+export type RunTrigger = "manual" | "schedule" | "event";
 
 export type RunSummary = {
   id: string;

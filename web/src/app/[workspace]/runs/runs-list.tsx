@@ -32,7 +32,7 @@ type RunStatus = LoadedRun["status"];
 type RunTrigger = LoadedRun["trigger"];
 
 const ALL_STATUSES: RunStatus[] = ["queued", "running", "succeeded", "failed"];
-const ALL_TRIGGERS: RunTrigger[] = ["manual", "schedule"];
+const ALL_TRIGGERS: RunTrigger[] = ["manual", "schedule", "event"];
 const PAGE_SIZE = 50;
 
 // "Recent" threshold for relative-time rendering on the Queued column.
@@ -319,6 +319,10 @@ function RunRow({
           <Badge variant="blue" size="small">
             Scheduled
           </Badge>
+        ) : run.trigger === "event" ? (
+          <Badge variant="purple" size="small">
+            Event
+          </Badge>
         ) : (
           <span className="text-foreground-weak text-xs">Manual</span>
         )}
@@ -432,6 +436,7 @@ const STATUS_LABELS: Record<RunStatus, string> = {
 const TRIGGER_LABELS: Record<RunTrigger, string> = {
   manual: "Manual",
   schedule: "Scheduled",
+  event: "Event",
 };
 
 const STATUS_BADGE: Record<

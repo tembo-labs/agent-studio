@@ -364,3 +364,240 @@ export async function deleteRemoteConnection(args: {
     return false;
   }
 }
+
+// ────────────────────────────────────────────────────────────────────
+// Event triggers — Composio-managed event subscriptions.
+//
+// Concept: Composio owns the per-provider subscription complexity
+// (Gmail push, Slack events, GitHub webhooks…). TAS hands them a
+// (userId, trigger_type, connected_account_id, config) tuple and gets
+// back a stable trigger_id. When the upstream provider produces an
+// event, Composio normalizes it, HMAC-signs the payload, and POSTs
+// to the single workspace-scoped webhook URL we register in their
+// dashboard. The webhook handler verifies the signature, looks up the
+// trigger row by trigger_id, and enqueues a run.
+//
+// We don't try to predict the shape of trigger_config — different
+// trigger types want different fields (Gmail wants a label filter,
+// Slack wants a channel id, …). The UI fetches `listTriggerTypes` +
+// `getTriggerType` to render the right form per provider.
+
+export type TriggerTypeSummary = {
+  slug: string;
+  /** Human-readable name from Composio (e.g., "New Gmail Message"). */
+  name: string;
+  /** Short description, if Composio supplies one. */
+  description: string | null;
+  toolkitSlug: string;
+};
+
+export type TriggerTypeDetail = TriggerTypeSummary & {
+  /**
+   * JSON-schema-shaped object describing the per-instance config that
+   * Composio expects when we call createTrigger. Pass it untouched
+   * into the form renderer; the schema language is JSON Schema draft
+   * with the usual `properties` / `required` keys.
+   */
+  configSchema: Record<string, unknown> | null;
+  /**
+   * Raw payload shape Composio will send for this trigger, when
+   * available. Useful for showing "what your agent will receive."
+   */
+  payloadSchema: Record<string, unknown> | null;
+};
+
+/**
+ * List all trigger types Composio knows about for a given toolkit
+ * (or all toolkits when omitted). Used by the per-agent create-
+ * trigger form to populate the trigger-type dropdown.
+ *
+ * Paginates through `nextCursor` so users of toolkits with many
+ * trigger types (Slack alone has dozens) see them all. Caps at 10
+ * pages of 100 defensively.
+ */
+export async function listTriggerTypes(args: {
+  apiKey: string;
+  toolkit?: string;
+}): Promise<TriggerTypeSummary[]> {
+  const c = makeClient(args.apiKey);
+  try {
+    const out: TriggerTypeSummary[] = [];
+    let cursor: string | undefined = undefined;
+    for (let page = 0; page < 10; page++) {
+      const res = (await c.triggers.listTypes({
+        toolkits: args.toolkit ? [args.toolkit] : undefined,
+        cursor,
+        limit: 100,
+      })) as {
+        items?: Array<Record<string, unknown>>;
+        nextCursor?: string | null;
+      };
+      for (const t of res.items ?? []) {
+        const slug = typeof t.slug === "string" ? t.slug : null;
+        const name = typeof t.name === "string" ? t.name : null;
+        const description =
+          typeof t.description === "string" ? t.description : null;
+        const toolkitSlug =
+          (t.toolkit as { slug?: string } | undefined)?.slug ?? "";
+        if (slug) {
+          out.push({
+            slug,
+            name: name ?? slug,
+            description,
+            toolkitSlug,
+          });
+        }
+      }
+      cursor = res.nextCursor ?? undefined;
+      if (!cursor) break;
+    }
+    return out;
+  } catch (e) {
+    const err = e as Error;
+    console.warn(`[composio] listTriggerTypes failed: ${err.message}`);
+    return [];
+  }
+}
+
+/**
+ * Fetch one trigger type's details — needed before we render the
+ * create form so we know what fields to ask for in the config.
+ */
+export async function getTriggerType(args: {
+  apiKey: string;
+  slug: string;
+}): Promise<TriggerTypeDetail | null> {
+  const c = makeClient(args.apiKey);
+  try {
+    const t = (await c.triggers.getType(args.slug)) as Record<string, unknown>;
+    const slug = typeof t.slug === "string" ? t.slug : args.slug;
+    const name = typeof t.name === "string" ? t.name : slug;
+    const description =
+      typeof t.description === "string" ? t.description : null;
+    const toolkitSlug =
+      (t.toolkit as { slug?: string } | undefined)?.slug ?? "";
+    const configSchema = (t.config as Record<string, unknown>) ?? null;
+    const payloadSchema = (t.payload as Record<string, unknown>) ?? null;
+    return {
+      slug,
+      name,
+      description,
+      toolkitSlug,
+      configSchema,
+      payloadSchema,
+    };
+  } catch (e) {
+    const err = e as Error;
+    console.warn(`[composio] getTriggerType failed: ${err.message}`);
+    return null;
+  }
+}
+
+export type CreateTriggerResult = {
+  /** Composio's trigger_id — store this in workspace_trigger. */
+  triggerId: string;
+};
+
+/**
+ * Create (subscribe) a Composio trigger instance for a specific
+ * (user, connected account, trigger type). The returned trigger_id
+ * is the only thing we need to cache: webhooks carry it back as the
+ * primary key into our workspace_trigger table.
+ */
+export async function createTrigger(args: {
+  apiKey: string;
+  workspaceId: string;
+  userId: string;
+  triggerType: string;
+  connectedAccountId: string;
+  triggerConfig: Record<string, unknown>;
+}): Promise<CreateTriggerResult> {
+  const c = makeClient(args.apiKey);
+  const composioUid = composioUserId(args.workspaceId, args.userId);
+  const res = await c.triggers.create(composioUid, args.triggerType, {
+    connectedAccountId: args.connectedAccountId,
+    triggerConfig: args.triggerConfig,
+  });
+  return { triggerId: res.triggerId };
+}
+
+export async function deleteTrigger(args: {
+  apiKey: string;
+  triggerId: string;
+}): Promise<boolean> {
+  try {
+    const c = makeClient(args.apiKey);
+    await c.triggers.delete(args.triggerId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function setTriggerEnabledRemote(args: {
+  apiKey: string;
+  triggerId: string;
+  enabled: boolean;
+}): Promise<boolean> {
+  try {
+    const c = makeClient(args.apiKey);
+    if (args.enabled) {
+      await c.triggers.enable(args.triggerId);
+    } else {
+      await c.triggers.disable(args.triggerId);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export type VerifiedWebhook = {
+  /** Composio trigger_id — our workspace_trigger lookup key. */
+  triggerId: string;
+  triggerSlug: string;
+  toolkitSlug: string;
+  /** Composite ${workspaceId}:${userId} that owns the connection. */
+  composioUserId: string;
+  /** Provider-shaped event payload (e.g., the Gmail message). */
+  payload: Record<string, unknown>;
+};
+
+/**
+ * Verify an incoming Composio webhook request and surface the parts
+ * we need to dispatch a run. Throws on signature failure — callers
+ * convert that to a 401. The raw body MUST be passed as the original
+ * string Composio signed; deserializing it first will break the
+ * HMAC check.
+ */
+export async function verifyTriggerWebhook(args: {
+  apiKey: string;
+  secret: string;
+  rawBody: string;
+  webhookId: string;
+  webhookTimestamp: string;
+  webhookSignature: string;
+}): Promise<VerifiedWebhook> {
+  const c = makeClient(args.apiKey);
+  const result = await c.triggers.verifyWebhook({
+    id: args.webhookId,
+    timestamp: args.webhookTimestamp,
+    signature: args.webhookSignature,
+    payload: args.rawBody,
+    secret: args.secret,
+  });
+  const p = result.payload as {
+    id: string;
+    triggerSlug: string;
+    toolkitSlug: string;
+    userId: string;
+    payload: Record<string, unknown>;
+  };
+  return {
+    triggerId: p.id,
+    triggerSlug: p.triggerSlug,
+    toolkitSlug: p.toolkitSlug,
+    composioUserId: p.userId,
+    payload: p.payload,
+  };
+}

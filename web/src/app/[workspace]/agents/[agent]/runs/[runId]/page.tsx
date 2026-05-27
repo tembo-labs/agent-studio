@@ -94,6 +94,8 @@ export default async function RunDetailPage({
                 </>
               ) : run.trigger === "schedule" ? (
                 "Scheduled (automation deleted)"
+              ) : run.trigger === "event" ? (
+                "Event (Composio webhook)"
               ) : (
                 "Manual"
               )}

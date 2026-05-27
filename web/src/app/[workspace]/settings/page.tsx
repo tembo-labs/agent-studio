@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
+import { getPublicOrigin } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
 import { listDeletedAgents } from "@/lib/workspace-agents";
 import {
@@ -56,6 +57,7 @@ export default async function SettingsPage({
     anthropicPreview,
     openaiPreview,
     composioPreview,
+    composioWebhookSecretPreview,
     repo,
     deletedAgents,
   ] = await Promise.all([
@@ -63,9 +65,11 @@ export default async function SettingsPage({
     getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
     getWorkspaceSecretPreview(workspace.id, "openai_api_key"),
     getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
+    getWorkspaceSecretPreview(workspace.id, "composio_webhook_secret"),
     getWorkspaceRepo(workspace.id),
     listDeletedAgents(workspace.id),
   ]);
+  const webhookUrl = `${getPublicOrigin()}/api/hooks/composio/${workspace.slug}`;
   // sp is currently unused on Settings — keep it as a typed
   // parameter so future ?banner=… style flows can land without
   // re-plumbing the page signature.
@@ -181,12 +185,12 @@ export default async function SettingsPage({
                   </Link>{" "}
                   page. Get one at{" "}
                   <a
-                    href="https://app.composio.dev/developers"
+                    href="https://dashboard.composio.dev"
                     target="_blank"
                     rel="noreferrer noopener"
                     className="text-foreground underline underline-offset-2"
                   >
-                    app.composio.dev/developers
+                    dashboard.composio.dev
                   </a>
                   .
                 </>
@@ -203,6 +207,49 @@ export default async function SettingsPage({
                     ? {
                         last4: composioPreview.last4,
                         updatedAt: composioPreview.updatedAt.toISOString(),
+                      }
+                    : null
+                }
+              />
+            </Section>
+          </div>
+
+        <div className="pb-5 pt-8">
+            <Section
+              title="Composio webhook secret"
+              description={
+                <>
+                  Signing secret for incoming Composio event webhooks.
+                  Required for event-driven triggers. Set the webhook URL
+                  to{" "}
+                  <code className="bg-surface rounded px-1 py-0.5 text-xs">
+                    {webhookUrl}
+                  </code>{" "}
+                  in your{" "}
+                  <a
+                    href="https://dashboard.composio.dev"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-foreground underline underline-offset-2"
+                  >
+                    Composio dashboard
+                  </a>{" "}
+                  and paste the secret it generates here.
+                </>
+              }
+            >
+              <SecretKeyForm
+                workspaceSlug={workspace.slug}
+                kind="composio_webhook_secret"
+                label="Composio webhook secret"
+                placeholder="whsec_…"
+                maskedPrefix="••••"
+                preview={
+                  composioWebhookSecretPreview
+                    ? {
+                        last4: composioWebhookSecretPreview.last4,
+                        updatedAt:
+                          composioWebhookSecretPreview.updatedAt.toISOString(),
                       }
                     : null
                 }

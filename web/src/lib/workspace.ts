@@ -14,7 +14,8 @@ export type WorkspaceSecretKind =
   | "github_pat"
   | "anthropic_api_key"
   | "openai_api_key"
-  | "composio_api_key";
+  | "composio_api_key"
+  | "composio_webhook_secret";
 
 // Single source of truth lives in @/lib/favicon-constants (client-safe).
 // Re-exported here so server-side callers don't need to know.
