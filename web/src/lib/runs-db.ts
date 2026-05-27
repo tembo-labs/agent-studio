@@ -406,6 +406,45 @@ export type AgentFailureGroup = {
  * Groups by SUBSTRING(error_message FROM 1 FOR 120) so different
  * verbose tails of the same root cause collapse into one row.
  */
+export type FailingAgentRecent = {
+  agentName: string;
+  failures: number;
+  lastFailureAt: Date;
+};
+
+/**
+ * Agents in this workspace with at least one failure in the last
+ * 24 hours, ordered by failure count desc. Drives the "Action
+ * needed" sidebar alerts that flag broken agents alongside the
+ * missing-connection alerts — operators see hot spots without
+ * walking the inventory.
+ */
+export async function listFailingAgents24h(
+  workspaceId: string,
+): Promise<FailingAgentRecent[]> {
+  const { rows } = await db.query<{
+    agent_name: string;
+    failures: string;
+    last_failure_at: Date;
+  }>(
+    `SELECT agent_name,
+            COUNT(*)::TEXT  AS failures,
+            MAX(created_at) AS last_failure_at
+       FROM run
+      WHERE workspace_id = $1
+        AND status = 'failed'
+        AND created_at >= NOW() - INTERVAL '24 hours'
+      GROUP BY agent_name
+      ORDER BY failures DESC, last_failure_at DESC`,
+    [workspaceId],
+  );
+  return rows.map((r) => ({
+    agentName: r.agent_name,
+    failures: Number(r.failures),
+    lastFailureAt: r.last_failure_at,
+  }));
+}
+
 export type WorkspaceTopFailingAgent = {
   agentName: string;
   failures: number;

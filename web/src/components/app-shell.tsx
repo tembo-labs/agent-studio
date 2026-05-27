@@ -33,6 +33,13 @@ type MissingConnection = {
   agentName: string;
 };
 
+type FailingAgentAlert = {
+  agentName: string;
+  failures: number;
+  /** ISO string so the prop is plain-data crossable. */
+  lastFailureAtIso: string;
+};
+
 type Props = {
   workspace: Workspace;
   workspaces: { slug: string; name: string }[];
@@ -44,6 +51,13 @@ type Props = {
    * jumps to Settings → Connections so the user can authorize.
    */
   missingConnections: MissingConnection[];
+  /**
+   * Agents that have failed at least once in the last 24h. Rendered
+   * above the missing-connection alerts so the loudest signal
+   * (something broke recently) leads. Capped upstream so the rail
+   * doesn't grow unbounded.
+   */
+  failingAgents: FailingAgentAlert[];
   children: ReactNode;
 };
 
@@ -52,6 +66,7 @@ export function AppShell({
   workspaces,
   user,
   missingConnections,
+  failingAgents,
   children,
 }: Props) {
   const instanceName = getInstanceName();
@@ -116,11 +131,36 @@ export function AppShell({
             icon={<IconSettingsSliderHor />}
           />
 
-          {missingConnections.length > 0 && (
+          {(failingAgents.length > 0 || missingConnections.length > 0) && (
             <div className="mt-6 flex flex-col gap-1.5">
               <span className="text-foreground-muted px-2 text-[10px] font-medium uppercase tracking-widest">
                 Action needed
               </span>
+              {failingAgents.map((f) => {
+                const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(f.agentName)}`;
+                return (
+                  <div
+                    key={`fail:${f.agentName}`}
+                    className="flex items-start gap-2 rounded-md bg-[var(--color-input-error)] px-2 py-2"
+                  >
+                    <IconExclamationTriangle
+                      size={14}
+                      className="text-sentiment-negative mt-0.5 shrink-0"
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+                      <span className="text-sentiment-negative text-xs leading-tight">
+                        <span className="font-semibold">{f.agentName}</span>{" "}
+                        failed{" "}
+                        <span className="font-semibold">{f.failures}×</span> in
+                        24h
+                      </span>
+                      <Button asChild variant="orange" size="small">
+                        <Link href={agentHref}>Open</Link>
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
               {missingConnections.map((m, i) => {
                 const params = new URLSearchParams({
                   workspace: workspace.slug,

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { listConnectionsForUser } from "@/lib/composio-connections";
+import { listFailingAgents24h } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
 import {
@@ -60,11 +61,13 @@ export default async function WorkspaceLayout({
   // Both fetches are tolerated to fail (no repo, invalid GitHub
   // token, Composio query error) — the sidebar drops the alerts
   // section in that case rather than blocking page render.
-  const [workspaces, agentsListing, myConnections] = await Promise.all([
-    listWorkspacesForUser(session.user.id),
-    listAgents(workspace.id).catch(() => null),
-    listConnectionsForUser(workspace.id, session.user.id).catch(() => []),
-  ]);
+  const [workspaces, agentsListing, myConnections, failingAgents] =
+    await Promise.all([
+      listWorkspacesForUser(session.user.id),
+      listAgents(workspace.id).catch(() => null),
+      listConnectionsForUser(workspace.id, session.user.id).catch(() => []),
+      listFailingAgents24h(workspace.id).catch(() => []),
+    ]);
   const switcherList = workspaces.map((w) => ({ slug: w.slug, name: w.name }));
   // Set of `${toolkit}:${name}` the current user holds ACTIVE.
   const mySlots = new Set(
@@ -96,12 +99,23 @@ export default async function WorkspaceLayout({
     }
   }
 
+  // Cap the failing-agents alert at 5 so the sidebar can't grow
+  // unbounded if a workspace has many broken agents at once. The
+  // full list lives on the workspace dashboard's "Top failing
+  // agents" section.
+  const failingAlerts = failingAgents.slice(0, 5).map((f) => ({
+    agentName: f.agentName,
+    failures: f.failures,
+    lastFailureAtIso: f.lastFailureAt.toISOString(),
+  }));
+
   return (
     <AppShell
       workspace={workspace}
       workspaces={switcherList}
       user={session.user}
       missingConnections={missingConnections}
+      failingAgents={failingAlerts}
     >
       {children}
     </AppShell>
