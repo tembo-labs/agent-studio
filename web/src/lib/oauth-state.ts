@@ -13,16 +13,6 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const SIG_LEN = 32; // sha-256 output
 
-export type OAuthStatePayload = {
-  workspaceId: string;
-  workspaceSlug: string;
-  connectionType: "slack" | "google-sheets";
-  /** Workspace-scoped name for the new connection. */
-  connectionName: string;
-  /** Short random nonce — defends against state replay across users. */
-  nonce: string;
-};
-
 function getSecret(): Buffer {
   const raw = process.env.BETTER_AUTH_SECRET;
   if (!raw) {
@@ -34,15 +24,29 @@ function getSecret(): Buffer {
   return Buffer.from(raw, "utf8");
 }
 
-/**
- * Pack and sign an OAuth state token. The returned string is URL-safe
- * base64 of `payload-json || hmac-sha256`. Pass it as the `state`
- * query param when redirecting the user to the OAuth provider.
- */
-export function signOAuthState(
-  payload: Omit<OAuthStatePayload, "nonce">,
+// Native-MCP OAuth state — for the v0.4 substrate that bypasses
+// Composio and authenticates directly with a provider (Attio etc).
+// Shape parallels ComposioStatePayload below; `provider` replaces
+// `toolkit` because Composio's catalog and TAS's native-MCP catalog
+// don't overlap by definition.
+
+export type NativeMcpStatePayload = {
+  workspaceId: string;
+  workspaceSlug: string;
+  /** Owner of the connection (the user who clicked Connect). */
+  userId: string;
+  /** Native-MCP provider slug from lib/mcp-providers. */
+  provider: string;
+  /** Workspace-scoped name slot for the connection. */
+  connectionName: string;
+  /** Short random nonce — defends against state replay across users. */
+  nonce: string;
+};
+
+export function signNativeMcpState(
+  payload: Omit<NativeMcpStatePayload, "nonce">,
 ): string {
-  const full: OAuthStatePayload = {
+  const full: NativeMcpStatePayload = {
     ...payload,
     nonce: randomBytes(8).toString("base64url"),
   };
@@ -51,14 +55,9 @@ export function signOAuthState(
   return Buffer.concat([body, sig]).toString("base64url");
 }
 
-/**
- * Verify and unpack an OAuth state token returned by the provider on
- * callback. Returns null if the signature doesn't verify, the payload
- * is malformed, or the embedded shape doesn't match. Callers should
- * still cross-check `connectionType` matches the route they were
- * invoked on.
- */
-export function verifyOAuthState(state: string): OAuthStatePayload | null {
+export function verifyNativeMcpState(
+  state: string,
+): NativeMcpStatePayload | null {
   let combined: Buffer;
   try {
     combined = Buffer.from(state, "base64url");
@@ -71,30 +70,30 @@ export function verifyOAuthState(state: string): OAuthStatePayload | null {
   const expected = createHmac("sha256", getSecret()).update(body).digest();
   if (sig.length !== expected.length) return null;
   if (!timingSafeEqual(sig, expected)) return null;
-
   let parsed: unknown;
   try {
     parsed = JSON.parse(body.toString("utf8"));
   } catch {
     return null;
   }
-  if (!isStatePayload(parsed)) return null;
+  if (!isNativeMcpStatePayload(parsed)) return null;
   return parsed;
 }
 
-function isStatePayload(value: unknown): value is OAuthStatePayload {
+function isNativeMcpStatePayload(value: unknown): value is NativeMcpStatePayload {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return (
     typeof v.workspaceId === "string" &&
     typeof v.workspaceSlug === "string" &&
-    (v.connectionType === "slack" || v.connectionType === "google-sheets") &&
+    typeof v.userId === "string" &&
+    typeof v.provider === "string" &&
     typeof v.connectionName === "string" &&
     typeof v.nonce === "string"
   );
 }
 
-// Composio-flavored state. Separate from OAuthStatePayload because
+// Composio-flavored state. Separate from NativeMcpStatePayload because
 // Composio gives us the connected_account_id at /authorize time (in
 // the `link()` response), and we want to pass that opaque id through
 // to the callback so we can `connectedAccounts.get(id)` it and only

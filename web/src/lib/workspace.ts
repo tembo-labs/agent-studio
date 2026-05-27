@@ -16,7 +16,25 @@ export type WorkspaceSecretKind =
   | "anthropic_api_key"
   | "openai_api_key"
   | "composio_api_key"
-  | "composio_webhook_secret";
+  | "composio_webhook_secret"
+  | "attio_oauth_client_id"
+  | "attio_oauth_client_secret";
+
+/**
+ * Convention: native-MCP providers store their OAuth client
+ * credentials as `<provider>_oauth_client_{id,secret}`. Callers that
+ * want to handle multiple providers uniformly compute the pair from
+ * the catalog slug rather than hard-coding the literal.
+ */
+export function nativeMcpClientSecretKinds(provider: string): {
+  idKind: WorkspaceSecretKind;
+  secretKind: WorkspaceSecretKind;
+} {
+  return {
+    idKind: `${provider}_oauth_client_id` as WorkspaceSecretKind,
+    secretKind: `${provider}_oauth_client_secret` as WorkspaceSecretKind,
+  };
+}
 
 // Single source of truth lives in @/lib/favicon-constants (client-safe).
 // Re-exported here so server-side callers don't need to know.

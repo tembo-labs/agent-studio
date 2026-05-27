@@ -7,15 +7,26 @@ import {
   type ComposioToolkit,
 } from "@/lib/composio";
 import { listConnectionsForUser } from "@/lib/composio-connections";
+import {
+  listNativeConnectionsForUser,
+  type WorkspaceConnection,
+} from "@/lib/connections";
+import {
+  listMcpProviders,
+  type McpProviderSlug,
+} from "@/lib/mcp-providers";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
-  getWorkspaceSecretPlaintext,
+  getWorkspaceRole,
   getWorkspaceSecretPreview,
+  getWorkspaceSecretPlaintext,
+  nativeMcpClientSecretKinds,
 } from "@/lib/workspace";
 
 import { ComposioConnectionsSection } from "../settings/composio-connections-section";
+import { NativeMcpConnectionsSection } from "./native-mcp-connections-section";
 
 export const dynamic = "force-dynamic";
 
@@ -39,11 +50,48 @@ export default async function ConnectionsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const [composioPreview, myConnections, agentsListing] = await Promise.all([
+  const [
+    composioPreview,
+    myConnections,
+    agentsListing,
+    nativeConnections,
+    currentUserRole,
+  ] = await Promise.all([
     getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
     listConnectionsForUser(workspace.id, session.user.id),
     listAgents(workspace.id),
+    listNativeConnectionsForUser(workspace.id, session.user.id),
+    getWorkspaceRole(workspace.id, session.user.id),
   ]);
+  if (!currentUserRole) notFound();
+
+  // For each provider in the native-MCP catalog, gather: whether the
+  // workspace has OAuth client credentials configured + whether this
+  // user has authorized an active connection. Renders into rows that
+  // self-describe their state.
+  const nativeProviderRows = await Promise.all(
+    listMcpProviders().map(async (provider) => {
+      const { idKind, secretKind } = nativeMcpClientSecretKinds(provider.slug);
+      const [idPreview, secretPreview] = await Promise.all([
+        getWorkspaceSecretPreview(workspace.id, idKind),
+        getWorkspaceSecretPreview(workspace.id, secretKind),
+      ]);
+      const connection: WorkspaceConnection | null =
+        nativeConnections.find(
+          (c) => c.type === provider.slug && c.status === "active",
+        ) ?? null;
+      return {
+        provider,
+        oauthClientConfigured: Boolean(idPreview && secretPreview),
+        connection,
+      };
+    }),
+  );
+  // Silence unused-var lints until the runtime path consumes the
+  // plaintext-fetcher import; the import itself stays to keep the
+  // contract surface narrow.
+  void getWorkspaceSecretPlaintext;
+  void (null as McpProviderSlug | null);
 
   // Composio catalog feeds the toolkit picker on the "Add another"
   // form. Only fetched when the workspace has an API key on file —
@@ -82,16 +130,32 @@ export default async function ConnectionsPage({
   })();
 
   // OAuth callback bounces back to /connections (post-promotion) with
-  // ?composio=…&result=…&detail=…. Re-render the inline banner here.
-  const composioParam = typeof sp.composio === "string" ? sp.composio : undefined;
+  // ?composio=…&result=…&detail=… (composio path) OR
+  // ?native_mcp=…&result=…&detail=… (native-MCP path). Each banner
+  // renders inside its own section.
   const resultParam = typeof sp.result === "string" ? sp.result : undefined;
   const detailParam = typeof sp.detail === "string" ? sp.detail : undefined;
+
+  const composioParam = typeof sp.composio === "string" ? sp.composio : undefined;
   const composioBanner =
     composioParam &&
     /^[a-z0-9_-]+$/.test(composioParam) &&
     (resultParam === "ok" || resultParam === "error")
       ? {
           toolkit: composioParam as ComposioToolkit,
+          result: resultParam as "ok" | "error",
+          detail: detailParam,
+        }
+      : undefined;
+
+  const nativeMcpParam =
+    typeof sp.native_mcp === "string" ? sp.native_mcp : undefined;
+  const nativeMcpBanner =
+    nativeMcpParam &&
+    /^[a-z0-9_-]+$/.test(nativeMcpParam) &&
+    (resultParam === "ok" || resultParam === "error")
+      ? {
+          provider: nativeMcpParam,
           result: resultParam as "ok" | "error",
           detail: detailParam,
         }
@@ -126,6 +190,13 @@ export default async function ConnectionsPage({
           </span>
         </div>
       )}
+
+      <NativeMcpConnectionsSection
+        workspaceSlug={workspace.slug}
+        providers={nativeProviderRows}
+        currentUserRole={currentUserRole}
+        banner={nativeMcpBanner}
+      />
 
       <ComposioConnectionsSection
         workspaceSlug={workspace.slug}
