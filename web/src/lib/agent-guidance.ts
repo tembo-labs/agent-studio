@@ -374,6 +374,13 @@ when the user holds multiple accounts of the same toolkit. Tool
 slugs come from each toolkit's page on
 https://composio.dev/toolkits (UPPER_SNAKE_CASE).
 
+When a TAS create-agent prompt includes a "Connection slots already
+authorized in this workspace" header, **use those slot names
+verbatim** instead of \`default\` — the user has already authorized
+those slots, and writing a slot name they haven't authorized makes
+the agent fail to run until they authorize it. Only fall back to
+\`default\` for a toolkit that isn't in the header.
+
 **Shorter forms** that resolve to the same shape (use sparingly —
 prefer the explicit form above so future readers can grok the file
 without learning shortcut rules):

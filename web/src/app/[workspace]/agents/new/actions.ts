@@ -11,8 +11,10 @@ import {
 import {
   buildCreateAgentPrompt,
   createTemboTask,
+  type AvailableConnectionSlots,
   type CapError,
 } from "@/lib/cap-api";
+import { listConnectionsForUser } from "@/lib/composio-connections";
 import {
   createImprovement,
   improvementMarker,
@@ -125,12 +127,27 @@ export async function createFromChatAction(
     userId,
   });
 
+  // Fetch the requesting user's authorized connections so the
+  // prompt can list the actual slot names (not just suggest
+  // `default`). Tembo's coding agent reads the repo, not the TAS
+  // DB, so without this it has no way to know which slot to write
+  // — leading to PRs that say `name: default` when the workspace
+  // already has a `name: tembo` slot authorized.
+  const myConnections = await listConnectionsForUser(workspace.id, userId);
+  const availableSlots: AvailableConnectionSlots = {};
+  for (const c of myConnections) {
+    if (c.status !== "ACTIVE") continue;
+    if (!availableSlots[c.toolkit]) availableSlots[c.toolkit] = [];
+    availableSlots[c.toolkit].push(c.name);
+  }
+
   const prompt = buildCreateAgentPrompt({
     framework,
     agentName: name,
     agentPath,
     description,
     improvementMarker: improvementMarker(row.id),
+    availableSlots,
   });
 
   const res = await createTemboTask({

@@ -210,12 +210,21 @@ function formatGuidanceFile(f: GuidanceFile): string[] {
 // marker line is the one piece of TAS scaffolding kept — without
 // it the PR scanner can't correlate the merged PR back to the
 // improvement row.
+export type AvailableConnectionSlots = Record<string, string[]>;
+
 export function buildCreateAgentPrompt(args: {
   framework: Framework;
   agentName: string;
   agentPath: string;
   description: string;
   improvementMarker: string;
+  /**
+   * Toolkit → authorized slot names for the user creating this
+   * agent. When present, the prompt tells Tembo to prefer these
+   * concrete slot names over `default`. Empty/missing = none
+   * authorized yet, so the prompt falls back to `default`.
+   */
+  availableSlots?: AvailableConnectionSlots;
 }): string {
   const frameworkGuide =
     args.framework === "cargo-ai" ? GUIDANCE_CARGO_AI_PATH : GUIDANCE_PYDANTIC_PATH;
@@ -229,6 +238,7 @@ export function buildCreateAgentPrompt(args: {
     "",
     `The agent's \`name:\` field must be exactly \`${args.agentName}\` (matching the filename). Don't put the file anywhere other than \`${args.agentPath}\`.`,
     "",
+    ...renderAvailableSlots(args.availableSlots),
     "If the agent needs to call external services (Slack, Gmail, Google",
     "Sheets, Notion, GitHub, Linear, HubSpot, etc.), declare them via the",
     "`connections:` field. The slug is whatever Composio uses (lowercase,",
@@ -240,8 +250,10 @@ export function buildCreateAgentPrompt(args: {
     "tools once the user authorizes the toolkit in Settings → Connections.",
     "",
     "**Always use the named-slot + narrow-tools form for connections.**",
-    "Pick a short name (`default` when there's only one) and list the",
-    "exact tool slugs the agent uses. Example:",
+    "Pick a short name and list the exact tool slugs the agent uses.",
+    "If the user has already authorized a slot in this workspace, use",
+    "that name (the prompt header above lists them). Use `default` only",
+    "when no slot exists for the toolkit yet. Example:",
     "",
     "```yaml",
     "connections:",
@@ -293,6 +305,41 @@ export function buildCreateAgentPrompt(args: {
     "",
     args.improvementMarker,
   ].join("\n");
+}
+
+// Format the "available slots" preamble for the create-agent prompt.
+// Returns the prompt-line array (caller spreads it in). Empty input
+// returns []  so the prompt falls back to the generic "use `default`"
+// guidance further down.
+function renderAvailableSlots(
+  slots: AvailableConnectionSlots | undefined,
+): string[] {
+  if (!slots) return [];
+  const entries = Object.entries(slots).filter(
+    ([, names]) => names.length > 0,
+  );
+  if (entries.length === 0) return [];
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  const lines: string[] = [
+    "**Connection slots already authorized in this workspace:**",
+    "",
+  ];
+  for (const [toolkit, names] of entries) {
+    lines.push(`- \`${toolkit}\`: ${names.map((n) => `\`${n}\``).join(", ")}`);
+  }
+  lines.push("");
+  lines.push(
+    "When the agent declares a `connections:` entry for one of these",
+  );
+  lines.push(
+    "toolkits, use the existing slot name (not `default`) so the user",
+  );
+  lines.push(
+    "doesn't have to re-authorize. For a toolkit not listed above, use",
+  );
+  lines.push("`default` and TAS will surface a Connect button.");
+  lines.push("");
+  return lines;
 }
 
 // Build a chat-to-edit prompt. No specific run is anchored; this is
