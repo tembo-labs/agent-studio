@@ -14,7 +14,6 @@ import {
   getComposioConnectionById,
   renameComposioConnection,
 } from "@/lib/composio-connections";
-import { deleteConnection } from "@/lib/connections";
 import { isWorkspaceRole, type WorkspaceRole } from "@/lib/rbac";
 import {
   refreshAllGuidanceFiles,
@@ -332,33 +331,6 @@ export async function disconnectRepoAction(
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
   return { message: "Repository disconnected." };
-}
-
-export type DisconnectConnectionFormState = {
-  message?: string;
-  error?: string;
-};
-
-export async function disconnectConnectionAction(
-  _prev: DisconnectConnectionFormState,
-  formData: FormData,
-): Promise<DisconnectConnectionFormState> {
-  const slug = String(formData.get("workspace") ?? "");
-  const connectionId = String(formData.get("connectionId") ?? "");
-  if (!connectionId) {
-    return { error: "Missing connection id." };
-  }
-
-  const auth = await authorizeWorkspace(slug, "workspace_admin");
-  if (auth.denied) return { error: DENIED_MESSAGE };
-  const { workspace } = auth;
-  const ok = await deleteConnection(workspace.id, connectionId);
-  if (!ok) {
-    return { error: "Connection not found." };
-  }
-
-  revalidatePath(`/${slug}/settings`);
-  return { message: "Connection removed." };
 }
 
 export type DisconnectComposioConnectionFormState = {
