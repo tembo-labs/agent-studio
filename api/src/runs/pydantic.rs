@@ -175,10 +175,15 @@ pub async fn invoke(args: PydanticArgs<'_>) -> anyhow::Result<PydanticResult> {
         } else {
             stderr.clone()
         };
+        // Cap at 16 KB — enough for a full Python traceback with
+        // multiple call sites plus the exception message. The DB
+        // column is TEXT (no length limit on Postgres's side) and
+        // the run-detail UI scrolls long messages, so the cap is
+        // here only to keep one runaway error from filling a row.
         bail!(
             "pydantic-ai wrapper exited with status {}: {}",
             output.status,
-            snippet.trim().chars().take(800).collect::<String>()
+            snippet.trim().chars().take(16_000).collect::<String>()
         );
     }
 

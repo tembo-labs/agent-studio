@@ -108,7 +108,7 @@ pub async fn invoke(args: CargoAiArgs<'_>) -> anyhow::Result<CargoAiResult> {
         bail!(
             "cargo-ai exited with status {}: {}",
             output.status,
-            snippet.trim().chars().take(800).collect::<String>()
+            snippet.trim().chars().take(16_000).collect::<String>()
         );
     }
 

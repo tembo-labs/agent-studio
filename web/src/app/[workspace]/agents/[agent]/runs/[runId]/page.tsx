@@ -215,16 +215,20 @@ function FailedReason({
   const failureGroupsHref = `/${workspaceSlug}/agents/${encodeURIComponent(run.agentName)}#failures`;
 
   return (
-    <div className="group relative mt-3 flex flex-col gap-2 overflow-hidden rounded-lg border border-[var(--color-sentiment-negative)] bg-[var(--color-input-error)] p-3 text-sm">
-      <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+    <div className="group relative mt-3 flex flex-col gap-2 rounded-lg border border-[var(--color-sentiment-negative)] bg-[var(--color-input-error)] p-3 text-sm">
+      <div className="absolute right-2 top-2 z-10 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
         <CopyOutputButton text={run.errorMessage ?? ""} />
       </div>
       <span className="text-sentiment-negative font-medium">
         Failure reason
       </span>
-      <span className="text-foreground whitespace-pre-wrap font-mono text-xs leading-5">
+      {/* max-height + overflow so a long stack trace doesn't push the
+          rest of the page (Improve form, recent runs) off-screen; the
+          Copy button above is the escape hatch for sharing the full
+          text elsewhere. */}
+      <pre className="text-foreground max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5">
         {run.errorMessage}
-      </span>
+      </pre>
       {/* Two investigation jumps. "Similar runs" pulls every failed
           run on this agent with the same error prefix in /runs;
           "Failure groups" jumps to the per-agent dashboard's
