@@ -4,12 +4,14 @@ import { notFound, redirect } from "next/navigation";
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listPendingCreatesForWorkspace } from "@/lib/improvements-api";
+import { meetsMinRole } from "@/lib/rbac";
 import { listAgentSummaries30d } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
+  getWorkspaceRole,
   getWorkspaceSecretPreview,
 } from "@/lib/workspace";
 
@@ -40,11 +42,14 @@ export default async function WorkspacePage({
     redirect(`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`);
   }
 
-  const [apiKeyPreview, agentsResult, pendingStored] = await Promise.all([
-    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
-    listAgents(workspace.id),
-    listPendingCreatesForWorkspace(workspace.id),
-  ]);
+  const [apiKeyPreview, agentsResult, pendingStored, currentUserRole] =
+    await Promise.all([
+      getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
+      listAgents(workspace.id),
+      listPendingCreatesForWorkspace(workspace.id),
+      getWorkspaceRole(workspace.id, session.user.id),
+    ]);
+  const canEdit = meetsMinRole(currentUserRole, "operator");
 
   const validNames = agentsResult.ok
     ? agentsResult.agents.filter((a) => a.ok).map((a) => a.spec.name)
@@ -193,6 +198,7 @@ export default async function WorkspacePage({
         <AgentsInventory
           agents={inventoryAgents}
           newAgentHref={`/${workspace.slug}/agents/new`}
+          canEdit={canEdit}
         />
       )}
     </div>

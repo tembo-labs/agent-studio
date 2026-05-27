@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { writeAuditEvent } from "@/lib/audit-db";
 import { getPublicOrigin } from "@/lib/config";
 import { findLatestActiveConnection } from "@/lib/composio";
 import { saveComposioConnection } from "@/lib/composio-connections";
@@ -137,7 +138,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  await saveComposioConnection({
+  const saved = await saveComposioConnection({
     workspaceId: payload.workspaceId,
     userId: payload.userId,
     toolkit: payload.toolkit,
@@ -146,6 +147,20 @@ export async function GET(request: NextRequest) {
     authConfigId: latest.authConfigId,
     status: latest.status,
     metadata: {},
+  });
+
+  await writeAuditEvent({
+    workspaceId: payload.workspaceId,
+    actorUserId: payload.userId,
+    source: "human_action",
+    kind: "connection.authorized",
+    targetType: "connection",
+    targetId: saved.id,
+    agentName: null,
+    payload: {
+      toolkit: payload.toolkit,
+      name: payload.connectionName,
+    },
   });
 
   return backToConnections(

@@ -9,12 +9,15 @@ import { listDeletedAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
+  getWorkspaceRole,
   getWorkspaceSecretPreview,
+  listWorkspaceMembers,
 } from "@/lib/workspace";
 
 import { ChangeModeSetting } from "./change-mode-setting";
 import { DisconnectRepoForm } from "./disconnect-repo-form";
 import { FaviconPicker } from "./favicon-picker";
+import { MembersSection } from "./members-section";
 import { RestoreAgentForm } from "./restore-agent-form";
 import { SecretKeyForm } from "./secret-key-form";
 import { SyncGuidanceForm } from "./sync-guidance-form";
@@ -60,6 +63,8 @@ export default async function SettingsPage({
     composioWebhookSecretPreview,
     repo,
     deletedAgents,
+    members,
+    currentUserRole,
   ] = await Promise.all([
     getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
     getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
@@ -68,7 +73,13 @@ export default async function SettingsPage({
     getWorkspaceSecretPreview(workspace.id, "composio_webhook_secret"),
     getWorkspaceRepo(workspace.id),
     listDeletedAgents(workspace.id),
+    listWorkspaceMembers(workspace.id),
+    getWorkspaceRole(workspace.id, session.user.id),
   ]);
+  // If the layout's membership check passed, role is non-null here.
+  // notFound() is the right fallback in case of a race — same shape
+  // the rest of the page uses for unexpected null state.
+  if (!currentUserRole) notFound();
   const webhookUrl = `${getPublicOrigin()}/api/hooks/composio/${workspace.slug}`;
   // sp is currently unused on Settings — keep it as a typed
   // parameter so future ?banner=… style flows can land without
@@ -356,6 +367,15 @@ export default async function SettingsPage({
                 }
               />
             </Section>
+          </div>
+
+        <div className="pb-5 pt-8">
+            <MembersSection
+              workspaceSlug={workspace.slug}
+              members={members}
+              currentUserRole={currentUserRole}
+              currentUserId={session.user.id}
+            />
           </div>
 
         <div className="pb-5 pt-8">

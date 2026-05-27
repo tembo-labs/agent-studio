@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 
+import { writeAuditEvent } from "@/lib/audit-db";
+import {
+  authorizeWorkspace,
+  DENIED_MESSAGE,
+} from "@/lib/auth-server";
 import {
   createAutomation,
   deleteAutomation,
@@ -10,8 +15,6 @@ import {
   updateAutomation,
 } from "@/lib/automations-api";
 import { validateCron } from "@/lib/cron";
-import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
 import { getAgentByName } from "@/lib/workspace-agents";
 
 export type AutomationFormState = {
@@ -66,14 +69,13 @@ export async function createAutomationAction(
   _prev: AutomationFormState,
   formData: FormData,
 ): Promise<AutomationFormState> {
-  const session = await getServerSession();
-  if (!session) notFound();
-
   const parsed = parseForm(formData);
-  const workspace = await getWorkspaceBySlug(parsed.workspaceSlug);
-  if (!workspace) notFound();
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(parsed.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
   const invalid = await validate(workspace.id, parsed);
   if (invalid) return invalid;
@@ -81,16 +83,32 @@ export async function createAutomationAction(
   // Owner defaults to the creator when the form leaves the picker
   // blank. Real workspace-member validation can land later — for v0.3
   // we just trust the dropdown's value (or fall back to self).
-  const ownerUserId = parsed.ownerUserId || session.user.id;
-  await createAutomation({
+  const ownerUserId = parsed.ownerUserId || userId;
+  const created = await createAutomation({
     workspaceId: workspace.id,
     name: parsed.name,
     agentName: parsed.agentName,
     cron: parsed.cron,
     inputMessage: parsed.inputMessage,
     enabled: parsed.enabled,
-    userId: session.user.id,
+    userId,
     ownerUserId,
+  });
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "automation.created",
+    targetType: "automation",
+    targetId: created.id,
+    agentName: parsed.agentName,
+    payload: {
+      name: parsed.name,
+      cron: parsed.cron,
+      enabled: parsed.enabled,
+      ownerUserId,
+    },
   });
 
   revalidatePath(`/${parsed.workspaceSlug}/automations`);
@@ -102,18 +120,18 @@ export async function updateAutomationAction(
   _prev: AutomationFormState,
   formData: FormData,
 ): Promise<AutomationFormState> {
-  const session = await getServerSession();
-  if (!session) notFound();
-
   const id = String(formData.get("id") ?? "");
   const existing = await getAutomation(id);
   if (!existing) notFound();
 
   const parsed = parseForm(formData);
-  const workspace = await getWorkspaceBySlug(parsed.workspaceSlug);
-  if (!workspace || workspace.id !== existing.workspaceId) notFound();
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(parsed.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+  if (workspace.id !== existing.workspaceId) notFound();
 
   const invalid = await validate(workspace.id, parsed);
   if (invalid) return invalid;
@@ -130,6 +148,24 @@ export async function updateAutomationAction(
     // always send the current owner so the edit doesn't accidentally
     // re-assign.
     ownerUserId: parsed.ownerUserId || existing.ownerUserId,
+  });
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "automation.updated",
+    targetType: "automation",
+    targetId: id,
+    agentName: parsed.agentName,
+    payload: {
+      name: parsed.name,
+      cron: parsed.cron,
+      enabled: parsed.enabled,
+      ownerUserId: parsed.ownerUserId || existing.ownerUserId,
+      agentChanged: existing.agentName !== parsed.agentName,
+      previousAgent: existing.agentName,
+    },
   });
 
   revalidatePath(`/${parsed.workspaceSlug}/automations`);
@@ -149,20 +185,30 @@ export async function deleteAutomationAction(
   _prev: DeleteAutomationFormState,
   formData: FormData,
 ): Promise<DeleteAutomationFormState> {
-  const session = await getServerSession();
-  if (!session) notFound();
-
   const id = String(formData.get("id") ?? "");
   const workspaceSlug = String(formData.get("workspace") ?? "");
   const existing = await getAutomation(id);
   if (!existing) notFound();
 
-  const workspace = await getWorkspaceBySlug(workspaceSlug);
-  if (!workspace || workspace.id !== existing.workspaceId) notFound();
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+  if (workspace.id !== existing.workspaceId) notFound();
 
   await deleteAutomation(id);
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "automation.deleted",
+    targetType: "automation",
+    targetId: id,
+    agentName: existing.agentName,
+    payload: { name: existing.name, cron: existing.cron },
+  });
   revalidatePath(`/${workspaceSlug}/automations`);
   revalidatePath(`/${workspaceSlug}/agents/${encodeURIComponent(existing.agentName)}`);
   return DELETE_EMPTY;
@@ -172,9 +218,6 @@ export async function deleteAutomationAction(
 // form. Reuses the update path; the form on the list page renders a
 // single hidden enabled field + an immediate submit on change.
 export async function toggleAutomationAction(formData: FormData): Promise<void> {
-  const session = await getServerSession();
-  if (!session) notFound();
-
   const id = String(formData.get("id") ?? "");
   const enabled = formData.get("enabled") === "true";
   const workspaceSlug = String(formData.get("workspace") ?? "");
@@ -182,10 +225,14 @@ export async function toggleAutomationAction(formData: FormData): Promise<void> 
   const existing = await getAutomation(id);
   if (!existing) notFound();
 
-  const workspace = await getWorkspaceBySlug(workspaceSlug);
-  if (!workspace || workspace.id !== existing.workspaceId) notFound();
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  // toggleAutomationAction has no return state (void), so a denied
+  // role here can't surface an error message in the UI — we silently
+  // 404 the way we did for non-membership. The toggle button should
+  // be hidden in the UI for viewers anyway (US-0.4-89).
+  const auth = await authorizeWorkspace(workspaceSlug, "operator");
+  if (!auth.ok) notFound();
+  const { workspace, userId } = auth;
+  if (workspace.id !== existing.workspaceId) notFound();
 
   await updateAutomation({
     id,
@@ -195,6 +242,16 @@ export async function toggleAutomationAction(formData: FormData): Promise<void> 
     inputMessage: existing.inputMessage,
     enabled,
     ownerUserId: existing.ownerUserId,
+  });
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: enabled ? "automation.enabled" : "automation.disabled",
+    targetType: "automation",
+    targetId: id,
+    agentName: existing.agentName,
+    payload: { name: existing.name },
   });
   revalidatePath(`/${workspaceSlug}/automations`);
   revalidatePath(`/${workspaceSlug}/agents/${encodeURIComponent(existing.agentName)}`);

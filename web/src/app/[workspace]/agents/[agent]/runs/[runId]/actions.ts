@@ -3,6 +3,10 @@
 import { notFound } from "next/navigation";
 
 import {
+  authorizeWorkspace,
+  DENIED_MESSAGE,
+} from "@/lib/auth-server";
+import {
   buildImprovePrompt,
   createTemboTask,
   type CapError,
@@ -13,12 +17,9 @@ import {
   setImprovementTask,
 } from "@/lib/improvements-api";
 import { getRun } from "@/lib/runs-api";
-import { getServerSession } from "@/lib/session";
 import {
-  getWorkspaceBySlug,
   getWorkspaceRepo,
   getWorkspaceSecretPlaintext,
-  userIsMember,
 } from "@/lib/workspace";
 
 export type ImproveResult =
@@ -41,14 +42,12 @@ export async function improveAgentAction(args: {
     return { ok: false, error: "Tell us what to improve before submitting." };
   }
 
-  const session = await getServerSession();
-  if (!session) notFound();
-
-  const workspace = await getWorkspaceBySlug(args.workspaceSlug);
-  if (!workspace) notFound();
-
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
   const run = await getRun(args.runId);
   if (!run || run.workspaceId !== workspace.id) notFound();
@@ -80,7 +79,7 @@ export async function improveAgentAction(args: {
     agentName: run.agentName,
     agentPath: run.agentPath,
     improvementText: improvement,
-    userId: session.user.id,
+    userId,
   });
 
   const prompt = buildImprovePrompt({

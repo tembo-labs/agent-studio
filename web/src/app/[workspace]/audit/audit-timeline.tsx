@@ -1,0 +1,580 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+
+import { LocalTime } from "@/components/local-time";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { ALL_AUDIT_SOURCES, type AuditSource } from "@/lib/audit";
+
+import { loadAuditAction } from "./actions";
+import type { LoadedAuditEntry } from "./shape";
+
+type SinceKey = "24h" | "7d" | "30d" | "all";
+
+const SINCE_PRESETS: { key: SinceKey; label: string; ms: number | null }[] = [
+  { key: "24h", label: "24h", ms: 24 * 60 * 60 * 1000 },
+  { key: "7d", label: "7 days", ms: 7 * 24 * 60 * 60 * 1000 },
+  { key: "30d", label: "30 days", ms: 30 * 24 * 60 * 60 * 1000 },
+  { key: "all", label: "All", ms: null },
+];
+
+const PAGE_SIZE = 100;
+
+type Actor = { userId: string; displayName: string | null; email: string };
+
+type Props = {
+  workspaceSlug: string;
+  actors: Actor[];
+  initial: LoadedAuditEntry[];
+  initialFilters: {
+    sources: AuditSource[];
+    actor: string;
+    agent: string;
+    since: SinceKey;
+  };
+};
+
+export function AuditTimeline({
+  workspaceSlug,
+  actors,
+  initial,
+  initialFilters,
+}: Props) {
+  const router = useRouter();
+  // Filter state syncs to the URL via applyFilters → router.push.
+  // We also re-sync from initialFilters whenever the props change so
+  // browser back/forward navigation keeps the chip UI in sync with
+  // the URL the server just rendered.
+  const [sources, setSources] = useState<AuditSource[]>(initialFilters.sources);
+  const [actor, setActor] = useState<string>(initialFilters.actor);
+  const [agent, setAgent] = useState<string>(initialFilters.agent);
+  const [since, setSince] = useState<SinceKey>(initialFilters.since);
+
+  const filtersKey = JSON.stringify({
+    sources: initialFilters.sources,
+    actor: initialFilters.actor,
+    agent: initialFilters.agent,
+    since: initialFilters.since,
+  });
+  const prevFiltersKey = useRef(filtersKey);
+  useEffect(() => {
+    if (prevFiltersKey.current !== filtersKey) {
+      setSources(initialFilters.sources);
+      setActor(initialFilters.actor);
+      setAgent(initialFilters.agent);
+      setSince(initialFilters.since);
+      prevFiltersKey.current = filtersKey;
+    }
+    // initialFilters is a fresh object each render, so we depend on
+    // the serialized key instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey]);
+
+  // Rows render directly from `initial` (which the server re-fetches
+  // when filters change) plus any pages appended via "Load more."
+  // `appended` resets whenever the filter set changes so we don't
+  // mix pages across filter contexts.
+  const [appended, setAppended] = useState<LoadedAuditEntry[]>([]);
+  const [more, setMore] = useState<boolean>(initial.length >= PAGE_SIZE);
+  useEffect(() => {
+    setAppended([]);
+    setMore(initial.length >= PAGE_SIZE);
+  }, [filtersKey, initial.length]);
+  const rows = useMemo(() => [...initial, ...appended], [initial, appended]);
+
+  const [pending, startTransition] = useTransition();
+
+  const actorOptions = useMemo(
+    () => [
+      { value: "", label: "Any actor" },
+      ...actors.map((a) => ({
+        value: a.userId,
+        label: a.displayName ?? a.email,
+      })),
+    ],
+    [actors],
+  );
+
+  // Filter changes drive a URL navigation so the server re-renders
+  // the initial page with the new filter set, and the URL stays
+  // shareable. Cheaper than a parallel client-side fetch path.
+  function applyFilters(next: {
+    sources?: AuditSource[];
+    actor?: string;
+    agent?: string;
+    since?: SinceKey;
+  }) {
+    const u = buildFilterParams({
+      sources: next.sources ?? sources,
+      actor: next.actor ?? actor,
+      agent: next.agent ?? agent,
+      since: next.since ?? since,
+    });
+    const qs = u.toString();
+    router.push(`/${workspaceSlug}/audit${qs ? `?${qs}` : ""}`);
+  }
+
+  // Export href mirrors the current filter set so "Export JSON" hands
+  // off exactly the rows the user is seeing in the table. Recomputes
+  // on filter change without a network round-trip.
+  const exportHref = useMemo(() => {
+    const u = buildFilterParams({ sources, actor, agent, since });
+    const qs = u.toString();
+    return `/api/workspaces/${workspaceSlug}/audit/export${qs ? `?${qs}` : ""}`;
+  }, [workspaceSlug, sources, actor, agent, since]);
+
+  const sinceIso = useMemo(() => {
+    const preset = SINCE_PRESETS.find((p) => p.key === since);
+    if (!preset || preset.ms === null) return undefined;
+    return new Date(Date.now() - preset.ms).toISOString();
+  }, [since]);
+
+  const onLoadMore = useCallback(() => {
+    if (rows.length === 0) return;
+    const last = rows[rows.length - 1];
+    startTransition(async () => {
+      const next = await loadAuditAction({
+        workspaceSlug,
+        filters: {
+          sources: sources.length ? sources : undefined,
+          actor: actor || undefined,
+          agent: agent || undefined,
+          since: sinceIso,
+        },
+        beforeIso: last.at,
+      });
+      setAppended((prev) => [...prev, ...next]);
+      setMore(next.length >= PAGE_SIZE);
+    });
+  }, [rows, workspaceSlug, sources, actor, agent, sinceIso]);
+
+  function toggleSource(s: AuditSource) {
+    const next = sources.includes(s)
+      ? sources.filter((x) => x !== s)
+      : [...sources, s];
+    setSources(next);
+    applyFilters({ sources: next });
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Filter row */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide">
+            Source
+          </span>
+          {ALL_AUDIT_SOURCES.map((s) => (
+            <FilterChip
+              key={s}
+              active={sources.includes(s)}
+              onClick={() => toggleSource(s)}
+              label={SOURCE_LABELS[s]}
+            />
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide">
+            Window
+          </span>
+          {SINCE_PRESETS.map((p) => (
+            <FilterChip
+              key={p.key}
+              active={since === p.key}
+              onClick={() => {
+                setSince(p.key);
+                applyFilters({ since: p.key });
+              }}
+              label={p.label}
+            />
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide">
+            Actor
+          </span>
+          <Select
+            value={actor}
+            onValueChange={(v) => {
+              setActor(v);
+              applyFilters({ actor: v });
+            }}
+            options={actorOptions}
+            ariaLabel="Filter by actor"
+            className="min-w-[200px]"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <label
+            htmlFor="audit-agent"
+            className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide"
+          >
+            Agent
+          </label>
+          <Input
+            id="audit-agent"
+            type="search"
+            placeholder="agent name"
+            value={agent}
+            onChange={(e) => setAgent(e.target.value)}
+            onBlur={() => applyFilters({ agent })}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                applyFilters({ agent });
+              }
+            }}
+            className="max-w-xs"
+            maxLength={120}
+          />
+        </div>
+      </div>
+
+      <hr className="border-[var(--color-border-weak)]" />
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-foreground-weak text-xs">
+          {pending
+            ? "Loading…"
+            : rows.length === 0
+              ? "No events match these filters."
+              : `${rows.length} event${rows.length === 1 ? "" : "s"}${more ? "+" : ""}`}
+        </div>
+        {rows.length > 0 && (
+          <a
+            href={exportHref}
+            // `download` is advisory; the route also sets
+            // Content-Disposition: attachment so the browser saves
+            // regardless of how the link gets opened.
+            download
+            className="text-foreground-weak hover:text-foreground text-xs hover:underline"
+          >
+            Export JSON →
+          </a>
+        )}
+      </div>
+
+      {rows.length > 0 && (
+        <div className="border-border overflow-hidden rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-secondary text-foreground-weak text-xs uppercase tracking-wide">
+              <tr>
+                <th className="w-[140px] px-3 py-2 text-left font-medium">
+                  When
+                </th>
+                <th className="w-[160px] px-3 py-2 text-left font-medium">
+                  Actor
+                </th>
+                <th className="w-[140px] px-3 py-2 text-left font-medium">
+                  Source
+                </th>
+                <th className="px-3 py-2 text-left font-medium">Event</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--color-border-weak)]">
+              {rows.map((r) => (
+                <AuditRow
+                  key={`${r.origin}:${r.id}`}
+                  entry={r}
+                  workspaceSlug={workspaceSlug}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {more && rows.length > 0 && (
+        <div className="flex justify-center pt-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onLoadMore}
+            disabled={pending}
+          >
+            {pending ? "Loading…" : "Load more"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AuditRow({
+  entry,
+  workspaceSlug,
+}: {
+  entry: LoadedAuditEntry;
+  workspaceSlug: string;
+}) {
+  const eventLabel = humanKind(entry.kind);
+  const tone = SOURCE_TONE[entry.source];
+  return (
+    <tr className="hover:bg-surface-secondary transition-colors">
+      <td className="text-foreground-weak px-3 py-2 align-top text-xs">
+        <LocalTime iso={entry.at} />
+      </td>
+      <td className="text-foreground px-3 py-2 align-top text-xs">
+        {entry.actorDisplayName ?? (
+          <span className="text-foreground-muted italic">System</span>
+        )}
+      </td>
+      <td className="px-3 py-2 align-top">
+        <Badge variant={tone} size="small">
+          {SOURCE_LABELS[entry.source]}
+        </Badge>
+      </td>
+      <td className="text-foreground px-3 py-2 align-top text-xs">
+        <div className="flex flex-col gap-0.5">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="font-medium">{eventLabel}</span>
+            <TargetLink entry={entry} workspaceSlug={workspaceSlug} />
+          </div>
+          <EventSummary entry={entry} />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function TargetLink({
+  entry,
+  workspaceSlug,
+}: {
+  entry: LoadedAuditEntry;
+  workspaceSlug: string;
+}) {
+  // Click-through targets vary by event type. Run/improvement origins
+  // get their natural detail page; agent-scoped explicit events get
+  // the per-agent detail page; everything else just shows the name
+  // unlinked.
+  if (entry.origin === "run" && entry.targetId && entry.agentName) {
+    return (
+      <Link
+        href={`/${workspaceSlug}/agents/${encodeURIComponent(entry.agentName)}/runs/${entry.targetId}`}
+        className="text-foreground-weak hover:underline text-xs"
+      >
+        on {entry.agentName} →
+      </Link>
+    );
+  }
+  if (entry.origin === "improvement" && entry.agentName) {
+    return (
+      <Link
+        href={`/${workspaceSlug}/improvements`}
+        className="text-foreground-weak hover:underline text-xs"
+      >
+        on {entry.agentName} →
+      </Link>
+    );
+  }
+  if (entry.agentName) {
+    return (
+      <Link
+        href={`/${workspaceSlug}/agents/${encodeURIComponent(entry.agentName)}`}
+        className="text-foreground-weak hover:underline text-xs"
+      >
+        on {entry.agentName} →
+      </Link>
+    );
+  }
+  return null;
+}
+
+function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
+  const p = entry.payload;
+  // Per-kind summaries kept brief — full payload is JSON-encoded
+  // available behind a "View" toggle later if we add one. For v0.4-01
+  // MVP, the inline summary covers the audit-needs-to-glance use
+  // case.
+  switch (entry.kind) {
+    case "run.succeeded":
+    case "run.failed":
+    case "run.running":
+    case "run.queued": {
+      const status = String(p.status ?? "");
+      const cost = p.costUsd ? ` · ~$${Number(p.costUsd).toFixed(4)}` : "";
+      const dur = p.durationMs
+        ? ` · ${(Number(p.durationMs) / 1000).toFixed(1)}s`
+        : "";
+      const err = p.errorMessage
+        ? ` · ${String(p.errorMessage).slice(0, 80)}`
+        : "";
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {status}
+          {dur}
+          {cost}
+          {err}
+        </span>
+      );
+    }
+    case "improvement.submitted":
+    case "improvement.pr_opened":
+    case "improvement.merged":
+    case "improvement.closed":
+      return (
+        <span className="text-foreground-weak truncate text-[11px]">
+          {String(p.improvementText ?? "")}
+        </span>
+      );
+    case "automation.created":
+    case "automation.updated":
+    case "automation.deleted":
+    case "automation.enabled":
+    case "automation.disabled":
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {String(p.name ?? "")}
+          {p.cron ? ` · ${String(p.cron)}` : ""}
+        </span>
+      );
+    case "trigger.created":
+    case "trigger.deleted":
+    case "trigger.enabled":
+    case "trigger.disabled":
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {String(p.toolkit ?? "")} · {String(p.triggerType ?? "")}
+        </span>
+      );
+    case "connection.authorized":
+    case "connection.disconnected":
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {String(p.toolkit ?? "")} · {String(p.name ?? "default")}
+        </span>
+      );
+    case "connection.renamed":
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {String(p.toolkit ?? "")} · {String(p.oldName ?? "")} → {String(p.newName ?? "")}
+        </span>
+      );
+    case "secret.set":
+    case "secret.rotated":
+    case "secret.removed":
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {String(p.secretKind ?? "")}
+        </span>
+      );
+    default:
+      return null;
+  }
+}
+
+function FilterChip({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center rounded-full border px-2.5 py-1 text-xs transition-colors ${
+        active
+          ? "border-foreground bg-surface-raised text-foreground"
+          : "border-border bg-surface text-foreground-weak hover:text-foreground"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+const SOURCE_LABELS: Record<AuditSource, string> = {
+  chat: "Chat",
+  pr: "PR",
+  hitl_response: "HITL",
+  dashboard_event: "Dashboard",
+  correction: "Correction",
+  human_action: "Human",
+  policy_change: "Policy",
+  system: "System",
+};
+
+const SOURCE_TONE: Record<
+  AuditSource,
+  "gray" | "blue" | "green" | "yellow" | "red" | "purple"
+> = {
+  chat: "blue",
+  pr: "purple",
+  hitl_response: "yellow",
+  dashboard_event: "gray",
+  correction: "red",
+  human_action: "green",
+  policy_change: "yellow",
+  system: "gray",
+};
+
+function buildFilterParams(args: {
+  sources: AuditSource[];
+  actor: string;
+  agent: string;
+  since: SinceKey;
+}): URLSearchParams {
+  const u = new URLSearchParams();
+  for (const s of args.sources) u.append("source", s);
+  if (args.actor) u.set("actor", args.actor);
+  if (args.agent) u.set("agent", args.agent);
+  // "30d" is the default the page applies when ?since is missing, so
+  // omit it from the URL to keep the canonical form clean.
+  if (args.since !== "30d") u.set("since", args.since);
+  return u;
+}
+
+function humanKind(kind: string): string {
+  // Lookup table for common kinds; fall back to the dotted form for
+  // anything we haven't named. New event types render readably without
+  // requiring this table to be updated.
+  const map: Record<string, string> = {
+    "run.queued": "Run queued",
+    "run.running": "Run started",
+    "run.succeeded": "Run succeeded",
+    "run.failed": "Run failed",
+    "improvement.submitted": "Improvement submitted",
+    "improvement.pr_opened": "Improvement PR opened",
+    "improvement.merged": "Improvement merged",
+    "improvement.closed": "Improvement closed",
+    "automation.created": "Automation created",
+    "automation.updated": "Automation updated",
+    "automation.deleted": "Automation deleted",
+    "automation.enabled": "Automation enabled",
+    "automation.disabled": "Automation disabled",
+    "trigger.created": "Trigger created",
+    "trigger.deleted": "Trigger deleted",
+    "trigger.enabled": "Trigger enabled",
+    "trigger.disabled": "Trigger disabled",
+    "connection.authorized": "Connection authorized",
+    "connection.disconnected": "Connection disconnected",
+    "connection.renamed": "Connection renamed",
+    "secret.set": "Secret saved",
+    "secret.rotated": "Secret rotated",
+    "secret.removed": "Secret removed",
+    "agent.deleted": "Agent deleted",
+    "agent.restored": "Agent restored",
+    "repo.disconnected": "Repository disconnected",
+  };
+  return map[kind] ?? kind;
+}

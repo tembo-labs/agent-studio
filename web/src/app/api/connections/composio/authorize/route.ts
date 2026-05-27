@@ -1,14 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { authorizeWorkspace } from "@/lib/auth-server";
 import { getPublicOrigin } from "@/lib/config";
 import { initiateConnection } from "@/lib/composio";
 import { signComposioState } from "@/lib/oauth-state";
-import { getServerSession } from "@/lib/session";
 import {
-  getWorkspaceBySlug,
   getWorkspaceSecretPreview,
   getWorkspaceSecretPlaintext,
-  userIsMember,
 } from "@/lib/workspace";
 
 // Initiates a Composio-managed OAuth flow for a (workspace, toolkit)
@@ -38,11 +36,6 @@ function connectionsErrorRedirect(
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession();
-  if (!session) {
-    return NextResponse.redirect(new URL("/", request.url), 302);
-  }
-
   const slug = request.nextUrl.searchParams.get("workspace");
   const toolkitRaw = request.nextUrl.searchParams.get("toolkit");
   if (!slug || !toolkitRaw) {
@@ -74,15 +67,23 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) {
-    return NextResponse.json({ error: "workspace not found" }, { status: 404 });
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "no-session") {
+      return NextResponse.redirect(new URL("/", request.url), 302);
+    }
+    if (auth.reason === "no-workspace") {
+      return NextResponse.json(
+        { error: "workspace not found" },
+        { status: 404 },
+      );
+    }
+    return NextResponse.json(
+      { error: "insufficient role — connections require operator" },
+      { status: 403 },
+    );
   }
-
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) {
-    return NextResponse.json({ error: "not a member" }, { status: 403 });
-  }
+  const { workspace, userId } = auth;
 
   // Workspace must have a Composio API key on file. Pre-check via the
   // preview (cheap, no decrypt) so we surface a clean redirect-back
@@ -104,7 +105,7 @@ export async function GET(request: NextRequest) {
   const state = signComposioState({
     workspaceId: workspace.id,
     workspaceSlug: workspace.slug,
-    userId: session.user.id,
+    userId,
     toolkit,
     connectionName,
   });
@@ -118,7 +119,7 @@ export async function GET(request: NextRequest) {
     link = await initiateConnection({
       apiKey,
       workspaceId: workspace.id,
-      userId: session.user.id,
+      userId,
       toolkit,
       callbackUrl: callbackUrl.toString(),
     });

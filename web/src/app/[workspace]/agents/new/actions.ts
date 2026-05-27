@@ -5,6 +5,10 @@ import { notFound } from "next/navigation";
 import { validateAgentName } from "@/lib/agent-format";
 import { FRAMEWORKS, type Framework } from "@/lib/agent-framework";
 import {
+  authorizeWorkspace,
+  DENIED_MESSAGE,
+} from "@/lib/auth-server";
+import {
   buildCreateAgentPrompt,
   createTemboTask,
   type CapError,
@@ -14,13 +18,10 @@ import {
   improvementMarker,
   setImprovementTask,
 } from "@/lib/improvements-api";
-import { getServerSession } from "@/lib/session";
 import { getAgentByName } from "@/lib/workspace-agents";
 import {
-  getWorkspaceBySlug,
   getWorkspaceRepo,
   getWorkspaceSecretPlaintext,
-  userIsMember,
 } from "@/lib/workspace";
 
 function parseFrameworkField(raw: unknown): Framework | null {
@@ -73,12 +74,12 @@ export async function createFromChatAction(
     return { error: "Describe what the agent should do before submitting." };
   }
 
-  const session = await getServerSession();
-  if (!session) notFound();
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
   const repo = await getWorkspaceRepo(workspace.id);
   if (!repo) {
@@ -121,7 +122,7 @@ export async function createFromChatAction(
     agentPath,
     improvementText: description,
     kind: "create",
-    userId: session.user.id,
+    userId,
   });
 
   const prompt = buildCreateAgentPrompt({

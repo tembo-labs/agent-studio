@@ -3,6 +3,10 @@
 import { notFound } from "next/navigation";
 
 import {
+  authorizeWorkspace,
+  DENIED_MESSAGE,
+} from "@/lib/auth-server";
+import {
   buildChatEditPrompt,
   createTemboTask,
   type CapError,
@@ -13,12 +17,9 @@ import {
   setImprovementTask,
 } from "@/lib/improvements-api";
 import { createRun } from "@/lib/runs-api";
-import { getServerSession } from "@/lib/session";
 import {
-  getWorkspaceBySlug,
   getWorkspaceRepo,
   getWorkspaceSecretPlaintext,
-  userIsMember,
 } from "@/lib/workspace";
 import { getAgentByName } from "@/lib/workspace-agents";
 
@@ -42,14 +43,12 @@ export async function chatSubmitAction(args: {
     return { ok: false, error: "Type a request before sending." };
   }
 
-  const session = await getServerSession();
-  if (!session) notFound();
-
-  const workspace = await getWorkspaceBySlug(args.workspaceSlug);
-  if (!workspace) notFound();
-
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
   const result = await getAgentByName(workspace.id, args.agentName);
   if (!result) notFound();
@@ -89,7 +88,7 @@ export async function chatSubmitAction(args: {
     agentName: canonicalName,
     agentPath: agent.path,
     improvementText: text,
-    userId: session.user.id,
+    userId,
   });
 
   const prompt = buildChatEditPrompt({
@@ -144,14 +143,12 @@ export async function sendToAgentAction(args: {
     return { ok: false, error: "Type a message before sending." };
   }
 
-  const session = await getServerSession();
-  if (!session) notFound();
-
-  const workspace = await getWorkspaceBySlug(args.workspaceSlug);
-  if (!workspace) notFound();
-
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
   const result = await getAgentByName(workspace.id, args.agentName);
   if (!result) notFound();
@@ -184,7 +181,7 @@ export async function sendToAgentAction(args: {
   try {
     const res = await createRun({
       workspaceId: workspace.id,
-      userId: session.user.id,
+      userId,
       agentName: spec.name,
       agentPath: agent.path,
       model,

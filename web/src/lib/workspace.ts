@@ -7,6 +7,7 @@ import {
   validateRepo,
   type ValidateRepoError,
 } from "@/lib/github";
+import { isWorkspaceRole, type WorkspaceRole } from "@/lib/rbac";
 import { suggestSlug, validateSlug } from "@/lib/slugify";
 
 export type WorkspaceSecretKind =
@@ -126,12 +127,14 @@ export type WorkspaceMember = {
   userId: string;
   name: string | null;
   email: string;
+  role: WorkspaceRole;
+  joinedAt: Date;
 };
 
 /**
- * List the (userId, name, email) of every member of a workspace.
- * Used by the automation "Run as" picker; tolerable to be a small
- * query since member counts are <100 in practice.
+ * List every member of a workspace with their role + joined-at.
+ * Used by the Settings → Members section and (without the role
+ * field, historically) the automation "Run as" picker.
  */
 export async function listWorkspaceMembers(
   workspaceId: string,
@@ -140,8 +143,10 @@ export async function listWorkspaceMembers(
     user_id: string;
     name: string | null;
     email: string;
+    role: string;
+    joined_at: Date;
   }>(
-    `SELECT m.user_id, u.name, u.email
+    `SELECT m.user_id, u.name, u.email, m.role, m.joined_at
        FROM workspace_member m
        JOIN "user" u ON u.id = m.user_id
       WHERE m.workspace_id = $1
@@ -152,7 +157,176 @@ export async function listWorkspaceMembers(
     userId: r.user_id,
     name: r.name,
     email: r.email,
+    role: isWorkspaceRole(r.role) ? r.role : "viewer",
+    joinedAt: r.joined_at,
   }));
+}
+
+export type AddMemberError = "user-not-found" | "already-member";
+export type AddMemberResult =
+  | { ok: true; member: WorkspaceMember }
+  | { ok: false; error: AddMemberError };
+
+/**
+ * Add a user to a workspace at the given role. Looks the user up by
+ * email (case-insensitive). Returns 'user-not-found' if no user row
+ * has signed in with that email yet — the inviter needs to ask the
+ * person to sign in once first, then re-try. Returns 'already-member'
+ * when the row already exists; we never silently overwrite a role
+ * via this path (use changeMemberRole for that).
+ */
+export async function addWorkspaceMemberByEmail(
+  workspaceId: string,
+  email: string,
+  role: WorkspaceRole,
+): Promise<AddMemberResult> {
+  const normalized = email.trim().toLowerCase();
+  const { rows: userRows } = await db.query<{
+    id: string;
+    name: string | null;
+    email: string;
+  }>(
+    `SELECT id, name, email FROM "user" WHERE LOWER(email) = $1 LIMIT 1`,
+    [normalized],
+  );
+  const user = userRows[0];
+  if (!user) return { ok: false, error: "user-not-found" };
+
+  const insert = await db.query(
+    `INSERT INTO workspace_member (workspace_id, user_id, role)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (workspace_id, user_id) DO NOTHING
+     RETURNING joined_at`,
+    [workspaceId, user.id, role],
+  );
+  if ((insert.rowCount ?? 0) === 0) {
+    return { ok: false, error: "already-member" };
+  }
+  return {
+    ok: true,
+    member: {
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      role,
+      joinedAt: (insert.rows[0] as { joined_at: Date }).joined_at,
+    },
+  };
+}
+
+export type ChangeMemberRoleError = "not-found" | "last-admin";
+export type ChangeMemberRoleResult =
+  | { ok: true; previousRole: WorkspaceRole; newRole: WorkspaceRole }
+  | { ok: false; error: ChangeMemberRoleError };
+
+/**
+ * Change a member's role. Blocks self-demotion of the last
+ * workspace_admin — an unreachable workspace is worse than a
+ * permission-denied error. Returns the previous role so the audit
+ * log can render a meaningful diff.
+ */
+export async function changeMemberRole(
+  workspaceId: string,
+  targetUserId: string,
+  newRole: WorkspaceRole,
+): Promise<ChangeMemberRoleResult> {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: existingRows } = await client.query<{ role: string }>(
+      `SELECT role FROM workspace_member
+        WHERE workspace_id = $1 AND user_id = $2
+        FOR UPDATE`,
+      [workspaceId, targetUserId],
+    );
+    const existing = existingRows[0];
+    if (!existing) {
+      await client.query("ROLLBACK");
+      return { ok: false, error: "not-found" };
+    }
+    const previousRole = isWorkspaceRole(existing.role)
+      ? existing.role
+      : "viewer";
+    if (previousRole === newRole) {
+      await client.query("ROLLBACK");
+      return { ok: true, previousRole, newRole };
+    }
+    // Block last-admin demotion: count admins, refuse if this
+    // member is the only one and they're being demoted.
+    if (previousRole === "workspace_admin" && newRole !== "workspace_admin") {
+      const { rows: countRows } = await client.query<{ n: string }>(
+        `SELECT COUNT(*)::text AS n
+           FROM workspace_member
+          WHERE workspace_id = $1 AND role = 'workspace_admin'`,
+        [workspaceId],
+      );
+      if (Number(countRows[0].n) <= 1) {
+        await client.query("ROLLBACK");
+        return { ok: false, error: "last-admin" };
+      }
+    }
+    await client.query(
+      `UPDATE workspace_member SET role = $3
+        WHERE workspace_id = $1 AND user_id = $2`,
+      [workspaceId, targetUserId, newRole],
+    );
+    await client.query("COMMIT");
+    return { ok: true, previousRole, newRole };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Remove a user from a workspace. Same last-admin guard as
+ * changeMemberRole. Used by the "Remove member" affordance.
+ */
+export async function removeWorkspaceMember(
+  workspaceId: string,
+  targetUserId: string,
+): Promise<{ ok: true } | { ok: false; error: "not-found" | "last-admin" }> {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: existingRows } = await client.query<{ role: string }>(
+      `SELECT role FROM workspace_member
+        WHERE workspace_id = $1 AND user_id = $2
+        FOR UPDATE`,
+      [workspaceId, targetUserId],
+    );
+    const existing = existingRows[0];
+    if (!existing) {
+      await client.query("ROLLBACK");
+      return { ok: false, error: "not-found" };
+    }
+    if (existing.role === "workspace_admin") {
+      const { rows: countRows } = await client.query<{ n: string }>(
+        `SELECT COUNT(*)::text AS n
+           FROM workspace_member
+          WHERE workspace_id = $1 AND role = 'workspace_admin'`,
+        [workspaceId],
+      );
+      if (Number(countRows[0].n) <= 1) {
+        await client.query("ROLLBACK");
+        return { ok: false, error: "last-admin" };
+      }
+    }
+    await client.query(
+      `DELETE FROM workspace_member
+        WHERE workspace_id = $1 AND user_id = $2`,
+      [workspaceId, targetUserId],
+    );
+    await client.query("COMMIT");
+    return { ok: true };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function userIsMember(
@@ -164,6 +338,29 @@ export async function userIsMember(
     [workspaceId, userId],
   );
   return (rowCount ?? 0) > 0;
+}
+
+/**
+ * Returns the user's workspace role, or null if they aren't a member.
+ * This is the only path through which role is read — server actions
+ * pair it with meetsMinRole / requireWorkspaceRole from @/lib/rbac.
+ */
+export async function getWorkspaceRole(
+  workspaceId: string,
+  userId: string,
+): Promise<WorkspaceRole | null> {
+  const { rows } = await db.query<{ role: string }>(
+    `SELECT role FROM workspace_member
+      WHERE workspace_id = $1 AND user_id = $2
+      LIMIT 1`,
+    [workspaceId, userId],
+  );
+  const role = rows[0]?.role;
+  if (!role) return null;
+  // Defensive guard: the CHECK constraint should keep junk out, but
+  // returning null on an unrecognized value beats throwing during a
+  // hot request path.
+  return isWorkspaceRole(role) ? role : null;
 }
 
 export type CreateWorkspaceResult =
@@ -223,7 +420,7 @@ export async function createWorkspace(
 
     await client.query(
       `INSERT INTO workspace_member (workspace_id, user_id, role)
-       VALUES ($1, $2, 'admin')`,
+       VALUES ($1, $2, 'workspace_admin')`,
       [workspace.id, userId],
     );
 

@@ -7,12 +7,14 @@ import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
+import { listAuditTimeline } from "@/lib/audit-db";
 import {
   listAutomationsForAgent,
   type Automation,
 } from "@/lib/automations-api";
 import { listConnectionsForUser } from "@/lib/composio-connections";
 import { nextFireAfter, validateCron } from "@/lib/cron";
+import { meetsMinRole } from "@/lib/rbac";
 import {
   getAgentDailyRuns30d,
   getAgentStats30d,
@@ -26,10 +28,12 @@ import { getAgentByName } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
+  getWorkspaceRole,
   getWorkspaceSecretPreview,
 } from "@/lib/workspace";
 
 import { AgentDashboard } from "./agent-dashboard";
+import { AgentTimeline } from "./agent-timeline";
 import { DeleteAgentButton } from "./delete-agent-button";
 import { RunNowButton } from "./run-now-button";
 import { TriggersSection } from "./triggers-section";
@@ -69,6 +73,8 @@ export default async function AgentDetailPage({
     myConnections,
     composioApiKeyPreview,
     composioWebhookSecretPreview,
+    timeline,
+    currentUserRole,
   ] = await Promise.all([
     listRecentRunsForAgent(workspace.id, canonicalName, 10),
     listAutomationsForAgent(workspace.id, canonicalName),
@@ -79,7 +85,10 @@ export default async function AgentDetailPage({
     listConnectionsForUser(workspace.id, session.user.id),
     getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
     getWorkspaceSecretPreview(workspace.id, "composio_webhook_secret"),
+    listAuditTimeline(workspace.id, { agentName: canonicalName }, 20),
+    getWorkspaceRole(workspace.id, session.user.id),
   ]);
+  const canEdit = meetsMinRole(currentUserRole, "operator");
 
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
 
@@ -117,7 +126,7 @@ export default async function AgentDetailPage({
                 View source
               </a>
             </Button>
-            {agent.ok && (
+            {agent.ok && canEdit && (
               <Button asChild variant="secondary">
                 <Link
                   href={`/${workspace.slug}/agents/${encodeURIComponent(canonicalName)}/chat`}
@@ -126,11 +135,13 @@ export default async function AgentDetailPage({
                 </Link>
               </Button>
             )}
-            <DeleteAgentButton
-              workspaceSlug={workspace.slug}
-              agentName={canonicalName}
-            />
-            {agent.ok && (
+            {canEdit && (
+              <DeleteAgentButton
+                workspaceSlug={workspace.slug}
+                agentName={canonicalName}
+              />
+            )}
+            {agent.ok && canEdit && (
               <RunNowButton
                 workspaceSlug={workspace.slug}
                 agentName={canonicalName}
@@ -185,6 +196,12 @@ export default async function AgentDetailPage({
             agentName={canonicalName}
           />
         </Section>
+
+        <AgentTimeline
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+          entries={timeline}
+        />
 
         <Section
           title="Definition"

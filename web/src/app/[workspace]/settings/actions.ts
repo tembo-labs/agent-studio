@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
+import { writeAuditEvent } from "@/lib/audit-db";
+import {
+  authorizeWorkspace as authorizeWorkspaceShared,
+  DENIED_MESSAGE,
+} from "@/lib/auth-server";
 import { deleteRemoteConnection } from "@/lib/composio";
 import {
   deleteComposioConnection,
@@ -10,23 +15,24 @@ import {
   renameComposioConnection,
 } from "@/lib/composio-connections";
 import { deleteConnection } from "@/lib/connections";
-import { getServerSession } from "@/lib/session";
+import { isWorkspaceRole, type WorkspaceRole } from "@/lib/rbac";
 import {
   refreshAllGuidanceFiles,
   restoreAgent,
   type RestoreAgentError,
 } from "@/lib/workspace-agents";
 import {
+  addWorkspaceMemberByEmail,
+  changeMemberRole,
   DEFAULT_FAVICON_KINDS,
   disconnectWorkspaceRepo,
-  getWorkspaceBySlug,
   getWorkspaceSecretPlaintext,
   getWorkspaceSecretPreview,
+  removeWorkspaceMember,
   removeWorkspaceSecret,
   setFaviconCustom,
   setFaviconDefault,
   setWorkspaceSecret,
-  userIsMember,
   type FaviconKind,
   type SetFaviconError,
   type SetWorkspaceSecretError,
@@ -85,17 +91,29 @@ function saveErrorMessage(
   }
 }
 
-async function authorizeWorkspace(slug: string) {
-  const session = await getServerSession();
-  if (!session) notFound();
-
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
-
-  const ok = await userIsMember(workspace.id, session.user.id);
-  if (!ok) notFound();
-
-  return workspace;
+// Authorize for a settings mutation. Default minRole is
+// workspace_admin — every operation in this file touches workspace
+// configuration. Operator-tier surfaces (own-connection rename /
+// disconnect, agent restore) override at the call site.
+//
+// Returns the workspace + actor on success. On no-session /
+// no-workspace we 404 (don't leak existence). On denial the caller
+// surfaces DENIED_MESSAGE in its form state — never silent.
+async function authorizeWorkspace(
+  slug: string,
+  minRole: WorkspaceRole = "workspace_admin",
+) {
+  const auth = await authorizeWorkspaceShared(slug, minRole);
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { denied: true as const };
+    notFound();
+  }
+  return {
+    denied: false as const,
+    workspace: auth.workspace,
+    userId: auth.userId,
+    role: auth.role,
+  };
 }
 
 export async function saveSecretAction(
@@ -111,11 +129,25 @@ export async function saveSecretAction(
   }
   const kind: SettingsKind = kindRaw;
 
-  const workspace = await authorizeWorkspace(slug);
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
+  const existing = await getWorkspaceSecretPreview(workspace.id, kind);
   const result = await setWorkspaceSecret(workspace.id, kind, apiKey);
   if (!result.ok) {
     return { error: saveErrorMessage(kind, result.error) };
   }
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: existing ? "secret.rotated" : "secret.set",
+    targetType: "secret",
+    targetId: kind,
+    agentName: null,
+    payload: { secretKind: kind },
+  });
 
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
@@ -134,8 +166,21 @@ export async function removeSecretAction(
   }
   const kind: SettingsKind = kindRaw;
 
-  const workspace = await authorizeWorkspace(slug);
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
   await removeWorkspaceSecret(workspace.id, kind);
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "secret.removed",
+    targetType: "secret",
+    targetId: kind,
+    agentName: null,
+    payload: { secretKind: kind },
+  });
 
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
@@ -173,14 +218,23 @@ export async function restoreAgentAction(
   const slug = String(formData.get("workspace") ?? "");
   const deletionId = String(formData.get("deletionId") ?? "");
 
-  const session = await getServerSession();
-  if (!session) return { error: "Not signed in." };
-
-  const workspace = await authorizeWorkspace(slug);
-  const result = await restoreAgent(workspace.id, session.user.id, deletionId);
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
+  const result = await restoreAgent(workspace.id, userId, deletionId);
   if (!result.ok) {
     return { error: RESTORE_ERROR_MESSAGES[result.error] };
   }
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "agent.restored",
+    targetType: "agent",
+    targetId: result.agentName,
+    agentName: result.agentName,
+    payload: { deletionId },
+  });
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
   return { message: `Restored ${result.agentName}.` };
@@ -216,7 +270,9 @@ export async function setFaviconDefaultAction(
     return { error: "Unknown favicon kind." };
   }
 
-  const workspace = await authorizeWorkspace(slug);
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace } = auth;
   const result = await setFaviconDefault(workspace.id, kindRaw);
   if (!result.ok) {
     return { error: FAVICON_ERROR_MESSAGES[result.error] };
@@ -236,7 +292,9 @@ export async function uploadFaviconAction(
     return { error: FAVICON_ERROR_MESSAGES.empty };
   }
 
-  const workspace = await authorizeWorkspace(slug);
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace } = auth;
   const buffer = Buffer.from(await file.arrayBuffer());
   const result = await setFaviconCustom(workspace.id, {
     bytes: buffer,
@@ -253,10 +311,23 @@ export async function uploadFaviconAction(
 export async function disconnectRepoAction(
   _prev: DisconnectRepoFormState,
   formData: FormData,
-): Promise<DisconnectRepoFormState> {
+): Promise<DisconnectRepoFormState & { error?: string }> {
   const slug = String(formData.get("workspace") ?? "");
-  const workspace = await authorizeWorkspace(slug);
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { message: undefined, error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
   await disconnectWorkspaceRepo(workspace.id);
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "repo.disconnected",
+    targetType: "workspace",
+    targetId: null,
+    agentName: null,
+    payload: {},
+  });
 
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}`);
@@ -278,7 +349,9 @@ export async function disconnectConnectionAction(
     return { error: "Missing connection id." };
   }
 
-  const workspace = await authorizeWorkspace(slug);
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace } = auth;
   const ok = await deleteConnection(workspace.id, connectionId);
   if (!ok) {
     return { error: "Connection not found." };
@@ -310,7 +383,9 @@ export async function disconnectComposioConnectionAction(
     return { error: "Missing connection id." };
   }
 
-  const workspace = await authorizeWorkspace(slug);
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
   const row = await getComposioConnectionById(workspace.id, connectionId);
   if (!row) {
     return { error: "Connection not found." };
@@ -331,6 +406,17 @@ export async function disconnectComposioConnectionAction(
     });
   }
   await deleteComposioConnection(workspace.id, connectionId);
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "connection.disconnected",
+    targetType: "connection",
+    targetId: connectionId,
+    agentName: null,
+    payload: { toolkit: row.toolkit, name: row.name },
+  });
 
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}/connections`);
@@ -357,7 +443,10 @@ export async function renameComposioConnectionAction(
   const newName = String(formData.get("newName") ?? "");
   if (!connectionId) return { error: "Missing connection id." };
 
-  const workspace = await authorizeWorkspace(slug);
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
+  const existing = await getComposioConnectionById(workspace.id, connectionId);
   const result = await renameComposioConnection(
     workspace.id,
     connectionId,
@@ -380,6 +469,21 @@ export async function renameComposioConnectionAction(
     }
   }
 
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "connection.renamed",
+    targetType: "connection",
+    targetId: connectionId,
+    agentName: null,
+    payload: {
+      toolkit: existing?.toolkit ?? null,
+      oldName: existing?.name ?? null,
+      newName: newName.trim().toLowerCase(),
+    },
+  });
+
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}/connections`);
   return { message: "Renamed." };
@@ -400,7 +504,9 @@ export async function syncGuidanceAction(
   formData: FormData,
 ): Promise<SyncGuidanceFormState> {
   const slug = String(formData.get("workspace") ?? "");
-  const workspace = await authorizeWorkspace(slug);
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace } = auth;
   const result = await refreshAllGuidanceFiles(workspace.id);
   if (!result.ok) {
     if (result.error === "no-repo") {
@@ -412,4 +518,162 @@ export async function syncGuidanceAction(
     message:
       "Synced agents/AGENTS.md and the per-framework AGENT_GUIDE.md files. Check the repo for new commits.",
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Members (US-0.4-02)
+
+export type MemberFormState = {
+  message?: string;
+  error?: string;
+};
+
+const MEMBER_EMPTY: MemberFormState = {};
+
+/**
+ * Add a workspace member by email. Workspace-admin only. The
+ * invitee must have signed in to TAS at least once so a user row
+ * exists; we don't email invitations from TAS itself today.
+ */
+export async function addMemberAction(
+  _prev: MemberFormState,
+  formData: FormData,
+): Promise<MemberFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const email = String(formData.get("email") ?? "").trim();
+  const roleRaw = String(formData.get("role") ?? "").trim();
+
+  if (!email) return { error: "Enter an email address." };
+  if (!isWorkspaceRole(roleRaw)) return { error: "Pick a role." };
+  const role: WorkspaceRole = roleRaw;
+
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
+
+  const result = await addWorkspaceMemberByEmail(workspace.id, email, role);
+  if (!result.ok) {
+    switch (result.error) {
+      case "user-not-found":
+        return {
+          error:
+            "No TAS user with that email. Ask them to sign in once, then try again.",
+        };
+      case "already-member":
+        return {
+          error:
+            "That user is already a member of this workspace. Change their role on the member row instead.",
+        };
+    }
+  }
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "policy_change",
+    kind: "member.added",
+    targetType: "member",
+    targetId: result.member.userId,
+    agentName: null,
+    payload: { email: result.member.email, role },
+  });
+
+  revalidatePath(`/${slug}/settings`);
+  return MEMBER_EMPTY;
+}
+
+/**
+ * Change an existing member's role. Workspace-admin only. Blocks
+ * demoting the last admin — the lib helper enforces this.
+ */
+export async function changeMemberRoleAction(
+  _prev: MemberFormState,
+  formData: FormData,
+): Promise<MemberFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const targetUserId = String(formData.get("user_id") ?? "").trim();
+  const newRoleRaw = String(formData.get("role") ?? "").trim();
+  if (!targetUserId) return { error: "Missing user id." };
+  if (!isWorkspaceRole(newRoleRaw)) return { error: "Pick a role." };
+  const newRole: WorkspaceRole = newRoleRaw;
+
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
+
+  const result = await changeMemberRole(workspace.id, targetUserId, newRole);
+  if (!result.ok) {
+    switch (result.error) {
+      case "not-found":
+        return { error: "Member no longer exists in this workspace." };
+      case "last-admin":
+        return {
+          error:
+            "Can't demote the last workspace admin. Promote someone else first.",
+        };
+    }
+  }
+
+  if (result.previousRole !== result.newRole) {
+    await writeAuditEvent({
+      workspaceId: workspace.id,
+      actorUserId: userId,
+      source: "policy_change",
+      kind: "member.role_changed",
+      targetType: "member",
+      targetId: targetUserId,
+      agentName: null,
+      payload: {
+        previousRole: result.previousRole,
+        newRole: result.newRole,
+      },
+    });
+  }
+
+  revalidatePath(`/${slug}/settings`);
+  return MEMBER_EMPTY;
+}
+
+/**
+ * Remove a member from a workspace. Workspace-admin only. Blocks
+ * removing the last admin.
+ */
+export async function removeMemberAction(
+  _prev: MemberFormState,
+  formData: FormData,
+): Promise<MemberFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const targetUserId = String(formData.get("user_id") ?? "").trim();
+  if (!targetUserId) return { error: "Missing user id." };
+
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
+
+  const result = await removeWorkspaceMember(workspace.id, targetUserId);
+  if (!result.ok) {
+    switch (result.error) {
+      case "not-found":
+        return { error: "Member no longer exists in this workspace." };
+      case "last-admin":
+        return {
+          error:
+            "Can't remove the last workspace admin. Promote someone else first.",
+        };
+    }
+  }
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "policy_change",
+    kind: "member.removed",
+    targetType: "member",
+    targetId: targetUserId,
+    agentName: null,
+    payload: {},
+  });
+
+  revalidatePath(`/${slug}/settings`);
+  return MEMBER_EMPTY;
 }

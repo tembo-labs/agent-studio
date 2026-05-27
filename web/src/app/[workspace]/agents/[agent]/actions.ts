@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 
+import { writeAuditEvent } from "@/lib/audit-db";
+import {
+  authorizeWorkspace,
+  DENIED_MESSAGE,
+} from "@/lib/auth-server";
 import {
   createTrigger,
   deleteTrigger as deleteTriggerRemote,
@@ -10,7 +15,6 @@ import {
 } from "@/lib/composio";
 import { getComposioConnectionById } from "@/lib/composio-connections";
 import { createRun } from "@/lib/runs-api";
-import { getServerSession } from "@/lib/session";
 import {
   deleteTriggerLocal,
   getTriggerById,
@@ -23,10 +27,8 @@ import {
   type DeleteAgentError,
 } from "@/lib/workspace-agents";
 import {
-  getWorkspaceBySlug,
   getWorkspaceSecretPlaintext,
   getWorkspaceSecretPreview,
-  userIsMember,
 } from "@/lib/workspace";
 
 export type DeleteAgentFormState = {
@@ -56,19 +58,27 @@ export async function deleteAgentAction(
   const slug = String(formData.get("workspace") ?? "");
   const agentName = String(formData.get("agent") ?? "");
 
-  const session = await getServerSession();
-  if (!session) notFound();
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
-
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
-
-  const result = await deleteAgent(workspace.id, session.user.id, agentName);
+  const result = await deleteAgent(workspace.id, userId, agentName);
   if (!result.ok) {
     return { error: ERROR_MESSAGES[result.error] };
   }
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "agent.deleted",
+    targetType: "agent",
+    targetId: agentName,
+    agentName,
+    payload: {},
+  });
   revalidatePath(`/${slug}`);
   revalidatePath(`/${slug}/settings`);
   // ?deleted=<name> gives the agents grid two affordances: render a
@@ -93,14 +103,12 @@ export async function runNowAction(
   // input" run that just exercises the agent's instructions).
   const userMessage = String(formData.get("user_message") ?? "");
 
-  const session = await getServerSession();
-  if (!session) notFound();
-
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
-
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
   // Pull the current agent definition off the repo. Both frameworks
   // are now passthrough — the runner gets the raw file bytes plus
@@ -132,7 +140,7 @@ export async function runNowAction(
   try {
     const res = await createRun({
       workspaceId: workspace.id,
-      userId: session.user.id,
+      userId,
       agentName: spec.name,
       agentPath: found.agent.path,
       model,
@@ -187,13 +195,12 @@ export async function createTriggerAction(
     .toUpperCase();
   const configRaw = String(formData.get("trigger_config") ?? "").trim();
 
-  const session = await getServerSession();
-  if (!session) notFound();
-
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
   const fieldErrors: TriggerFormState["fieldErrors"] = {};
   if (!connectionId) fieldErrors.connection = "Pick a connection.";
@@ -219,7 +226,7 @@ export async function createTriggerAction(
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
   const connection = await getComposioConnectionById(workspace.id, connectionId);
-  if (!connection || connection.userId !== session.user.id) {
+  if (!connection || connection.userId !== userId) {
     return {
       fieldErrors: { connection: "Pick one of your own connections." },
     };
@@ -250,7 +257,7 @@ export async function createTriggerAction(
     const res = await createTrigger({
       apiKey,
       workspaceId: workspace.id,
-      userId: session.user.id,
+      userId,
       triggerType,
       connectedAccountId: connection.composioConnectionId,
       triggerConfig: parsedConfig,
@@ -261,16 +268,31 @@ export async function createTriggerAction(
     return { error: `Composio rejected the trigger: ${err.message}` };
   }
 
-  await saveTrigger({
+  const saved = await saveTrigger({
     workspaceId: workspace.id,
-    userId: session.user.id,
+    userId,
     agentName,
     composioTriggerId,
     toolkitSlug: connection.toolkit,
     triggerType,
     connectionId: connection.id,
     triggerConfig: parsedConfig,
-    createdBy: session.user.id,
+    createdBy: userId,
+  });
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "trigger.created",
+    targetType: "trigger",
+    targetId: saved.id,
+    agentName,
+    payload: {
+      triggerType,
+      toolkit: connection.toolkit,
+      connectionName: connection.name,
+    },
   });
 
   revalidatePath(`/${slug}/agents/${encodeURIComponent(agentName)}`);
@@ -288,12 +310,12 @@ export async function toggleTriggerAction(
   const id = String(formData.get("id") ?? "");
   const enabled = formData.get("enabled") === "true";
 
-  const session = await getServerSession();
-  if (!session) notFound();
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
   const trigger = await getTriggerById(workspace.id, id);
   if (!trigger) return { error: "Trigger no longer exists." };
@@ -316,6 +338,16 @@ export async function toggleTriggerAction(
     );
   }
   await setTriggerEnabled(workspace.id, id, enabled);
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: enabled ? "trigger.enabled" : "trigger.disabled",
+    targetType: "trigger",
+    targetId: id,
+    agentName: trigger.agentName,
+    payload: { triggerType: trigger.triggerType, toolkit: trigger.toolkitSlug },
+  });
   revalidatePath(`/${slug}/agents/${encodeURIComponent(trigger.agentName)}`);
   return SIMPLE_EMPTY;
 }
@@ -327,12 +359,12 @@ export async function deleteTriggerAction(
   const slug = String(formData.get("workspace") ?? "");
   const id = String(formData.get("id") ?? "");
 
-  const session = await getServerSession();
-  if (!session) notFound();
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) notFound();
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
 
   const trigger = await getTriggerById(workspace.id, id);
   if (!trigger) return SIMPLE_EMPTY;
@@ -346,6 +378,17 @@ export async function deleteTriggerAction(
   // to route the inbound webhook to, so it 200s as "ignored").
   await deleteTriggerRemote({ apiKey, triggerId: trigger.composioTriggerId });
   await deleteTriggerLocal(workspace.id, id);
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "trigger.deleted",
+    targetType: "trigger",
+    targetId: id,
+    agentName: trigger.agentName,
+    payload: { triggerType: trigger.triggerType, toolkit: trigger.toolkitSlug },
+  });
 
   revalidatePath(`/${slug}/agents/${encodeURIComponent(trigger.agentName)}`);
   return SIMPLE_EMPTY;

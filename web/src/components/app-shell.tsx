@@ -17,6 +17,7 @@ import {
   IconExclamationTriangle,
   IconHistory,
   IconSettingsSliderHor,
+  IconShield,
 } from "central-icons";
 
 // Layout shell shared by every signed-in workspace route. Modeled on
@@ -114,6 +115,11 @@ export function AppShell({
             href={`${home}/runs`}
             label="Runs"
             icon={<IconHistory />}
+          />
+          <SidebarNavItem
+            href={`${home}/audit`}
+            label="Audit"
+            icon={<IconShield />}
           />
           <SidebarNavItem
             href={`${home}/improvements`}
