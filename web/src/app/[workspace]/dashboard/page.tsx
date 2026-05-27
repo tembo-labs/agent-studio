@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { LocalTime } from "@/components/local-time";
+import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import {
@@ -11,19 +12,19 @@ import {
   type ImprovementStatus,
 } from "@/lib/improvements-api";
 import {
-  countRunsForAgents,
-  countRunsForWorkspace,
-  listAgentNamesWithRuns,
+  getWorkspaceDailyRuns30d,
+  getWorkspaceStats30d,
+  listWorkspaceTopFailingAgents30d,
 } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
-import { listAgents } from "@/lib/workspace-agents";
+
+import { WorkspaceDashboard } from "./workspace-dashboard";
 
 export const dynamic = "force-dynamic";
 
-// Length of the "this week" window we use for the headline stats.
-// Calendar weeks would be neater but ambiguous across time zones —
-// a rolling 7 days is what every analytics tool defaults to anyway.
+// Length of the "this week" window used for the Improvements counts.
+// 7 days rolling avoids the cross-tz ambiguity of calendar weeks.
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default async function DashboardPage({
@@ -42,39 +43,18 @@ export default async function DashboardPage({
   const since = new Date(Date.now() - WEEK_MS);
   // Refresh open PR statuses before reading counts so the headline
   // numbers reflect reality. listOpenImprovements returns every non-
-  // terminal row regardless of age — a six-week-old "PR opened" that
-  // got merged yesterday still gets flipped to "merged" before we
-  // count.
+  // terminal row regardless of age.
   const open = await listOpenImprovements(workspace.id);
   await scanImprovementsForPRs(workspace.id, open);
 
-  // Pull the data the two dashboard sections need in parallel.
-  //   - improvement counts + recent list drive the Improvements section
-  //   - listAgents + run aggregates drive the Agents section
-  // listAgents hits GitHub once; the run aggregates are single SQL
-  // queries each. We then derive the "active" set client-side as
-  // the intersection of "ever ran" and "still in the repo".
-  const [counts, recent, agentsResult, agentsWithRuns, totalRunsAllTime] =
+  const [stats, daily, topFailing, improvementCounts, recentImprovements] =
     await Promise.all([
+      getWorkspaceStats30d(workspace.id),
+      getWorkspaceDailyRuns30d(workspace.id),
+      listWorkspaceTopFailingAgents30d(workspace.id, 5),
       countImprovementsSince(workspace.id, since),
       listImprovements(workspace.id, 10),
-      listAgents(workspace.id),
-      listAgentNamesWithRuns(workspace.id),
-      countRunsForWorkspace(workspace.id),
     ]);
-
-  const activeAgentNames = agentsResult.ok
-    ? new Set(
-        agentsResult.agents.filter((a) => a.ok).map((a) => a.spec.name),
-      )
-    : new Set<string>();
-  const activeAgentsWithRunsCount = agentsWithRuns.filter((n) =>
-    activeAgentNames.has(n),
-  ).length;
-  const totalRunsActiveAgents = await countRunsForAgents(
-    workspace.id,
-    agentsWithRuns.filter((n) => activeAgentNames.has(n)),
-  );
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8">
@@ -83,127 +63,122 @@ export default async function DashboardPage({
           Dashboard
         </h1>
         <p className="text-foreground-weak text-sm">
-          Activity for{" "}
-          <span className="text-foreground font-medium">{workspace.name}</span>{" "}
-          over the last 7 days.
+          Workspace-wide activity for{" "}
+          <span className="text-foreground font-medium">{workspace.name}</span>
+          .
         </p>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-foreground text-lg font-semibold">Agents</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {/* Ordered active-first so the "what we ship today"
-              numbers lead. The all-time pair sits to the right as
-              context — historical breadth of the agent surface
-              and total runs we've shouldered. */}
-          <StatCard
-            label="Active agents"
-            value={activeAgentsWithRunsCount}
-            accent="green"
-          />
-          <StatCard
-            label="Runs · active"
-            value={totalRunsActiveAgents}
-            accent="blue"
-          />
-          <StatCard
-            label="Agents ever (≥1 run)"
-            value={agentsWithRuns.length}
-            accent="gray"
-          />
-          <StatCard
-            label="Runs · all time"
-            value={totalRunsAllTime}
-            accent="gray"
-          />
-        </div>
-      </section>
+      <hr className="border-[var(--color-border-weak)]" />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-foreground text-lg font-semibold">Improvements</h2>
-        <h3 className="text-foreground-weak text-xs font-medium uppercase tracking-wide">
-          This week
-        </h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {/* Submitted is the cumulative count of *all* improvement
-              rows created in the window, regardless of their current
-              status — a row that was submitted, opened a PR, and got
-              merged still counts here. The other three cards break
-              that population down by where it ended up. */}
-          <StatCard label="Submitted" value={counts.total} accent="gray" />
-          <StatCard label="PR open" value={counts.pr_opened} accent="blue" />
-          <StatCard label="Merged" value={counts.merged} accent="green" />
-          <StatCard label="Closed" value={counts.closed} accent="red" />
-        </div>
-      </section>
+      <WorkspaceDashboard
+        stats={stats}
+        daily={daily}
+        topFailing={topFailing}
+        workspaceSlug={workspace.slug}
+      />
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between">
-          <h3 className="text-foreground-weak text-xs font-medium uppercase tracking-wide">
-            Recent improvements
-          </h3>
-          <Link
-            href={`/${workspace.slug}/improvements`}
-            className="text-foreground-weak hover:text-foreground text-xs"
-          >
-            View all →
-          </Link>
+      <Section
+        title="Improvements"
+        description="Edits proposed from run-detail pages this week, plus the latest activity."
+      >
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Submitted is the cumulative count of *all* improvement
+                rows created in the window, regardless of their current
+                status. The other three break that population down by
+                where it ended up. */}
+            <StatCard
+              label="Submitted"
+              value={improvementCounts.total}
+              accent="gray"
+            />
+            <StatCard
+              label="PR open"
+              value={improvementCounts.pr_opened}
+              accent="blue"
+            />
+            <StatCard
+              label="Merged"
+              value={improvementCounts.merged}
+              accent="green"
+            />
+            <StatCard
+              label="Closed"
+              value={improvementCounts.closed}
+              accent="red"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-foreground-weak text-[10px] font-medium uppercase tracking-widest">
+                Recent improvements
+              </span>
+              <Link
+                href={`/${workspace.slug}/improvements`}
+                className="text-foreground-weak hover:text-foreground text-xs"
+              >
+                View all →
+              </Link>
+            </div>
+            {recentImprovements.length === 0 ? (
+              <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
+                No improvements yet. Open a run and use{" "}
+                <em>Improve the Agent</em> to start one.
+              </p>
+            ) : (
+              <ul className="border-border divide-border-weak bg-surface divide-y overflow-hidden rounded-lg border">
+                {recentImprovements.map((i) => {
+                  const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(i.agentName)}`;
+                  const runHref = `${agentHref}/runs/${i.runId}`;
+                  return (
+                    <li
+                      key={i.id}
+                      className="flex items-start justify-between gap-4 px-3 py-2.5 text-sm"
+                    >
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={agentHref}
+                            className="text-foreground font-medium hover:underline"
+                          >
+                            {i.agentName}
+                          </Link>
+                          <StatusBadge status={i.status} />
+                        </div>
+                        <p className="text-foreground-weak line-clamp-2 text-xs leading-5">
+                          {i.improvementText}
+                        </p>
+                      </div>
+                      <div className="text-foreground-weak flex shrink-0 flex-col items-end gap-1 text-xs">
+                        <span>
+                          <LocalTime iso={i.createdAt.toISOString()} />
+                        </span>
+                        <div className="flex gap-2">
+                          <Link href={runHref} className="hover:underline">
+                            Run
+                          </Link>
+                          {i.prUrl && (
+                            <a
+                              href={i.prUrl}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="hover:underline"
+                            >
+                              PR ↗
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
-        {recent.length === 0 ? (
-          <p className="text-foreground-weak text-sm">
-            No improvements yet. Open a run and use{" "}
-            <em>Improve the Agent</em> to start one.
-          </p>
-        ) : (
-          <ul className="border-border divide-border-weak divide-y rounded-lg border bg-surface-raised">
-            {recent.map((i) => {
-              const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(i.agentName)}`;
-              const runHref = `${agentHref}/runs/${i.runId}`;
-              return (
-                <li
-                  key={i.id}
-                  className="flex items-start justify-between gap-4 px-3 py-2.5 text-sm"
-                >
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={agentHref}
-                        className="text-foreground font-medium hover:underline"
-                      >
-                        {i.agentName}
-                      </Link>
-                      <StatusBadge status={i.status} />
-                    </div>
-                    <p className="text-foreground-weak line-clamp-2 text-xs leading-5">
-                      {i.improvementText}
-                    </p>
-                  </div>
-                  <div className="text-foreground-weak flex shrink-0 flex-col items-end gap-1 text-xs">
-                    <span>
-                      <LocalTime iso={i.createdAt.toISOString()} />
-                    </span>
-                    <div className="flex gap-2">
-                      <Link href={runHref} className="hover:underline">
-                        Run
-                      </Link>
-                      {i.prUrl && (
-                        <a
-                          href={i.prUrl}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className="hover:underline"
-                        >
-                          PR ↗
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      </Section>
     </div>
   );
 }
@@ -219,13 +194,11 @@ function StatCard({
 }) {
   const accentClass = ACCENT_CLASS[accent];
   return (
-    <div className="border-border bg-surface-raised flex flex-col gap-1 rounded-lg border px-4 py-3">
-      <span className="text-foreground-weak text-xs font-medium uppercase tracking-wide">
+    <div className="border-border bg-surface flex flex-col gap-0.5 rounded-lg border px-3 py-2">
+      <span className="text-foreground-weak text-[10px] font-medium uppercase tracking-widest">
         {label}
       </span>
-      <span className={`text-3xl font-bold tabular-nums ${accentClass}`}>
-        {value}
-      </span>
+      <span className={`text-xl font-semibold ${accentClass}`}>{value}</span>
     </div>
   );
 }

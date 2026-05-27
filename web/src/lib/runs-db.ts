@@ -150,57 +150,6 @@ export async function listChatRunsForAgent(
   }));
 }
 
-/**
- * Returns the distinct agent names that have at least one run in the
- * workspace — across all time. Used by the dashboard to count "agents
- * ever with at least one run".
- */
-export async function listAgentNamesWithRuns(
-  workspaceId: string,
-): Promise<string[]> {
-  const { rows } = await db.query<{ agent_name: string }>(
-    `SELECT DISTINCT agent_name
-       FROM run
-      WHERE workspace_id = $1`,
-    [workspaceId],
-  );
-  return rows.map((r) => r.agent_name);
-}
-
-/**
- * Total count of `run` rows in the workspace, no filters. Drives the
- * "total runs all time" stat on the dashboard.
- */
-export async function countRunsForWorkspace(
-  workspaceId: string,
-): Promise<number> {
-  const { rows } = await db.query<{ n: string }>(
-    `SELECT COUNT(*)::text AS n FROM run WHERE workspace_id = $1`,
-    [workspaceId],
-  );
-  return Number(rows[0]?.n ?? 0);
-}
-
-/**
- * Count of runs whose agent_name is in the supplied list. Caller
- * passes the names of currently-active (still-in-repo) agents to
- * get "total runs across active agents". Empty input short-circuits
- * to 0.
- */
-export async function countRunsForAgents(
-  workspaceId: string,
-  agentNames: string[],
-): Promise<number> {
-  if (agentNames.length === 0) return 0;
-  const { rows } = await db.query<{ n: string }>(
-    `SELECT COUNT(*)::text AS n
-       FROM run
-      WHERE workspace_id = $1 AND agent_name = ANY($2)`,
-    [workspaceId, agentNames],
-  );
-  return Number(rows[0]?.n ?? 0);
-}
-
 // Workspace-wide run list with optional filters. Status / trigger
 // arrays use ANY() so an empty array means "no filter" via NULL
 // coalescing on the parameter; agentName is a scalar; search runs an
@@ -446,6 +395,121 @@ export type AgentFailureGroup = {
  * Groups by SUBSTRING(error_message FROM 1 FOR 120) so different
  * verbose tails of the same root cause collapse into one row.
  */
+export type WorkspaceTopFailingAgent = {
+  agentName: string;
+  failures: number;
+  /** Total runs in the window — denominator for the failure rate. */
+  totalRuns: number;
+  lastSeen: Date;
+  exampleRunId: string;
+};
+
+/**
+ * Top-K agents by 30-day failure count. Workspace-wide equivalent
+ * of the per-agent failure-prefix grouping — at the workspace level
+ * "which agent is failing" is the useful pivot, since the same
+ * error string can come from very different agents.
+ */
+export async function listWorkspaceTopFailingAgents30d(
+  workspaceId: string,
+  limit = 5,
+): Promise<WorkspaceTopFailingAgent[]> {
+  const { rows } = await db.query<{
+    agent_name: string;
+    failures: string;
+    total_runs: string;
+    last_seen: Date;
+    example_run_id: string;
+  }>(
+    `SELECT
+        agent_name,
+        COUNT(*) FILTER (WHERE status = 'failed')::TEXT  AS failures,
+        COUNT(*)::TEXT                                    AS total_runs,
+        MAX(created_at) FILTER (WHERE status = 'failed') AS last_seen,
+        (ARRAY_AGG(id ORDER BY created_at DESC)
+           FILTER (WHERE status = 'failed'))[1]          AS example_run_id
+       FROM run
+      WHERE workspace_id = $1
+        AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY agent_name
+     HAVING COUNT(*) FILTER (WHERE status = 'failed') > 0
+      ORDER BY failures DESC, last_seen DESC
+      LIMIT $2`,
+    [workspaceId, limit],
+  );
+  return rows.map((r) => ({
+    agentName: r.agent_name,
+    failures: Number(r.failures),
+    totalRuns: Number(r.total_runs),
+    lastSeen: r.last_seen,
+    exampleRunId: r.example_run_id,
+  }));
+}
+
+export async function getWorkspaceStats30d(
+  workspaceId: string,
+): Promise<AgentStats30d> {
+  const { rows } = await db.query<{
+    total_runs: string;
+    succeeded: string;
+    failed: string;
+    total_cost_usd: string | null;
+    avg_duration_ms: string | null;
+  }>(
+    `SELECT
+        COUNT(*)::TEXT                                            AS total_runs,
+        COUNT(*) FILTER (WHERE status = 'succeeded')::TEXT        AS succeeded,
+        COUNT(*) FILTER (WHERE status = 'failed')::TEXT           AS failed,
+        COALESCE(SUM(cost_usd), 0)::TEXT                          AS total_cost_usd,
+        ROUND(AVG(EXTRACT(EPOCH FROM (completed_at - started_at))
+                    * 1000) FILTER (WHERE completed_at IS NOT NULL
+                                      AND started_at IS NOT NULL))::TEXT
+                                                                  AS avg_duration_ms
+       FROM run
+      WHERE workspace_id = $1
+        AND created_at >= NOW() - INTERVAL '30 days'`,
+    [workspaceId],
+  );
+  const r = rows[0];
+  return {
+    totalRuns: Number(r.total_runs ?? "0"),
+    succeeded: Number(r.succeeded ?? "0"),
+    failed: Number(r.failed ?? "0"),
+    totalCostUsd: Number(r.total_cost_usd ?? "0"),
+    avgDurationMs: r.avg_duration_ms ? Number(r.avg_duration_ms) : null,
+  };
+}
+
+export async function getWorkspaceDailyRuns30d(
+  workspaceId: string,
+): Promise<AgentDailyRunCount[]> {
+  const { rows } = await db.query<{
+    day: Date;
+    succeeded: string;
+    failed: string;
+    other: string;
+  }>(
+    `SELECT
+        date_trunc('day', created_at)                                AS day,
+        COUNT(*) FILTER (WHERE status = 'succeeded')::TEXT           AS succeeded,
+        COUNT(*) FILTER (WHERE status = 'failed')::TEXT              AS failed,
+        COUNT(*) FILTER (WHERE status NOT IN ('succeeded','failed'))::TEXT
+                                                                     AS other
+       FROM run
+      WHERE workspace_id = $1
+        AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY day
+      ORDER BY day ASC`,
+    [workspaceId],
+  );
+  return rows.map((r) => ({
+    day: r.day.toISOString().slice(0, 10),
+    succeeded: Number(r.succeeded),
+    failed: Number(r.failed),
+    other: Number(r.other),
+  }));
+}
+
 export async function listAgentFailureGroups30d(
   workspaceId: string,
   agentName: string,
