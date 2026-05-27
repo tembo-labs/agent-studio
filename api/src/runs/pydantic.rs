@@ -24,10 +24,12 @@ use serde::Deserialize;
 use std::process::Stdio;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
+use uuid::Uuid;
 
 const PYDANTIC_PY: &str = "/opt/pydantic-ai/bin/python3";
 const PYDANTIC_SCRIPT: &str = "/usr/local/bin/run_pydantic.py";
 const USAGE_SENTINEL: &str = "__TAS_USAGE__:";
+const STALE_CONNECTION_MARKER: &str = "__TAS_STALE_CONNECTION__:";
 
 pub struct PydanticArgs<'a> {
     /// Raw spec content as it sits in the repo (YAML or JSON).
@@ -60,6 +62,14 @@ pub struct PydanticArgs<'a> {
     /// session reports the connections as inactive even though the
     /// workspace authorized them.
     pub composio_connected_accounts_json: Option<&'a str>,
+    /// Workspace + user the run executes under. Used to flip a
+    /// `workspace_composio_connection` row's status to `STALE` if
+    /// the Python wrapper detects Composio's
+    /// `ToolRouterV2_InvalidConnectedAccountIds` error — the cached
+    /// id no longer matches a connection that user owns.
+    pub workspace_id: Uuid,
+    pub acting_user_id: &'a str,
+    pub db: &'a sqlx::PgPool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -170,6 +180,52 @@ pub async fn invoke(args: PydanticArgs<'_>) -> anyhow::Result<PydanticResult> {
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
 
     if !output.status.success() {
+        // Pull out any stale-connection markers the wrapper emitted
+        // before bailing — they tell us *which* slot Composio's API
+        // refused. We flip those rows to STALE so the sidebar shows
+        // a Connect alert next time the user lands, and the failure
+        // reason becomes actionable ("reconnect X") instead of a
+        // raw 400.
+        let (stale_slots, cleaned_stderr) = parse_stale_markers(&stderr);
+        for slot in &stale_slots {
+            mark_connection_stale(
+                args.db,
+                args.workspace_id,
+                args.acting_user_id,
+                &slot.toolkit,
+                &slot.name,
+            )
+            .await;
+        }
+
+        if !stale_slots.is_empty() {
+            // Friendlier replacement message — the raw Composio
+            // payload still rides along after a separator so a
+            // determined operator can see the upstream error.
+            let labels = stale_slots
+                .iter()
+                .map(|s| {
+                    if s.name == "default" {
+                        s.toolkit.clone()
+                    } else {
+                        format!("{}/{}", s.toolkit, s.name)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            bail!(
+                "Composio rejected the cached connection for: {labels}. \
+                 Open the Connections page, click Disconnect on that \
+                 slot, then Reconnect to re-authorize.\n\n\
+                 ──── raw error ────\n{}",
+                cleaned_stderr
+                    .trim()
+                    .chars()
+                    .take(16_000)
+                    .collect::<String>()
+            );
+        }
+
         let snippet = if stderr.trim().is_empty() {
             stdout.clone()
         } else {
@@ -188,6 +244,66 @@ pub async fn invoke(args: PydanticArgs<'_>) -> anyhow::Result<PydanticResult> {
     }
 
     Ok(parse_output(&stdout))
+}
+
+#[derive(Debug, Deserialize)]
+struct StaleConnectionMarker {
+    toolkit: String,
+    name: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    connection_id: String,
+}
+
+/// Pull every `__TAS_STALE_CONNECTION__:[json]` line out of stderr
+/// and return (parsed markers, stderr with those lines removed).
+/// Each marker line carries a JSON array of {toolkit, name,
+/// connection_id} entries (the wrapper sometimes flags multiple
+/// slots in one go when several share a stale id).
+fn parse_stale_markers(stderr: &str) -> (Vec<StaleConnectionMarker>, String) {
+    let mut markers: Vec<StaleConnectionMarker> = Vec::new();
+    let mut cleaned: Vec<&str> = Vec::new();
+    for line in stderr.lines() {
+        if let Some(payload) = line.trim().strip_prefix(STALE_CONNECTION_MARKER) {
+            match serde_json::from_str::<Vec<StaleConnectionMarker>>(payload) {
+                Ok(parsed) => markers.extend(parsed),
+                Err(e) => {
+                    tracing::warn!(?e, "stale-connection marker failed to parse — keeping line in stderr");
+                    cleaned.push(line);
+                }
+            }
+        } else {
+            cleaned.push(line);
+        }
+    }
+    (markers, cleaned.join("\n"))
+}
+
+async fn mark_connection_stale(
+    db: &sqlx::PgPool,
+    workspace_id: Uuid,
+    user_id: &str,
+    toolkit: &str,
+    name: &str,
+) {
+    // Best-effort. A failure here means the next run will hit the
+    // same Composio 400 — annoying but not catastrophic, and the
+    // run's failure reason already names the slot for the user.
+    let res = sqlx::query(
+        "UPDATE workspace_composio_connection
+            SET status = 'STALE', updated_at = NOW()
+          WHERE workspace_id = $1 AND user_id = $2
+            AND toolkit_slug = $3 AND name = $4",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .bind(toolkit)
+    .bind(name)
+    .execute(db)
+    .await;
+    if let Err(e) = res {
+        tracing::warn!(?e, %toolkit, %name, "failed to mark composio connection stale");
+    }
 }
 
 /// Strip the trailing `__TAS_USAGE__:{json}` sentinel (if present)

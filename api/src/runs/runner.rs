@@ -311,6 +311,9 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
         composio_api_key: composio_key.as_deref(),
         composio_user_id: composio_key.as_ref().map(|_| composio_user_id.as_str()),
         composio_connected_accounts_json: composio_connected_accounts_json.as_deref(),
+        workspace_id: ctx.workspace_id,
+        acting_user_id: ctx.acting_user_id.as_str(),
+        db: &state.db,
     })
     .await?;
 

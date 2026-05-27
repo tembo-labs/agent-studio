@@ -383,12 +383,62 @@ def build_composio_toolset(connections: list[tuple[str, str, list[str]]]):
         from composio import SESSION_PRESET_DIRECT_TOOLS
         create_kwargs["session_preset"] = SESSION_PRESET_DIRECT_TOOLS
 
-    session = composio.create(**create_kwargs)
+    try:
+        session = composio.create(**create_kwargs)
+    except Exception as exc:
+        _maybe_emit_stale_connection_marker(exc, connections, resolved)
+        raise
     mcp = MCPServerStreamableHTTP(
         session.mcp.url,
         headers={"x-api-key": api_key},
     )
     return (mcp, all_narrowed)
+
+
+# Sentinel the runner watches for on stderr. When Composio rejects
+# session.create with `ToolRouterV2_InvalidConnectedAccountIds`, the
+# cached `composio_connection_id` in our DB no longer matches a
+# connection that user actually owns on Composio's side (revoked,
+# deleted in their dashboard, replaced by a fresher account). The
+# wrapper itself can't reach Postgres — it emits a structured marker
+# and the Rust runner translates that into a clean failure message +
+# flips the local row's status so the sidebar surfaces a Connect
+# alert.
+STALE_CONNECTION_MARKER = "__TAS_STALE_CONNECTION__"
+
+
+def _maybe_emit_stale_connection_marker(
+    exc: Exception,
+    connections: list[tuple[str, str, list[str]]],
+    resolved: dict[str, str],
+) -> None:
+    msg = str(exc)
+    if "ToolRouterV2_InvalidConnectedAccountIds" not in msg:
+        return
+    # Composio names the failing connected_account_id in the error
+    # message. Find it in the resolved map so we know which (toolkit,
+    # name) slot to flag.
+    stale_id: str | None = None
+    import re as _re
+    m = _re.search(r"(ca_[A-Za-z0-9_-]+)", msg)
+    if m:
+        stale_id = m.group(1)
+    flagged: list[dict[str, str]] = []
+    for toolkit, name, _ in connections:
+        cid = resolved.get(toolkit)
+        if cid and (stale_id is None or cid == stale_id):
+            flagged.append({
+                "toolkit": toolkit,
+                "name": name,
+                "connection_id": cid,
+            })
+    if not flagged:
+        return
+    print(
+        f"{STALE_CONNECTION_MARKER}:{json.dumps(flagged)}",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 async def run(spec: dict, user_message: str) -> None:
