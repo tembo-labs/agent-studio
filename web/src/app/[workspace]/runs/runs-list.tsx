@@ -44,15 +44,38 @@ type Props = {
   workspaceSlug: string;
   agentNames: string[];
   initial: LoadedRun[];
+  /**
+   * Initial filter values, typically read from the URL by the server
+   * component so deep links (e.g. from a failed-run "find similar"
+   * affordance) land prefiltered. Empty arrays / empty strings mean
+   * "no filter."
+   */
+  initialFilters?: {
+    statuses?: RunStatus[];
+    triggers?: RunTrigger[];
+    agentName?: string;
+    search?: string;
+  };
 };
 
-export function RunsList({ workspaceSlug, agentNames, initial }: Props) {
+export function RunsList({
+  workspaceSlug,
+  agentNames,
+  initial,
+  initialFilters,
+}: Props) {
   const router = useRouter();
 
-  const [statuses, setStatuses] = useState<RunStatus[]>([]);
-  const [triggers, setTriggers] = useState<RunTrigger[]>([]);
-  const [agentName, setAgentName] = useState<string>("");
-  const [search, setSearch] = useState<string>("");
+  const [statuses, setStatuses] = useState<RunStatus[]>(
+    initialFilters?.statuses ?? [],
+  );
+  const [triggers, setTriggers] = useState<RunTrigger[]>(
+    initialFilters?.triggers ?? [],
+  );
+  const [agentName, setAgentName] = useState<string>(
+    initialFilters?.agentName ?? "",
+  );
+  const [search, setSearch] = useState<string>(initialFilters?.search ?? "");
 
   const [rows, setRows] = useState<LoadedRun[]>(initial);
   const [more, setMore] = useState<boolean>(initial.length >= PAGE_SIZE);
@@ -210,7 +233,7 @@ export function RunsList({ workspaceSlug, agentNames, initial }: Props) {
           <Input
             id="run-search"
             type="search"
-            placeholder="Search input or output…"
+            placeholder="Search input, output, or error…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-sm"
@@ -327,9 +350,19 @@ function RunRow({
           <span className="text-foreground-weak text-xs">Manual</span>
         )}
       </td>
-      <td className="text-foreground max-w-md truncate px-3 py-2 align-top text-xs">
-        {run.userMessagePreview || (
+      <td className="text-foreground max-w-md px-3 py-2 align-top text-xs">
+        {run.userMessagePreview ? (
+          <div className="truncate">{run.userMessagePreview}</div>
+        ) : !run.errorMessagePreview ? (
           <span className="text-foreground-muted">—</span>
+        ) : null}
+        {run.errorMessagePreview && (
+          // Failed runs surface their error inline so a triager can
+          // scan failures without clicking into each row. Two-line
+          // clamp keeps the column from ballooning on verbose stacks.
+          <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-[11px] leading-4">
+            {run.errorMessagePreview}
+          </div>
         )}
       </td>
       <td className="text-foreground-weak px-3 py-2 align-top text-xs">

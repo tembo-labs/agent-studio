@@ -153,9 +153,10 @@ export async function listChatRunsForAgent(
 // Workspace-wide run list with optional filters. Status / trigger
 // arrays use ANY() so an empty array means "no filter" via NULL
 // coalescing on the parameter; agentName is a scalar; search runs an
-// ILIKE on user_message + output. Pagination is cursor-by-created_at
-// (descending), passing the last seen createdAt as `before` for the
-// next page. limit is enforced server-side to keep queries cheap.
+// ILIKE on user_message + output + error_message. Pagination is
+// cursor-by-created_at (descending), passing the last seen createdAt
+// as `before` for the next page. limit is enforced server-side to
+// keep queries cheap.
 
 export type RunListFilters = {
   statuses?: RunSummary["status"][];
@@ -177,6 +178,10 @@ export type RunListItem = {
   // input without round-tripping to the run detail page. Empty when
   // the run had no input (the manual "Run now" path).
   userMessagePreview: string;
+  // First slice of error_message for failed runs — lets the table
+  // surface why a run failed without clicking through. Null on rows
+  // that didn't fail or didn't carry an error string.
+  errorMessagePreview: string | null;
   // Estimated USD cost — computed + persisted by the Rust runner at
   // mark_succeeded time so the UI doesn't recompute every render.
   // Null for: runs that pre-date the column, frameworks that don't
@@ -212,13 +217,14 @@ export async function listRunsForWorkspace(
     where.push(`trigger = ANY($${params.length}::text[])`);
   }
   if (filters.search && filters.search.trim()) {
-    // Single placeholder reused twice via a CTE-free OR; ILIKE on
-    // both user_message and output. Caller is expected to keep
-    // the search term short (~200 chars) — the UI input enforces
-    // that.
+    // Single placeholder reused across the OR; ILIKE on user_message,
+    // output, and error_message so a triager can grep across input,
+    // success output, and failure text in one shot. Caller is
+    // expected to keep the search term short (~200 chars) — the UI
+    // input enforces that.
     params.push(`%${filters.search.trim()}%`);
     where.push(
-      `(user_message ILIKE $${params.length} OR output ILIKE $${params.length})`,
+      `(user_message ILIKE $${params.length} OR output ILIKE $${params.length} OR error_message ILIKE $${params.length})`,
     );
   }
   if (options.before) {
@@ -238,13 +244,14 @@ export async function listRunsForWorkspace(
     started_at: Date | null;
     completed_at: Date | null;
     user_message: string;
+    error_message: string | null;
     // pg returns NUMERIC as a string by default to preserve precision.
     // Parse on the way out.
     cost_usd: string | null;
   }>(
     `SELECT id, agent_name, status, trigger, automation_id,
             created_at, started_at, completed_at, user_message,
-            cost_usd
+            error_message, cost_usd
        FROM run
       WHERE ${where.join(" AND ")}
       ORDER BY created_at DESC
@@ -262,6 +269,10 @@ export async function listRunsForWorkspace(
     startedAt: r.started_at,
     completedAt: r.completed_at,
     userMessagePreview: (r.user_message ?? "").slice(0, 200),
+    errorMessagePreview:
+      r.error_message && r.error_message.length > 0
+        ? r.error_message.slice(0, 240)
+        : null,
     costUsd: r.cost_usd === null ? null : Number(r.cost_usd),
   }));
 }
