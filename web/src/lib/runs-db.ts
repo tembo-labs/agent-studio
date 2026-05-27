@@ -18,46 +18,85 @@ export type RunSummary = {
   automationId: string | null;
 };
 
+export type AgentSummary = {
+  agentName: string;
+  /** Last 30 days. Both ok/failed live here, used for the success rate. */
+  totalRuns30d: number;
+  succeeded30d: number;
+  failed30d: number;
+  /** Latest run regardless of age — null when the agent has never run. */
+  lastRunStatus: "queued" | "running" | "succeeded" | "failed" | null;
+  lastRunAt: Date | null;
+};
+
 /**
- * For each agent name in `agentNames`, return the most recent run row
- * (or omit the entry if the agent has no runs yet). One round-trip via
- * Postgres DISTINCT ON.
+ * Workspace agent-inventory rollup. For each name in `agentNames`,
+ * returns 30-day counts + the latest-run snapshot in one round trip.
+ * Agents with zero runs come back with all zeros + null last-run —
+ * the inventory table still wants to render their row.
  */
-export async function getLatestRunPerAgent(
+export async function listAgentSummaries30d(
   workspaceId: string,
   agentNames: string[],
-): Promise<Map<string, RunSummary>> {
-  if (agentNames.length === 0) return new Map();
+): Promise<Map<string, AgentSummary>> {
+  const out = new Map<string, AgentSummary>();
+  if (agentNames.length === 0) return out;
+
+  // CTE: 30d aggregations + the latest run per agent. LEFT JOIN so a
+  // name that exists in the repo but has no runs at all still shows
+  // up — we want every agent in the inventory, not just the ones
+  // that have fired.
   const { rows } = await db.query<{
-    id: string;
     agent_name: string;
-    status: RunSummary["status"];
-    created_at: Date;
-    completed_at: Date | null;
-    trigger: RunTrigger;
-    automation_id: string | null;
+    total_runs_30d: string | null;
+    succeeded_30d: string | null;
+    failed_30d: string | null;
+    last_run_status: AgentSummary["lastRunStatus"];
+    last_run_at: Date | null;
   }>(
-    `SELECT DISTINCT ON (agent_name)
-            id, agent_name, status, created_at, completed_at, trigger, automation_id
-       FROM run
-      WHERE workspace_id = $1 AND agent_name = ANY($2::text[])
-      ORDER BY agent_name, created_at DESC`,
+    `WITH agent_names AS (
+        SELECT UNNEST($2::text[]) AS agent_name
+     ),
+     agent_stats AS (
+        SELECT
+            agent_name,
+            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')                                AS total_runs_30d,
+            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days' AND status = 'succeeded')        AS succeeded_30d,
+            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days' AND status = 'failed')           AS failed_30d
+          FROM run
+         WHERE workspace_id = $1 AND agent_name = ANY($2::text[])
+         GROUP BY agent_name
+     ),
+     latest AS (
+        SELECT DISTINCT ON (agent_name) agent_name, status, created_at
+          FROM run
+         WHERE workspace_id = $1 AND agent_name = ANY($2::text[])
+         ORDER BY agent_name, created_at DESC
+     )
+     SELECT
+        n.agent_name,
+        s.total_runs_30d::TEXT,
+        s.succeeded_30d::TEXT,
+        s.failed_30d::TEXT,
+        l.status      AS last_run_status,
+        l.created_at  AS last_run_at
+       FROM agent_names n
+       LEFT JOIN agent_stats s USING (agent_name)
+       LEFT JOIN latest l      USING (agent_name)`,
     [workspaceId, agentNames],
   );
-  return new Map(
-    rows.map((r) => [
-      r.agent_name,
-      {
-        id: r.id,
-        agentName: r.agent_name,
-        status: r.status,
-        createdAt: r.created_at,
-        completedAt: r.completed_at,
-        trigger: r.trigger,
-        automationId: r.automation_id,
-      },
-    ]),
-  );
+
+  for (const r of rows) {
+    out.set(r.agent_name, {
+      agentName: r.agent_name,
+      totalRuns30d: Number(r.total_runs_30d ?? "0"),
+      succeeded30d: Number(r.succeeded_30d ?? "0"),
+      failed30d: Number(r.failed_30d ?? "0"),
+      lastRunStatus: r.last_run_status,
+      lastRunAt: r.last_run_at,
+    });
+  }
+  return out;
 }
 
 // Runs that originated from the /chat composer (non-empty

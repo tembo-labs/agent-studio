@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listPendingCreatesForWorkspace } from "@/lib/improvements-api";
-import { getLatestRunPerAgent } from "@/lib/runs-db";
+import { listAgentSummaries30d } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
 import {
@@ -13,7 +13,7 @@ import {
   getWorkspaceSecretPreview,
 } from "@/lib/workspace";
 
-import { AgentsGrid, type GridAgent } from "./agents-grid";
+import { AgentsInventory, type InventoryAgent } from "./agents-inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -49,10 +49,10 @@ export default async function WorkspacePage({
   const validNames = agentsResult.ok
     ? agentsResult.agents.filter((a) => a.ok).map((a) => a.spec.name)
     : [];
-  const latestRuns = await getLatestRunPerAgent(workspace.id, validNames);
+  const summaries = await listAgentSummaries30d(workspace.id, validNames);
 
   // Refresh pending creates' PR status (submitted → pr_opened → merged)
-  // so the pending cards reflect reality without a separate poll. The
+  // so the inventory reflects reality without a separate poll. The
   // scanner writes back to postgres, so the in-memory array is stale
   // — re-derive `pending` from the scanner's return value and then
   // drop rows that have moved past the non-terminal window.
@@ -67,11 +67,10 @@ export default async function WorkspacePage({
   // Live agents have names sourced from the parsed spec. If a pending
   // create's intended name already matches a live agent — meaning the
   // PR merged and the file landed before we caught the status change —
-  // drop the pending card so we don't double-render. The scanner above
-  // catches most of these; this is the belt-and-suspenders.
+  // drop the pending row so we don't double-render.
   const liveNames = new Set(validNames);
 
-  const gridAgents: GridAgent[] = agentsResult.ok
+  const inventoryAgents: InventoryAgent[] = agentsResult.ok
     ? agentsResult.agents
         // Defensive filter against the GitHub fetch cache returning
         // a just-deleted file. ?deleted=<name> arrives via the post-
@@ -81,43 +80,48 @@ export default async function WorkspacePage({
         .filter((a) =>
           deletedAgentName && a.ok ? a.spec.name !== deletedAgentName : true,
         )
-        .map((a): GridAgent => {
+        .map((a): InventoryAgent => {
           if (!a.ok) {
             return {
-              ok: false,
+              kind: "invalid",
               path: a.path,
               filename: a.filename,
               error: a.error,
               detail: a.detail,
             };
           }
-          const lastRun = latestRuns.get(a.spec.name) ?? null;
+          const s = summaries.get(a.spec.name);
           return {
-            ok: true,
+            kind: "live",
             path: a.path,
             filename: a.filename,
             name: a.spec.name,
+            detailHref: `/${workspace.slug}/agents/${encodeURIComponent(a.spec.name)}`,
             frameworkLabel: FRAMEWORK_LABELS[a.spec.framework],
             model: a.spec.model ?? null,
-            detailHref: `/${workspace.slug}/agents/${encodeURIComponent(a.spec.name)}`,
-            lastRun: lastRun
-              ? {
-                  status: lastRun.status,
-                  createdAtIso: lastRun.createdAt.toISOString(),
-                }
-              : null,
+            runs30d: s?.totalRuns30d ?? 0,
+            succeeded30d: s?.succeeded30d ?? 0,
+            failed30d: s?.failed30d ?? 0,
+            lastRun:
+              s?.lastRunStatus && s.lastRunAt
+                ? {
+                    status: s.lastRunStatus,
+                    createdAtIso: s.lastRunAt.toISOString(),
+                  }
+                : null,
           };
         })
     : [];
 
-  // Prepend pending creates so they appear at the start of the grid —
-  // they're the freshest signal in the workspace.
+  // Append pending creates so the inventory sees them. The default
+  // sort surfaces them above idle agents (Pending sorts before Active
+  // / Idle in STATUS_META).
   for (const p of pending) {
     if (liveNames.has(p.agentName)) continue;
     const framework = p.agentPath.startsWith("agents/cargo-ai/")
       ? "cargo-ai"
       : "pydantic-agentspec";
-    gridAgents.unshift({
+    inventoryAgents.push({
       kind: "pending-create",
       key: p.id,
       name: p.agentName,
@@ -186,8 +190,8 @@ export default async function WorkspacePage({
           {agentsResult.detail ? ` — ${agentsResult.detail}` : ""}
         </div>
       ) : (
-        <AgentsGrid
-          agents={gridAgents}
+        <AgentsInventory
+          agents={inventoryAgents}
           newAgentHref={`/${workspace.slug}/agents/new`}
         />
       )}
