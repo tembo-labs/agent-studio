@@ -40,13 +40,7 @@ Operator-surface personas (Reviewer, Support Engineer) live in [v0.3 (Operationa
 
 ## US-0.4-03 — Org-level policy templates
 
-**As an** Org Admin, **I want** to set org-level policy templates (e.g., "customer-facing agents require review") that workspaces inherit, **so that** I do not have to chase each workspace admin to enforce baseline rules.
-
-**Acceptance Criteria**
-- Workspaces inherit org defaults on creation.
-- Overriding an inherited policy at the workspace level produces a changelog event with a required justification field.
-- A view at the org level shows which workspaces are deviating from defaults and why.
-- A workspace can tighten an inherited policy without an audit-required justification; loosening always requires one.
+> **Moved to [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates) on 2026-05-27.** The other v0.4 stories landed without it. Pull forward when a concrete customer use case lands or when v0.5 prep needs the substrate.
 
 ---
 

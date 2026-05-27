@@ -9,8 +9,9 @@ That's the audience v0.4 is for.
 ## What v0.4 Adds
 
 - **Immutable `who/when/why` changelog.** Every agent change, run, human intervention, and policy switch is recorded with the actor, the time, and the originating intent.
-- **Role-based access control.** Org admin → workspace admin → operator → viewer, enforced at the API layer.
-- **Org-level policy templates.** Defaults inherited by workspaces, with explicit override events.
+- **Role-based access control.** Workspace admin → operator → viewer, enforced at the API layer.
+
+(Org-level policy templates — the third capability originally scoped to v0.4 — moved to [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). The substrate is comparable in size to v0.3 Connections; the rest of v0.4 ships cleanly without it.)
 
 ## The Compliance Conversation v0.4 Closes Out
 

@@ -30,15 +30,18 @@ Each phase has an exit bar and a set of open questions the next phase must answe
 | 0.4 | [`0.4/`](./0.4/) | Governance depth (audit log, RBAC) |
 | 0.5 | [`0.5/`](./0.5/) | Adaptive intelligence |
 | 0.6 | [`0.6/`](./0.6/) | Mycelium (cross-deployment learning) |
+| —   | [`backlog/`](./backlog/) | Unscheduled — designed but no milestone yet |
 
 ## Folder Conventions
 
-Each phase contains:
+Each numbered phase contains:
 
 - `README.md` — PRFAQ-style launch doc: problem, solution, customer quote, FAQ, exit bar.
 - `BLOG_POST.md` — draft of the public announcement.
 - `USER_STORIES.md` — Connextra-format stories with acceptance criteria.
 - `DEMO_SCRIPT.md` — minute-by-minute demo flow with narration cues.
+
+The `backlog/` folder is leaner — just `README.md` (what goes here vs an in-phase Deferred section) and `USER_STORIES.md` (the stories themselves with provenance lines). Entries graduate into a numbered phase's `USER_STORIES.md` when scheduled.
 
 ## How to Use These Docs
 

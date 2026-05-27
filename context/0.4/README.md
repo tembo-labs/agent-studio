@@ -16,22 +16,23 @@ Without these, scale doesn't compound — it amplifies risk. And the adaptive in
 
 ## Our Solution
 
-v0.4 is the governance release. It adds three interlocking capabilities:
+v0.4 is the governance release. Two interlocking capabilities:
 
 1. **Immutable `who/when/why` changelog.** Every agent change, run, human intervention, and policy switch is recorded with the actor, timestamp, and originating intent (chat session ID, PR number, correction ID).
-2. **Role-based access control (RBAC).** Org admin → workspace admin → operator → viewer, enforced at the API layer, not just the UI.
-3. **Org-level policy templates.** Defaults inherited by workspaces, with explicit overrides — and the overrides are themselves audited.
+2. **Role-based access control (RBAC).** Workspace admin → operator → viewer, enforced at the API layer, not just the UI.
+
+A third originally-planned capability — **org-level policy templates** — was scoped out of v0.4 and lives in [`context/backlog/`](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). It needs an org concept (a scope above workspace) plus a generic policy substrate, and the rest of v0.4 ships cleanly without it.
 
 ## What Ships in v0.4
 
 - **Immutable changelog API + UI.** Per-agent and per-workspace views. Filter by actor, time, source (chat / PR / HITL response / dashboard event / correction / human action).
-- **RBAC.** Org admin → workspace admin → operator → viewer. Custom roles deferred to post-v0.6 unless a customer blocks.
-- **Policy templates.** Org-level defaults (e.g., "all customer-facing agents are review-required") that workspaces inherit; per-workspace override creates an audit entry with required justification.
+- **RBAC.** Workspace admin → operator → viewer. Org-admin tier deferred until cross-workspace endpoints exist; custom roles deferred to post-v0.6 unless a customer blocks.
 - **Cross-system export.** Per-agent JSON export at v0.4. Streaming to a SIEM is in the v0.5 open-questions list — pilot destinations welcome.
 
 ## Out of Scope for v0.4
 
 - Rich HITL forms and per-agent dashboards — already shipped in [v0.3 (Operational surface)](../0.3/). v0.4 reads the events v0.3 produced; it doesn't reproduce them.
+- Org-level policy templates — moved to [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). The substrate (org concept + policy resolver + tightening/loosening rule) was disproportionate to the rest of v0.4; pull forward when scheduled.
 - Correction-to-code learning, variant lifecycle — [v0.5 (Adaptive intelligence)](../0.5/).
 - Cross-deployment shared learning — [v0.6 (Mycelium)](../0.6/).
 - Custom RBAC roles beyond the four built-ins — post-v0.6 unless a customer blocks.
@@ -73,8 +74,9 @@ The four built-ins (org admin / workspace admin / operator / viewer) cover the c
 
 - [ ] A compliance reviewer can, in under five minutes, answer "who changed this agent, when, why, and who approved it?" for any agent in any workspace.
 - [ ] RBAC roles are enforced at the API layer, not just the UI (verified by a deny-test).
-- [ ] An override of an org-level policy template produces a changelog entry with required justification, demonstrated end-to-end.
 - [ ] Per-agent changelog JSON export works for at least one pilot customer's reporting flow.
+
+(The originally-planned policy-override exit-bar item moved to [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates) along with the rest of US-0.4-03.)
 
 ## Open Questions Before v0.5
 

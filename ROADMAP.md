@@ -85,5 +85,6 @@ deliberate org-admin action.
 | 0.4 | Governance depth (audit log, RBAC, policy) | [`context/0.4/`](./context/0.4/) |
 | 0.5 | Adaptive intelligence (corrections, variants) | [`context/0.5/`](./context/0.5/) |
 | 0.6 | Mycelium (cross-deployment shared learning) | [`context/0.6/`](./context/0.6/) |
+| —   | Backlog (unscheduled, no milestone)           | [`context/backlog/`](./context/backlog/) |
 
 See [`context/README.md`](./context/README.md) for the strategy overview.

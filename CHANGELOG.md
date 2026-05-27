@@ -58,6 +58,16 @@ match the phase numbers in [`ROADMAP.md`](./ROADMAP.md).
   (`web/scripts/rbac-policy.test.mjs`) covers the role-ordering
   invariant; an HTTP-level integration deny test is deferred
   until we set up a session-aware test harness.
+- **US-0.4-03 (org-level policy templates) → Backlog.** Needs an
+  org concept (a scope above workspace) plus a generic policy
+  resolver substrate; the rest of v0.4 ships cleanly without it.
+  Pulls forward when a concrete customer use case lands or when
+  v0.5 prep needs the substrate.
+- **New `context/backlog/` folder.** Sibling to the numbered
+  phase folders; holds designed-but-unscheduled stories with
+  `Moved from: vX.Y` provenance lines. Replaces the per-phase
+  `Stretch (Considered, Deferred)` pattern as the home for
+  stories that *don't* have a phase yet.
 
 ## [v0.3] — Operational surface — shipped May 2026
 
