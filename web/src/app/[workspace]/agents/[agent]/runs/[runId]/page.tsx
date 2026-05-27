@@ -168,7 +168,10 @@ export default async function RunDetailPage({
           </div>
         )}
         {run.status === "failed" && run.errorMessage && (
-          <FailedReason run={run} />
+          <FailedReason
+            run={run}
+            workspaceSlug={workspace.slug}
+          />
         )}
       </Section>
 
@@ -190,15 +193,55 @@ export default async function RunDetailPage({
   );
 }
 
-function FailedReason({ run }: { run: RunRecord }) {
+function FailedReason({
+  run,
+  workspaceSlug,
+}: {
+  run: RunRecord;
+  workspaceSlug: string;
+}) {
+  // First slice of the error message used as the "similar failures"
+  // search term. Matches the prefix the per-agent dashboard uses for
+  // its failure groups (120 chars), so the same root cause across
+  // runs lands in the same bucket. Truncate to ~80 chars for the URL
+  // — anything longer just shows up as a less specific match anyway.
+  const errorSearchTerm =
+    run.errorMessage?.slice(0, 80).trim() ?? "";
+  const similarHref = `/${workspaceSlug}/runs?${new URLSearchParams({
+    status: "failed",
+    agent: run.agentName,
+    q: errorSearchTerm,
+  }).toString()}`;
+  const failureGroupsHref = `/${workspaceSlug}/agents/${encodeURIComponent(run.agentName)}#failures`;
+
   return (
-    <div className="mt-3 flex flex-col gap-1 rounded-lg border border-[var(--color-sentiment-negative)] bg-[var(--color-input-error)] p-3 text-sm">
+    <div className="mt-3 flex flex-col gap-2 rounded-lg border border-[var(--color-sentiment-negative)] bg-[var(--color-input-error)] p-3 text-sm">
       <span className="text-sentiment-negative font-medium">
         Failure reason
       </span>
       <span className="text-foreground whitespace-pre-wrap font-mono text-xs leading-5">
         {run.errorMessage}
       </span>
+      {/* Two investigation jumps. "Similar runs" pulls every failed
+          run on this agent with the same error prefix in /runs;
+          "Failure groups" jumps to the per-agent dashboard's
+          grouped-by-error rollup. Same data, two pivots. */}
+      <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
+        {errorSearchTerm && (
+          <Link
+            href={similarHref}
+            className="text-foreground hover:underline"
+          >
+            Find similar runs →
+          </Link>
+        )}
+        <Link
+          href={failureGroupsHref}
+          className="text-foreground-weak hover:text-foreground hover:underline"
+        >
+          View {run.agentName} failure groups →
+        </Link>
+      </div>
     </div>
   );
 }

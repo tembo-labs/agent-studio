@@ -244,7 +244,10 @@ function FailureGroups({
   agentName: string;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    // id="failures" + scroll-mt so deep links from the failed-run
+    // detail page land here without their target headline hidden
+    // under whatever's sticky above.
+    <div id="failures" className="flex scroll-mt-4 flex-col gap-1.5">
       <span className="text-foreground-weak text-[10px] font-medium uppercase tracking-widest">
         Recent failures (30d)
       </span>
