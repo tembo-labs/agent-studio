@@ -6,9 +6,9 @@
 //   - `pydantic-agentspec` — Pydantic AI's single-file AgentSpec format.
 //     The v0.1 canonical authoring format.
 //   - `cargo-ai` — Cargo AI single-file JSON format. Importable in v0.1
-//     (parser lands as a follow-up to slice 4); see context/0.1/AGENT_FORMAT.md.
+//     (parser lands as a follow-up to slice 4); see context/shipped/0.1/AGENT_FORMAT.md.
 //
-// The v0.3+ direction (see context/0.3/README.md) expands this enum to
+// The v0.3+ direction (see context/shipped/0.3/README.md) expands this enum to
 // include LangGraph, OpenAI Agents SDK, Mastra, CrewAI, and Pydantic AI
 // code mode as first-class supported runtimes.
 //

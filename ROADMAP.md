@@ -11,7 +11,7 @@ Each phase folder under [`context/`](./context/) contains a PRFAQ-style
 `USER_STORIES.md`, and a `DEMO_SCRIPT.md`. The repo's
 [`CHANGELOG.md`](./CHANGELOG.md) tracks what has actually shipped.
 
-## [Phase 0.1 — Foundation](./context/0.1/) · *The trustworthy floor*
+## [Phase 0.1 — Foundation](./context/shipped/0.1/) · *The trustworthy floor*
 
 > **Shipped May 2026.**
 
@@ -21,7 +21,7 @@ readable logs. Nothing flashy. Everything that follows depends on this
 layer being dependable, so this is where we resist the urge to demo
 authoring before runs are solid.
 
-## [Phase 0.2 — Authoring velocity](./context/0.2/) · *Chat to PR*
+## [Phase 0.2 — Authoring velocity](./context/shipped/0.2/) · *Chat to PR*
 
 > **Shipped May 2026.** See [`CHANGELOG.md`](./CHANGELOG.md) for the
 > full list of what landed.
@@ -32,7 +32,7 @@ reads the existing definition, produces a targeted diff, and opens a pull
 request. Reviewers approve or comment. On merge, the new behavior is live.
 The PR is the contract — even when the author wasn't human.
 
-## [Phase 0.3 — Operational surface](./context/0.3/) · *Forms and dashboards*
+## [Phase 0.3 — Operational surface](./context/shipped/0.3/) · *Forms and dashboards*
 
 > **Shipped May 2026.** See [`CHANGELOG.md`](./CHANGELOG.md) for the
 > full list of what landed.
@@ -43,7 +43,7 @@ answer is one screen, not four hours of log spelunking. The
 human-in-the-loop forms slice of v0.3 anchored on a substrate
 larger than the phase could absorb and moved to v0.4 — see the
 "Deferred from the v0.3 plan" section in the phase
-[`README.md`](./context/0.3/) for the full set of carve-outs.
+[`README.md`](./context/shipped/0.3/) for the full set of carve-outs.
 
 ## [Phase 0.4 — Governance depth](./context/0.4/) · *Audit and access*
 
@@ -79,12 +79,14 @@ deliberate org-admin action.
 
 | Phase | Theme | Docs |
 | ----- | ----- | ---- |
-| 0.1 | Foundation | [`context/0.1/`](./context/0.1/) |
-| 0.2 | Authoring velocity (chat → PR) | [`context/0.2/`](./context/0.2/) |
-| 0.3 | Operational surface (HITL forms, dashboards) | [`context/0.3/`](./context/0.3/) |
-| 0.4 | Governance depth (audit log, RBAC, policy) | [`context/0.4/`](./context/0.4/) |
-| 0.5 | Adaptive intelligence (corrections, variants) | [`context/0.5/`](./context/0.5/) |
-| 0.6 | Mycelium (cross-deployment shared learning) | [`context/0.6/`](./context/0.6/) |
-| —   | Backlog (unscheduled, no milestone)           | [`context/backlog/`](./context/backlog/) |
+| 0.1 | Foundation (shipped) | [`context/shipped/0.1/`](./context/shipped/0.1/) |
+| 0.2 | Authoring velocity (shipped) | [`context/shipped/0.2/`](./context/shipped/0.2/) |
+| 0.3 | Operational surface (shipped) | [`context/shipped/0.3/`](./context/shipped/0.3/) |
+| 0.4 | Governance depth (in flight) | [`context/0.4/`](./context/0.4/) |
+| 0.5 | Adaptive intelligence (planned) | [`context/0.5/`](./context/0.5/) |
+| 0.6 | Mycelium (planned) | [`context/0.6/`](./context/0.6/) |
+| —   | Backlog (unscheduled, no milestone) | [`context/backlog/`](./context/backlog/) |
+
+Shipped phase folders moved under [`context/shipped/`](./context/shipped/) — see [`context/README.md`](./context/README.md) for the convention.
 
 See [`context/README.md`](./context/README.md) for the strategy overview.

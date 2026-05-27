@@ -27,7 +27,7 @@ Adaptive systems rewrite source. The first time something goes wrong on a rewrit
 
 ## What v0.4 Is Not
 
-- Not the operator surface. HITL forms and per-agent dashboards shipped in [v0.3 (Operational surface)](../0.3/).
+- Not the operator surface. HITL forms and per-agent dashboards shipped in [v0.3 (Operational surface)](../shipped/0.3/).
 - Not the learning release. Correction-to-code is [v0.5 (Adaptive intelligence)](../0.5/).
 - Not cross-deployment exchange. That's [v0.6 (Mycelium)](../0.6/), opt-in and off by default.
 - Not a place where governance becomes optional — v0.4 raises the floor for the platform.

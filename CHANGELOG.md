@@ -68,6 +68,15 @@ match the phase numbers in [`ROADMAP.md`](./ROADMAP.md).
   `Moved from: vX.Y` provenance lines. Replaces the per-phase
   `Stretch (Considered, Deferred)` pattern as the home for
   stories that *don't* have a phase yet.
+- **`context/shipped/` folder.** Shipped phase folders (0.1, 0.2,
+  0.3) moved under `context/shipped/` so active phases stay
+  uncluttered at the `context/` root. Docs themselves remain
+  load-bearing references; only the directory layer changed.
+  All cross-phase relative links updated; v0.4 → shipped uses
+  `../shipped/0.X/`, shipped → v0.4+ uses `../../0.X/`, and
+  sibling refs within `shipped/` stay as `../0.X/`. Root README +
+  ROADMAP + a couple of source-file comments updated to point at
+  the new paths.
 
 ## [v0.3] — Operational surface — shipped May 2026
 

@@ -7,7 +7,7 @@ import type { Framework } from "@/lib/agent-framework";
 // authoring format) and Cargo AI's single-file JSON (importable). The
 // parser dispatches on shape — see detectFramework below — and returns
 // a discriminated union so the type system can tell consumers which
-// fields are guaranteed for each framework. See context/0.1/AGENT_FORMAT.md.
+// fields are guaranteed for each framework. See context/shipped/0.1/AGENT_FORMAT.md.
 
 // Re-export so callers that import from agent-format keep working.
 export { FRAMEWORKS, FRAMEWORK_LABELS } from "@/lib/agent-framework";

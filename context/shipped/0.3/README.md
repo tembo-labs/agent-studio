@@ -11,7 +11,7 @@ After v0.2, customers are shipping changes in minutes instead of weeks. That spe
 - **HITL is too crude.** Free-text pause/resume works for a quoting workflow but not for a reviewer who needs to upload a signed PDF, pick from a conditional dropdown, and confirm a structured summary.
 - **Per-agent operational visibility is absent.** When an agent misbehaves, support engineers cobble together a story from raw run logs and Slack screenshots.
 
-Without these, the v0.2 authoring win is real but the operator experience around it stays brittle. (Audit, RBAC, and org-level policy are a separate trust conversation — addressed in [v0.4 (Governance depth)](../0.4/).)
+Without these, the v0.2 authoring win is real but the operator experience around it stays brittle. (Audit, RBAC, and org-level policy are a separate trust conversation — addressed in [v0.4 (Governance depth)](../../0.4/).)
 
 ## Our Solution
 
@@ -111,9 +111,9 @@ v0.3 is the operational-surface release. It adds five interlocking capabilities,
 
 ## Out of Scope for v0.3
 
-- Immutable `who/when/why` changelog, RBAC, and org-level policy templates — [v0.4 (Governance depth)](../0.4/).
-- Correction-to-code learning, variant lifecycle — [v0.5 (Adaptive intelligence)](../0.5/).
-- Cross-deployment shared learning — [v0.6 (Mycelium)](../0.6/).
+- Immutable `who/when/why` changelog, RBAC, and org-level policy templates — [v0.4 (Governance depth)](../../0.4/).
+- Correction-to-code learning, variant lifecycle — [v0.5 (Adaptive intelligence)](../../0.5/).
+- Cross-deployment shared learning — [v0.6 (Mycelium)](../../0.6/).
 
 ## Strategy
 
@@ -126,7 +126,7 @@ Get the operator experience right *before* layering governance and adaptive loop
 [v0.1's `AGENT_FORMAT.md`](../0.1/AGENT_FORMAT.md) intentionally limited the supported authoring formats to single-file declarative specs (Pydantic AI `AgentSpec` and Cargo AI JSON), on the grounds that the v0.2 chat-to-PR loop needs diffs a non-engineer can read. That constraint was right for v0.1, but it does not extend to every agent forever:
 
 - **YOLO mode breaks the universal-diff-readability premise.** [v0.2's PR policy](../0.2/) already lets organizations opt individual agents into auto-merge on green CI. For an agent under YOLO, the gate is CI, not human review — so the format does not need to be approachable for a non-engineer.
-- **Production review applies regardless of format.** Once an agent ships to production, [v0.4](../0.4/)'s RBAC + policy templates gate every change. A senior engineer reviewing a LangGraph PR is doing the same governed thing as a PM reviewing an `AgentSpec` YAML PR; the policy engine is the lever, not the format.
+- **Production review applies regardless of format.** Once an agent ships to production, [v0.4](../../0.4/)'s RBAC + policy templates gate every change. A senior engineer reviewing a LangGraph PR is doing the same governed thing as a PM reviewing an `AgentSpec` YAML PR; the policy engine is the lever, not the format.
 - **Complex agents need code.** Stateful multi-tool workflows, durable execution, and tight host-app integration outgrow a declarative spec. Telling a customer with a working LangGraph or Mastra agent "TAS isn't for you" defeats the goal of being *the* control plane for agents, plural.
 
 Starting in v0.3+, TAS expands the set of **runtimes** it can host while keeping a small, opinionated default for **authoring starters**. The candidate first-class supported runtimes:

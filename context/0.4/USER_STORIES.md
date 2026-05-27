@@ -8,7 +8,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 - **Org Admin** — sets policy across many workspaces.
 - **Workspace Admin** — runs one team's TAS workspace; inherits org policy and can tighten but not loosen.
 
-Operator-surface personas (Reviewer, Support Engineer) live in [v0.3 (Operational surface)](../0.3/).
+Operator-surface personas (Reviewer, Support Engineer) live in [v0.3 (Operational surface)](../shipped/0.3/).
 
 ---
 

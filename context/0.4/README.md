@@ -31,7 +31,7 @@ A third originally-planned capability — **org-level policy templates** — was
 
 ## Out of Scope for v0.4
 
-- Rich HITL forms and per-agent dashboards — already shipped in [v0.3 (Operational surface)](../0.3/). v0.4 reads the events v0.3 produced; it doesn't reproduce them.
+- Rich HITL forms and per-agent dashboards — already shipped in [v0.3 (Operational surface)](../shipped/0.3/). v0.4 reads the events v0.3 produced; it doesn't reproduce them.
 - Org-level policy templates — moved to [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). The substrate (org concept + policy resolver + tightening/loosening rule) was disproportionate to the rest of v0.4; pull forward when scheduled.
 - Correction-to-code learning, variant lifecycle — [v0.5 (Adaptive intelligence)](../0.5/).
 - Cross-deployment shared learning — [v0.6 (Mycelium)](../0.6/).

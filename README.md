@@ -85,7 +85,7 @@ and [`ROADMAP.md`](./ROADMAP.md) for where it's headed.
 agent-studio/
 ├── web/        Next.js 16 + Tailwind v4 + shadcn/ui + better-auth (control plane UI)
 ├── api/        Rust (axum + sqlx) — runtime + orchestration, owns Postgres migrations
-├── agents/     Seed agent fixtures (see context/0.1/AGENT_FORMAT.md)
+├── agents/     Seed agent fixtures (see context/shipped/0.1/AGENT_FORMAT.md)
 ├── context/    Phase docs (PRFAQ, blog, user stories, demo script per phase)
 └── docker-compose.yml
 ```

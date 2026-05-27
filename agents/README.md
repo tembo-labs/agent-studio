@@ -19,7 +19,7 @@ into the right subfolder automatically based on the parsed shape.
   format. Parsed, listed, and **runnable** end-to-end against Anthropic.
 - **Cargo AI** (JSON) — single-file definitions with `agent_schema` and
   `actions`. Parsed and listed in v0.1; runtime support is wired
-  separately (see `context/0.3/README.md` for the broader multi-framework
+  separately (see `context/shipped/0.3/README.md` for the broader multi-framework
   direction).
 
 **Layout is required.** Agents must live in the right framework
@@ -28,4 +28,4 @@ are ignored by the listing surface — move them into
 `agents/pydantic-agentspec/` or `agents/cargo-ai/` as appropriate.
 
 For the format decision and rationale, see
-[`../context/0.1/AGENT_FORMAT.md`](../context/0.1/AGENT_FORMAT.md).
+[`../context/shipped/0.1/AGENT_FORMAT.md`](../context/shipped/0.1/AGENT_FORMAT.md).

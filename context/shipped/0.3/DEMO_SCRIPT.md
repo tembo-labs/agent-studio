@@ -2,7 +2,7 @@
 
 **Target audience:** prospective customer's operations/reviewer stakeholder plus the engineering manager who already saw v0.2.
 **Target duration:** 18–22 minutes.
-**Goal of the demo:** prove that v0.3 closes the HITL and operational-visibility gaps the v0.2 conversation surfaced — without slowing authoring. Audit, RBAC, and policy templates are a separate conversation, demoed in [v0.4](../0.4/DEMO_SCRIPT.md).
+**Goal of the demo:** prove that v0.3 closes the HITL and operational-visibility gaps the v0.2 conversation surfaced — without slowing authoring. Audit, RBAC, and policy templates are a separate conversation, demoed in [v0.4](../../0.4/DEMO_SCRIPT.md).
 
 ## Pre-Demo Checklist (Off-Screen)
 

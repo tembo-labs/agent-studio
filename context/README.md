@@ -22,19 +22,26 @@ Each phase has an exit bar and a set of open questions the next phase must answe
 
 ## Phase Index
 
-| Phase | Folder | Theme |
-| ----- | ------ | ----- |
-| 0.1 | [`0.1/`](./0.1/) | Foundation |
-| 0.2 | [`0.2/`](./0.2/) | Authoring velocity |
-| 0.3 | [`0.3/`](./0.3/) | Operational surface (HITL, dashboards) |
-| 0.4 | [`0.4/`](./0.4/) | Governance depth (audit log, RBAC) |
-| 0.5 | [`0.5/`](./0.5/) | Adaptive intelligence |
-| 0.6 | [`0.6/`](./0.6/) | Mycelium (cross-deployment learning) |
-| —   | [`backlog/`](./backlog/) | Unscheduled — designed but no milestone yet |
+| Phase | Status | Folder | Theme |
+| ----- | ------ | ------ | ----- |
+| 0.1 | shipped | [`shipped/0.1/`](./shipped/0.1/) | Foundation |
+| 0.2 | shipped | [`shipped/0.2/`](./shipped/0.2/) | Authoring velocity |
+| 0.3 | shipped | [`shipped/0.3/`](./shipped/0.3/) | Operational surface (HITL, dashboards) |
+| 0.4 | in flight | [`0.4/`](./0.4/) | Governance depth (audit log, RBAC) |
+| 0.5 | planned | [`0.5/`](./0.5/) | Adaptive intelligence |
+| 0.6 | planned | [`0.6/`](./0.6/) | Mycelium (cross-deployment learning) |
+| —   | backlog | [`backlog/`](./backlog/) | Unscheduled — designed but no milestone yet |
+
+Shipped phases moved under [`shipped/`](./shipped/) so the active
+phase folders stay uncluttered. The docs themselves remain load-
+bearing: the v0.4 audit substrate cites v0.3's structured events,
+the v0.2 PR-policy carve-out is still referenced from backlog memos,
+etc. See [`shipped/README.md`](./shipped/README.md) for the
+convention.
 
 ## Folder Conventions
 
-Each numbered phase contains:
+Each numbered phase folder contains:
 
 - `README.md` — PRFAQ-style launch doc: problem, solution, customer quote, FAQ, exit bar.
 - `BLOG_POST.md` — draft of the public announcement.
@@ -42,6 +49,8 @@ Each numbered phase contains:
 - `DEMO_SCRIPT.md` — minute-by-minute demo flow with narration cues.
 
 The `backlog/` folder is leaner — just `README.md` (what goes here vs an in-phase Deferred section) and `USER_STORIES.md` (the stories themselves with provenance lines). Entries graduate into a numbered phase's `USER_STORIES.md` when scheduled.
+
+The `shipped/` folder is an organizational layer only — its subfolders are full phase folders, identical in structure to in-flight phases.
 
 ## How to Use These Docs
 
