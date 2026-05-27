@@ -575,7 +575,10 @@ export async function addMemberAction(
     targetType: "member",
     targetId: result.member.userId,
     agentName: null,
-    payload: { email: result.member.email, role },
+    payload: {
+      target: { name: result.member.name, email: result.member.email },
+      role,
+    },
   });
 
   revalidatePath(`/${slug}/settings`);
@@ -624,6 +627,7 @@ export async function changeMemberRoleAction(
       targetId: targetUserId,
       agentName: null,
       payload: {
+        target: result.target,
         previousRole: result.previousRole,
         newRole: result.newRole,
       },
@@ -671,7 +675,10 @@ export async function removeMemberAction(
     targetType: "member",
     targetId: targetUserId,
     agentName: null,
-    payload: {},
+    payload: {
+      target: result.target,
+      previousRole: result.previousRole,
+    },
   });
 
   revalidatePath(`/${slug}/settings`);

@@ -42,6 +42,15 @@ match the phase numbers in [`ROADMAP.md`](./ROADMAP.md).
   current user's role; server enforcement remains the contract.
   Org-admin tier deferred until there are concrete cross-workspace
   endpoints to gate on it.
+- **RBAC-half of US-0.4-05 closed.** Role-assignment audit events
+  (`member.added` / `member.role_changed` / `member.removed`) now
+  carry the target user's name + email in the payload, and the
+  audit UI renders them as readable rows ("Alice · viewer →
+  operator" rather than the raw uuid). The audit-export event
+  (`audit.exported`) renders the filter snapshot + row count.
+  The policy-half of the AC (template version diffs, override
+  events with justification) stays open until the policy
+  substrate ships, since those event types don't exist yet.
 
 ### Scope moves
 - **API-level deny test in CI → v0.4+.** The v0.4-02 AC asks for

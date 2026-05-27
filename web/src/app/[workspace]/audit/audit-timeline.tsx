@@ -474,6 +474,48 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
           {String(p.secretKind ?? "")}
         </span>
       );
+    case "member.added": {
+      const t = p.target as { name?: string; email?: string } | undefined;
+      const who = t?.name ?? t?.email ?? "";
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {who} as {String(p.role ?? "")}
+        </span>
+      );
+    }
+    case "member.role_changed": {
+      const t = p.target as { name?: string; email?: string } | undefined;
+      const who = t?.name ?? t?.email ?? "";
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {who} · {String(p.previousRole ?? "")} → {String(p.newRole ?? "")}
+        </span>
+      );
+    }
+    case "member.removed": {
+      const t = p.target as { name?: string; email?: string } | undefined;
+      const who = t?.name ?? t?.email ?? "";
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {who}
+          {p.previousRole ? ` (was ${String(p.previousRole)})` : ""}
+        </span>
+      );
+    }
+    case "audit.exported": {
+      const f = p.filters as Record<string, unknown> | undefined;
+      const rc = p.rowCount as number | undefined;
+      const parts: string[] = [];
+      if (rc !== undefined) parts.push(`${rc} rows`);
+      if (f?.agent) parts.push(`agent: ${String(f.agent)}`);
+      if (Array.isArray(f?.sources))
+        parts.push(`sources: ${(f.sources as string[]).join(", ")}`);
+      return (
+        <span className="text-foreground-weak text-[11px]">
+          {parts.join(" · ")}
+        </span>
+      );
+    }
     default:
       return null;
   }
@@ -575,6 +617,10 @@ function humanKind(kind: string): string {
     "agent.deleted": "Agent deleted",
     "agent.restored": "Agent restored",
     "repo.disconnected": "Repository disconnected",
+    "member.added": "Member added",
+    "member.role_changed": "Member role changed",
+    "member.removed": "Member removed",
+    "audit.exported": "Audit exported",
   };
   return map[kind] ?? kind;
 }

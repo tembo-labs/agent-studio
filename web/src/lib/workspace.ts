@@ -216,7 +216,13 @@ export async function addWorkspaceMemberByEmail(
 
 export type ChangeMemberRoleError = "not-found" | "last-admin";
 export type ChangeMemberRoleResult =
-  | { ok: true; previousRole: WorkspaceRole; newRole: WorkspaceRole }
+  | {
+      ok: true;
+      previousRole: WorkspaceRole;
+      newRole: WorkspaceRole;
+      /** Target user display details — used by audit payloads. */
+      target: { name: string | null; email: string };
+    }
   | { ok: false; error: ChangeMemberRoleError };
 
 /**
@@ -233,10 +239,16 @@ export async function changeMemberRole(
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    const { rows: existingRows } = await client.query<{ role: string }>(
-      `SELECT role FROM workspace_member
-        WHERE workspace_id = $1 AND user_id = $2
-        FOR UPDATE`,
+    const { rows: existingRows } = await client.query<{
+      role: string;
+      name: string | null;
+      email: string;
+    }>(
+      `SELECT m.role, u.name, u.email
+         FROM workspace_member m
+         JOIN "user" u ON u.id = m.user_id
+        WHERE m.workspace_id = $1 AND m.user_id = $2
+        FOR UPDATE OF m`,
       [workspaceId, targetUserId],
     );
     const existing = existingRows[0];
@@ -247,9 +259,10 @@ export async function changeMemberRole(
     const previousRole = isWorkspaceRole(existing.role)
       ? existing.role
       : "viewer";
+    const target = { name: existing.name, email: existing.email };
     if (previousRole === newRole) {
       await client.query("ROLLBACK");
-      return { ok: true, previousRole, newRole };
+      return { ok: true, previousRole, newRole, target };
     }
     // Block last-admin demotion: count admins, refuse if this
     // member is the only one and they're being demoted.
@@ -271,7 +284,7 @@ export async function changeMemberRole(
       [workspaceId, targetUserId, newRole],
     );
     await client.query("COMMIT");
-    return { ok: true, previousRole, newRole };
+    return { ok: true, previousRole, newRole, target };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -280,6 +293,14 @@ export async function changeMemberRole(
   }
 }
 
+export type RemoveMemberResult =
+  | {
+      ok: true;
+      target: { name: string | null; email: string };
+      previousRole: WorkspaceRole;
+    }
+  | { ok: false; error: "not-found" | "last-admin" };
+
 /**
  * Remove a user from a workspace. Same last-admin guard as
  * changeMemberRole. Used by the "Remove member" affordance.
@@ -287,14 +308,20 @@ export async function changeMemberRole(
 export async function removeWorkspaceMember(
   workspaceId: string,
   targetUserId: string,
-): Promise<{ ok: true } | { ok: false; error: "not-found" | "last-admin" }> {
+): Promise<RemoveMemberResult> {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    const { rows: existingRows } = await client.query<{ role: string }>(
-      `SELECT role FROM workspace_member
-        WHERE workspace_id = $1 AND user_id = $2
-        FOR UPDATE`,
+    const { rows: existingRows } = await client.query<{
+      role: string;
+      name: string | null;
+      email: string;
+    }>(
+      `SELECT m.role, u.name, u.email
+         FROM workspace_member m
+         JOIN "user" u ON u.id = m.user_id
+        WHERE m.workspace_id = $1 AND m.user_id = $2
+        FOR UPDATE OF m`,
       [workspaceId, targetUserId],
     );
     const existing = existingRows[0];
@@ -302,6 +329,10 @@ export async function removeWorkspaceMember(
       await client.query("ROLLBACK");
       return { ok: false, error: "not-found" };
     }
+    const target = { name: existing.name, email: existing.email };
+    const previousRole = isWorkspaceRole(existing.role)
+      ? existing.role
+      : "viewer";
     if (existing.role === "workspace_admin") {
       const { rows: countRows } = await client.query<{ n: string }>(
         `SELECT COUNT(*)::text AS n
@@ -320,7 +351,7 @@ export async function removeWorkspaceMember(
       [workspaceId, targetUserId],
     );
     await client.query("COMMIT");
-    return { ok: true };
+    return { ok: true, target, previousRole };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

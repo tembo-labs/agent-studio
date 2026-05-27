@@ -154,6 +154,10 @@ function humanKind(kind: string): string {
     "trigger.disabled": "Trigger disabled",
     "agent.deleted": "Agent deleted",
     "agent.restored": "Agent restored",
+    "member.added": "Member added",
+    "member.role_changed": "Member role changed",
+    "member.removed": "Member removed",
+    "audit.exported": "Audit exported",
   };
   return map[kind] ?? kind;
 }
