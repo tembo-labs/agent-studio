@@ -1,17 +1,18 @@
-// Native MCP provider catalog. Each entry describes a provider
-// whose connection mode is "native-mcp" — TAS-owned OAuth flow,
-// tokens stored in workspace_connection, agent runtime talks
-// directly to the provider's official MCP server.
+// Native MCP provider catalog.
 //
-// This is the *registry* — UI and OAuth routes read from here. Adding
-// a new provider means adding one entry plus a per-provider OAuth
-// callback handler (the authorize side is generic; tokens-endpoint
-// shapes vary just enough that callbacks usually need provider-
-// specific code).
+// Each entry describes a provider whose connection mode is
+// "native-mcp" — TAS-owned OAuth, tokens stored in
+// workspace_connection, agent runtime talks directly to the
+// provider's official MCP server.
 //
-// Lives in lib (not server-only) because the Connections UI uses
-// the display fields client-side. The OAuth URLs are public-facing
-// information; nothing in this file is sensitive.
+// Catalog is tiny on purpose: just display label + the MCP server
+// URL. Everything else (OAuth endpoints, scopes, registration URL,
+// supported auth methods) is discovered at run time from the
+// provider's /.well-known/oauth-protected-resource and the linked
+// /.well-known/oauth-authorization-server. This means TAS picks up
+// new MCP providers with just one catalog entry — no per-provider
+// authorize/callback code, no manual OAuth-client registration on
+// the customer's side.
 
 import { getPublicOrigin } from "@/lib/config";
 
@@ -20,21 +21,9 @@ export type McpProviderSlug = "attio";
 export type McpProvider = {
   slug: McpProviderSlug;
   displayName: string;
-  /** Three-line markdown explaining the OAuth-client setup steps. */
-  setupInstructions: string;
-  /** Where to register the OAuth app. */
-  developerConsoleUrl: string;
-  /** Auth pattern. v0.4 ships oauth2 only; pat is reserved for
-   *  providers that accept Personal Access Tokens (GitHub, Linear). */
-  authType: "oauth2" | "pat";
-  /** Provider's OAuth 2.0 authorize endpoint. */
-  authorizeUrl: string;
-  /** Provider's OAuth 2.0 token-exchange endpoint. */
-  tokenUrl: string;
-  /** Space-separated scope list to request. */
-  scopes: string[];
-  /** The MCP server URL pydantic-ai's MCPServerStreamableHTTP
-   *  connects to once we hold an access token. */
+  /** The MCP server URL pydantic-ai connects to with the user's
+   *  bearer token at run time. The /.well-known endpoints are
+   *  derived from this URL's origin. */
   mcpServerUrl: string;
 };
 
@@ -42,26 +31,7 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
   attio: {
     slug: "attio",
     displayName: "Attio",
-    developerConsoleUrl: "https://app.attio.com/settings/developers",
-    authType: "oauth2",
-    // NOTE: Attio's OAuth + MCP endpoints below should be verified
-    // against their current docs before the first connect attempt.
-    // The shape is consistent with standard OAuth 2.0 + MCP-over-SSE
-    // providers; specific URLs may need a one-line adjustment.
-    authorizeUrl: "https://app.attio.com/authorize",
-    tokenUrl: "https://app.attio.com/oauth/token",
-    scopes: [
-      "record_permission:read",
-      "record_permission:read-write",
-      "object_configuration:read",
-      "list_entry:read",
-      "list_configuration:read",
-    ],
     mcpServerUrl: "https://mcp.attio.com/mcp",
-    setupInstructions: `1. Open **Attio → Settings → Developers** and click **Create an OAuth app**.
-2. Set the redirect URI exactly to:
-   \`{{REDIRECT_URI}}\`
-3. Copy the **Client ID** and **Client Secret** into the fields below.`,
   },
 };
 
@@ -74,21 +44,23 @@ export function listMcpProviders(): McpProvider[] {
 }
 
 /**
- * Resolved redirect URI for a given provider's OAuth callback.
- * Anchored on getPublicOrigin() so we get the canonical https URL
- * the operator sees, not a docker bind-address.
+ * URL of the provider's protected-resource metadata document. Per
+ * the MCP authorization spec (and OAuth 2.0 Protected Resource
+ * Metadata, RFC 9728), this lives at /.well-known/oauth-protected-
+ * resource on the resource server's origin. The document points us
+ * at the actual authorization server(s) and supported scopes.
  */
-export function redirectUriFor(slug: McpProviderSlug): string {
-  return `${getPublicOrigin()}/api/connections/${slug}/callback`;
+export function protectedResourceUrl(mcpServerUrl: string): string {
+  const u = new URL(mcpServerUrl);
+  return `${u.origin}/.well-known/oauth-protected-resource`;
 }
 
 /**
- * Setup-instructions string with the redirect URI substituted in.
- * Used by the Connections page's Configure form.
+ * Resolved redirect URI for a given provider's OAuth callback. The
+ * redirect URI we register dynamically (via DCR) at authorize time
+ * must match exactly what the provider receives in the callback,
+ * so both call sites share this single source of truth.
  */
-export function setupInstructionsFor(slug: McpProviderSlug): string {
-  return MCP_PROVIDERS[slug].setupInstructions.replace(
-    /\{\{REDIRECT_URI\}\}/g,
-    redirectUriFor(slug),
-  );
+export function redirectUriFor(slug: McpProviderSlug): string {
+  return `${getPublicOrigin()}/api/connections/native/${slug}/callback`;
 }

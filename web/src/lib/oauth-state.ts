@@ -39,6 +39,20 @@ export type NativeMcpStatePayload = {
   provider: string;
   /** Workspace-scoped name slot for the connection. */
   connectionName: string;
+  /** PKCE verifier (raw, base64url). The provider receives only the
+   *  derived S256 challenge in the /authorize redirect; we present
+   *  the verifier on the callback's token exchange to complete the
+   *  PKCE proof. Embedded in the state because it never crosses
+   *  our trust boundary — state is HMAC-signed and opaque to the
+   *  provider. */
+  pkceVerifier: string;
+  /** OAuth client_id that Dynamic Client Registration just issued
+   *  for this flow. New per Connect attempt (MCP DCR is cheap;
+   *  caching adds complexity without much payoff at v1). */
+  clientId: string;
+  /** Authorization server token endpoint, captured during
+   *  discovery so the callback doesn't need to re-discover. */
+  tokenEndpoint: string;
   /** Short random nonce — defends against state replay across users. */
   nonce: string;
 };
@@ -89,6 +103,9 @@ function isNativeMcpStatePayload(value: unknown): value is NativeMcpStatePayload
     typeof v.userId === "string" &&
     typeof v.provider === "string" &&
     typeof v.connectionName === "string" &&
+    typeof v.pkceVerifier === "string" &&
+    typeof v.clientId === "string" &&
+    typeof v.tokenEndpoint === "string" &&
     typeof v.nonce === "string"
   );
 }

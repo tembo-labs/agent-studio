@@ -8,22 +8,17 @@ import {
   redirectUriFor,
   type McpProviderSlug,
 } from "@/lib/mcp-providers";
+import { fetchNativeMcpTools } from "@/lib/native-mcp-tools";
+import { replaceToolsForConnection } from "@/lib/mcp-tools";
 import { verifyNativeMcpState } from "@/lib/oauth-state";
 import { getServerSession } from "@/lib/session";
-import {
-  getWorkspaceSecretPlaintext,
-  nativeMcpClientSecretKinds,
-  userIsMember,
-} from "@/lib/workspace";
+import { userIsMember } from "@/lib/workspace";
 
-// OAuth callback for native-MCP providers. Provider redirects the
-// user back here with ?code=...&state=...; we verify the state, swap
-// the code for tokens against the provider's token endpoint, and
-// store the result in workspace_connection.
-//
-// All redirects anchor on getPublicOrigin() so a request landing on
-// the docker bind-address (0.0.0.0) gets bounced to the canonical
-// host where the better-auth session cookie is valid.
+// Native-MCP OAuth callback. The provider redirects the user back
+// here with ?code=...&state=...; we swap the code for tokens at the
+// token endpoint embedded in the signed state, using the PKCE
+// verifier and DCR-issued client_id we squirreled away at authorize
+// time. No client_secret — token_endpoint_auth_method=none + PKCE.
 
 function back(
   slug: string,
@@ -58,36 +53,33 @@ export async function GET(
     return NextResponse.redirect(new URL("/", request.url), 302);
   }
 
-  const state = request.nextUrl.searchParams.get("state");
-  if (!state) {
+  const stateRaw = request.nextUrl.searchParams.get("state");
+  if (!stateRaw) {
     return NextResponse.json({ error: "missing state" }, { status: 400 });
   }
-  const payload = verifyNativeMcpState(state);
-  if (!payload) {
+  const state = verifyNativeMcpState(stateRaw);
+  if (!state) {
     return NextResponse.json(
       { error: "state failed signature verification" },
       { status: 400 },
     );
   }
-  if (payload.provider !== provider.slug) {
+  if (state.provider !== provider.slug) {
     return NextResponse.json(
       { error: "state provider doesn't match route" },
       { status: 400 },
     );
   }
-  // Session user must match the user the state was signed for.
-  // Defends against a different user resuming someone else's
-  // half-completed OAuth flow.
-  if (session.user.id !== payload.userId) {
+  if (session.user.id !== state.userId) {
     return back(
-      payload.workspaceSlug,
+      state.workspaceSlug,
       provider.slug,
       "error",
       "Session user changed during OAuth flow.",
     );
   }
 
-  const isMember = await userIsMember(payload.workspaceId, session.user.id);
+  const isMember = await userIsMember(state.workspaceId, session.user.id);
   if (!isMember) {
     return NextResponse.json({ error: "not a member" }, { status: 403 });
   }
@@ -95,77 +87,69 @@ export async function GET(
   const providerError = request.nextUrl.searchParams.get("error");
   if (providerError) {
     return back(
-      payload.workspaceSlug,
+      state.workspaceSlug,
       provider.slug,
       "error",
       `${provider.displayName} rejected the authorization: ${providerError}`,
     );
   }
-
   const code = request.nextUrl.searchParams.get("code");
   if (!code) {
     return back(
-      payload.workspaceSlug,
+      state.workspaceSlug,
       provider.slug,
       "error",
       `${provider.displayName} didn't return an authorization code.`,
     );
   }
 
-  // Exchange the code for tokens. POST x-www-form-urlencoded to the
-  // provider's token endpoint with the OAuth-client credentials we
-  // stored when the admin set things up.
-  const { idKind, secretKind } = nativeMcpClientSecretKinds(provider.slug);
-  let clientId: string;
-  let clientSecret: string;
-  try {
-    clientId = await getWorkspaceSecretPlaintext(payload.workspaceId, idKind);
-    clientSecret = await getWorkspaceSecretPlaintext(
-      payload.workspaceId,
-      secretKind,
-    );
-  } catch {
-    return back(
-      payload.workspaceSlug,
-      provider.slug,
-      "error",
-      `${provider.displayName} OAuth client was removed during the flow.`,
-    );
-  }
-
-  const tokenRes = await fetch(provider.tokenUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUriFor(provider.slug as McpProviderSlug),
-      client_id: clientId,
-      client_secret: clientSecret,
-    }).toString(),
-  });
-  if (!tokenRes.ok) {
-    const body = await tokenRes.text().catch(() => "");
-    return back(
-      payload.workspaceSlug,
-      provider.slug,
-      "error",
-      `Token exchange failed (${tokenRes.status}): ${body.slice(0, 200)}`,
-    );
-  }
-  const tokenJson = (await tokenRes.json()) as {
+  // PKCE token exchange. Public client → no client_secret. The
+  // code_verifier proves we're the same party that initiated the
+  // authorize request (we hold the verifier whose S256 hash we sent
+  // as the challenge).
+  let tokenJson: {
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;
     scope?: string;
     token_type?: string;
   };
+  try {
+    const tokenRes = await fetch(state.tokenEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUriFor(provider.slug as McpProviderSlug),
+        client_id: state.clientId,
+        code_verifier: state.pkceVerifier,
+      }).toString(),
+    });
+    if (!tokenRes.ok) {
+      const body = await tokenRes.text().catch(() => "");
+      return back(
+        state.workspaceSlug,
+        provider.slug,
+        "error",
+        `Token exchange failed (${tokenRes.status}): ${body.slice(0, 200)}`,
+      );
+    }
+    tokenJson = await tokenRes.json();
+  } catch (e) {
+    return back(
+      state.workspaceSlug,
+      provider.slug,
+      "error",
+      `Token exchange fetch failed: ${(e as Error).message}`,
+    );
+  }
   if (!tokenJson.access_token) {
     return back(
-      payload.workspaceSlug,
+      state.workspaceSlug,
       provider.slug,
       "error",
       `${provider.displayName} returned no access token.`,
@@ -177,10 +161,10 @@ export async function GET(
     : undefined;
 
   const saved = await saveNativeConnection({
-    workspaceId: payload.workspaceId,
-    userId: payload.userId,
+    workspaceId: state.workspaceId,
+    userId: state.userId,
     type: provider.slug as McpProviderSlug,
-    name: payload.connectionName,
+    name: state.connectionName,
     mcpServerUrl: provider.mcpServerUrl,
     authType: "oauth2",
     credentials: {
@@ -190,12 +174,15 @@ export async function GET(
       scope: tokenJson.scope,
       token_type: tokenJson.token_type,
     },
-    metadata: {},
+    // DCR client_id stays in metadata so a future "refresh token"
+    // exchange can present the same client identity. (We can also
+    // re-DCR on reconnect; this is a minor optimization.)
+    metadata: { dcr_client_id: state.clientId },
   });
 
   await writeAuditEvent({
-    workspaceId: payload.workspaceId,
-    actorUserId: payload.userId,
+    workspaceId: state.workspaceId,
+    actorUserId: state.userId,
     source: "human_action",
     kind: "connection.authorized",
     targetType: "connection",
@@ -203,10 +190,39 @@ export async function GET(
     agentName: null,
     payload: {
       provider: provider.slug,
-      name: payload.connectionName,
+      name: state.connectionName,
       source: "native-mcp",
     },
   });
 
-  return back(payload.workspaceSlug, provider.slug, "ok");
+  // Best-effort: prime the tool-list cache so the Connections page
+  // can show "N tools available" immediately. Don't block the
+  // redirect on failure — the connection itself is good, and we can
+  // backfill the cache later (refresh button, or lazy on first
+  // render). Just log so a recurring failure is visible.
+  try {
+    const tools = await fetchNativeMcpTools(
+      provider.mcpServerUrl,
+      tokenJson.access_token,
+    );
+    await replaceToolsForConnection({
+      workspaceId: state.workspaceId,
+      userId: state.userId,
+      source: "native-mcp",
+      provider: provider.slug,
+      connectionName: state.connectionName,
+      tools: tools.map((t) => ({
+        slug: t.slug,
+        displayName: t.name,
+        description: t.description,
+      })),
+    });
+  } catch (e) {
+    console.error(
+      `[native-mcp/${provider.slug}] tool-cache prime failed:`,
+      (e as Error).message,
+    );
+  }
+
+  return back(state.workspaceSlug, provider.slug, "ok");
 }

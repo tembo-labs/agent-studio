@@ -4,6 +4,8 @@ import { writeAuditEvent } from "@/lib/audit-db";
 import { getPublicOrigin } from "@/lib/config";
 import { findLatestActiveConnection } from "@/lib/composio";
 import { saveComposioConnection } from "@/lib/composio-connections";
+import { fetchComposioToolkitTools } from "@/lib/composio-tools";
+import { replaceToolsForConnection } from "@/lib/mcp-tools";
 import { verifyComposioState } from "@/lib/oauth-state";
 import { getServerSession } from "@/lib/session";
 import {
@@ -162,6 +164,32 @@ export async function GET(request: NextRequest) {
       name: payload.connectionName,
     },
   });
+
+  // Best-effort: prime the tool-list cache so Connections shows
+  // "N tools available" immediately and the Tools page has the
+  // catalog without waiting for a refresh. Composio's curated
+  // subset is per-toolkit (not per-connection), so the result is
+  // stable across users. Don't block the redirect on failure.
+  try {
+    const tools = await fetchComposioToolkitTools(apiKey, payload.toolkit);
+    await replaceToolsForConnection({
+      workspaceId: payload.workspaceId,
+      userId: payload.userId,
+      source: "composio",
+      provider: payload.toolkit,
+      connectionName: payload.connectionName,
+      tools: tools.map((t) => ({
+        slug: t.slug,
+        displayName: t.name,
+        description: t.description,
+      })),
+    });
+  } catch (e) {
+    console.error(
+      `[composio/${payload.toolkit}] tool-cache prime failed:`,
+      (e as Error).message,
+    );
+  }
 
   return backToConnections(
     request,

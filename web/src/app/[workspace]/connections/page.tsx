@@ -11,18 +11,15 @@ import {
   listNativeConnectionsForUser,
   type WorkspaceConnection,
 } from "@/lib/connections";
-import {
-  listMcpProviders,
-  type McpProviderSlug,
-} from "@/lib/mcp-providers";
+import { listMcpProviders } from "@/lib/mcp-providers";
+import { listToolsForUser, type McpTool } from "@/lib/mcp-tools";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRole,
-  getWorkspaceSecretPreview,
   getWorkspaceSecretPlaintext,
-  nativeMcpClientSecretKinds,
+  getWorkspaceSecretPreview,
 } from "@/lib/workspace";
 
 import { ComposioConnectionsSection } from "../settings/composio-connections-section";
@@ -56,42 +53,70 @@ export default async function ConnectionsPage({
     agentsListing,
     nativeConnections,
     currentUserRole,
+    allTools,
   ] = await Promise.all([
     getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
     listConnectionsForUser(workspace.id, session.user.id),
     listAgents(workspace.id),
     listNativeConnectionsForUser(workspace.id, session.user.id),
     getWorkspaceRole(workspace.id, session.user.id),
+    listToolsForUser(workspace.id, session.user.id),
   ]);
   if (!currentUserRole) notFound();
 
-  // For each provider in the native-MCP catalog, gather: whether the
-  // workspace has OAuth client credentials configured + whether this
-  // user has authorized an active connection. Renders into rows that
-  // self-describe their state.
-  const nativeProviderRows = await Promise.all(
-    listMcpProviders().map(async (provider) => {
-      const { idKind, secretKind } = nativeMcpClientSecretKinds(provider.slug);
-      const [idPreview, secretPreview] = await Promise.all([
-        getWorkspaceSecretPreview(workspace.id, idKind),
-        getWorkspaceSecretPreview(workspace.id, secretKind),
-      ]);
-      const connection: WorkspaceConnection | null =
-        nativeConnections.find(
-          (c) => c.type === provider.slug && c.status === "active",
-        ) ?? null;
-      return {
+  // Bucket tools by `${source}:${provider}:${name}` once so each row
+  // can render its own count + expand without scanning the full set
+  // in JS for every row. The list is per-user and bounded (~hundreds
+  // of tools across all connections), so an in-memory group is fine.
+  const toolsBySlot = new Map<string, McpTool[]>();
+  for (const t of allTools) {
+    const key = `${t.source}:${t.provider}:${t.connectionName}`;
+    const arr = toolsBySlot.get(key);
+    if (arr) arr.push(t);
+    else toolsBySlot.set(key, [t]);
+  }
+
+  // One row per (provider, name) slot the user has authorized.
+  // Catalog providers with zero connections still get a single
+  // "first-time Connect" placeholder row so the user can discover
+  // them without going through the Add Another form. Providers with
+  // ≥1 connection get one row per slot — mirrors how a user with
+  // multiple Composio Gmail accounts sees multiple rows.
+  const nativeCatalog = listMcpProviders();
+  const activeByProvider = new Map<string, WorkspaceConnection[]>();
+  for (const c of nativeConnections.filter((c) => c.status === "active")) {
+    const arr = activeByProvider.get(c.type) ?? [];
+    arr.push(c);
+    activeByProvider.set(c.type, arr);
+  }
+  type NativeRow = {
+    provider: (typeof nativeCatalog)[number];
+    connection: WorkspaceConnection | null;
+    tools: McpTool[];
+  };
+  const nativeProviderRows: NativeRow[] = [];
+  for (const provider of nativeCatalog) {
+    const conns = activeByProvider.get(provider.slug) ?? [];
+    if (conns.length === 0) {
+      nativeProviderRows.push({ provider, connection: null, tools: [] });
+      continue;
+    }
+    // Stable order: "default" first, then alphabetical, so a user's
+    // primary slot leads the list.
+    conns.sort((a, b) => {
+      if (a.name === "default") return -1;
+      if (b.name === "default") return 1;
+      return a.name.localeCompare(b.name);
+    });
+    for (const c of conns) {
+      nativeProviderRows.push({
         provider,
-        oauthClientConfigured: Boolean(idPreview && secretPreview),
-        connection,
-      };
-    }),
-  );
-  // Silence unused-var lints until the runtime path consumes the
-  // plaintext-fetcher import; the import itself stays to keep the
-  // contract surface narrow.
-  void getWorkspaceSecretPlaintext;
-  void (null as McpProviderSlug | null);
+        connection: c,
+        tools:
+          toolsBySlot.get(`native-mcp:${provider.slug}:${c.name}`) ?? [],
+      });
+    }
+  }
 
   // Composio catalog feeds the toolkit picker on the "Add another"
   // form. Only fetched when the workspace has an API key on file —
@@ -108,7 +133,9 @@ export default async function ConnectionsPage({
     : [];
 
   // Same shape ComposioConnectionsSection expects — pairs declared by
-  // any pydantic-agentspec agent in the connected repo.
+  // any pydantic-agentspec agent in the connected repo. Skip
+  // native-MCP entries: those are surfaced by the NativeMcp section
+  // and would otherwise look like missing Composio toolkits here.
   const declaredSlots: { toolkit: string; name: string }[] = (() => {
     if (!agentsListing.ok) return [];
     const seen = new Set<string>();
@@ -117,6 +144,7 @@ export default async function ConnectionsPage({
       if (!a.ok) continue;
       if (a.spec.framework !== "pydantic-agentspec") continue;
       for (const conn of a.spec.connections) {
+        if (conn.source !== "composio") continue;
         const toolkit = conn.toolkit.trim().toLowerCase();
         const name = conn.name.trim().toLowerCase() || "default";
         if (!toolkit) continue;
@@ -194,7 +222,7 @@ export default async function ConnectionsPage({
       <NativeMcpConnectionsSection
         workspaceSlug={workspace.slug}
         providers={nativeProviderRows}
-        currentUserRole={currentUserRole}
+        catalog={nativeCatalog}
         banner={nativeMcpBanner}
       />
 
@@ -205,6 +233,7 @@ export default async function ConnectionsPage({
         catalog={catalog}
         composioEnabled={Boolean(composioPreview)}
         banner={composioBanner}
+        toolsBySlot={toolsBySlot}
       />
     </div>
   );

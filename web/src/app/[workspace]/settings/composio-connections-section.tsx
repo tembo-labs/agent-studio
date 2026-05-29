@@ -4,9 +4,11 @@ import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
 import { toolkitLabel, type CatalogToolkit } from "@/lib/composio";
 import { type WorkspaceComposioConnection } from "@/lib/composio-connections";
+import type { McpTool } from "@/lib/mcp-tools";
 
 import { ToolkitPicker } from "../connections/toolkit-picker";
 import { DisconnectComposioConnectionForm } from "./disconnect-composio-connection-form";
+import { RefreshComposioToolsForm } from "./refresh-composio-tools-form";
 import { RenameComposioConnectionForm } from "./rename-composio-connection-form";
 
 // Settings → Connections (basic mode, Composio-backed, per-user).
@@ -34,6 +36,9 @@ type Props = {
     result: "ok" | "error";
     detail?: string;
   };
+  /** Cached tool lists keyed by `${source}:${provider}:${connectionName}`.
+   *  Connections page builds this once; we lift the per-row slice here. */
+  toolsBySlot?: Map<string, McpTool[]>;
 };
 
 type SlotKey = string; // `${toolkit}:${name}`
@@ -45,6 +50,7 @@ export function ComposioConnectionsSection({
   catalog,
   composioEnabled,
   banner,
+  toolsBySlot,
 }: Props) {
   // Index of slot → connection the current user has.
   const ownedSlots = new Map<SlotKey, WorkspaceComposioConnection>();
@@ -86,8 +92,8 @@ export function ComposioConnectionsSection({
 
   return (
     <Section
-      title="Your connections"
-      description="External services you've authorized for agents in this workspace. Connections are per-user — other workspace members authorize their own. The list below is driven by the agents in your connected repo plus anything you've connected on top."
+      title="Composio connections"
+      description="Composio-managed OAuth across ~250 services. Composio wraps each provider's REST API as MCP tools and holds the credentials in their vault — easier to add coverage breadth, but the tool surface lags providers that ship official MCP servers (use Native MCP for those)."
     >
       <div id="connections" className="flex flex-col gap-3">
         {!composioEnabled && (
@@ -145,6 +151,7 @@ export function ComposioConnectionsSection({
         ) : (
           allSlots.map((slot) => {
             const key = `${slot.toolkit}:${slot.name}`;
+            const owned = ownedSlots.get(key);
             return (
               <ComposioConnectionRow
                 key={key}
@@ -152,8 +159,15 @@ export function ComposioConnectionsSection({
                 name={slot.name}
                 logoUrl={logoBySlug.get(slot.toolkit) ?? null}
                 workspaceSlug={workspaceSlug}
-                connection={ownedSlots.get(key)}
+                connection={owned}
                 enabled={composioEnabled}
+                tools={
+                  owned
+                    ? toolsBySlot?.get(
+                        `composio:${owned.toolkit}:${owned.name}`,
+                      ) ?? []
+                    : []
+                }
               />
             );
           })
@@ -194,7 +208,7 @@ function AddAnotherConnectionForm({
       <input type="hidden" name="workspace" value={workspaceSlug} />
       <div className="flex flex-col gap-0.5">
         <span className="text-foreground text-sm font-medium">
-          Add another connection
+          Add another Composio connection
         </span>
         <span className="text-foreground-muted text-xs">
           Pre-authorize a toolkit before an agent declares it, or attach a
@@ -251,6 +265,7 @@ function ComposioConnectionRow({
   workspaceSlug,
   connection,
   enabled,
+  tools,
 }: {
   toolkit: string;
   name: string;
@@ -258,6 +273,7 @@ function ComposioConnectionRow({
   workspaceSlug: string;
   connection: WorkspaceComposioConnection | undefined;
   enabled: boolean;
+  tools: McpTool[];
 }) {
   const params = new URLSearchParams({
     workspace: workspaceSlug,
@@ -285,9 +301,18 @@ function ComposioConnectionRow({
     "Set the Composio API key below first."
   );
 
+  const toolCount = tools.length;
+  const lastRefreshed =
+    tools.length > 0
+      ? tools.reduce(
+          (latest, t) => (t.refreshedAt > latest ? t.refreshedAt : latest),
+          tools[0].refreshedAt,
+        )
+      : null;
+
   return (
-    <div className="bg-surface border-border flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+    <div className="bg-surface border-border flex flex-col gap-2 rounded-lg border px-3 py-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
         {logoUrl ? (
           // Plain <img> to skip Next.js Image host-whitelist config;
           // these are small icons where optimization isn't critical.
@@ -304,16 +329,62 @@ function ComposioConnectionRow({
             className="bg-surface-raised h-7 w-7 shrink-0 rounded-md"
           />
         )}
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className="text-foreground text-sm font-medium">
             {toolkitLabel(toolkit)}
           </span>
           <span className="text-foreground-muted truncate text-xs">
             {subtitle}
           </span>
+          {connection && (
+            toolCount > 0 ? (
+              <details className="text-xs">
+                <summary className="text-foreground-weak hover:text-foreground cursor-pointer select-none">
+                  <span className="text-foreground font-medium">
+                    {toolCount}
+                  </span>{" "}
+                  tools available
+                  {lastRefreshed && (
+                    <>
+                      {" · refreshed "}
+                      <LocalTime iso={lastRefreshed.toISOString()} />
+                    </>
+                  )}
+                </summary>
+                <ul className="mt-2 max-h-80 space-y-1.5 overflow-y-auto pr-2">
+                  {tools.map((t) => (
+                    <li
+                      key={t.slug}
+                      className="border-border-weak border-l-2 pl-2"
+                    >
+                      <code className="text-foreground text-[11px]">
+                        {t.slug}
+                      </code>
+                      {t.description && (
+                        <p className="text-foreground-weak mt-0.5 text-[11px]">
+                          {t.description}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : (
+              <p className="text-foreground-weak text-xs">
+                No tools cached yet — click Refresh to populate.
+              </p>
+            )
+          )}
         </div>
       </div>
       <div className="flex items-center gap-3">
+        {connection && (
+          <RefreshComposioToolsForm
+            workspaceSlug={workspaceSlug}
+            connectionId={connection.id}
+            label={toolCount > 0 ? "Refresh tools" : "Refresh"}
+          />
+        )}
         {connection && (
           <DisconnectComposioConnectionForm
             workspaceSlug={workspaceSlug}

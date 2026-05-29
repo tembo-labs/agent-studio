@@ -14,6 +14,11 @@ import {
   getComposioConnectionById,
   renameComposioConnection,
 } from "@/lib/composio-connections";
+import { fetchComposioToolkitTools } from "@/lib/composio-tools";
+import {
+  deleteToolsForConnection,
+  replaceToolsForConnection,
+} from "@/lib/mcp-tools";
 import { isWorkspaceRole, type WorkspaceRole } from "@/lib/rbac";
 import {
   refreshAllGuidanceFiles,
@@ -379,6 +384,16 @@ export async function disconnectComposioConnectionAction(
   }
   await deleteComposioConnection(workspace.id, connectionId);
 
+  // Drop the cached tool catalog for this slot too — a future
+  // reconnect under the same (toolkit, name) starts fresh.
+  await deleteToolsForConnection({
+    workspaceId: workspace.id,
+    userId: row.userId,
+    source: "composio",
+    provider: row.toolkit,
+    connectionName: row.name,
+  });
+
   await writeAuditEvent({
     workspaceId: workspace.id,
     actorUserId: userId,
@@ -393,6 +408,69 @@ export async function disconnectComposioConnectionAction(
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}/connections`);
   return { message: "Connection removed." };
+}
+
+export type RefreshComposioToolsFormState = {
+  error?: string;
+};
+
+const REFRESH_COMPOSIO_TOOLS_EMPTY: RefreshComposioToolsFormState = {};
+
+/**
+ * Re-fetch Composio's curated tool list for a connection and
+ * replace the cached rows. Owner of the connection (operator+) can
+ * refresh their own; workspace_admin can refresh anyone's. Mirrors
+ * the native-MCP refresh action.
+ */
+export async function refreshComposioToolsAction(
+  _prev: RefreshComposioToolsFormState,
+  formData: FormData,
+): Promise<RefreshComposioToolsFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const connectionId = String(formData.get("connectionId") ?? "");
+  if (!connectionId) return { error: "Missing connection id." };
+
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId, role } = auth;
+
+  const row = await getComposioConnectionById(workspace.id, connectionId);
+  if (!row) return { error: "Connection not found." };
+  if (role !== "workspace_admin" && row.userId !== userId) {
+    return { error: DENIED_MESSAGE };
+  }
+
+  const preview = await getWorkspaceSecretPreview(workspace.id, "composio_api_key");
+  if (!preview) {
+    return {
+      error: "Set the workspace Composio API key in Settings first.",
+    };
+  }
+  const apiKey = await getWorkspaceSecretPlaintext(
+    workspace.id,
+    "composio_api_key",
+  );
+
+  try {
+    const tools = await fetchComposioToolkitTools(apiKey, row.toolkit);
+    await replaceToolsForConnection({
+      workspaceId: workspace.id,
+      userId: row.userId,
+      source: "composio",
+      provider: row.toolkit,
+      connectionName: row.name,
+      tools: tools.map((t) => ({
+        slug: t.slug,
+        displayName: t.name,
+        description: t.description,
+      })),
+    });
+  } catch (e) {
+    return { error: `Refresh failed: ${(e as Error).message.slice(0, 160)}` };
+  }
+
+  revalidatePath(`/${slug}/connections`);
+  return REFRESH_COMPOSIO_TOOLS_EMPTY;
 }
 
 export type RenameComposioConnectionFormState = {

@@ -42,41 +42,15 @@ import { Composio } from "@composio/core";
 // an agent that reads email needed `gmail`).
 export type ComposioToolkit = string;
 
-// Curated display labels for the toolkits we surface most often.
-// Falls back to a title-cased slug for anything not in the table
-// (see toolkitLabel below). Exported so the Settings → Connections
-// "Add another" form can populate its toolkit autocomplete from the
-// same source of truth.
-export const COMPOSIO_TOOLKIT_LABEL_OVERRIDES: Record<string, string> = {
-  slack: "Slack",
-  googlesheets: "Google Sheets",
-  gmail: "Gmail",
-  googlecalendar: "Google Calendar",
-  googledrive: "Google Drive",
-  googledocs: "Google Docs",
-  notion: "Notion",
-  github: "GitHub",
-  linear: "Linear",
-  hubspot: "HubSpot",
-  salesforce: "Salesforce",
-  airtable: "Airtable",
-  asana: "Asana",
-  jira: "Jira",
-};
-
-export function toolkitLabel(slug: string): string {
-  const override = COMPOSIO_TOOLKIT_LABEL_OVERRIDES[slug.toLowerCase()];
-  if (override) return override;
-  // Fallback: title-case the slug. "gmail" → "Gmail", "google_sheets"
-  // → "Google Sheets". Composio slugs are usually lowercase + no
-  // separator, so this is approximate; users can ask us to add an
-  // override entry if a slug renders ugly.
-  return slug
-    .split(/[_\-\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
+// Label helpers live in a client-safe module so client components
+// (Tools table, etc.) can import them without pulling the
+// @composio/core SDK into the browser bundle. Re-exported here so
+// existing server-side callers keep working with the same import
+// path.
+export {
+  COMPOSIO_TOOLKIT_LABEL_OVERRIDES,
+  toolkitLabel,
+} from "@/lib/composio-label";
 
 function makeClient(apiKey: string): Composio {
   return new Composio({ apiKey });

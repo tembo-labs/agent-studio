@@ -413,11 +413,16 @@ export type FailingAgentRecent = {
 };
 
 /**
- * Agents in this workspace with at least one failure in the last
- * 24 hours, ordered by failure count desc. Drives the "Action
- * needed" sidebar alerts that flag broken agents alongside the
- * missing-connection alerts — operators see hot spots without
- * walking the inventory.
+ * Agents whose **most recent run failed** AND the failure is within
+ * the last 24 hours. Drives the "Action needed" sidebar alerts that
+ * flag broken agents alongside the missing-connection alerts.
+ *
+ * The latest-run filter is intentional: a transient failure that
+ * the operator already fixed with a subsequent successful run
+ * should clear from the sidebar — otherwise yesterday's rate-limit
+ * blip nags everyone for a day. The `latest_run` CTE picks the
+ * single newest run per agent (any time, any status); the outer
+ * query keeps only the agents where that newest run is a failure.
  */
 export async function listFailingAgents24h(
   workspaceId: string,
@@ -427,14 +432,23 @@ export async function listFailingAgents24h(
     failures: string;
     last_failure_at: Date;
   }>(
-    `SELECT agent_name,
+    `WITH latest_run AS (
+       SELECT DISTINCT ON (agent_name)
+              agent_name, status, created_at
+         FROM run
+        WHERE workspace_id = $1
+        ORDER BY agent_name, created_at DESC
+     )
+     SELECT r.agent_name,
             COUNT(*)::TEXT  AS failures,
-            MAX(created_at) AS last_failure_at
-       FROM run
-      WHERE workspace_id = $1
-        AND status = 'failed'
-        AND created_at >= NOW() - INTERVAL '24 hours'
-      GROUP BY agent_name
+            MAX(r.created_at) AS last_failure_at
+       FROM run r
+       JOIN latest_run l
+         ON l.agent_name = r.agent_name AND l.status = 'failed'
+      WHERE r.workspace_id = $1
+        AND r.status = 'failed'
+        AND r.created_at >= NOW() - INTERVAL '24 hours'
+      GROUP BY r.agent_name
       ORDER BY failures DESC, last_failure_at DESC`,
     [workspaceId],
   );

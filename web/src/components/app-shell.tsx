@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { toolkitLabel } from "@/lib/composio";
+import { getMcpProvider } from "@/lib/mcp-providers";
 import { getInstanceName } from "@/lib/config";
 import type { Workspace } from "@/lib/workspace";
 import {
@@ -15,6 +16,7 @@ import {
   IconChatBubbles,
   IconDashboardMiddle,
   IconExclamationTriangle,
+  IconHammer,
   IconHistory,
   IconSettingsSliderHor,
   IconShield,
@@ -32,6 +34,10 @@ type MissingConnection = {
   /** Named slot — "default" or a user-chosen alias like "work". */
   name: string;
   agentName: string;
+  /** Which substrate the agent's entry targets. Drives the authorize
+   *  URL and the displayed label — Composio + Native MCP have
+   *  separate connection sets per user. */
+  source: "composio" | "native-mcp";
 };
 
 type FailingAgentAlert = {
@@ -101,6 +107,11 @@ export function AppShell({
             icon={<IconDashboardMiddle />}
           />
           <SidebarNavItem
+            href={`${home}/runs`}
+            label="Runs"
+            icon={<IconHistory />}
+          />
+          <SidebarNavItem
             href={home}
             label="Agents"
             icon={<IconAgent />}
@@ -112,14 +123,14 @@ export function AppShell({
             icon={<IconCalendarRepeat />}
           />
           <SidebarNavItem
-            href={`${home}/runs`}
-            label="Runs"
-            icon={<IconHistory />}
+            href={`${home}/connections`}
+            label="Connections"
+            icon={<IconApiConnection />}
           />
           <SidebarNavItem
-            href={`${home}/audit`}
-            label="Audit"
-            icon={<IconShield />}
+            href={`${home}/tools`}
+            label="Tools"
+            icon={<IconHammer />}
           />
           <SidebarNavItem
             href={`${home}/improvements`}
@@ -127,9 +138,9 @@ export function AppShell({
             icon={<IconChatBubbles />}
           />
           <SidebarNavItem
-            href={`${home}/connections`}
-            label="Connections"
-            icon={<IconApiConnection />}
+            href={`${home}/audit`}
+            label="Audit"
+            icon={<IconShield />}
           />
           <SidebarNavItem
             href={`${home}/settings`}
@@ -168,21 +179,42 @@ export function AppShell({
                 );
               })}
               {missingConnections.map((m, i) => {
-                const params = new URLSearchParams({
-                  workspace: workspace.slug,
-                  toolkit: m.toolkit,
-                });
-                if (m.name && m.name !== "default") {
-                  params.set("name", m.name);
+                // Authorize endpoint differs per substrate: Composio
+                // is one route per workspace (toolkit in query
+                // string), Native MCP is one route per provider
+                // (provider in path). Sidebar dispatches by source
+                // so the Connect button always lands on the right
+                // OAuth flow.
+                let authorizeHref: string;
+                let providerLabel: string;
+                if (m.source === "native-mcp") {
+                  const params = new URLSearchParams({
+                    workspace: workspace.slug,
+                  });
+                  if (m.name && m.name !== "default") {
+                    params.set("name", m.name);
+                  }
+                  authorizeHref = `/api/connections/native/${m.toolkit}/authorize?${params.toString()}`;
+                  providerLabel =
+                    getMcpProvider(m.toolkit)?.displayName ?? m.toolkit;
+                } else {
+                  const params = new URLSearchParams({
+                    workspace: workspace.slug,
+                    toolkit: m.toolkit,
+                  });
+                  if (m.name && m.name !== "default") {
+                    params.set("name", m.name);
+                  }
+                  authorizeHref = `/api/connections/composio/authorize?${params.toString()}`;
+                  providerLabel = toolkitLabel(m.toolkit);
                 }
-                const authorizeHref = `/api/connections/composio/authorize?${params.toString()}`;
                 // Show "Gmail (work)" when the slot has a custom name
-                // so the user can tell which Gmail account the agent
-                // wants — otherwise just the toolkit label.
+                // so the user can tell which account the agent
+                // wants — otherwise just the provider label.
                 const labelWithSlot =
                   m.name && m.name !== "default"
-                    ? `${toolkitLabel(m.toolkit)} (${m.name})`
-                    : toolkitLabel(m.toolkit);
+                    ? `${providerLabel} (${m.name})`
+                    : providerLabel;
                 return (
                   <div
                     key={`${m.toolkit}:${m.name}:${m.agentName}:${i}`}

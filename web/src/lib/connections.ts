@@ -32,14 +32,6 @@ export type ConnectionCredentials = {
   token_type?: string;
 };
 
-export type CachedTool = {
-  /** Composio-style slug, UPPER_SNAKE_CASE if the MCP follows that
-   *  convention. Provider-determined. */
-  slug: string;
-  name?: string;
-  description?: string;
-};
-
 export type WorkspaceConnection = {
   id: string;
   workspaceId: string;
@@ -51,8 +43,6 @@ export type WorkspaceConnection = {
   status: NativeConnectionStatus;
   tokenExpiresAt: Date | null;
   metadata: Record<string, unknown>;
-  cachedTools: CachedTool[] | null;
-  cachedToolsRefreshedAt: Date | null;
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
@@ -69,16 +59,14 @@ type ConnectionRow = {
   status: string;
   token_expires_at: Date | null;
   metadata: Record<string, unknown> | null;
-  cached_tools: CachedTool[] | null;
-  cached_tools_refreshed_at: Date | null;
   created_by: string;
   created_at: Date;
   updated_at: Date;
 };
 
 const COLUMNS = `id, workspace_id, user_id, type, name, mcp_server_url,
-  auth_type, status, token_expires_at, metadata, cached_tools,
-  cached_tools_refreshed_at, created_by, created_at, updated_at`;
+  auth_type, status, token_expires_at, metadata,
+  created_by, created_at, updated_at`;
 
 function rowToConnection(r: ConnectionRow): WorkspaceConnection {
   return {
@@ -92,8 +80,6 @@ function rowToConnection(r: ConnectionRow): WorkspaceConnection {
     status: (r.status as NativeConnectionStatus) ?? "active",
     tokenExpiresAt: r.token_expires_at,
     metadata: r.metadata ?? {},
-    cachedTools: r.cached_tools,
-    cachedToolsRefreshedAt: r.cached_tools_refreshed_at,
     createdBy: r.created_by,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -221,6 +207,63 @@ export async function saveNativeConnection(
   return rowToConnection(rows[0]);
 }
 
+export type RenameNativeConnectionError =
+  | "bad-name-shape"
+  | "name-taken"
+  | "not-found";
+
+export type RenameNativeConnectionResult =
+  | { ok: true; oldName: string; newName: string }
+  | { ok: false; error: RenameNativeConnectionError };
+
+/**
+ * Rename the slot identifier on an existing native-MCP connection.
+ * Returns `name-taken` when the user already holds another
+ * connection with the same (provider, new-name) tuple,
+ * `bad-name-shape` when the name fails the slug regex, `not-found`
+ * when the row id doesn't belong to the workspace. Mirrors the
+ * Composio rename — `name` is purely a TAS-local label, the OAuth
+ * tokens stay attached to the same row.
+ *
+ * Caller is responsible for: (a) updating cached tool rows in
+ * workspace_mcp_tool so the (provider, name) bucket stays in
+ * sync, and (b) surfacing that any agent file referencing the old
+ * name will fail at run time until its `connections:` field is
+ * updated.
+ */
+export async function renameNativeConnection(
+  workspaceId: string,
+  connectionId: string,
+  newName: string,
+): Promise<RenameNativeConnectionResult> {
+  const normalized = newName.trim().toLowerCase();
+  if (!/^[a-z0-9_-]+$/.test(normalized)) {
+    return { ok: false, error: "bad-name-shape" };
+  }
+  const existing = await getNativeConnectionById(workspaceId, connectionId);
+  if (!existing) return { ok: false, error: "not-found" };
+  if (existing.name === normalized) {
+    return { ok: true, oldName: existing.name, newName: normalized };
+  }
+  const { rowCount: collision } = await db.query(
+    `SELECT 1 FROM workspace_connection
+       WHERE workspace_id = $1 AND user_id = $2
+         AND type = $3 AND name = $4 AND id <> $5
+       LIMIT 1`,
+    [workspaceId, existing.userId, existing.type, normalized, connectionId],
+  );
+  if ((collision ?? 0) > 0) {
+    return { ok: false, error: "name-taken" };
+  }
+  await db.query(
+    `UPDATE workspace_connection
+        SET name = $2, updated_at = NOW()
+      WHERE id = $1`,
+    [connectionId, normalized],
+  );
+  return { ok: true, oldName: existing.name, newName: normalized };
+}
+
 export async function deleteNativeConnection(
   workspaceId: string,
   id: string,
@@ -249,21 +292,3 @@ export async function setNativeConnectionStatus(
   );
 }
 
-/**
- * Persist a freshly-fetched list_tools snapshot. The UI's
- * "available tools" hint reads this without contacting the MCP
- * server every render. Caller decides the freshness budget.
- */
-export async function updateCachedTools(
-  connectionId: string,
-  tools: CachedTool[],
-): Promise<void> {
-  await db.query(
-    `UPDATE workspace_connection
-        SET cached_tools = $2,
-            cached_tools_refreshed_at = NOW(),
-            updated_at = NOW()
-      WHERE id = $1`,
-    [connectionId, JSON.stringify(tools)],
-  );
-}

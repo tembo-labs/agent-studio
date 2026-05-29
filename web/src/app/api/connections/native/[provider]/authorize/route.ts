@@ -1,33 +1,36 @@
+import { createHash, randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { authorizeWorkspace } from "@/lib/auth-server";
 import { getPublicOrigin } from "@/lib/config";
 import {
   getMcpProvider,
+  protectedResourceUrl,
   redirectUriFor,
   type McpProviderSlug,
 } from "@/lib/mcp-providers";
 import { signNativeMcpState } from "@/lib/oauth-state";
-import {
-  getWorkspaceSecretPlaintext,
-  getWorkspaceSecretPreview,
-  nativeMcpClientSecretKinds,
-} from "@/lib/workspace";
 
-// OAuth authorize handler for native-MCP providers. URL shape:
+// Native-MCP OAuth authorize handler. URL shape:
 //
 //   GET /api/connections/native/<provider>/authorize?workspace=<slug>&name=<slot>
 //
-// Flow:
-//   1. Validate provider against the MCP_PROVIDERS catalog.
-//   2. Require workspace_admin to have configured the OAuth client
-//      first (their client_id + client_secret in workspace_secret).
-//      Until then the row's Connect button is hidden in the UI;
-//      this server check is the contract.
-//   3. Authorize the requesting user as operator+ (matches Composio
-//      authorize) — connecting your own slot is content editing.
-//   4. Sign state with user identity + provider + connection name.
-//   5. Redirect to provider.authorizeUrl with scopes + redirect URI.
+// MCP-spec auth flow — no per-provider OAuth-app setup needed:
+//
+//   1. Discover authorization server metadata via the MCP server's
+//      /.well-known/oauth-protected-resource endpoint.
+//   2. Fetch /.well-known/oauth-authorization-server from the
+//      provider's auth server to get registration / authorize /
+//      token endpoints + supported scopes.
+//   3. Dynamic Client Registration (RFC 7591): POST our redirect URI
+//      to registration_endpoint, get back a fresh client_id. Using
+//      token_endpoint_auth_method=none + PKCE means no client_secret
+//      is needed — we're a public client.
+//   4. Generate a PKCE verifier and its S256 challenge. The verifier
+//      lands in the signed state token (opaque to the provider);
+//      the challenge goes in the /authorize redirect URL.
+//   5. Redirect the user to authorization_endpoint with all of the
+//      above + scopes from the protected-resource metadata.
 
 function back(slug: string, provider: string, detail: string): NextResponse {
   const target = new URL(`/${slug}/connections`, getPublicOrigin());
@@ -38,6 +41,24 @@ function back(slug: string, provider: string, detail: string): NextResponse {
 }
 
 type RouteParams = Promise<{ provider: string }>;
+
+type ProtectedResourceMetadata = {
+  resource?: string;
+  authorization_servers?: string[];
+  scopes_supported?: string[];
+};
+
+type AuthServerMetadata = {
+  authorization_endpoint?: string;
+  token_endpoint?: string;
+  registration_endpoint?: string;
+  token_endpoint_auth_methods_supported?: string[];
+  code_challenge_methods_supported?: string[];
+};
+
+type DcrResponse = {
+  client_id?: string;
+};
 
 export async function GET(
   request: NextRequest,
@@ -86,39 +107,159 @@ export async function GET(
   }
   const { workspace, userId } = auth;
 
-  // Both halves of the OAuth client must be configured. Without the
-  // pair, the redirect to provider.authorizeUrl would 400 at the
-  // provider's gate; better to fail with a clear in-app message
-  // pointing at the Configure form.
-  const { idKind, secretKind } = nativeMcpClientSecretKinds(provider.slug);
-  const idPreview = await getWorkspaceSecretPreview(workspace.id, idKind);
-  const secretPreview = await getWorkspaceSecretPreview(workspace.id, secretKind);
-  if (!idPreview || !secretPreview) {
+  // ── Step 1: protected-resource discovery ────────────────────────
+  const prMetaUrl = protectedResourceUrl(provider.mcpServerUrl);
+  let prMeta: ProtectedResourceMetadata;
+  try {
+    const res = await fetch(prMetaUrl, { headers: { Accept: "application/json" } });
+    if (!res.ok) {
+      return back(
+        workspace.slug,
+        provider.slug,
+        `Couldn't discover ${provider.displayName} MCP auth metadata (${res.status}).`,
+      );
+    }
+    prMeta = (await res.json()) as ProtectedResourceMetadata;
+  } catch (e) {
     return back(
       workspace.slug,
       provider.slug,
-      `${provider.displayName} OAuth client isn't configured yet. ` +
-        `A workspace admin needs to set it up first.`,
+      `Discovery fetch failed: ${(e as Error).message}`,
     );
   }
-  const clientId = await getWorkspaceSecretPlaintext(workspace.id, idKind);
+  const authServerUrl = prMeta.authorization_servers?.[0];
+  if (!authServerUrl) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `${provider.displayName} MCP didn't advertise an authorization server.`,
+    );
+  }
+  const scopes = prMeta.scopes_supported ?? [];
 
+  // ── Step 2: authorization-server discovery ──────────────────────
+  const asMetaUrl = `${authServerUrl.replace(/\/+$/, "")}/.well-known/oauth-authorization-server`;
+  let asMeta: AuthServerMetadata;
+  try {
+    const res = await fetch(asMetaUrl, { headers: { Accept: "application/json" } });
+    if (!res.ok) {
+      return back(
+        workspace.slug,
+        provider.slug,
+        `Couldn't fetch authorization server metadata (${res.status}).`,
+      );
+    }
+    asMeta = (await res.json()) as AuthServerMetadata;
+  } catch (e) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `Authorization server metadata fetch failed: ${(e as Error).message}`,
+    );
+  }
+  if (
+    !asMeta.authorization_endpoint ||
+    !asMeta.token_endpoint ||
+    !asMeta.registration_endpoint
+  ) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `${provider.displayName} authorization server is missing required endpoints.`,
+    );
+  }
+  if (
+    !(asMeta.code_challenge_methods_supported ?? []).some((m) => m === "S256")
+  ) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `${provider.displayName} auth server doesn't support PKCE/S256 — auth flow won't complete safely.`,
+    );
+  }
+  const useNoneAuth = (asMeta.token_endpoint_auth_methods_supported ?? []).some(
+    (m) => m === "none",
+  );
+  if (!useNoneAuth) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `${provider.displayName} auth server requires a confidential client; TAS only supports public clients today.`,
+    );
+  }
+
+  // ── Step 3: Dynamic Client Registration ─────────────────────────
+  const redirectUri = redirectUriFor(provider.slug as McpProviderSlug);
+  let clientId: string;
+  try {
+    const dcrRes = await fetch(asMeta.registration_endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        client_name: "Tembo Agent Studio",
+        redirect_uris: [redirectUri],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+      }),
+    });
+    if (!dcrRes.ok) {
+      const body = await dcrRes.text().catch(() => "");
+      return back(
+        workspace.slug,
+        provider.slug,
+        `Dynamic client registration failed (${dcrRes.status}): ${body.slice(0, 150)}`,
+      );
+    }
+    const dcrJson = (await dcrRes.json()) as DcrResponse;
+    if (!dcrJson.client_id) {
+      return back(
+        workspace.slug,
+        provider.slug,
+        `DCR succeeded but no client_id in the response.`,
+      );
+    }
+    clientId = dcrJson.client_id;
+  } catch (e) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `DCR fetch failed: ${(e as Error).message}`,
+    );
+  }
+
+  // ── Step 4: PKCE verifier + S256 challenge ──────────────────────
+  // Verifier: 32 bytes → 43 base64url chars. Within spec (43–128).
+  const pkceVerifier = randomBytes(32).toString("base64url");
+  const pkceChallenge = createHash("sha256")
+    .update(pkceVerifier)
+    .digest("base64url");
+
+  // ── Step 5: sign state + redirect ───────────────────────────────
   const state = signNativeMcpState({
     workspaceId: workspace.id,
     workspaceSlug: workspace.slug,
     userId,
     provider: provider.slug,
     connectionName,
+    pkceVerifier,
+    clientId,
+    tokenEndpoint: asMeta.token_endpoint,
   });
 
-  const authorizeUrl = new URL(provider.authorizeUrl);
+  const authorizeUrl = new URL(asMeta.authorization_endpoint);
   authorizeUrl.searchParams.set("client_id", clientId);
-  authorizeUrl.searchParams.set("redirect_uri", redirectUriFor(provider.slug as McpProviderSlug));
+  authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("response_type", "code");
-  authorizeUrl.searchParams.set("state", state);
-  if (provider.scopes.length > 0) {
-    authorizeUrl.searchParams.set("scope", provider.scopes.join(" "));
+  if (scopes.length > 0) {
+    authorizeUrl.searchParams.set("scope", scopes.join(" "));
   }
+  authorizeUrl.searchParams.set("state", state);
+  authorizeUrl.searchParams.set("code_challenge", pkceChallenge);
+  authorizeUrl.searchParams.set("code_challenge_method", "S256");
 
   return NextResponse.redirect(authorizeUrl.toString(), 302);
 }

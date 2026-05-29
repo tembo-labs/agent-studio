@@ -6,36 +6,45 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { McpProvider } from "@/lib/mcp-providers";
 import type { WorkspaceConnection } from "@/lib/connections";
-import { type WorkspaceRole } from "@/lib/rbac";
+import type { McpTool } from "@/lib/mcp-tools";
 
-import { ConfigureOAuthClientForm } from "./configure-oauth-client-form";
+import { AddNativeMcpConnectionForm } from "./add-native-mcp-connection-form";
 import { DisconnectNativeMcpConnectionForm } from "./disconnect-native-mcp-connection-form";
+import { RefreshNativeMcpToolsForm } from "./refresh-native-mcp-tools-form";
+import { RenameNativeMcpConnectionForm } from "./rename-native-mcp-connection-form";
 
-// Per-provider Native-MCP card. Each provider exists in three states:
+// Per-provider Native-MCP card. Each provider is in one of two
+// states:
 //
-//   1. OAuth client not configured     → admin sees Configure form;
-//                                        operator/viewer sees an
-//                                        "Ask your admin" hint.
-//   2. Client configured, user not yet authorized
-//                                      → Connect button initiates
-//                                        the OAuth flow.
-//   3. User authorized                 → Connected affordance plus
-//                                        Disconnect.
+//   1. User not yet authorized → Connect button initiates the
+//                                OAuth flow (TAS performs MCP
+//                                discovery + DCR + PKCE under the
+//                                hood; user only sees the provider's
+//                                login screen).
+//   2. User authorized          → Connected affordance + Disconnect.
 //
-// Source-of-truth for the provider catalog is lib/mcp-providers.ts;
-// new providers add a catalog entry + a per-provider Configure-form
-// row gains nothing custom (the form template substitutes the
-// provider's setup instructions verbatim).
+// No per-provider Configure step: TAS dynamically registers itself
+// with the provider's authorization server at Connect time (RFC
+// 7591). Each new provider only needs a catalog entry in
+// lib/mcp-providers.ts — no per-provider OAuth-client setup, no
+// per-provider authorize/callback code.
 
 type Props = {
   workspaceSlug: string;
+  /** One row per (provider, name) slot the user has authorized,
+   *  plus one placeholder row per catalog provider with no
+   *  connections (so first-time Connect stays discoverable). The
+   *  page builds this — a user with two Attio slots gets two rows. */
   providers: {
     provider: McpProvider;
-    oauthClientConfigured: boolean;
-    /** User's own authorized connection for this provider, if any. */
+    /** Connection backing this row, or null for the "no connections
+     *  for this provider yet" placeholder. */
     connection: WorkspaceConnection | null;
+    /** Tools cached for this connection (empty when not connected). */
+    tools: McpTool[];
   }[];
-  currentUserRole: WorkspaceRole;
+  /** Full provider catalog — feeds the "Add another" picker. */
+  catalog: McpProvider[];
   banner?: {
     provider: string;
     result: "ok" | "error";
@@ -46,11 +55,9 @@ type Props = {
 export function NativeMcpConnectionsSection({
   workspaceSlug,
   providers,
-  currentUserRole,
+  catalog,
   banner,
 }: Props) {
-  const isAdmin = currentUserRole === "workspace_admin";
-
   return (
     <Section
       title="Native MCP connections"
@@ -74,17 +81,25 @@ export function NativeMcpConnectionsSection({
         )}
 
         <ul className="divide-border bg-surface border-border flex flex-col divide-y overflow-hidden rounded-lg border">
-          {providers.map(({ provider, oauthClientConfigured, connection }) => (
+          {providers.map(({ provider, connection, tools }) => (
             <ProviderRow
-              key={provider.slug}
+              // Provider slug isn't unique once a user has multiple
+              // slots; suffix with the connection name (or "new" for
+              // the placeholder row) so React's reconciler can tell
+              // sibling rows apart.
+              key={`${provider.slug}:${connection?.name ?? "new"}`}
               workspaceSlug={workspaceSlug}
               provider={provider}
-              oauthClientConfigured={oauthClientConfigured}
               connection={connection}
-              isAdmin={isAdmin}
+              tools={tools}
             />
           ))}
         </ul>
+
+        <AddNativeMcpConnectionForm
+          workspaceSlug={workspaceSlug}
+          catalog={catalog}
+        />
       </div>
     </Section>
   );
@@ -93,54 +108,14 @@ export function NativeMcpConnectionsSection({
 function ProviderRow({
   workspaceSlug,
   provider,
-  oauthClientConfigured,
   connection,
-  isAdmin,
+  tools,
 }: {
   workspaceSlug: string;
   provider: McpProvider;
-  oauthClientConfigured: boolean;
   connection: WorkspaceConnection | null;
-  isAdmin: boolean;
+  tools: McpTool[];
 }) {
-  // Three-way render decision keyed off oauthClientConfigured +
-  // connection presence. Each branch lays out one row.
-  if (!oauthClientConfigured) {
-    return (
-      <li className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-foreground text-sm font-medium">
-              {provider.displayName}
-            </span>
-            <Badge variant="gray" size="small">
-              Native MCP
-            </Badge>
-          </div>
-          <p className="text-foreground-weak text-xs">
-            OAuth client not configured.{" "}
-            {isAdmin
-              ? "Set the client ID + secret below to enable the Connect button."
-              : "Ask a workspace admin to set it up."}
-          </p>
-        </div>
-        {isAdmin && (
-          <details className="sm:max-w-[55%]">
-            <summary className="text-foreground hover:text-foreground-strong cursor-pointer text-sm font-medium">
-              Configure
-            </summary>
-            <div className="mt-3">
-              <ConfigureOAuthClientForm
-                workspaceSlug={workspaceSlug}
-                provider={provider}
-              />
-            </div>
-          </details>
-        )}
-      </li>
-    );
-  }
-
   if (!connection) {
     const authorizeHref = `/api/connections/native/${provider.slug}/authorize?workspace=${encodeURIComponent(
       workspaceSlug,
@@ -157,7 +132,7 @@ function ProviderRow({
             </Badge>
           </div>
           <p className="text-foreground-weak text-xs">
-            OAuth client ready. Click Connect to authorize your account.
+            Click Connect to log in with your {provider.displayName} account.
           </p>
         </div>
         <Button asChild variant="primary" size="small">
@@ -167,14 +142,22 @@ function ProviderRow({
     );
   }
 
-  // Authorized: show connected state + disconnect. The reconnect
-  // path is "disconnect, then click Connect again" — simpler than
-  // mirroring Composio's three-button (Disconnect/Reconnect/Rename)
-  // row until we hear users actually want it for native MCP.
+  // Authorized: show connected state + cached tool list + disconnect.
+  // Reconnect path is "disconnect, then click Connect again" —
+  // simpler than mirroring Composio's three-button row until we
+  // hear users want it for native MCP.
+  const toolCount = tools.length;
+  const lastRefreshed =
+    tools.length > 0
+      ? tools.reduce(
+          (latest, t) => (t.refreshedAt > latest ? t.refreshedAt : latest),
+          tools[0].refreshedAt,
+        )
+      : null;
   return (
-    <li className="flex items-baseline justify-between gap-3 px-3 py-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex items-baseline gap-2">
+    <li className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
           <span className="text-foreground text-sm font-medium">
             {provider.displayName}
           </span>
@@ -204,11 +187,57 @@ function ProviderRow({
             </>
           )}
         </p>
+
+        {toolCount > 0 ? (
+          <details className="text-xs">
+            <summary className="text-foreground-weak hover:text-foreground cursor-pointer select-none">
+              <span className="text-foreground font-medium">{toolCount}</span>{" "}
+              tools available
+              {lastRefreshed && (
+                <>
+                  {" · refreshed "}
+                  <LocalTime iso={lastRefreshed.toISOString()} />
+                </>
+              )}
+            </summary>
+            <ul className="mt-2 max-h-80 space-y-1.5 overflow-y-auto pr-2">
+              {tools.map((t) => (
+                <li
+                  key={t.slug}
+                  className="border-border-weak border-l-2 pl-2"
+                >
+                  <code className="text-foreground text-[11px]">{t.slug}</code>
+                  {t.description && (
+                    <p className="text-foreground-weak mt-0.5 text-[11px]">
+                      {t.description}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : (
+          <p className="text-foreground-weak text-xs">
+            No tools cached yet — click Refresh to populate.
+          </p>
+        )}
       </div>
-      <DisconnectNativeMcpConnectionForm
-        workspaceSlug={workspaceSlug}
-        connectionId={connection.id}
-      />
+      <div className="flex flex-col items-end gap-2">
+        <RefreshNativeMcpToolsForm
+          workspaceSlug={workspaceSlug}
+          connectionId={connection.id}
+          label={toolCount > 0 ? "Refresh tools" : "Refresh"}
+        />
+        <RenameNativeMcpConnectionForm
+          workspaceSlug={workspaceSlug}
+          connectionId={connection.id}
+          currentName={connection.name}
+        />
+        <DisconnectNativeMcpConnectionForm
+          workspaceSlug={workspaceSlug}
+          connectionId={connection.id}
+        />
+      </div>
     </li>
   );
 }

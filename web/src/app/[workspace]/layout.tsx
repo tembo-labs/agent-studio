@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { listConnectionsForUser } from "@/lib/composio-connections";
+import { listNativeConnectionsForUser } from "@/lib/connections";
 import { listFailingAgents24h } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
@@ -61,24 +62,41 @@ export default async function WorkspaceLayout({
   // Both fetches are tolerated to fail (no repo, invalid GitHub
   // token, Composio query error) — the sidebar drops the alerts
   // section in that case rather than blocking page render.
-  const [workspaces, agentsListing, myConnections, failingAgents] =
-    await Promise.all([
-      listWorkspacesForUser(session.user.id),
-      listAgents(workspace.id).catch(() => null),
-      listConnectionsForUser(workspace.id, session.user.id).catch(() => []),
-      listFailingAgents24h(workspace.id).catch(() => []),
-    ]);
+  const [
+    workspaces,
+    agentsListing,
+    myConnections,
+    myNativeConnections,
+    failingAgents,
+  ] = await Promise.all([
+    listWorkspacesForUser(session.user.id),
+    listAgents(workspace.id).catch(() => null),
+    listConnectionsForUser(workspace.id, session.user.id).catch(() => []),
+    listNativeConnectionsForUser(workspace.id, session.user.id).catch(() => []),
+    listFailingAgents24h(workspace.id).catch(() => []),
+  ]);
   const switcherList = workspaces.map((w) => ({ slug: w.slug, name: w.name }));
-  // Set of `${toolkit}:${name}` the current user holds ACTIVE.
+  // Two parallel slot sets — one per substrate. An agent's
+  // `connections:` entry dispatches by its `source:` field, so a
+  // native-mcp entry checks myNativeSlots and a composio entry
+  // checks mySlots. Mixing them up was the bug that surfaced "Attio
+  // for pipeline-report Connect" in the sidebar even after the user
+  // had authorized Native MCP Attio.
   const mySlots = new Set(
     myConnections
       .filter((c) => c.status === "ACTIVE")
       .map((c) => `${c.toolkit}:${c.name}`),
   );
+  const myNativeSlots = new Set(
+    myNativeConnections
+      .filter((c) => c.status === "active")
+      .map((c) => `${c.type}:${c.name}`),
+  );
   const missingConnections: {
     toolkit: string;
     name: string;
     agentName: string;
+    source: "composio" | "native-mcp";
   }[] = [];
   if (agentsListing && agentsListing.ok) {
     for (const a of agentsListing.agents) {
@@ -88,11 +106,13 @@ export default async function WorkspaceLayout({
         const toolkit = conn.toolkit.trim().toLowerCase();
         const name = conn.name.trim().toLowerCase() || "default";
         if (!toolkit) continue;
-        if (!mySlots.has(`${toolkit}:${name}`)) {
+        const slots = conn.source === "native-mcp" ? myNativeSlots : mySlots;
+        if (!slots.has(`${toolkit}:${name}`)) {
           missingConnections.push({
             toolkit,
             name,
             agentName: a.spec.name,
+            source: conn.source,
           });
         }
       }
