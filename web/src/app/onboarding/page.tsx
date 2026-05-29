@@ -5,6 +5,7 @@ import { getServerSession } from "@/lib/session";
 import { listWorkspacesForUser } from "@/lib/workspace";
 
 import { OnboardingForm } from "./onboarding-form";
+import { SignOutLink } from "./sign-out-link";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function OnboardingPage() {
           </p>
         </div>
         <OnboardingForm isFirst={isFirst} />
+        <SignOutLink email={session.user.email} />
       </div>
     </main>
   );
