@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import {
   refreshNativeMcpToolsAction,
@@ -26,6 +27,7 @@ export function RefreshNativeMcpToolsForm({
     refreshNativeMcpToolsAction,
     INITIAL,
   );
+  useActionToast(state);
   return (
     <div className="flex flex-col items-end gap-1">
       <form action={formAction}>

@@ -133,14 +133,14 @@ function AutomationRow({
       </td>
       <td className="text-foreground-weak px-3 py-2 align-top text-xs">
         {nextFire ? (
-          <LocalTime iso={nextFire.toISOString()} />
+          <LocalTime iso={nextFire.toISOString()} style="relative" />
         ) : (
           <span className="text-foreground-muted">—</span>
         )}
       </td>
       <td className="text-foreground-weak px-3 py-2 align-top text-xs">
         {automation.lastFiredAt ? (
-          <LocalTime iso={automation.lastFiredAt.toISOString()} />
+          <LocalTime iso={automation.lastFiredAt.toISOString()} style="relative" />
         ) : (
           <span className="text-foreground-muted">Never</span>
         )}

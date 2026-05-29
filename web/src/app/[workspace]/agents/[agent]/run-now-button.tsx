@@ -7,6 +7,7 @@
 // instructions only" behavior.
 
 import { useActionState, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import {
   AlertDialog,
@@ -33,6 +34,7 @@ type Props = {
 export function RunNowButton({ workspaceSlug, agentName }: Props) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(runNowAction, INITIAL);
+  useActionToast(state);
   // Controlled — React 19's useActionState resets uncontrolled fields
   // after each submission, including the returned-error path. Reset
   // when the dialog closes so reopening starts fresh.

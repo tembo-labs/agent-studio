@@ -23,7 +23,10 @@ import { fetchNativeMcpTools } from "@/lib/native-mcp-tools";
 // (Authorize + callback go through dedicated route handlers under
 // /api/connections/native/[provider]/…)
 
-export type SimpleConnectionActionState = { error?: string };
+export type SimpleConnectionActionState = {
+  message?: string;
+  error?: string;
+};
 const EMPTY: SimpleConnectionActionState = {};
 
 /**
@@ -82,7 +85,7 @@ export async function disconnectNativeMcpConnectionAction(
   });
 
   revalidatePath(`/${slug}/connections`);
-  return EMPTY;
+  return { message: "Connection disconnected." };
 }
 
 /**
@@ -143,7 +146,7 @@ export async function refreshNativeMcpToolsAction(
   }
 
   revalidatePath(`/${slug}/connections`);
-  return EMPTY;
+  return { message: "Tools refreshed." };
 }
 
 export type RenameNativeMcpConnectionFormState = {

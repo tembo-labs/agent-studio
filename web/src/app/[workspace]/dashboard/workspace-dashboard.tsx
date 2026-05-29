@@ -32,9 +32,17 @@ export function WorkspaceDashboard({
 }: Props) {
   if (stats.totalRuns === 0) {
     return (
-      <div className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
-        No runs in the last 30 days yet — the dashboard fills in as
-        agents start firing.
+      <div className="text-foreground-weak flex flex-col items-center gap-2 rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
+        <p>
+          No runs in the last 30 days yet — the dashboard fills in as
+          agents start firing.
+        </p>
+        <Link
+          href={`/${workspaceSlug}`}
+          className="text-foreground font-medium hover:underline"
+        >
+          Browse your agents →
+        </Link>
       </div>
     );
   }
@@ -295,7 +303,7 @@ function TopFailingAgents({
                   href={`/${workspaceSlug}/agents/${encodeURIComponent(r.agentName)}/runs/${r.exampleRunId}`}
                   className="text-foreground-weak hover:text-foreground shrink-0 text-xs hover:underline"
                 >
-                  Last <LocalTime iso={r.lastSeen.toISOString()} /> →
+                  Last <LocalTime iso={r.lastSeen.toISOString()} style="relative" /> →
                 </Link>
               </div>
             </li>

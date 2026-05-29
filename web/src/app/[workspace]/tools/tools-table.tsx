@@ -8,6 +8,7 @@ import { toolkitLabel } from "@/lib/composio-label";
 import type { McpTool } from "@/lib/mcp-tools";
 
 import { CopyableSlug } from "./copyable-slug";
+import { ToolDetailDrawer } from "./tool-detail-drawer";
 
 // Client-side filtered table for the workspace Tools tab. Data
 // volume is bounded per-user (a handful of connections × ~10-20
@@ -27,6 +28,7 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
   const [search, setSearch] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
   const [provider, setProvider] = useState<string>("all");
+  const [selected, setSelected] = useState<McpTool | null>(null);
 
   // Provider options derived from the data so the dropdown only
   // shows providers the user actually has connections for. The
@@ -180,7 +182,18 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
             </thead>
             <tbody className="divide-y divide-[var(--color-border-weak)]">
               {filtered.map((t) => (
-                <tr key={t.id} className="hover:bg-surface align-top">
+                <tr
+                  key={t.id}
+                  onClick={(e) => {
+                    // Clicks on the slug's copy button shouldn't
+                    // also open the drawer — the user's intent is
+                    // narrow. Same goes for any future inline link.
+                    const target = e.target as HTMLElement;
+                    if (target.closest("button, a")) return;
+                    setSelected(t);
+                  }}
+                  className="hover:bg-surface cursor-pointer align-top"
+                >
                   <td className="px-3 py-2 align-top">
                     <CopyableSlug
                       slug={t.slug}
@@ -217,6 +230,8 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
           </table>
         </div>
       )}
+
+      <ToolDetailDrawer tool={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

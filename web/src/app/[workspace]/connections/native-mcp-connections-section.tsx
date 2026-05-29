@@ -179,11 +179,11 @@ function ProviderRow({
         </div>
         <p className="text-foreground-weak text-sm">
           Connected{" "}
-          <LocalTime iso={connection.createdAt.toISOString()} />
+          <LocalTime iso={connection.createdAt.toISOString()} style="relative" />
           {connection.tokenExpiresAt && (
             <>
               {" · token expires "}
-              <LocalTime iso={connection.tokenExpiresAt.toISOString()} />
+              <LocalTime iso={connection.tokenExpiresAt.toISOString()} style="relative" />
             </>
           )}
         </p>
@@ -196,7 +196,7 @@ function ProviderRow({
               {lastRefreshed && (
                 <>
                   {" · refreshed "}
-                  <LocalTime iso={lastRefreshed.toISOString()} />
+                  <LocalTime iso={lastRefreshed.toISOString()} style="relative" />
                 </>
               )}
             </summary>

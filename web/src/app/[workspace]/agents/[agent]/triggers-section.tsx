@@ -89,7 +89,7 @@ export function TriggersSection({
                 <p className="text-foreground-weak text-sm">
                   {t.lastFiredAt ? (
                     <>
-                      Last fired <LocalTime iso={t.lastFiredAt.toISOString()} />
+                      Last fired <LocalTime iso={t.lastFiredAt.toISOString()} style="relative" />
                     </>
                   ) : (
                     "Never fired"

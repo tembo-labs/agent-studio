@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,10 +45,12 @@ export function SecretKeyForm({
     saveSecretAction,
     INITIAL,
   );
+  useActionToast(saveState);
   const [removeState, removeAction, removePending] = useActionState(
     removeSecretAction,
     INITIAL,
   );
+  useActionToast(removeState);
   // Controlled — keeps the user's pasted key across error re-renders.
   // React 19's useActionState resets uncontrolled fields after each
   // submission, including the returned-error path.

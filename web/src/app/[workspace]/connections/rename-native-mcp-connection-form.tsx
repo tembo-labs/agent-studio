@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { Button } from "@/components/ui/button";
 
@@ -32,6 +33,7 @@ export function RenameNativeMcpConnectionForm({
     renameNativeMcpConnectionAction,
     INITIAL,
   );
+  useActionToast(state);
 
   if (state.message && editing) {
     setEditing(false);

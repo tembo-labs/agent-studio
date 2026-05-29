@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import {
   AlertDialog,
@@ -30,6 +31,7 @@ export function DeleteAgentButton({ workspaceSlug, agentName }: Props) {
     deleteAgentAction,
     INITIAL,
   );
+  useActionToast(state);
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>

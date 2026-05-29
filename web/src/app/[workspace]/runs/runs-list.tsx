@@ -417,7 +417,7 @@ function QueuedAt({ iso }: { iso: string }) {
   }, []);
   const ms = Date.now() - new Date(iso).getTime();
   if (ms < RELATIVE_MS) return <span>{formatRelativeAgo(ms)}</span>;
-  return <LocalTime iso={iso} />;
+  return <LocalTime iso={iso} style="relative" />;
 }
 
 function formatRelativeAgo(diffMs: number): string {

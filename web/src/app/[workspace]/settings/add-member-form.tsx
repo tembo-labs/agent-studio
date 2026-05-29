@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ export function AddMemberForm({ workspaceSlug }: { workspaceSlug: string }) {
     addMemberAction,
     INITIAL,
   );
+  useActionToast(state);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<WorkspaceRole>("operator");
 

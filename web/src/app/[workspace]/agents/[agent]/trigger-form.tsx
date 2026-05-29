@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { Button } from "@/components/ui/button";
 
@@ -34,6 +35,7 @@ export function TriggerForm({
     createTriggerAction,
     INITIAL,
   );
+  useActionToast(state);
   // Controlled inputs — React 19's useActionState resets uncontrolled
   // fields on each submit, including the error path. We also reset
   // them ourselves after a successful submit (empty state object).

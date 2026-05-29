@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import {
   disconnectComposioConnectionAction,
@@ -24,6 +25,7 @@ export function DisconnectComposioConnectionForm({
     disconnectComposioConnectionAction,
     INITIAL,
   );
+  useActionToast(state);
 
   return (
     <div className="flex flex-col items-end gap-1">

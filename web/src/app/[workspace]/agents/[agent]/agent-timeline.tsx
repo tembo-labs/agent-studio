@@ -67,7 +67,7 @@ export function AgentTimeline({ workspaceSlug, agentName, entries }: Props) {
               </div>
               <span className="text-foreground-muted shrink-0">
                 {e.actorDisplayName ?? "System"} ·{" "}
-                <LocalTime iso={e.at.toISOString()} />
+                <LocalTime iso={e.at.toISOString()} style="relative" />
               </span>
             </li>
           ))}

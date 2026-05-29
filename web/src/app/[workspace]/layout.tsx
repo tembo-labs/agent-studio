@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { Toaster } from "@/components/toaster";
 import { listConnectionsForUser } from "@/lib/composio-connections";
 import { listNativeConnectionsForUser } from "@/lib/connections";
 import { listFailingAgents24h } from "@/lib/runs-db";
@@ -138,6 +139,7 @@ export default async function WorkspaceLayout({
       failingAgents={failingAlerts}
     >
       {children}
+      <Toaster />
     </AppShell>
   );
 }

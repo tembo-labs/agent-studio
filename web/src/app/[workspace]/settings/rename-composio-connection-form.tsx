@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { Button } from "@/components/ui/button";
 
@@ -32,6 +33,7 @@ export function RenameComposioConnectionForm({
     renameComposioConnectionAction,
     INITIAL,
   );
+  useActionToast(state);
 
   // Successful submits close the editor; errors keep it open so the
   // user can correct without re-clicking Rename.

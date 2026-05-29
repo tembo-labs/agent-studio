@@ -164,10 +164,22 @@ export function AgentsInventory({ agents, newAgentHref, canEdit }: Props) {
       <FacetPills counts={counts} active={bucket} onChange={setBucket} />
 
       {filtered.length === 0 ? (
-        <div className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm">
-          {agents.length === 0
-            ? "No agents yet."
-            : "No agents match these filters."}
+        <div className="text-foreground-weak flex flex-col items-center gap-2 rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm">
+          {agents.length === 0 ? (
+            <>
+              <p>No agents yet.</p>
+              {canEdit && (
+                <Link
+                  href={newAgentHref}
+                  className="text-foreground font-medium hover:underline"
+                >
+                  Create your first one →
+                </Link>
+              )}
+            </>
+          ) : (
+            "No agents match these filters."
+          )}
         </div>
       ) : (
         <div className="border-border overflow-hidden rounded-lg border">

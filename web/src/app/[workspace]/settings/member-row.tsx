@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
@@ -27,10 +28,12 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
     changeMemberRoleAction,
     INITIAL,
   );
+  useActionToast(changeState);
   const [removeState, removeAction, removePending] = useActionState(
     removeMemberAction,
     INITIAL,
   );
+  useActionToast(removeState);
   // Track the local select value so the user gets immediate feedback;
   // the role committed at the server might lag if there's an error.
   const [roleDraft, setRoleDraft] = useState<WorkspaceRole>(member.role);

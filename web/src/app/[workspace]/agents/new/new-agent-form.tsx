@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
     createFromChatAction,
     CHAT_INITIAL,
   );
+  useActionToast(state);
   // Cargo AI is an advanced option for porting existing assets; most
   // new agents go through Pydantic. Hide the framework picker behind
   // a small "Advanced" disclosure so the common case is name +

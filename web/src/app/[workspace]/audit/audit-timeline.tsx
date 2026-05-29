@@ -327,7 +327,7 @@ function AuditRow({
   return (
     <tr className="hover:bg-surface-secondary transition-colors">
       <td className="text-foreground-weak px-3 py-2 align-top text-xs">
-        <LocalTime iso={entry.at} />
+        <LocalTime iso={entry.at} style="relative" />
       </td>
       <td className="text-foreground px-3 py-2 align-top text-xs">
         {entry.actorDisplayName ?? (

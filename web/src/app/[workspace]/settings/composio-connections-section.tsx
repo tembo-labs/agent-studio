@@ -289,7 +289,7 @@ function ComposioConnectionRow({
       <span className="text-foreground-weak font-medium">{name}</span>
       <span> · </span>
       Status: {connection.status} · updated{" "}
-      <LocalTime iso={connection.updatedAt.toISOString()} />
+      <LocalTime iso={connection.updatedAt.toISOString()} style="relative" />
     </>
   ) : enabled ? (
     <>
@@ -347,7 +347,7 @@ function ComposioConnectionRow({
                   {lastRefreshed && (
                     <>
                       {" · refreshed "}
-                      <LocalTime iso={lastRefreshed.toISOString()} />
+                      <LocalTime iso={lastRefreshed.toISOString()} style="relative" />
                     </>
                   )}
                 </summary>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { Button } from "@/components/ui/button";
 
@@ -20,6 +21,7 @@ export function DisconnectRepoForm({
     disconnectRepoAction,
     INITIAL,
   );
+  useActionToast(state);
 
   return (
     <div className="flex flex-col gap-2">

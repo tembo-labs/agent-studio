@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useRef } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -33,10 +34,12 @@ export function FaviconPicker({
     setFaviconDefaultAction,
     INITIAL,
   );
+  useActionToast(defaultState);
   const [uploadState, uploadAction, uploadPending] = useActionState(
     uploadFaviconAction,
     INITIAL,
   );
+  useActionToast(uploadState);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const customSrc = `/api/workspaces/${encodeURIComponent(workspaceSlug)}/favicon?v=${cacheKey}`;

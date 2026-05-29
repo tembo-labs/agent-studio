@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { Button } from "@/components/ui/button";
 
@@ -21,6 +22,7 @@ export function RestoreAgentForm({ workspaceSlug, deletionId }: Props) {
     restoreAgentAction,
     INITIAL,
   );
+  useActionToast(state);
 
   return (
     <div className="flex flex-col items-end gap-1">

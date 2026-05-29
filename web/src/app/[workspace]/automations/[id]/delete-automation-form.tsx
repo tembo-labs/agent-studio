@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useActionState, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import {
   AlertDialog,
@@ -38,6 +39,7 @@ export function DeleteAutomationForm({
     deleteAutomationAction,
     INITIAL,
   );
+  useActionToast(state);
 
   return (
     <div className="flex items-center justify-between gap-3">

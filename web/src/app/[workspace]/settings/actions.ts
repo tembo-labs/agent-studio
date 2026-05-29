@@ -411,6 +411,7 @@ export async function disconnectComposioConnectionAction(
 }
 
 export type RefreshComposioToolsFormState = {
+  message?: string;
   error?: string;
 };
 
@@ -470,7 +471,7 @@ export async function refreshComposioToolsAction(
   }
 
   revalidatePath(`/${slug}/connections`);
-  return REFRESH_COMPOSIO_TOOLS_EMPTY;
+  return { message: "Tools refreshed." };
 }
 
 export type RenameComposioConnectionFormState = {

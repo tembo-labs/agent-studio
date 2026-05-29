@@ -132,7 +132,7 @@ function ImprovementRow({
         <StatusBadge status={improvement.status} />
       </td>
       <td className="text-foreground-weak px-3 py-2 align-top text-xs">
-        <LocalTime iso={improvement.createdAt.toISOString()} />
+        <LocalTime iso={improvement.createdAt.toISOString()} style="relative" />
       </td>
       <td className="px-3 py-2 align-top">
         <div className="flex flex-wrap gap-2 text-xs">

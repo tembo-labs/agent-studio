@@ -7,6 +7,7 @@
 // scheduler — see lib/cron.ts.
 
 import { useActionState, useMemo, useState } from "react";
+import { useActionToast } from "@/lib/use-action-toast";
 
 import { LocalTime } from "@/components/local-time";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ export function AutomationForm({
 }: CommonProps & { mode: "create" | "edit" }) {
   const action = mode === "create" ? createAutomationAction : updateAutomationAction;
   const [state, formAction, pending] = useActionState(action, INITIAL);
+  useActionToast(state);
 
   // Controlled — React 19's useActionState resets uncontrolled fields
   // after each submission, including the returned-error path.
