@@ -347,49 +347,81 @@ export async function getAgentStats30d(
   };
 }
 
-export type AgentDailyRunCount = {
-  /** Calendar date in UTC, YYYY-MM-DD. */
-  day: string;
-  succeeded: number;
-  failed: number;
-  other: number;
+export type DailyRunBand = {
+  status: "success" | "failed" | "other";
+  /** How many consecutive runs of this status lit up in this band. */
+  count: number;
 };
 
+export type AgentDailyRunBands = {
+  /** Calendar date in UTC, YYYY-MM-DD. */
+  day: string;
+  /** Run-length-encoded sequence of statuses, time-ordered earliest
+   *  → latest. A day with `4 failed → 3 succeeded → 3 failed` lands
+   *  here as three bands so the dashboard can render it as three
+   *  stacked color stripes. */
+  bands: DailyRunBand[];
+  /** Convenience: sum of band counts. The trend chart uses this to
+   *  size each band's flex-basis within the day's box. */
+  total: number;
+};
+
+type RunStatusRow = { day: Date; status: string; created_at: Date };
+
+function rowsToBands(rows: RunStatusRow[]): AgentDailyRunBands[] {
+  // SQL returns one row per run, sorted by created_at. We bucket by
+  // day and RLE within each day. Status normalisation collapses
+  // anything that isn't "succeeded" or "failed" into "other" so the
+  // rendering layer doesn't have to deal with queued/running/cancelled
+  // bands separately.
+  const out = new Map<string, AgentDailyRunBands>();
+  for (const r of rows) {
+    const day = r.day.toISOString().slice(0, 10);
+    const status: DailyRunBand["status"] =
+      r.status === "succeeded"
+        ? "success"
+        : r.status === "failed"
+          ? "failed"
+          : "other";
+    let entry = out.get(day);
+    if (!entry) {
+      entry = { day, bands: [], total: 0 };
+      out.set(day, entry);
+    }
+    const last = entry.bands[entry.bands.length - 1];
+    if (last && last.status === status) last.count += 1;
+    else entry.bands.push({ status, count: 1 });
+    entry.total += 1;
+  }
+  return Array.from(out.values());
+}
+
 /**
- * Daily run counts for the last 30 days, bucketed by `date_trunc('day',
- * created_at)` in UTC. Days with zero runs are NOT returned — callers
- * fill the gaps when rendering the trend bar so the visualisation
- * stays a fixed-width "last 30 days" regardless of activity sparsity.
+ * Per-day, time-ordered run-status bands for the last 30 days.
+ * Sparse — days with zero runs aren't returned; the dashboard fills
+ * the gaps when rendering so the chart is always 30 boxes wide.
+ *
+ * One row per run with day + status + created_at, RLE'd in JS into
+ * consecutive same-status bands. The window function alternative
+ * (precomputing RLE in SQL with `LAG`) would be cleaner but the
+ * 30-day per-agent volume is bounded at low thousands, so the
+ * client-side roll-up stays cheap and easy to reason about.
  */
-export async function getAgentDailyRuns30d(
+export async function getAgentDailyRunBands30d(
   workspaceId: string,
   agentName: string,
-): Promise<AgentDailyRunCount[]> {
-  const { rows } = await db.query<{
-    day: Date;
-    succeeded: string;
-    failed: string;
-    other: string;
-  }>(
-    `SELECT
-        date_trunc('day', created_at)                                AS day,
-        COUNT(*) FILTER (WHERE status = 'succeeded')::TEXT           AS succeeded,
-        COUNT(*) FILTER (WHERE status = 'failed')::TEXT              AS failed,
-        COUNT(*) FILTER (WHERE status NOT IN ('succeeded','failed'))::TEXT
-                                                                     AS other
+): Promise<AgentDailyRunBands[]> {
+  const { rows } = await db.query<RunStatusRow>(
+    `SELECT date_trunc('day', created_at) AS day,
+            status,
+            created_at
        FROM run
       WHERE workspace_id = $1 AND agent_name = $2
         AND created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY day
-      ORDER BY day ASC`,
+      ORDER BY created_at ASC`,
     [workspaceId, agentName],
   );
-  return rows.map((r) => ({
-    day: r.day.toISOString().slice(0, 10),
-    succeeded: Number(r.succeeded),
-    failed: Number(r.failed),
-    other: Number(r.other),
-  }));
+  return rowsToBands(rows);
 }
 
 export type AgentFailureGroup = {
@@ -544,34 +576,21 @@ export async function getWorkspaceStats30d(
   };
 }
 
-export async function getWorkspaceDailyRuns30d(
+/** Workspace-scope sibling of {@link getAgentDailyRunBands30d}. */
+export async function getWorkspaceDailyRunBands30d(
   workspaceId: string,
-): Promise<AgentDailyRunCount[]> {
-  const { rows } = await db.query<{
-    day: Date;
-    succeeded: string;
-    failed: string;
-    other: string;
-  }>(
-    `SELECT
-        date_trunc('day', created_at)                                AS day,
-        COUNT(*) FILTER (WHERE status = 'succeeded')::TEXT           AS succeeded,
-        COUNT(*) FILTER (WHERE status = 'failed')::TEXT              AS failed,
-        COUNT(*) FILTER (WHERE status NOT IN ('succeeded','failed'))::TEXT
-                                                                     AS other
+): Promise<AgentDailyRunBands[]> {
+  const { rows } = await db.query<RunStatusRow>(
+    `SELECT date_trunc('day', created_at) AS day,
+            status,
+            created_at
        FROM run
       WHERE workspace_id = $1
         AND created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY day
-      ORDER BY day ASC`,
+      ORDER BY created_at ASC`,
     [workspaceId],
   );
-  return rows.map((r) => ({
-    day: r.day.toISOString().slice(0, 10),
-    succeeded: Number(r.succeeded),
-    failed: Number(r.failed),
-    other: Number(r.other),
-  }));
+  return rowsToBands(rows);
 }
 
 export async function listAgentFailureGroups30d(

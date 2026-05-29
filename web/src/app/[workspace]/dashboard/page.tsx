@@ -12,7 +12,7 @@ import {
   type ImprovementStatus,
 } from "@/lib/improvements-api";
 import {
-  getWorkspaceDailyRuns30d,
+  getWorkspaceDailyRunBands30d,
   getWorkspaceStats30d,
   listWorkspaceTopFailingAgents30d,
 } from "@/lib/runs-db";
@@ -50,7 +50,7 @@ export default async function DashboardPage({
   const [stats, daily, topFailing, improvementCounts, recentImprovements] =
     await Promise.all([
       getWorkspaceStats30d(workspace.id),
-      getWorkspaceDailyRuns30d(workspace.id),
+      getWorkspaceDailyRunBands30d(workspace.id),
       listWorkspaceTopFailingAgents30d(workspace.id, 5),
       countImprovementsSince(workspace.id, since),
       listImprovements(workspace.id, 10),

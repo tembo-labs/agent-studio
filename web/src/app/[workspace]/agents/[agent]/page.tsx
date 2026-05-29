@@ -16,7 +16,7 @@ import { listConnectionsForUser } from "@/lib/composio-connections";
 import { nextFireAfter, validateCron } from "@/lib/cron";
 import { meetsMinRole } from "@/lib/rbac";
 import {
-  getAgentDailyRuns30d,
+  getAgentDailyRunBands30d,
   getAgentStats30d,
   listAgentFailureGroups30d,
   listRecentRunsForAgent,
@@ -79,7 +79,7 @@ export default async function AgentDetailPage({
     listRecentRunsForAgent(workspace.id, canonicalName, 10),
     listAutomationsForAgent(workspace.id, canonicalName),
     getAgentStats30d(workspace.id, canonicalName),
-    getAgentDailyRuns30d(workspace.id, canonicalName),
+    getAgentDailyRunBands30d(workspace.id, canonicalName),
     listAgentFailureGroups30d(workspace.id, canonicalName, 5),
     listTriggersForAgent(workspace.id, canonicalName),
     listConnectionsForUser(workspace.id, session.user.id),

@@ -3,8 +3,9 @@ import Link from "next/link";
 import { LocalTime } from "@/components/local-time";
 import { formatCurrency } from "@/lib/pricing";
 import {
-  type AgentDailyRunCount,
+  type AgentDailyRunBands,
   type AgentStats30d,
+  type DailyRunBand,
   type WorkspaceTopFailingAgent,
 } from "@/lib/runs-db";
 
@@ -18,7 +19,7 @@ import {
 
 type Props = {
   stats: AgentStats30d;
-  daily: AgentDailyRunCount[];
+  daily: AgentDailyRunBands[];
   topFailing: WorkspaceTopFailingAgent[];
   workspaceSlug: string;
 };
@@ -157,23 +158,8 @@ function Tile({
   );
 }
 
-function DailyTrend({ daily }: { daily: AgentDailyRunCount[] }) {
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const byDay = new Map(daily.map((d) => [d.day, d]));
-  const days: AgentDailyRunCount[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    days.push(
-      byDay.get(key) ?? { day: key, succeeded: 0, failed: 0, other: 0 },
-    );
-  }
-  const maxRuns = Math.max(
-    1,
-    ...days.map((d) => d.succeeded + d.failed + d.other),
-  );
+export function DailyTrend({ daily }: { daily: AgentDailyRunBands[] }) {
+  const days = fillThirtyDays(daily);
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between">
@@ -184,33 +170,92 @@ function DailyTrend({ daily }: { daily: AgentDailyRunCount[] }) {
           {days[0].day} → {days[days.length - 1].day}
         </span>
       </div>
-      <div className="bg-surface border-border flex h-16 items-end gap-[2px] rounded-lg border p-2">
-        {days.map((d) => {
-          const total = d.succeeded + d.failed + d.other;
-          const heightPct = total === 0 ? 0 : (total / maxRuns) * 100;
-          const failedPct = total === 0 ? 0 : (d.failed / total) * 100;
-          return (
-            <div
-              key={d.day}
-              title={`${d.day}: ${d.succeeded} succeeded, ${d.failed} failed${d.other ? `, ${d.other} other` : ""}`}
-              className="bg-surface-secondary relative flex-1 self-stretch rounded-sm"
-            >
-              <div
-                className="absolute bottom-0 left-0 right-0 rounded-sm bg-[var(--color-sentiment-positive)] opacity-80"
-                style={{ height: `${heightPct}%` }}
-              />
-              {failedPct > 0 && (
-                <div
-                  className="absolute bottom-0 left-0 right-0 rounded-sm bg-[var(--color-sentiment-negative)]"
-                  style={{ height: `${(heightPct * failedPct) / 100}%` }}
-                />
-              )}
-            </div>
-          );
-        })}
+      <div className="bg-surface border-border flex h-16 items-stretch gap-[2px] rounded-lg border p-2">
+        {days.map((d) => (
+          <DayBox key={d.day} day={d} />
+        ))}
       </div>
     </div>
   );
+}
+
+/**
+ * One column in the 30-day strip. Empty days render as a neutral
+ * placeholder so the chart's "what's the cadence here?" reading stays
+ * honest — a sparse gap is meaningful (no runs that day), and styling
+ * it the same as a day full of "other"-status runs would be a lie.
+ *
+ * Within a populated box, bands stack top-to-bottom in time order:
+ * earliest runs at the top, latest at the bottom. The success/failure
+ * pattern stripes downward, which mirrors how operators tend to read
+ * timelines (top first, scroll for "what happened later").
+ */
+function DayBox({ day }: { day: AgentDailyRunBands }) {
+  if (day.total === 0) {
+    return (
+      <div
+        title={`${day.day}: no runs`}
+        className="bg-surface-secondary flex-1 self-stretch rounded-sm opacity-50"
+      />
+    );
+  }
+  const succeeded = day.bands
+    .filter((b) => b.status === "success")
+    .reduce((n, b) => n + b.count, 0);
+  const failed = day.bands
+    .filter((b) => b.status === "failed")
+    .reduce((n, b) => n + b.count, 0);
+  const other = day.total - succeeded - failed;
+  const title =
+    `${day.day}: ${succeeded} succeeded, ${failed} failed` +
+    (other ? `, ${other} other` : "");
+  return (
+    <div
+      title={title}
+      className="flex flex-1 flex-col overflow-hidden rounded-sm"
+    >
+      {day.bands.map((band, i) => (
+        <div
+          key={i}
+          className={bandColorClass(band.status)}
+          style={{ flexBasis: `${(band.count / day.total) * 100}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function bandColorClass(status: DailyRunBand["status"]): string {
+  // Tokens follow the same green/red/neutral split used in the stats
+  // tiles + health header so the dashboard reads as one palette
+  // regardless of which surface drew first.
+  switch (status) {
+    case "success":
+      return "bg-[var(--color-sentiment-positive)]";
+    case "failed":
+      return "bg-[var(--color-sentiment-negative)]";
+    case "other":
+      return "bg-surface-tertiary";
+  }
+}
+
+function fillThirtyDays(
+  sparse: AgentDailyRunBands[],
+): AgentDailyRunBands[] {
+  // The DB returns only days that had runs. Fill the gaps so the strip
+  // is always 30 boxes wide; empty days render as the neutral
+  // placeholder DayBox draws for `total === 0`.
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const byDay = new Map(sparse.map((d) => [d.day, d]));
+  const out: AgentDailyRunBands[] = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    out.push(byDay.get(key) ?? { day: key, bands: [], total: 0 });
+  }
+  return out;
 }
 
 function TopFailingAgents({

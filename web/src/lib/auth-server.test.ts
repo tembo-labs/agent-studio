@@ -37,7 +37,7 @@ const fakeWorkspace = {
   createdBy: "u-1",
   createdAt: new Date(),
   updatedAt: new Date(),
-  faviconKind: "neutral" as const,
+  faviconKind: "default-tembo" as const,
 };
 
 function setSession(userId: string | null) {

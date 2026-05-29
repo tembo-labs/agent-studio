@@ -3,10 +3,12 @@ import Link from "next/link";
 import { LocalTime } from "@/components/local-time";
 import { formatCurrency } from "@/lib/pricing";
 import {
-  type AgentDailyRunCount,
+  type AgentDailyRunBands,
   type AgentFailureGroup,
   type AgentStats30d,
 } from "@/lib/runs-db";
+
+import { DailyTrend } from "../../dashboard/workspace-dashboard";
 
 // Per-agent operational dashboard. The four header tiles answer
 // "how's it going lately?" at a glance; the daily trend bar makes
@@ -20,7 +22,7 @@ import {
 
 type Props = {
   stats: AgentStats30d;
-  daily: AgentDailyRunCount[];
+  daily: AgentDailyRunBands[];
   failures: AgentFailureGroup[];
   workspaceSlug: string;
   agentName: string;
@@ -166,70 +168,6 @@ function Tile({
         {value}
       </span>
       <span className="text-foreground-muted text-sm">{sub}</span>
-    </div>
-  );
-}
-
-function DailyTrend({ daily }: { daily: AgentDailyRunCount[] }) {
-  // Fill in gaps so a 30-day strip is always 30 bars wide. The DB
-  // only returns days that had runs; we render every day in the
-  // window so the rhythm of activity is visible (a flat empty
-  // stretch reads differently than a missing day).
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const byDay = new Map(daily.map((d) => [d.day, d]));
-  const days: AgentDailyRunCount[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    days.push(
-      byDay.get(key) ?? { day: key, succeeded: 0, failed: 0, other: 0 },
-    );
-  }
-  const maxRuns = Math.max(
-    1,
-    ...days.map((d) => d.succeeded + d.failed + d.other),
-  );
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between">
-        <span className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
-          Last 30 days
-        </span>
-        <span className="text-foreground-muted text-sm">
-          {days[0].day} → {days[days.length - 1].day}
-        </span>
-      </div>
-      <div className="bg-surface border-border flex h-16 items-end gap-[2px] rounded-lg border p-2">
-        {days.map((d) => {
-          const total = d.succeeded + d.failed + d.other;
-          // Bar height proportional to that day's total runs; the
-          // failed segment renders on top in red so a partial-fail
-          // day is visually distinct from an all-clear day.
-          const heightPct = total === 0 ? 0 : (total / maxRuns) * 100;
-          const failedPct = total === 0 ? 0 : (d.failed / total) * 100;
-          return (
-            <div
-              key={d.day}
-              title={`${d.day}: ${d.succeeded} succeeded, ${d.failed} failed${d.other ? `, ${d.other} other` : ""}`}
-              className="bg-surface-secondary relative flex-1 self-stretch rounded-sm"
-            >
-              <div
-                className="absolute bottom-0 left-0 right-0 rounded-sm bg-[var(--color-sentiment-positive)] opacity-80"
-                style={{ height: `${heightPct}%` }}
-              />
-              {failedPct > 0 && (
-                <div
-                  className="absolute bottom-0 left-0 right-0 rounded-sm bg-[var(--color-sentiment-negative)]"
-                  style={{ height: `${(heightPct * failedPct) / 100}%` }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
