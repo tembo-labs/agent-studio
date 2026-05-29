@@ -48,19 +48,9 @@ export function WorkspaceDashboard({
   }
 
   const successRate = stats.succeeded / stats.totalRuns;
-  const failureRate = 1 - successRate;
-  const healthBand =
-    stats.failed === 0
-      ? "healthy"
-      : failureRate < 0.05
-        ? "ok"
-        : failureRate < 0.2
-          ? "warn"
-          : "alert";
 
   return (
     <div className="flex flex-col gap-5">
-      <HealthHeader band={healthBand} stats={stats} />
       <StatTiles stats={stats} successRate={successRate} />
       <DailyTrend daily={daily} />
       {topFailing.length > 0 && (
@@ -69,36 +59,6 @@ export function WorkspaceDashboard({
           workspaceSlug={workspaceSlug}
         />
       )}
-    </div>
-  );
-}
-
-function HealthHeader({
-  band,
-  stats,
-}: {
-  band: "healthy" | "ok" | "warn" | "alert";
-  stats: AgentStats30d;
-}) {
-  const messages: Record<typeof band, string> = {
-    healthy: `Healthy — ${stats.totalRuns} runs across the workspace in the last 30 days, no failures.`,
-    ok: `Mostly healthy — ${stats.failed} of ${stats.totalRuns} runs failed in the last 30 days.`,
-    warn: `Investigate — ${stats.failed} of ${stats.totalRuns} runs failed in the last 30 days.`,
-    alert: `Broken — ${stats.failed} of ${stats.totalRuns} runs failed in the last 30 days.`,
-  };
-  const colors: Record<typeof band, string> = {
-    healthy:
-      "border-sentiment-positive bg-[var(--color-sentiment-positive-subtle)]",
-    ok: "border-sentiment-positive bg-[var(--color-sentiment-positive-subtle)]",
-    warn: "border-[var(--color-border-sentiment-caution)] bg-[var(--color-sentiment-caution-subtle)]",
-    alert: "border-sentiment-negative bg-[var(--color-input-error)]",
-  };
-  return (
-    <div
-      className={`rounded-lg border px-3 py-2 text-sm ${colors[band]}`}
-      role={band === "alert" ? "alert" : undefined}
-    >
-      <span className="text-foreground">{messages[band]}</span>
     </div>
   );
 }
