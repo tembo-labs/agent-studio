@@ -11,8 +11,8 @@ import { usePathname } from "next/navigation";
 type Item = { slug: string; label: string };
 
 const ITEMS: Item[] = [
-  { slug: "composio", label: "Composio" },
   { slug: "native-mcp", label: "Native MCP" },
+  { slug: "composio", label: "Composio" },
 ];
 
 export function ConnectionsNav({ workspaceSlug }: { workspaceSlug: string }) {
@@ -29,7 +29,7 @@ export function ConnectionsNav({ workspaceSlug }: { workspaceSlug: string }) {
         const isActive =
           pathname === href ||
           pathname.startsWith(`${href}/`) ||
-          (pathname === base && item.slug === "composio");
+          (pathname === base && item.slug === "native-mcp");
         return (
           <Link
             key={item.slug}

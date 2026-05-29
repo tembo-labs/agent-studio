@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 
-// Bare /<workspace>/connections → /<workspace>/connections/composio.
-// Composio is the broader-coverage substrate so it's the default
-// landing; Native MCP is one click away in the left rail.
+// Bare /<workspace>/connections → /<workspace>/connections/native-mcp.
+// Native MCP leads because it's the substrate we'd reach for first
+// for any provider that publishes an official MCP server (richer
+// tools, schema-aware operations). Composio is one click away in
+// the left rail for everything that doesn't.
 
 export default async function ConnectionsIndex({
   params,
@@ -10,5 +12,5 @@ export default async function ConnectionsIndex({
   params: Promise<{ workspace: string }>;
 }) {
   const { workspace: slug } = await params;
-  redirect(`/${slug}/connections/composio`);
+  redirect(`/${slug}/connections/native-mcp`);
 }
