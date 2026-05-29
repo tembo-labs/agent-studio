@@ -6,11 +6,6 @@ import {
   GUIDANCE_INDEX_PATH,
   GUIDANCE_PYDANTIC_PATH,
   GUIDANCE_ROOT_PATH,
-  TAS_APP_VERSION,
-  TAS_GUIDANCE_VERSION,
-  additionalInstructionsFile,
-  guidanceFilesFor,
-  type GuidanceFile,
 } from "@/lib/agent-guidance";
 import type { Framework } from "@/lib/agent-framework";
 
@@ -127,79 +122,31 @@ function frameworkFromAgentPath(path: string): Framework {
 
 // Step-0 block that the coding agent applies BEFORE the requested
 // change: refresh the per-framework guidance files in the repo to
-// match what TAS is shipping right now. The block carries both
-// version stamps + the canonical content for each guidance file so
-// the coding agent can diff against the on-disk version marker and
-// overwrite stale copies in the same PR. We only include the index
-// + the relevant framework's guide — the other framework's guide
-// stays out to save tokens, since these prompts target a specific
-// agent file.
-function buildGuidanceRefreshBlock(framework: Framework): string {
-  // guidanceFilesFor returns [root AGENTS.md, agents/AGENTS.md, framework guide]
-  // in that order. All three are TAS-managed and refresh on drift.
-  const tasManaged = guidanceFilesFor(framework);
-  const additional = additionalInstructionsFile();
-  const frameworkGuide = tasManaged[2];
-  const otherFrameworkPath =
-    framework === "cargo-ai" ? GUIDANCE_PYDANTIC_PATH : GUIDANCE_CARGO_AI_PATH;
-
+// Point Tembo CAP at the guidance files already committed in the
+// customer's repo, instead of embedding the full canonical content
+// in every prompt. Trades the prior auto-refresh-on-drift guarantee
+// for a much smaller prompt; the customer keeps guidance current by
+// running "Sync agent guidance" from Settings (or on a schedule, see
+// the backlog). We still scope the pointer list to the framework
+// this PR touches so Tembo doesn't waste tokens reading the other
+// framework's guide.
+function buildGuidancePointerBlock(framework: Framework): string {
+  const frameworkGuide =
+    framework === "cargo-ai" ? GUIDANCE_CARGO_AI_PATH : GUIDANCE_PYDANTIC_PATH;
   return [
-    "# Step 0 — Refresh agent guidance (do this first)",
+    "**Step 1 — Read the agent guidance first**",
     "",
-    `Tembo Agent Studio version: ${TAS_APP_VERSION}`,
-    `Guidance version (this prompt): ${TAS_GUIDANCE_VERSION}`,
+    "The TAS-managed guidance for this repo is committed and treated as",
+    "current. Before making the change, read:",
     "",
-    "The studio ships agent-authoring guidance into the customer's repo.",
-    "TAS-managed files start their first line with an HTML comment of",
-    "the form `<!-- tas-guidance-version: <hash> -->`.",
+    `- \`${GUIDANCE_ROOT_PATH}\` — repo entry point`,
+    `- \`${GUIDANCE_INDEX_PATH}\` — agent authoring overview`,
+    `- \`${frameworkGuide}\` — framework-specific shape and patterns`,
+    `- \`${GUIDANCE_ADDITIONAL_PATH}\` — project-specific overrides (read if present)`,
     "",
-    "Before doing the requested change:",
-    "",
-    "**TAS-managed files (refresh on drift — overwrite if marker is",
-    "missing or stale):**",
-    "",
-    `- \`${GUIDANCE_ROOT_PATH}\``,
-    `- \`${GUIDANCE_INDEX_PATH}\``,
-    `- \`${frameworkGuide.path}\``,
-    "",
-    `For each: if missing, or the version marker on its first line is`,
-    `not exactly \`<!-- tas-guidance-version: ${TAS_GUIDANCE_VERSION} -->\`,`,
-    `replace the file with the canonical content quoted below.`,
-    "",
-    "**Customer-managed file (create only if missing — never overwrite):**",
-    "",
-    `- \`${GUIDANCE_ADDITIONAL_PATH}\``,
-    "",
-    `If \`${GUIDANCE_ADDITIONAL_PATH}\` does not exist, create it from`,
-    `the canonical starter quoted below. If it already exists, leave`,
-    `it alone — this file is the customer's project-specific override`,
-    `slot. Read its current contents and respect any instructions it`,
-    `contains when authoring the requested change.`,
-    "",
-    `Any guidance file change lands in the same PR as the requested`,
-    `change.`,
-    "",
-    `Leave \`${otherFrameworkPath}\` alone — this PR targets a`,
-    `${framework} agent and shouldn't touch the other framework's guide.`,
-    "",
-    ...tasManaged.flatMap((f) => formatGuidanceFile(f)),
-    ...formatGuidanceFile(additional),
+    "Trust the on-disk content. Don't refresh or overwrite these files;",
+    "they're maintained out-of-band.",
   ].join("\n");
-}
-
-function formatGuidanceFile(f: GuidanceFile): string[] {
-  // Fenced with backticks; the marker comment is part of the content
-  // string, so the canonical version-marker line appears at the top
-  // of the fence. The coding agent should write exactly what's
-  // inside the fence, marker line included, with no transformation.
-  return [
-    `## Canonical contents of \`${f.path}\``,
-    "",
-    "```",
-    f.content,
-    "```",
-    "",
-  ];
 }
 
 // Build a chat-to-create prompt. Pass the user's description through
@@ -353,14 +300,13 @@ export function buildChatEditPrompt(args: {
 }): string {
   const framework = frameworkFromAgentPath(args.agentPath);
   return [
-    buildGuidanceRefreshBlock(framework),
+    buildGuidancePointerBlock(framework),
     "",
-    "# Step 1 — Requested change",
+    "**Step 2 — Requested change**",
     "",
     `Improve the agent defined at @${args.agentPath}.`,
     "",
-    "Open a pull request with the targeted change (and any guidance",
-    "refresh from Step 0).",
+    "Open a pull request with the targeted change.",
     "",
     "IMPORTANT: Include this exact line on its own at the end of the pull",
     "request description so the Tembo Agent Studio can correlate the PR",
@@ -393,14 +339,13 @@ export function buildImprovePrompt(args: {
     : args.output;
 
   return [
-    buildGuidanceRefreshBlock(framework),
+    buildGuidancePointerBlock(framework),
     "",
-    "# Step 1 — Requested change",
+    "**Step 2 — Requested change**",
     "",
     `Improve the agent defined at @${args.agentPath}.`,
     "",
-    "Open a pull request with the targeted change (and any guidance",
-    "refresh from Step 0).",
+    "Open a pull request with the targeted change.",
     "",
     "IMPORTANT: Include this exact line on its own at the end of the pull",
     "request description so the Tembo Agent Studio can correlate the PR",

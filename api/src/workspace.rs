@@ -47,6 +47,87 @@ pub async fn list_active_composio_connections(
     Ok(rows)
 }
 
+/// One resolved native-MCP connection slot ready for the Python
+/// wrapper: the provider's MCP endpoint and the decrypted bearer
+/// token the wrapper will set as `Authorization: Bearer …` on the
+/// MCPServerStreamableHTTP transport.
+#[derive(Debug, Clone)]
+pub struct NativeMcpRow {
+    pub provider: String,
+    pub name: String,
+    pub mcp_url: String,
+    pub access_token: String,
+}
+
+/// Decrypted native-MCP connections owned by a specific user in a
+/// workspace. The runner serializes these into nested JSON
+/// `{provider: {name: {mcp_url, access_token}}}` so the Python
+/// wrapper can build one MCPServerStreamableHTTP per declared
+/// (provider, name) pair without doing its own DB work or carrying
+/// the encryption key.
+///
+/// Rows whose credentials fail to decrypt or whose plaintext isn't
+/// the expected JSON shape are dropped with a warning rather than
+/// killing the whole run — the worst case is the wrapper later
+/// reports "connection missing" for that slot, which is the same
+/// outcome as if the user never authorized it.
+pub async fn list_active_native_connections(
+    pool: &PgPool,
+    key: &MasterKey,
+    workspace_id: uuid::Uuid,
+    user_id: &str,
+) -> anyhow::Result<Vec<NativeMcpRow>> {
+    let rows: Vec<(String, String, Option<String>, Vec<u8>)> = sqlx::query_as(
+        "SELECT type, name, mcp_server_url, credentials \
+           FROM workspace_connection \
+          WHERE workspace_id = $1 AND user_id = $2 AND status = 'active'",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .context("failed to list workspace_connection")?;
+
+    let mut out = Vec::with_capacity(rows.len());
+    for (provider, name, mcp_url, ciphertext) in rows {
+        let mcp_url = match mcp_url {
+            Some(u) if !u.is_empty() => u,
+            _ => {
+                tracing::warn!(%provider, %name, "skipping native connection with no mcp_server_url");
+                continue;
+            }
+        };
+        let plaintext = match key.decrypt(&ciphertext) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(?e, %provider, %name, "skipping native connection: decrypt failed");
+                continue;
+            }
+        };
+        let parsed: serde_json::Value = match serde_json::from_str(&plaintext) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(?e, %provider, %name, "skipping native connection: credentials not JSON");
+                continue;
+            }
+        };
+        let access_token = match parsed.get("access_token").and_then(|v| v.as_str()) {
+            Some(t) if !t.is_empty() => t.to_string(),
+            _ => {
+                tracing::warn!(%provider, %name, "skipping native connection: no access_token in credentials");
+                continue;
+            }
+        };
+        out.push(NativeMcpRow {
+            provider,
+            name,
+            mcp_url,
+            access_token,
+        });
+    }
+    Ok(out)
+}
+
 /// Returns the decrypted plaintext for a workspace secret. Mirrors the
 /// TS-side `getWorkspaceSecretPlaintext` — the web app encrypts on save,
 /// the runtime decrypts on use.

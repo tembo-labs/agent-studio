@@ -62,6 +62,13 @@ pub struct PydanticArgs<'a> {
     /// session reports the connections as inactive even though the
     /// workspace authorized them.
     pub composio_connected_accounts_json: Option<&'a str>,
+    /// JSON-encoded `{provider: {name: {mcp_url, access_token}}}` map
+    /// of the workspace's ACTIVE native-MCP connections, decrypted.
+    /// Surfaced as `TAS_NATIVE_MCP_CONNECTIONS`. The Python wrapper
+    /// builds one MCPServerStreamableHTTP toolset per declared
+    /// (provider, name) slot, with the bearer token in
+    /// Authorization headers.
+    pub native_mcp_connections_json: Option<&'a str>,
     /// Workspace + user the run executes under. Used to flip a
     /// `workspace_composio_connection` row's status to `STALE` if
     /// the Python wrapper detects Composio's
@@ -156,6 +163,14 @@ pub async fn invoke(args: PydanticArgs<'_>) -> anyhow::Result<PydanticResult> {
     }
     if let Some(accounts_json) = args.composio_connected_accounts_json {
         cmd.env("TAS_COMPOSIO_CONNECTED_ACCOUNTS", accounts_json);
+    }
+    // Native MCP — independent of Composio. Only set when the
+    // workspace's acting user has any active native connections;
+    // wrapper treats absence as "no native entries possible" so
+    // missing slots fail with a clean message rather than a JSON
+    // decode error.
+    if let Some(native_json) = args.native_mcp_connections_json {
+        cmd.env("TAS_NATIVE_MCP_CONNECTIONS", native_json);
     }
 
     let mut child = cmd.spawn().context("failed to spawn pydantic-ai wrapper")?;

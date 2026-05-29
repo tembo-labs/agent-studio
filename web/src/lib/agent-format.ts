@@ -20,8 +20,12 @@ type AgentSpecBase = {
   raw: Record<string, unknown>;
 };
 
+export type AgentConnectionSource = "composio" | "native-mcp";
+
 export type AgentConnection = {
-  /** Composio toolkit slug, e.g. "gmail", "slack". */
+  /** Provider slug. For source="composio" this is a Composio toolkit
+   *  slug ("gmail", "slack"); for source="native-mcp" it's a slug
+   *  from lib/mcp-providers ("attio"). */
   toolkit: string;
   /**
    * Named connection slot — disambiguates when a user has multiple
@@ -30,6 +34,14 @@ export type AgentConnection = {
    * form.
    */
   name: string;
+  /**
+   * Which connection mode the runner should use for this entry.
+   * Defaults to "composio" so existing specs need no edit. Set
+   * "native-mcp" to talk directly to the provider's official MCP
+   * server with TAS-managed OAuth (the workspace_connection row
+   * the user authorized under Connections).
+   */
+  source: AgentConnectionSource;
 };
 
 export type PydanticAgentSpec = AgentSpecBase & {
@@ -159,41 +171,51 @@ function parsePydanticSpec(
  * workspace_composio_connection row at run time. Malformed entries
  * are dropped — the runner does the strict validation.
  */
+function coerceSource(raw: unknown): AgentConnectionSource {
+  return raw === "native-mcp" ? "native-mcp" : "composio";
+}
+
 function parseConnectionsField(raw: unknown): AgentConnection[] {
   if (!Array.isArray(raw)) return [];
   const out: AgentConnection[] = [];
   for (const item of raw) {
     if (typeof item === "string" && item.trim()) {
-      out.push({ toolkit: item.trim(), name: "default" });
+      out.push({ toolkit: item.trim(), name: "default", source: "composio" });
       continue;
     }
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
 
-    // Verbose form: { type|toolkit: "slack", name?: "alt" }
+    // Verbose form: { type|toolkit: "slack", name?: "alt", source?: "..." }
     const slug = o.type ?? o.toolkit;
     if (typeof slug === "string" && slug.trim()) {
       const name =
         typeof o.name === "string" && o.name.trim() ? o.name.trim() : "default";
-      out.push({ toolkit: slug.trim(), name });
+      out.push({
+        toolkit: slug.trim(),
+        name,
+        source: coerceSource(o.source),
+      });
       continue;
     }
 
     // Compact form: single-key dict where the key IS the toolkit slug.
     // Value can be: list of tool slugs (narrow tools, no name), or
-    // a dict carrying { name, tools }.
+    // a dict carrying { name, tools, source }.
     const keys = Object.keys(o);
     if (keys.length === 1 && keys[0].trim()) {
       const toolkit = keys[0].trim();
       const body = o[keys[0]];
       let name = "default";
+      let source: AgentConnectionSource = "composio";
       if (body && typeof body === "object" && !Array.isArray(body)) {
         const b = body as Record<string, unknown>;
         if (typeof b.name === "string" && b.name.trim()) {
           name = b.name.trim();
         }
+        source = coerceSource(b.source);
       }
-      out.push({ toolkit, name });
+      out.push({ toolkit, name, source });
     }
   }
   return out;

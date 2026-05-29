@@ -346,92 +346,168 @@ Common capabilities:
 
 ### connections
 
-External services this agent calls at run time (Slack, Google
-Sheets, etc.). Each entry is a Composio toolkit slug. The Studio
-exposes the corresponding tools to the agent via an MCP toolset
-that the workspace's authorized Composio connections back.
+External services this agent calls at run time. Each entry resolves
+at run time to a connection the **acting user** of the run has
+authorized in the workspace.
 
-**Use the named-slot + narrow-tools form for every connection.**
-This is the canonical shape — it disambiguates which account the
-agent targets (so users can hold multiple Gmails / Slacks / etc.)
-and turns on the \`DIRECT_TOOLS\` preset so only the declared tool
-schemas land in the model's context (~10× cheaper input tokens
-per run vs the loose path's search-and-execute dance).
+TAS has two connection substrates and the agent file picks between
+them per-entry with a \`source:\` field:
+
+| \`source:\`    | When to pick it                                     |
+|---------------|-----------------------------------------------------|
+| \`composio\`    | Default. ~250 services wrapped as REST tools by Composio. Slugs are lowercase (\`slack\`, \`googlesheets\`). |
+| \`native-mcp\`  | Provider has an official MCP server — richer tools, schema-aware operations, fewer round trips. Use when available. Slugs from TAS's native catalog (today: \`attio\`). |
+
+The default when \`source:\` is omitted is \`composio\` — existing
+agents need no edit.
+
+**Canonical form** — named slot + narrow tools for Composio, named
+slot for Native MCP. Pin the slot name (so users can hold multiple
+accounts) and, for Composio, list the exact tools the agent calls
+so only those schemas land in the model's context (~10× cheaper
+input tokens per run vs. the loose search-and-execute path):
 
 \`\`\`yaml
 connections:
+  # Composio (default source)
   - gmail:
       name: default
       tools: [GMAIL_SEND_EMAIL]
   - googlesheets:
       name: default
       tools: [GOOGLESHEETS_BATCH_GET]
+
+  # Native MCP — provider's official server, TAS-managed OAuth.
+  - { type: attio, source: native-mcp, name: default }
 \`\`\`
 
 \`name: default\` is what a single-account workspace uses; pick
 something descriptive like \`work\` / \`personal\` / \`customer-support\`
-when the user holds multiple accounts of the same toolkit. Tool
-slugs come from each toolkit's page on
-https://composio.dev/toolkits (UPPER_SNAKE_CASE).
+when the user holds multiple accounts of the same provider.
 
 When a TAS create-agent prompt includes a "Connection slots already
 authorized in this workspace" header, **use those slot names
 verbatim** instead of \`default\` — the user has already authorized
 those slots, and writing a slot name they haven't authorized makes
 the agent fail to run until they authorize it. Only fall back to
-\`default\` for a toolkit that isn't in the header.
+\`default\` for a provider that isn't in the header.
+
+**Finding tool slugs.** Every cached tool for the workspace is
+visible at \`/<workspace>/tools\` (the **Tools** tab in the
+sidebar). Search / filter by source or provider and **copy the
+slug verbatim** into \`tools: [...]\` or your prompt. Case +
+separators are provider-determined and inconsistent across
+providers:
+
+- Composio uses UPPER_SNAKE_CASE — e.g. \`SLACK_SEND_MESSAGE\`,
+  \`GOOGLESHEETS_BATCH_GET\`.
+- Attio (Native MCP) uses kebab-case — e.g. \`run-basic-report\`,
+  \`create-record\`, \`add-record-to-list\`.
+- Other Native MCP providers may use snake_case, camelCase, or
+  something else; do not assume.
+
+Tool calls fail silently if the slug case is wrong, so always copy
+from the Tools tab rather than guessing. If a slug you need isn't
+visible, the connection's cache may be stale — refresh it from the
+Connections page.
+
+**\`tools:\` narrowing works on both substrates.** For Composio it
+flips the agent into DIRECT_TOOLS mode (only those schemas land in
+the model's context, no search/execute meta-tools). For Native MCP
+the wrapper drops the full tool list down to just the named slugs
+via a filtered toolset — same effect on context size and steering.
+Slug match is exact, so copy verbatim from the Tools tab
+(\`run-basic-report\`, not \`run_basic_report\`). Omitting \`tools:\`
+on a Native MCP entry exposes every tool the MCP server publishes.
 
 **Shorter forms** that resolve to the same shape (use sparingly —
 prefer the explicit form above so future readers can grok the file
-without learning shortcut rules):
+without learning shortcut rules). All shortcuts default to
+\`source: composio\`; Native MCP requires the verbose form:
 
 \`\`\`yaml
 connections:
-  # Loose — all tools, default slot. The model has to discover
-  # actions via meta-tools at run time. Token cost is higher.
+  # Loose — all tools, default slot, composio. The model has to
+  # discover actions via meta-tools at run time. Token cost is
+  # higher.
   - slack
 
-  # Narrow tools, default slot. Same DIRECT_TOOLS path as above.
+  # Narrow tools, default slot, composio. Same DIRECT_TOOLS path
+  # as the canonical form above.
   - slack: [SLACK_SEND_MESSAGE]
 
-  # Named slot, loose tools.
+  # Named slot, loose tools, composio.
   - gmail: { name: work }
 
-  # Verbose form — same as the canonical form above, single line.
+  # Verbose composio — same as canonical, single line.
   - { type: slack, name: alt, tools: [SLACK_SEND_MESSAGE] }
+
+  # Verbose native-mcp — only way to pick this source.
+  - { type: attio, source: native-mcp, name: default }
 \`\`\`
 
-Forms can mix in the same file. Anything without an explicit name
-uses the \`default\` slot for that user; anything without an
-explicit tools list runs in loose mode for that slot.
+Forms can mix in the same file.
 
-**Toolkit slugs** are whatever Composio uses. Common ones:
-\`slack\`, \`gmail\`, \`googlesheets\`, \`googlecalendar\`,
-\`googledocs\`, \`googledrive\`, \`notion\`, \`github\`, \`linear\`,
-\`hubspot\`, \`salesforce\`, \`airtable\`, \`asana\`, \`jira\`. The
-full catalog (hundreds) lives at
-https://composio.dev/toolkits — anything there is reachable. TAS
-doesn't maintain an allowlist; declare whatever the agent needs.
-The user will see a Connect button for each declared toolkit under
-Settings → Connections.
+**Common Composio toolkit slugs:** \`slack\`, \`gmail\`,
+\`googlesheets\`, \`googlecalendar\`, \`googledocs\`, \`googledrive\`,
+\`notion\`, \`github\`, \`linear\`, \`hubspot\`, \`salesforce\`,
+\`airtable\`, \`asana\`, \`jira\`. The full catalog (hundreds) lives
+at https://composio.dev/toolkits. TAS doesn't maintain an
+allowlist; declare whatever the agent needs.
+
+**Native MCP providers** (as of v0.4): \`attio\`. The catalog grows
+when TAS adds an entry to \`lib/mcp-providers.ts\` — check the
+Connections page's "Native MCP connections" section for the
+current list. If a provider you want isn't there, fall back to
+\`composio\` (assuming the service has a Composio toolkit).
 
 Studio rules:
 
 - **Connections are per-user.** Every workspace member authorizes
-  their own toolkits. A manual "Run now" uses the requesting user's
+  their own. A manual "Run now" uses the requesting user's
   connections; a scheduled automation uses its **Run as** owner's
   connections (set on the automation form, defaults to whoever
   created it). The runner fails fast if the acting user hasn't
-  authorized a declared toolkit + name.
+  authorized a declared (source, provider, name) triple.
 - **Authorize first, declare second.** Once an agent declares a
-  toolkit, every member who'll run it sees a "Connect X for Y"
+  connection, every member who'll run it sees a "Connect X for Y"
   alert in their sidebar until they authorize.
-- **No credentials in the file.** The agent file declares *which*
-  toolkits it needs; the actual OAuth tokens live in Composio's
-  vault, scoped per workspace.
-- **Slugs are case-sensitive.** Toolkit slugs are lowercase
-  (\`googlesheets\`, not \`google-sheets\`). Tool slugs are
-  uppercase (\`SLACK_SEND_MESSAGE\`).
+- **No credentials in the file.** Composio holds tokens in their
+  vault; Native MCP tokens live encrypted in TAS's database. The
+  agent file just names the (source, provider, name) triple.
+- **Slugs are case-sensitive.** Composio toolkit slugs are
+  lowercase (\`googlesheets\`, not \`google-sheets\`). Composio tool
+  slugs are uppercase (\`SLACK_SEND_MESSAGE\`). Native MCP provider
+  slugs are lowercase; tool slugs are provider-determined (copy
+  from the Tools tab verbatim).
+- **Renames break references.** Renaming a slot in the UI (e.g.
+  \`default\` → \`work\`) updates the connection row but every
+  agent file pinning \`name: default\` will fail until you also
+  edit the file. Grep this folder for the old name when you
+  rename.
+
+### Switching an agent from Composio to Native MCP
+
+Common evolution: an agent starts on Composio's wrapper for a
+service and the provider later ships an official MCP server with
+richer tools. To switch:
+
+\`\`\`yaml
+# Before
+connections:
+  - attio
+
+# After
+connections:
+  - { type: attio, source: native-mcp, name: default, tools: [run-basic-report] }
+instructions: |
+  …existing prompt…
+  Use the \`run-basic-report\` tool to summarise weekly activity.
+\`\`\`
+
+Then have the user re-authorize: open Connections, click **Connect**
+on the Attio row in the "Native MCP connections" section. The old
+Composio Attio connection can be disconnected separately.
 
 ### retries
 

@@ -11,7 +11,8 @@ use uuid::Uuid;
 
 use crate::runs::{cargo_ai, pydantic};
 use crate::workspace::{
-    get_workspace_secret_plaintext, list_active_composio_connections, SecretKind,
+    get_workspace_secret_plaintext, list_active_composio_connections,
+    list_active_native_connections, SecretKind,
 };
 use crate::AppState;
 
@@ -291,6 +292,49 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
         None
     };
 
+    // Native-MCP credentials — decrypted in the runtime so the
+    // Python wrapper never holds the encryption key. JSON shape:
+    // `{provider: {name: {mcp_url, access_token}}}`. Independent of
+    // Composio; an agent can mix both sources in its spec.
+    let native_mcp_connections_json: Option<String> = {
+        let rows = list_active_native_connections(
+            &state.db,
+            &state.encryption_key,
+            ctx.workspace_id,
+            &ctx.acting_user_id,
+        )
+        .await
+        .unwrap_or_default();
+        if rows.is_empty() {
+            None
+        } else {
+            let mut by_provider: std::collections::BTreeMap<
+                String,
+                serde_json::Map<String, serde_json::Value>,
+            > = std::collections::BTreeMap::new();
+            for row in rows {
+                let mut entry = serde_json::Map::new();
+                entry.insert(
+                    "mcp_url".to_string(),
+                    serde_json::Value::String(row.mcp_url),
+                );
+                entry.insert(
+                    "access_token".to_string(),
+                    serde_json::Value::String(row.access_token),
+                );
+                by_provider
+                    .entry(row.provider)
+                    .or_default()
+                    .insert(row.name, serde_json::Value::Object(entry));
+            }
+            let mut top = serde_json::Map::new();
+            for (provider, inner) in by_provider {
+                top.insert(provider, serde_json::Value::Object(inner));
+            }
+            Some(serde_json::Value::Object(top).to_string())
+        }
+    };
+
     if openai_key.is_none() && anthropic_key.is_none() {
         // Pydantic-ai would fail inside the subprocess with a less
         // friendly message; intercept here so the run row's error
@@ -311,6 +355,7 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
         composio_api_key: composio_key.as_deref(),
         composio_user_id: composio_key.as_ref().map(|_| composio_user_id.as_str()),
         composio_connected_accounts_json: composio_connected_accounts_json.as_deref(),
+        native_mcp_connections_json: native_mcp_connections_json.as_deref(),
         workspace_id: ctx.workspace_id,
         acting_user_id: ctx.acting_user_id.as_str(),
         db: &state.db,

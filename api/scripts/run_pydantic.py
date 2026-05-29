@@ -76,18 +76,34 @@ def usage_payload(usage_obj) -> dict:
     return out
 
 
-def parse_connections(spec: dict) -> list[tuple[str, str, list[str]]]:
-    """Extract `connections:` as `[(toolkit, name, [tool_slug, …])]`.
+def _coerce_source(value) -> str:
+    """Connection source discriminator: "composio" (default) or
+    "native-mcp". Anything else falls back to "composio" so older
+    specs and typos stay on the well-trodden Composio path."""
+    return "native-mcp" if value == "native-mcp" else "composio"
+
+
+def parse_connections(
+    spec: dict,
+) -> list[tuple[str, str, list[str], str]]:
+    """Extract `connections:` as `[(toolkit, name, [tool_slug, …], source)]`.
 
     `name` is the user-scoped slot ("default", "work", "personal")
-    that determines which workspace_composio_connection row backs
-    the slot at run time. An empty tool list means "all tools from
-    this toolkit"; a non-empty list narrows the Composio session
-    to exactly those tools.
+    that determines which row backs the slot at run time. `source`
+    selects which substrate handles the connection:
+      - "composio"  (default) → workspace_composio_connection +
+                                Composio Tool Router
+      - "native-mcp"          → workspace_connection + the provider's
+                                official MCP server (TAS-managed OAuth)
+
+    An empty tool list means "all tools from this toolkit"; a
+    non-empty list narrows the Composio session. (Tool narrowing
+    isn't yet honored for native-MCP — every tool the provider's
+    MCP server exposes is available.)
 
     Accepted shapes (loose → most explicit):
 
-        # Loose — slot defaults to "default"
+        # Loose — slot defaults to "default", source = composio
         connections:
           - slack
           - googlesheets
@@ -102,6 +118,11 @@ def parse_connections(spec: dict) -> list[tuple[str, str, list[str]]]:
           - gmail: { name: work }
           - gmail: { name: personal, tools: [GMAIL_SEND_EMAIL] }
 
+        # Native-MCP (TAS-managed OAuth, official provider MCP)
+        connections:
+          - { type: attio, source: native-mcp }
+          - attio: { source: native-mcp, name: work }
+
         # Verbose form
         connections:
           - { type: slack, name: alt, tools: [SLACK_SEND_MESSAGE] }
@@ -114,17 +135,17 @@ def parse_connections(spec: dict) -> list[tuple[str, str, list[str]]]:
             "`connections:` must be a list of toolkit slugs "
             "(e.g. `connections: [slack, googlesheets]`)"
         )
-    out: list[tuple[str, str, list[str]]] = []
+    out: list[tuple[str, str, list[str], str]] = []
     for item in raw:
         if isinstance(item, str):
-            out.append((item.strip(), "default", []))
+            out.append((item.strip(), "default", [], "composio"))
             continue
         if not isinstance(item, dict):
             raise ValueError(
                 f"`connections:` entry must be a string or object, "
                 f"got {type(item).__name__}"
             )
-        # Verbose form: `{type: slack, name: alt, tools: [...]}`.
+        # Verbose form: `{type: slack, name: alt, tools: [...], source: ...}`.
         slug_from_verbose = item.get("type") or item.get("toolkit")
         if isinstance(slug_from_verbose, str):
             name = (
@@ -133,22 +154,26 @@ def parse_connections(spec: dict) -> list[tuple[str, str, list[str]]]:
                 else "default"
             )
             tools = _coerce_tools_value(item.get("tools"))
-            out.append((slug_from_verbose.strip(), name, tools))
+            source = _coerce_source(item.get("source"))
+            out.append((slug_from_verbose.strip(), name, tools, source))
             continue
-        # Compact form: `{slack: [...]}` or `{slack: {name, tools}}`.
+        # Compact form: `{slack: [...]}` or `{slack: {name, tools, source}}`.
         if len(item) == 1:
             slug, body = next(iter(item.items()))
             name = "default"
+            source = "composio"
             if isinstance(body, dict):
                 if isinstance(body.get("name"), str) and body.get("name").strip():
                     name = body["name"].strip().lower()
+                source = _coerce_source(body.get("source"))
             tools = _coerce_tools_value(body)
-            out.append((str(slug).strip(), name, tools))
+            out.append((str(slug).strip(), name, tools, source))
             continue
         raise ValueError(
             f"`connections:` entry has no toolkit slug: {item!r}"
         )
-    return [(slug, name, tools) for (slug, name, tools) in out if slug]
+    return [(slug, name, tools, source)
+            for (slug, name, tools, source) in out if slug]
 
 
 def _coerce_tools_value(value) -> list[str]:
@@ -275,21 +300,33 @@ def build_agent(
     return Agent(model, **kwargs)
 
 
-def build_composio_toolset(connections: list[tuple[str, str, list[str]]]):
+def build_composio_toolset(
+    connections: list[tuple[str, str, list[str], str]],
+):
     """Create a Composio Tool Router session for the declared toolkits
-    and wrap it in an MCPServerStreamableHTTP so pydantic-ai can call
-    the tools.
+    and wrap it in an MCPToolset so pydantic-ai can call the tools.
+    (`MCPToolset` is the v1.x replacement for `MCPServerStreamableHTTP`;
+    streamable HTTP is its default transport for HTTP URLs.)
 
-    Returns `(mcp, used_direct_tools)`. `used_direct_tools` is True
-    when every declared toolkit narrowed its tool list — in that case
-    we use the DIRECT_TOOLS preset, preload only those tool schemas,
-    and skip the search/execute meta-tools entirely (much cheaper per
-    run). Otherwise we fall back to the default Tool Router with the
+    Only entries with source="composio" are folded into the session;
+    native-MCP entries are handled by `build_native_mcp_toolsets`
+    instead. Returns `(mcp, used_direct_tools)`.
+
+    `used_direct_tools` is True when every declared composio toolkit
+    narrowed its tool list — in that case we use the DIRECT_TOOLS
+    preset, preload only those tool schemas, and skip the
+    search/execute meta-tools entirely (much cheaper per run).
+    Otherwise we fall back to the default Tool Router with the
     search + multi-execute meta-tools (cheap input context, but the
     model spends extra round trips discovering tools).
 
-    Returns `(None, False)` when `connections` is empty.
+    Returns `(None, False)` when no composio entries are declared.
     """
+    connections = [
+        (tk, name, tools, source)
+        for (tk, name, tools, source) in connections
+        if source == "composio"
+    ]
     if not connections:
         return (None, False)
 
@@ -310,7 +347,7 @@ def build_composio_toolset(connections: list[tuple[str, str, list[str]]]):
     # don't pay the import cost (and so a broken composio install
     # doesn't crash agents that don't need it).
     from composio import Composio
-    from pydantic_ai.mcp import MCPServerStreamableHTTP
+    from pydantic_ai.mcp import MCPToolset
 
     # The Rust runner pre-resolves the workspace's active connections
     # from workspace_composio_connection and ships them as a JSON map
@@ -343,7 +380,7 @@ def build_composio_toolset(connections: list[tuple[str, str, list[str]]]):
 
     resolved: dict[str, str] = {}
     missing: list[str] = []
-    for (toolkit, name, _tools) in connections:
+    for (toolkit, name, _tools, _source) in connections:
         cid = nested.get(toolkit, {}).get(name)
         if cid is None:
             slot_label = toolkit if name == "default" else f"{toolkit}/{name}"
@@ -363,16 +400,16 @@ def build_composio_toolset(connections: list[tuple[str, str, list[str]]]):
     # to DIRECT_TOOLS so only those schemas land in the model's
     # context (no search/execute meta-tools, no extra round trip).
     tools_param: dict[str, list[str]] = {
-        toolkit: tools for (toolkit, _name, tools) in connections if tools
+        toolkit: tools for (toolkit, _name, tools, _source) in connections if tools
     }
     all_narrowed = bool(connections) and all(
-        bool(tools) for (_, _, tools) in connections
+        bool(tools) for (_, _, tools, _source) in connections
     )
 
     composio = Composio(api_key=api_key)
     create_kwargs: dict = {
         "user_id": user_id,
-        "toolkits": sorted({tk for (tk, _, _) in connections}),
+        "toolkits": sorted({tk for (tk, _, _, _) in connections}),
         "connected_accounts": resolved,
         "manage_connections": False,
         "workbench": {"enable": False},
@@ -388,7 +425,7 @@ def build_composio_toolset(connections: list[tuple[str, str, list[str]]]):
     except Exception as exc:
         _maybe_emit_stale_connection_marker(exc, connections, resolved)
         raise
-    mcp = MCPServerStreamableHTTP(
+    mcp = MCPToolset(
         session.mcp.url,
         headers={"x-api-key": api_key},
     )
@@ -407,9 +444,99 @@ def build_composio_toolset(connections: list[tuple[str, str, list[str]]]):
 STALE_CONNECTION_MARKER = "__TAS_STALE_CONNECTION__"
 
 
+def build_native_mcp_toolsets(
+    connections: list[tuple[str, str, list[str], str]],
+) -> list:
+    """One MCPToolset per declared (provider, name) native-MCP entry,
+    with the user's bearer token in the Authorization header. Returns
+    [] if no native entries are declared. (`MCPToolset` is the v1.x
+    replacement for the deprecated `MCPServerStreamableHTTP`;
+    streamable HTTP is its default transport for HTTP URLs.)
+
+    Honors `tools:` narrowing on a native-mcp entry by wrapping the
+    raw MCP toolset in a FilteredToolset (via `.filtered(...)`) so
+    only the named tools land in the model's context. Slug match is
+    exact — case + separators are provider-determined (Attio uses
+    kebab-case, others may not), so the caller is expected to copy
+    slugs verbatim from the Tools tab. Empty/absent tools list ⇒ no
+    filter, every tool the MCP server exposes is available.
+
+    Credentials come in via env var TAS_NATIVE_MCP_CONNECTIONS as
+    nested JSON `{provider: {name: {mcp_url, access_token}}}`. The
+    Rust runner builds it after decrypting each row's credentials —
+    we do no DB work here.
+
+    A declared slot with no matching row in the env JSON is a hard
+    failure: the runner already filters to ACTIVE rows for the
+    acting user, so a missing slot means the user never authorized
+    that provider (or the connection went stale and was deleted).
+    """
+    native = [
+        (provider, name, tools)
+        for (provider, name, tools, source) in connections
+        if source == "native-mcp"
+    ]
+    if not native:
+        return []
+
+    raw = os.environ.get("TAS_NATIVE_MCP_CONNECTIONS")
+    nested: dict[str, dict[str, dict[str, str]]] = {}
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                for provider, inner in parsed.items():
+                    if isinstance(inner, dict):
+                        nested[str(provider)] = {
+                            str(name): {str(k): str(v) for k, v in entry.items()}
+                            for name, entry in inner.items()
+                            if isinstance(entry, dict)
+                        }
+        except json.JSONDecodeError:
+            pass
+
+    # Deferred import — agents that don't use native MCP don't pay
+    # the import cost (matches the composio-side pattern).
+    from pydantic_ai.mcp import MCPToolset
+
+    toolsets: list = []
+    missing: list[str] = []
+    for provider, name, tools in native:
+        entry = nested.get(provider, {}).get(name)
+        if not entry or not entry.get("mcp_url") or not entry.get("access_token"):
+            slot_label = (
+                provider if name == "default" else f"{provider}/{name}"
+            )
+            missing.append(slot_label)
+            continue
+        mcp = MCPToolset(
+            entry["mcp_url"],
+            headers={"Authorization": f"Bearer {entry['access_token']}"},
+        )
+        if tools:
+            # Capture the allowed set in a default-argument so the
+            # closure doesn't late-bind to the loop variable. The
+            # filter runs per tool-name lookup; AbstractToolset's
+            # `.filtered(...)` returns a FilteredToolset wrapper that
+            # gates which definitions reach the model.
+            allowed = frozenset(tools)
+            mcp = mcp.filtered(
+                lambda ctx, td, _allowed=allowed: td.name in _allowed
+            )
+        toolsets.append(mcp)
+    if missing:
+        raise ValueError(
+            "Agent declares native-MCP connections "
+            f"{missing!r} but the run's acting user has no active "
+            "connection for them. Open Connections and click Connect "
+            "for the missing provider, then try again."
+        )
+    return toolsets
+
+
 def _maybe_emit_stale_connection_marker(
     exc: Exception,
-    connections: list[tuple[str, str, list[str]]],
+    connections: list[tuple[str, str, list[str], str]],
     resolved: dict[str, str],
 ) -> None:
     msg = str(exc)
@@ -424,7 +551,7 @@ def _maybe_emit_stale_connection_marker(
     if m:
         stale_id = m.group(1)
     flagged: list[dict[str, str]] = []
-    for toolkit, name, _ in connections:
+    for toolkit, name, _tools, _source in connections:
         cid = resolved.get(toolkit)
         if cid and (stale_id is None or cid == stale_id):
             flagged.append({
@@ -444,25 +571,32 @@ def _maybe_emit_stale_connection_marker(
 async def run(spec: dict, user_message: str) -> None:
     connections = parse_connections(spec)
     toolsets: list = []
-    mcp, used_direct_tools = build_composio_toolset(connections)
-    if mcp is not None:
-        toolsets.append(mcp)
 
-    # Preamble framing differs between DIRECT_TOOLS (tools attached
-    # by name) and loose mode (model has to discover via meta-tools).
-    # Both variants share the "act, don't chat" instructions because
-    # Sonnet-tier models will hedge regardless of which path they're
-    # on without explicit imperative framing.
-    preamble_toolkits = (
-        sorted({slug for (slug, _name, _tools) in connections})
-        if mcp is not None
+    composio_mcp, used_direct_tools = build_composio_toolset(connections)
+    if composio_mcp is not None:
+        toolsets.append(composio_mcp)
+
+    native_toolsets = build_native_mcp_toolsets(connections)
+    toolsets.extend(native_toolsets)
+
+    # Preamble framing: if every connection's tools are attached
+    # directly (composio in DIRECT_TOOLS mode, or any native-MCP
+    # entry — native MCPs always expose tools by name), use the
+    # direct-tools preamble. Otherwise fall back to the loose
+    # preamble that teaches the model about Composio's meta-tools.
+    # Native MCP doesn't add meta-tools, so it doesn't change the
+    # decision — only Composio's loose mode does.
+    direct_mode = (composio_mcp is None or used_direct_tools)
+    preamble_labels = (
+        sorted({slug for (slug, _n, _t, _s) in connections})
+        if toolsets
         else None
     )
     agent = build_agent(
         spec,
         toolsets=toolsets or None,
-        connections=preamble_toolkits,
-        direct_tools=used_direct_tools,
+        connections=preamble_labels,
+        direct_tools=direct_mode,
     )
 
     # MCP toolsets are async context managers — pydantic-ai keeps the
@@ -476,20 +610,43 @@ async def run(spec: dict, user_message: str) -> None:
             # whether the model had tools available at all when it
             # decided to hedge.
             try:
+                # Diagnostic counts. We probe each toolset's raw
+                # `list_tools()` (the MCP server's full catalog) and
+                # also walk through wrappers like FilteredToolset to
+                # report the post-filter set the model actually sees.
+                # The two numbers differ when a `tools:` narrowing is
+                # applied — prior probe shape silently skipped
+                # wrappers entirely.
                 tool_names: list[str] = []
+                filtered_notes: list[str] = []
                 for ts in toolsets:
-                    if hasattr(ts, "list_tools"):
-                        listed = await ts.list_tools()
-                        for t in listed:
-                            name = getattr(t, "name", None) or (
-                                t.get("name") if isinstance(t, dict) else None
+                    inner = ts
+                    wrapper_chain: list[str] = []
+                    while hasattr(inner, "wrapped"):
+                        wrapper_chain.append(type(inner).__name__)
+                        inner = inner.wrapped  # type: ignore[attr-defined]
+                    if hasattr(inner, "list_tools"):
+                        listed = await inner.list_tools()
+                        names = [
+                            getattr(t, "name", None)
+                            or (t.get("name") if isinstance(t, dict) else None)
+                            for t in listed
+                        ]
+                        names = [n for n in names if n]
+                        tool_names.extend(names)
+                        if wrapper_chain:
+                            filtered_notes.append(
+                                f"{type(ts).__name__}({'/'.join(wrapper_chain)})"
+                                f" over {len(names)} server tools"
                             )
-                            if name:
-                                tool_names.append(name)
                 sys.stderr.write(
                     f"[tas] MCP toolset exposes {len(tool_names)} tools: "
                     f"{tool_names[:10]}{'…' if len(tool_names) > 10 else ''}\n"
                 )
+                if filtered_notes:
+                    sys.stderr.write(
+                        f"[tas] wrapper chains in play: {filtered_notes}\n"
+                    )
             except Exception as e:
                 sys.stderr.write(f"[tas] list_tools probe failed: {e}\n")
             result = await agent.run(user_message)
