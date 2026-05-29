@@ -209,7 +209,7 @@ function ProviderRow({
           </p>
         )}
       </div>
-      <div className="flex flex-col items-end gap-2">
+      <div className="grid grid-cols-2 justify-items-end gap-x-4 gap-y-1">
         <RefreshNativeMcpToolsForm
           workspaceSlug={workspaceSlug}
           connectionId={connection.id}
