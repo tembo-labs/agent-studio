@@ -21,7 +21,7 @@ v0.4 is the governance release. Two interlocking capabilities:
 1. **Immutable `who/when/why` changelog.** Every agent change, run, human intervention, and policy switch is recorded with the actor, timestamp, and originating intent (chat session ID, PR number, correction ID).
 2. **Role-based access control (RBAC).** Workspace admin → operator → viewer, enforced at the API layer, not just the UI.
 
-A third originally-planned capability — **org-level policy templates** — was scoped out of v0.4 and lives in [`context/backlog/`](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). It needs an org concept (a scope above workspace) plus a generic policy substrate, and the rest of v0.4 ships cleanly without it.
+A third originally-planned capability — **org-level policy templates** — was scoped out of v0.4 and lives in [`context/backlog/`](../../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). It needs an org concept (a scope above workspace) plus a generic policy substrate, and the rest of v0.4 ships cleanly without it.
 
 ## What Ships in v0.4
 
@@ -31,10 +31,10 @@ A third originally-planned capability — **org-level policy templates** — was
 
 ## Out of Scope for v0.4
 
-- Rich HITL forms and per-agent dashboards — already shipped in [v0.3 (Operational surface)](../shipped/0.3/). v0.4 reads the events v0.3 produced; it doesn't reproduce them.
-- Org-level policy templates — moved to [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). The substrate (org concept + policy resolver + tightening/loosening rule) was disproportionate to the rest of v0.4; pull forward when scheduled.
-- Correction-to-code learning, variant lifecycle — [v0.5 (Adaptive intelligence)](../0.5/).
-- Cross-deployment shared learning — [v0.6 (Mycelium)](../0.6/).
+- Rich HITL forms and per-agent dashboards — already shipped in [v0.3 (Operational surface)](../0.3/). v0.4 reads the events v0.3 produced; it doesn't reproduce them.
+- Org-level policy templates — moved to [Backlog](../../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). The substrate (org concept + policy resolver + tightening/loosening rule) was disproportionate to the rest of v0.4; pull forward when scheduled.
+- Correction-to-code learning, variant lifecycle — [v0.5 (Adaptive intelligence)](../../0.5/).
+- Cross-deployment shared learning — [v0.6 (Mycelium)](../../0.6/).
 - Custom RBAC roles beyond the four built-ins — post-v0.6 unless a customer blocks.
 
 ## Strategy
@@ -76,7 +76,7 @@ The four built-ins (org admin / workspace admin / operator / viewer) cover the c
 - [ ] RBAC roles are enforced at the API layer, not just the UI (verified by a deny-test).
 - [ ] Per-agent changelog JSON export works for at least one pilot customer's reporting flow.
 
-(The originally-planned policy-override exit-bar item moved to [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates) along with the rest of US-0.4-03.)
+(The originally-planned policy-override exit-bar item moved to [Backlog](../../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates) along with the rest of US-0.4-03.)
 
 ## Open Questions Before v0.5
 

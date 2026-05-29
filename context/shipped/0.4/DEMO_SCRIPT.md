@@ -1,7 +1,7 @@
 # v0.4 Demo Script
 
 > **Update (2026-05-27):** Org-level policy templates moved out of
-> v0.4 to [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates).
+> v0.4 to [Backlog](../../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates).
 > Section 4 (Policy templates and overrides) and the policy beats
 > in success criteria + pre-demo checklist are stubbed out below.
 > Re-enable when the substrate ships.
@@ -46,7 +46,7 @@
 > "Three built-in roles. Enforcement at the API layer — UI just mirrors API state. No 'we hid the button' safety nets. An org-admin tier and custom roles are deferred until concrete cross-workspace endpoints exist."
 
 ### 4. ~~Policy templates and overrides~~ — moved to backlog
-> *Stubbed; this section re-enables when [US-BACKLOG-01](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates) is scheduled into a phase.*
+> *Stubbed; this section re-enables when [US-BACKLOG-01](../../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates) is scheduled into a phase.*
 
 ### 5. Audit export (13:00 – 17:00)
 **Do:**
@@ -77,6 +77,6 @@
 ## Common Questions & Crisp Answers
 
 - **"Is the changelog exportable?"** Per-agent JSON export at v0.4. Streaming to a SIEM is on the v0.5 open-questions list — bring your preferred destination to the pilot.
-- **"What about role permissions outside the three built-ins?"** An org-admin tier lands when concrete cross-workspace endpoints exist; custom roles past that are deferred past v0.6 unless a customer blocks. Org-level policy templates (the typical "fine-grained permission" extension) are tracked in [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates).
+- **"What about role permissions outside the three built-ins?"** An org-admin tier lands when concrete cross-workspace endpoints exist; custom roles past that are deferred past v0.6 unless a customer blocks. Org-level policy templates (the typical "fine-grained permission" extension) are tracked in [Backlog](../../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates).
 - **"Why isn't v0.5 first — adaptive demos better?"** Because adaptive systems without audit substrate are how customers get burned. We ship the substrate first, on purpose. v0.5 lands in this changelog.
 - **"How does this relate to v0.6 Mycelium?"** Mycelium imports also land in this changelog with attribution. There's no separate "Mycelium activity" audit surface — it's the same trail.

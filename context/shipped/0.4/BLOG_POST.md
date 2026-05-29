@@ -11,7 +11,7 @@ That's the audience v0.4 is for.
 - **Immutable `who/when/why` changelog.** Every agent change, run, human intervention, and policy switch is recorded with the actor, the time, and the originating intent.
 - **Role-based access control.** Workspace admin → operator → viewer, enforced at the API layer.
 
-(Org-level policy templates — the third capability originally scoped to v0.4 — moved to [Backlog](../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). The substrate is comparable in size to v0.3 Connections; the rest of v0.4 ships cleanly without it.)
+(Org-level policy templates — the third capability originally scoped to v0.4 — moved to [Backlog](../../backlog/USER_STORIES.md#us-backlog-01--org-level-policy-templates). The substrate is comparable in size to v0.3 Connections; the rest of v0.4 ships cleanly without it.)
 
 ## The Compliance Conversation v0.4 Closes Out
 
@@ -27,9 +27,9 @@ Adaptive systems rewrite source. The first time something goes wrong on a rewrit
 
 ## What v0.4 Is Not
 
-- Not the operator surface. HITL forms and per-agent dashboards shipped in [v0.3 (Operational surface)](../shipped/0.3/).
-- Not the learning release. Correction-to-code is [v0.5 (Adaptive intelligence)](../0.5/).
-- Not cross-deployment exchange. That's [v0.6 (Mycelium)](../0.6/), opt-in and off by default.
+- Not the operator surface. HITL forms and per-agent dashboards shipped in [v0.3 (Operational surface)](../0.3/).
+- Not the learning release. Correction-to-code is [v0.5 (Adaptive intelligence)](../../0.5/).
+- Not cross-deployment exchange. That's [v0.6 (Mycelium)](../../0.6/), opt-in and off by default.
 - Not a place where governance becomes optional — v0.4 raises the floor for the platform.
 
 ## Why Governance Is Its Own Phase
