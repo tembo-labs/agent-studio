@@ -363,18 +363,12 @@ function ComposioConnectionRow({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col items-end gap-2">
         {connection && (
           <RefreshComposioToolsForm
             workspaceSlug={workspaceSlug}
             connectionId={connection.id}
             label={toolCount > 0 ? "Refresh tools" : "Refresh"}
-          />
-        )}
-        {connection && (
-          <DisconnectComposioConnectionForm
-            workspaceSlug={workspaceSlug}
-            connectionId={connection.id}
           />
         )}
         {enabled && (
@@ -390,6 +384,12 @@ function ComposioConnectionRow({
             workspaceSlug={workspaceSlug}
             connectionId={connection.id}
             currentName={connection.name}
+          />
+        )}
+        {connection && (
+          <DisconnectComposioConnectionForm
+            workspaceSlug={workspaceSlug}
+            connectionId={connection.id}
           />
         )}
       </div>
