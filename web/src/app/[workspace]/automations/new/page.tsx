@@ -48,7 +48,7 @@ export default async function NewAutomationPage({
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           New automation
         </h1>
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           Schedule an agent to run on a recurring cadence. The cron is
           interpreted in UTC; all displayed times use your local timezone.
         </p>

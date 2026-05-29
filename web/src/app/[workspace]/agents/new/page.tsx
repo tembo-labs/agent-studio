@@ -33,7 +33,7 @@ export default async function NewAgentPage({
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           New agent
         </h1>
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           Describe the agent in plain English. Tembo writes a valid agent
           file and opens a pull request against{" "}
           <span className="text-foreground font-medium">

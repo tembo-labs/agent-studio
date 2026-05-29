@@ -26,7 +26,7 @@ export function Section({
         <div className="flex min-w-0 flex-col">
           <h2 className="text-foreground-title text-base font-bold">{title}</h2>
           {description && (
-            <p className="text-foreground-weak text-sm">{description}</p>
+            <p className="text-foreground-weak text-base">{description}</p>
           )}
         </div>
         {actions && <div className="shrink-0">{actions}</div>}

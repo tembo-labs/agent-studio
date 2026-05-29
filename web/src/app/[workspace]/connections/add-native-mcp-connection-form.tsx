@@ -51,7 +51,7 @@ export function AddNativeMcpConnectionForm({
         <span className="text-foreground text-sm font-medium">
           Add another Native MCP connection
         </span>
-        <span className="text-foreground-muted text-xs">
+        <span className="text-foreground-muted text-sm">
           Authorize a second account for a provider you already use, or
           pre-authorize a name slot before an agent declares it. Name
           distinguishes accounts (e.g. <code>work</code>, <code>personal</code>).
@@ -61,7 +61,7 @@ export function AddNativeMcpConnectionForm({
         <div className="flex min-w-[180px] flex-1 flex-col gap-1">
           <label
             htmlFor="add-native-provider"
-            className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
+            className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
           >
             Provider
           </label>
@@ -81,7 +81,7 @@ export function AddNativeMcpConnectionForm({
         <div className="flex min-w-[140px] flex-1 flex-col gap-1">
           <label
             htmlFor="add-native-name"
-            className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
+            className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
           >
             Name
           </label>

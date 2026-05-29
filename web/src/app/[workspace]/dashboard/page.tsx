@@ -57,12 +57,12 @@ export default async function DashboardPage({
     ]);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Dashboard
         </h1>
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           Workspace-wide activity for{" "}
           <span className="text-foreground font-medium">{workspace.name}</span>
           .
@@ -112,7 +112,7 @@ export default async function DashboardPage({
 
           <div className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between">
-              <span className="text-foreground-weak text-[10px] font-medium uppercase tracking-widest">
+              <span className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
                 Recent improvements
               </span>
               <Link
@@ -195,7 +195,7 @@ function StatCard({
   const accentClass = ACCENT_CLASS[accent];
   return (
     <div className="border-border bg-surface flex flex-col gap-0.5 rounded-lg border px-3 py-2">
-      <span className="text-foreground-weak text-[10px] font-medium uppercase tracking-widest">
+      <span className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
         {label}
       </span>
       <span className={`text-xl font-semibold ${accentClass}`}>{value}</span>

@@ -93,7 +93,7 @@ export default async function AgentDetailPage({
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-2">
         <BackLink href={`/${workspace.slug}`} label="Agents" />
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -109,7 +109,7 @@ export default async function AgentDetailPage({
                 <Badge variant="purple" size="small">
                   {agent.spec.model ?? "—"}
                 </Badge>
-                <code className="text-foreground-muted text-[11px]">
+                <code className="text-foreground-muted text-sm">
                   {agent.filename}
                 </code>
               </div>
@@ -261,7 +261,7 @@ function RecentRuns({
               )}
               <LocalTime
                 iso={run.createdAt.toISOString()}
-                className="text-foreground-muted text-xs"
+                className="text-foreground-muted text-sm"
               />
             </Link>
             <Link

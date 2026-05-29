@@ -190,12 +190,12 @@ export default async function ConnectionsPage({
       : undefined;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Connections
         </h1>
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           OAuth authorizations the agents in{" "}
           <span className="text-foreground font-medium">{workspace.name}</span>{" "}
           can use at run time. Per-user — your authorizations don&apos;t

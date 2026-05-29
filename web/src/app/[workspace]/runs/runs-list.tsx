@@ -245,7 +245,7 @@ export function RunsList({
       <hr className="border-[var(--color-border-weak)]" />
 
       {/* Result count + table */}
-      <div className="text-foreground-weak text-xs">
+      <div className="text-foreground-weak text-sm">
         {pending
           ? "Loading…"
           : rows.length === 0
@@ -256,7 +256,7 @@ export function RunsList({
       {rows.length > 0 && (
         <div className="border-border overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-xs uppercase tracking-wide">
+            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Status</th>
                 <th className="px-3 py-2 text-left font-medium">Agent</th>
@@ -347,7 +347,7 @@ function RunRow({
             Event
           </Badge>
         ) : (
-          <span className="text-foreground-weak text-xs">Manual</span>
+          <span className="text-foreground-weak text-sm">Manual</span>
         )}
       </td>
       <td className="text-foreground max-w-md px-3 py-2 align-top text-xs">
@@ -360,7 +360,7 @@ function RunRow({
           // Failed runs surface their error inline so a triager can
           // scan failures without clicking into each row. Two-line
           // clamp keeps the column from ballooning on verbose stacks.
-          <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-[11px] leading-4">
+          <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-xs leading-4">
             {run.errorMessagePreview}
           </div>
         )}

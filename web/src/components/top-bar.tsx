@@ -44,7 +44,7 @@ export function TopBar({ title, crumbs, back, actions, meta }: Props) {
                   {c.label}
                 </Link>
               ) : (
-                <span className="text-foreground-weak text-sm">{c.label}</span>
+                <span className="text-foreground-weak text-base">{c.label}</span>
               )}
               <span className="text-foreground-muted text-sm">/</span>
             </span>
@@ -53,7 +53,7 @@ export function TopBar({ title, crumbs, back, actions, meta }: Props) {
             {title}
           </h1>
         </div>
-        {meta && <div className="text-foreground-weak text-xs">{meta}</div>}
+        {meta && <div className="text-foreground-weak text-sm">{meta}</div>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>

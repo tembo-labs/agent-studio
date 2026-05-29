@@ -87,12 +87,12 @@ export default async function SettingsPage({
   void sp;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Settings
         </h1>
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           Manage{" "}
           <span className="text-foreground font-medium">{workspace.name}</span>
           &apos;s repository, credentials, and branding.
@@ -141,7 +141,7 @@ export default async function SettingsPage({
                     >
                       github.com/{repo.owner}/{repo.name}
                     </a>
-                    <span className="text-foreground-muted text-xs">
+                    <span className="text-foreground-muted text-sm">
                       Default branch {repo.defaultBranch} · connected{" "}
                       <LocalTime iso={repo.connectedAt.toISOString()} />
                     </span>
@@ -149,7 +149,7 @@ export default async function SettingsPage({
                   <DisconnectRepoForm workspaceSlug={workspace.slug} />
                 </div>
               ) : (
-                <p className="text-foreground-weak text-sm">
+                <p className="text-foreground-weak text-base">
                   No repository connected.{" "}
                   <Link
                     href={`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`}
@@ -384,7 +384,7 @@ export default async function SettingsPage({
               description="Agents removed from this workspace stay listed here so you can restore them. Restore writes the file back to the connected repo with a new commit; the deletion record is preserved for audit."
             >
               {deletedAgents.length === 0 ? (
-                <p className="text-foreground-weak text-sm">
+                <p className="text-foreground-weak text-base">
                   No deleted agents.
                 </p>
               ) : (
@@ -398,7 +398,7 @@ export default async function SettingsPage({
                         <span className="text-foreground text-sm font-medium">
                           {d.agentName}
                         </span>
-                        <span className="text-foreground-muted text-xs">
+                        <span className="text-foreground-muted text-sm">
                           <code>{d.filePath}</code>
                           <span>
                             {" · deleted "}

@@ -63,7 +63,7 @@ export function SecretKeyForm({
             <span className="text-foreground text-sm font-medium">
               {maskedPrefix}••••••••{preview.last4}
             </span>
-            <span className="text-foreground-muted text-xs">
+            <span className="text-foreground-muted text-sm">
               Last set {formatDate(preview.updatedAt)}
             </span>
           </div>
@@ -91,7 +91,7 @@ export function SecretKeyForm({
           </div>
         </div>
         {removeState.message && (
-          <p className="text-foreground-weak text-xs">{removeState.message}</p>
+          <p className="text-foreground-weak text-sm">{removeState.message}</p>
         )}
       </div>
     );
@@ -118,7 +118,7 @@ export function SecretKeyForm({
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
         />
-        <p className="text-foreground-muted text-xs">
+        <p className="text-foreground-muted text-sm">
           Stored encrypted at rest (AES-256-GCM). Only the last four characters
           are kept in cleartext for the masked preview.
         </p>
@@ -130,7 +130,7 @@ export function SecretKeyForm({
         </p>
       )}
       {saveState.message && (
-        <p className="text-foreground-weak text-xs">{saveState.message}</p>
+        <p className="text-foreground-weak text-sm">{saveState.message}</p>
       )}
 
       <div className="flex gap-2">

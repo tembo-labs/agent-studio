@@ -41,7 +41,7 @@ export function DeleteAutomationForm({
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <p className="text-foreground-weak text-sm">
+      <p className="text-foreground-weak text-base">
         Deleting an automation removes the schedule. Past runs it produced
         are kept on the run history.
       </p>

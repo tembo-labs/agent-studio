@@ -56,13 +56,13 @@ export default async function AgentChatPage({
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(canonicalName)}`;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-2">
         <BackLink href={agentHref} label={canonicalName} />
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Chat to edit
         </h1>
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           Describe a change you&apos;d like to make to{" "}
           <span className="text-foreground font-medium">
             {canonicalName}

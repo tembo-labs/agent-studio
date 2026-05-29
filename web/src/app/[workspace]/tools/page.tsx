@@ -40,7 +40,7 @@ export default async function ToolsPage({
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Tools
         </h1>
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           Every MCP tool you&apos;ve authorized in{" "}
           <span className="text-foreground font-medium">{workspace.name}</span>,
           across Composio and native MCP providers. Tools are cached on

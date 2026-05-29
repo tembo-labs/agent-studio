@@ -43,7 +43,7 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
             {member.name ?? member.email}
           </span>
           {isSelf && (
-            <span className="text-foreground-muted text-xs">(you)</span>
+            <span className="text-foreground-muted text-sm">(you)</span>
           )}
         </div>
         <div className="text-foreground-weak flex items-center gap-2 text-xs">

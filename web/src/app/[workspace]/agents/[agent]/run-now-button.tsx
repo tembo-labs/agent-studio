@@ -80,7 +80,7 @@ export function RunNowButton({ workspaceSlug, agentName }: Props) {
                 }
               }}
             />
-            <p className="text-foreground-weak text-xs">
+            <p className="text-foreground-weak text-sm">
               Cmd/Ctrl-Enter submits.
             </p>
             {state.error && (

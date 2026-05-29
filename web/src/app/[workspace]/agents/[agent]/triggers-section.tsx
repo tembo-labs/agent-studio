@@ -82,11 +82,11 @@ export function TriggersSection({
                   <span className="text-foreground text-sm font-medium">
                     {toolkitLabel(t.toolkitSlug)}
                   </span>
-                  <code className="text-foreground-muted text-[11px]">
+                  <code className="text-foreground-muted text-sm">
                     {t.triggerType}
                   </code>
                 </div>
-                <p className="text-foreground-weak text-xs">
+                <p className="text-foreground-weak text-sm">
                   {t.lastFiredAt ? (
                     <>
                       Last fired <LocalTime iso={t.lastFiredAt.toISOString()} />

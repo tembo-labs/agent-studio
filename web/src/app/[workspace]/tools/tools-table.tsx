@@ -75,7 +75,7 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
         <div className="flex min-w-[240px] flex-1 flex-col gap-1">
           <label
             htmlFor="tools-search"
-            className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
+            className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
           >
             Search
           </label>
@@ -91,7 +91,7 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
         <div className="flex min-w-[140px] flex-col gap-1">
           <label
             htmlFor="tools-source"
-            className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
+            className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
           >
             Source
           </label>
@@ -109,7 +109,7 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
         <div className="flex min-w-[160px] flex-col gap-1">
           <label
             htmlFor="tools-provider"
-            className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
+            className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
           >
             Provider
           </label>
@@ -129,7 +129,7 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
         </div>
       </div>
 
-      <div className="text-foreground-weak text-sm">
+      <div className="text-foreground-weak text-base">
         Showing{" "}
         <span className="text-foreground font-medium">{visibleCount}</span> of{" "}
         <span className="text-foreground font-medium">{totalCount}</span>{" "}
@@ -137,7 +137,7 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           {totalCount === 0 ? (
             <>
               No tools cached yet. Head to{" "}
@@ -161,7 +161,7 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
               still claims slack space from siblings, and Description
               ended up squeezed even though Tool was set narrow. */}
           <table className="w-full table-fixed border-collapse text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-xs uppercase tracking-wide">
+            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
               <tr>
                 <th className="w-[220px] px-3 py-2 text-left font-medium">
                   Tool
@@ -184,15 +184,15 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
                   <td className="px-3 py-2 align-top">
                     <CopyableSlug
                       slug={t.slug}
-                      className="text-foreground break-all text-[12px] font-medium"
+                      className="text-foreground break-all text-xs font-medium"
                     />
                     {t.displayName && t.displayName !== t.slug && (
-                      <div className="text-foreground-weak mt-0.5 text-[11px]">
+                      <div className="text-foreground-weak mt-0.5 text-xs">
                         {t.displayName}
                       </div>
                     )}
                   </td>
-                  <td className="text-foreground-weak px-3 py-2 align-top text-[12px] leading-snug">
+                  <td className="text-foreground-weak px-3 py-2 align-top text-xs leading-snug">
                     {t.description ?? "—"}
                   </td>
                   <td className="px-3 py-2 align-top whitespace-nowrap">
@@ -203,12 +203,12 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
                       {t.source === "composio" ? "Composio" : "Native MCP"}
                     </Badge>
                   </td>
-                  <td className="text-foreground px-3 py-2 align-top text-[12px]">
+                  <td className="text-foreground px-3 py-2 align-top text-xs">
                     {t.source === "composio"
                       ? toolkitLabel(t.provider)
                       : t.provider}
                   </td>
-                  <td className="text-foreground-muted px-3 py-2 align-top text-[11px]">
+                  <td className="text-foreground-muted px-3 py-2 align-top text-xs">
                     <code>{t.connectionName}</code>
                   </td>
                 </tr>

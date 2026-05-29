@@ -27,7 +27,7 @@ export function SyncGuidanceForm({
         </Button>
       </form>
       {state.message && (
-        <p className="text-foreground-weak text-xs">{state.message}</p>
+        <p className="text-foreground-weak text-sm">{state.message}</p>
       )}
       {state.error && (
         <p className="text-sentiment-negative text-xs">{state.error}</p>

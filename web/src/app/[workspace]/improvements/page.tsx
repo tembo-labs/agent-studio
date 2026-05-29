@@ -38,12 +38,12 @@ export default async function ImprovementsPage({
   const improvements = await listImprovements(workspace.id);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Improvements
         </h1>
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           Each row is an improvement submission from a run&apos;s
           &ldquo;Improve the Agent&rdquo; form. Status updates when a Tembo
           task opens a PR and when that PR is merged.
@@ -53,7 +53,7 @@ export default async function ImprovementsPage({
       <hr className="border-[var(--color-border-weak)]" />
 
       {improvements.length === 0 ? (
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           No improvements yet. Open a run, scroll to{" "}
           <em>Improve the Agent</em>, and submit one to start.
         </p>
@@ -77,7 +77,7 @@ function ImprovementTable({
   return (
     <div className="border-border overflow-hidden rounded-lg border">
       <table className="w-full text-sm">
-        <thead className="bg-surface-secondary text-foreground-weak text-xs uppercase tracking-wide">
+        <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
           <tr>
             <th className="px-3 py-2 text-left font-medium">Agent</th>
             <th className="px-3 py-2 text-left font-medium">Improvement</th>

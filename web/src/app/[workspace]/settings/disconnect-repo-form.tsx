@@ -35,7 +35,7 @@ export function DisconnectRepoForm({
         </Button>
       </form>
       {state.message && (
-        <p className="text-foreground-weak text-xs">{state.message}</p>
+        <p className="text-foreground-weak text-sm">{state.message}</p>
       )}
     </div>
   );

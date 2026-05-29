@@ -53,7 +53,7 @@ const CardDescription = forwardRef<
   <div
     ref={ref}
     data-slot="card-description"
-    className={cn("text-foreground-weak text-sm", className)}
+    className={cn("text-foreground-weak text-base", className)}
     {...props}
   />
 ));

@@ -248,7 +248,7 @@ export function AuditTimeline({
       <hr className="border-[var(--color-border-weak)]" />
 
       <div className="flex items-center justify-between gap-3">
-        <div className="text-foreground-weak text-xs">
+        <div className="text-foreground-weak text-sm">
           {pending
             ? "Loading…"
             : rows.length === 0
@@ -272,7 +272,7 @@ export function AuditTimeline({
       {rows.length > 0 && (
         <div className="border-border overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-xs uppercase tracking-wide">
+            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
               <tr>
                 <th className="w-[140px] px-3 py-2 text-left font-medium">
                   When
@@ -416,7 +416,7 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
         ? ` · ${String(p.errorMessage).slice(0, 80)}`
         : "";
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {status}
           {dur}
           {cost}
@@ -429,7 +429,7 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
     case "improvement.merged":
     case "improvement.closed":
       return (
-        <span className="text-foreground-weak truncate text-[11px]">
+        <span className="text-foreground-weak truncate text-xs">
           {String(p.improvementText ?? "")}
         </span>
       );
@@ -439,7 +439,7 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
     case "automation.enabled":
     case "automation.disabled":
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {String(p.name ?? "")}
           {p.cron ? ` · ${String(p.cron)}` : ""}
         </span>
@@ -449,20 +449,20 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
     case "trigger.enabled":
     case "trigger.disabled":
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {String(p.toolkit ?? "")} · {String(p.triggerType ?? "")}
         </span>
       );
     case "connection.authorized":
     case "connection.disconnected":
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {String(p.toolkit ?? "")} · {String(p.name ?? "default")}
         </span>
       );
     case "connection.renamed":
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {String(p.toolkit ?? "")} · {String(p.oldName ?? "")} → {String(p.newName ?? "")}
         </span>
       );
@@ -470,7 +470,7 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
     case "secret.rotated":
     case "secret.removed":
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {String(p.secretKind ?? "")}
         </span>
       );
@@ -478,7 +478,7 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
       const t = p.target as { name?: string; email?: string } | undefined;
       const who = t?.name ?? t?.email ?? "";
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {who} as {String(p.role ?? "")}
         </span>
       );
@@ -487,7 +487,7 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
       const t = p.target as { name?: string; email?: string } | undefined;
       const who = t?.name ?? t?.email ?? "";
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {who} · {String(p.previousRole ?? "")} → {String(p.newRole ?? "")}
         </span>
       );
@@ -496,7 +496,7 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
       const t = p.target as { name?: string; email?: string } | undefined;
       const who = t?.name ?? t?.email ?? "";
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {who}
           {p.previousRole ? ` (was ${String(p.previousRole)})` : ""}
         </span>
@@ -511,7 +511,7 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
       if (Array.isArray(f?.sources))
         parts.push(`sources: ${(f.sources as string[]).join(", ")}`);
       return (
-        <span className="text-foreground-weak text-[11px]">
+        <span className="text-foreground-weak text-sm">
           {parts.join(" · ")}
         </span>
       );

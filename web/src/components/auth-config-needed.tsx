@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/card";
 
 const codeClass =
-  "bg-surface text-foreground rounded px-1 py-0.5 font-mono text-[11px]";
+  "bg-surface text-foreground rounded px-1 py-0.5 font-mono text-xs";
 
 export function AuthConfigNeeded() {
   return (
@@ -59,7 +59,7 @@ export function AuthConfigNeeded() {
           <p className="text-foreground text-sm font-medium">
             Prefer a different provider?
           </p>
-          <p className="text-foreground-weak text-sm leading-6">
+          <p className="text-foreground-weak text-base leading-6">
             Edit <code className={codeClass}>socialProviders</code> in{" "}
             <code className={codeClass}>web/src/lib/auth.ts</code>. better-auth
             ships native support for GitHub, Microsoft (Entra ID / Azure AD),
@@ -101,7 +101,7 @@ export function AuthConfigNeeded() {
               </a>
             </li>
           </ul>
-          <p className="text-foreground-muted text-xs">
+          <p className="text-foreground-muted text-sm">
             Add the provider&apos;s env vars to{" "}
             <code className={codeClass}>.env</code> and{" "}
             <code className={codeClass}>docker-compose.yml</code> so they reach

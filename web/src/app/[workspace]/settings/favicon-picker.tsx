@@ -116,7 +116,7 @@ export function FaviconPicker({
         </form>
       </div>
 
-      <p className="text-foreground-muted text-xs">
+      <p className="text-foreground-muted text-sm">
         PNG, SVG, or ICO, up to 200 KB. The favicon shows in the browser
         tab for everyone using this workspace.
       </p>
@@ -127,7 +127,7 @@ export function FaviconPicker({
         </p>
       )}
       {(defaultState.message || uploadState.message) && (
-        <p className="text-foreground-weak text-xs">
+        <p className="text-foreground-weak text-sm">
           {defaultState.message ?? uploadState.message}
         </p>
       )}

@@ -172,7 +172,7 @@ export function AgentsInventory({ agents, newAgentHref, canEdit }: Props) {
       ) : (
         <div className="border-border overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-xs uppercase tracking-wide">
+            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
               <tr>
                 <SortableTh
                   label="Status"
@@ -265,7 +265,7 @@ function FacetPills({
           >
             {label}
             <span
-              className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+              className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${
                 isActive
                   ? "bg-surface text-foreground-weak"
                   : "bg-surface-secondary text-foreground-muted"
@@ -305,7 +305,7 @@ function SortableTh({
         }`}
       >
         {label}
-        <span className="text-[10px]" aria-hidden>
+        <span className="text-xs" aria-hidden>
           {active ? (dir === "asc" ? "↑" : "↓") : "↕"}
         </span>
       </button>

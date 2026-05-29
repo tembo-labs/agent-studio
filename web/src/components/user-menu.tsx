@@ -62,7 +62,7 @@ export function UserMenu({ name, email }: Props) {
           {name ?? email}
         </span>
         {name && (
-          <span className="text-foreground-muted text-[11px] leading-tight">
+          <span className="text-foreground-muted text-sm leading-tight">
             {email}
           </span>
         )}

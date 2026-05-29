@@ -91,7 +91,7 @@ export function AppShell({
             sidebar quieter so the Action needed cards (when present)
             land as the loudest thing in the rail. */}
         <div className="flex flex-col gap-0.5 px-3 py-3">
-          <span className="text-foreground-muted text-[10px] font-medium uppercase tracking-widest">
+          <span className="text-foreground-muted text-sm font-medium uppercase tracking-widest">
             {instanceName}
           </span>
           <WorkspaceSwitcher
@@ -150,7 +150,7 @@ export function AppShell({
 
           {(failingAgents.length > 0 || missingConnections.length > 0) && (
             <div className="mt-6 flex flex-col gap-1.5">
-              <span className="text-foreground-muted px-2 text-[10px] font-medium uppercase tracking-widest">
+              <span className="text-foreground-muted px-2 text-xs font-medium uppercase tracking-widest">
                 Action needed
               </span>
               {failingAgents.map((f) => {

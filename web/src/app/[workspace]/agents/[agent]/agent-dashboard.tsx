@@ -159,13 +159,13 @@ function Tile({
 }) {
   return (
     <div className="bg-surface border-border flex flex-col gap-0.5 rounded-lg border px-3 py-2">
-      <span className="text-foreground-weak text-[10px] font-medium uppercase tracking-widest">
+      <span className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
         {label}
       </span>
       <span className="text-foreground-title text-xl font-semibold">
         {value}
       </span>
-      <span className="text-foreground-muted text-xs">{sub}</span>
+      <span className="text-foreground-muted text-sm">{sub}</span>
     </div>
   );
 }
@@ -195,10 +195,10 @@ function DailyTrend({ daily }: { daily: AgentDailyRunCount[] }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between">
-        <span className="text-foreground-weak text-[10px] font-medium uppercase tracking-widest">
+        <span className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
           Last 30 days
         </span>
-        <span className="text-foreground-muted text-xs">
+        <span className="text-foreground-muted text-sm">
           {days[0].day} → {days[days.length - 1].day}
         </span>
       </div>
@@ -248,7 +248,7 @@ function FailureGroups({
     // detail page land here without their target headline hidden
     // under whatever's sticky above.
     <div id="failures" className="flex scroll-mt-4 flex-col gap-1.5">
-      <span className="text-foreground-weak text-[10px] font-medium uppercase tracking-widest">
+      <span className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
         Recent failures (30d)
       </span>
       <ul className="divide-border bg-surface border-border flex flex-col divide-y overflow-hidden rounded-lg border">

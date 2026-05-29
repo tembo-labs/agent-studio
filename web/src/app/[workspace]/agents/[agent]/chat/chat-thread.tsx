@@ -152,7 +152,7 @@ export function ChatThread({
           className="bg-surface border-border text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)] rounded-md border px-3 py-2 text-sm leading-6 resize-y"
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-foreground-weak text-xs">
+          <span className="text-foreground-weak text-sm">
             Cmd/Ctrl-Enter sends to the agent. Submit a change to open a PR
             for review.
           </span>
@@ -206,7 +206,7 @@ function RunBubble({ run }: { run: ChatRun }) {
           <p className="whitespace-pre-wrap text-sm leading-5">
             {run.userMessage}
           </p>
-          <span className="text-foreground-on-accent/70 text-[10px]">
+          <span className="text-foreground-on-accent/70 text-xs">
             <LocalTime iso={run.createdAt.toISOString()} />
           </span>
         </div>
@@ -217,7 +217,7 @@ function RunBubble({ run }: { run: ChatRun }) {
       <div className="flex justify-start">
         <div className="border-border bg-surface-raised flex max-w-[80%] flex-col gap-1 rounded-lg border px-3 py-2">
           {run.status === "queued" || run.status === "running" ? (
-            <p className="text-foreground-weak text-sm italic">
+            <p className="text-foreground-weak text-base italic">
               {run.status === "queued" ? "Queued…" : "Thinking…"}
             </p>
           ) : run.status === "failed" ? (
@@ -254,14 +254,14 @@ function ImprovementBubble({
       <div className="flex justify-end">
         <div className="bg-interactive text-foreground-on-accent flex max-w-[80%] flex-col gap-1 rounded-lg px-3 py-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-foreground-on-accent/80 text-[10px] uppercase tracking-wide">
+            <span className="text-foreground-on-accent/80 text-xs uppercase tracking-wide">
               Change request
             </span>
           </div>
           <p className="whitespace-pre-wrap text-sm leading-5">
             {improvement.improvementText}
           </p>
-          <span className="text-foreground-on-accent/70 text-[10px]">
+          <span className="text-foreground-on-accent/70 text-xs">
             {improvementSubmitterLabel(improvement)} ·{" "}
             <LocalTime iso={improvement.createdAt.toISOString()} />
             {runHref && (
@@ -300,13 +300,13 @@ function ImprovementBubble({
                 href={improvement.temboTaskHtmlUrl}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-foreground-weak text-xs hover:underline"
+                className="text-foreground-weak text-sm hover:underline"
               >
                 Tembo Session ↗
               </a>
             )}
           </div>
-          <p className="text-foreground-weak text-xs leading-5">
+          <p className="text-foreground-weak text-sm leading-5">
             {statusBlurb(improvement.status)}
           </p>
         </div>

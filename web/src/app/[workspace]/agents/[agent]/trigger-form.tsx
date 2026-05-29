@@ -126,7 +126,7 @@ export function TriggerForm({
           spellCheck={false}
           className="bg-input text-foreground-strong placeholder:text-foreground-weak hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-2 px-3 font-mono text-sm focus:outline-none transition-[background-color,box-shadow,color] duration-150"
         />
-        <span className="text-foreground-weak text-xs">
+        <span className="text-foreground-weak text-sm">
           SCREAMING_SNAKE_CASE. Find slugs in{" "}
           <a
             href="https://docs.composio.dev/triggers"
@@ -158,9 +158,9 @@ export function TriggerForm({
           spellCheck={false}
           className="bg-input text-foreground-strong placeholder:text-foreground-weak hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-2 px-3 font-mono text-xs leading-5 focus:outline-none transition-[background-color,box-shadow,color] duration-150 resize-y"
         />
-        <span className="text-foreground-weak text-xs">
+        <span className="text-foreground-weak text-sm">
           Per-trigger config. Use{" "}
-          <code className="bg-surface rounded px-1 py-0.5 text-[10px]">
+          <code className="bg-surface rounded px-1 py-0.5 text-xs">
             {"{}"}
           </code>{" "}
           when the trigger has no required fields.

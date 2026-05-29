@@ -131,7 +131,7 @@ function ProviderRow({
               Native MCP
             </Badge>
           </div>
-          <p className="text-foreground-weak text-xs">
+          <p className="text-foreground-weak text-sm">
             Click Connect to log in with your {provider.displayName} account.
           </p>
         </div>
@@ -164,7 +164,7 @@ function ProviderRow({
           <Badge variant="gray" size="small">
             Native MCP
           </Badge>
-          <code className="text-foreground-muted text-[11px]">
+          <code className="text-foreground-muted text-sm">
             {connection.name}
           </code>
           {connection.status === "active" ? (
@@ -177,7 +177,7 @@ function ProviderRow({
             </Badge>
           )}
         </div>
-        <p className="text-foreground-weak text-xs">
+        <p className="text-foreground-weak text-sm">
           Connected{" "}
           <LocalTime iso={connection.createdAt.toISOString()} />
           {connection.tokenExpiresAt && (
@@ -206,9 +206,9 @@ function ProviderRow({
                   key={t.slug}
                   className="border-border-weak border-l-2 pl-2"
                 >
-                  <code className="text-foreground text-[11px]">{t.slug}</code>
+                  <code className="text-foreground text-xs">{t.slug}</code>
                   {t.description && (
-                    <p className="text-foreground-weak mt-0.5 text-[11px]">
+                    <p className="text-foreground-weak mt-0.5 text-xs">
                       {t.description}
                     </p>
                   )}
@@ -217,7 +217,7 @@ function ProviderRow({
             </ul>
           </details>
         ) : (
-          <p className="text-foreground-weak text-xs">
+          <p className="text-foreground-weak text-sm">
             No tools cached yet — click Refresh to populate.
           </p>
         )}

@@ -29,13 +29,13 @@ export default async function AutomationsPage({
   const automations = await listAutomations(workspace.id);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
             Automations
           </h1>
-          <p className="text-foreground-weak text-sm">
+          <p className="text-foreground-weak text-base">
             Schedules and event triggers that fire agent runs on their own.
             Cron expressions are evaluated in UTC; the columns below render
             instants in your local time.
@@ -49,7 +49,7 @@ export default async function AutomationsPage({
       <hr className="border-[var(--color-border-weak)]" />
 
       {automations.length === 0 ? (
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           No automations yet. Click <em>New automation</em> to schedule an
           agent.
         </p>
@@ -70,7 +70,7 @@ function AutomationTable({
   return (
     <div className="border-border overflow-hidden rounded-lg border">
       <table className="w-full text-sm">
-        <thead className="bg-surface-secondary text-foreground-weak text-xs uppercase tracking-wide">
+        <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
           <tr>
             <th className="px-3 py-2 text-left font-medium">Name</th>
             <th className="px-3 py-2 text-left font-medium">Agent</th>
@@ -124,7 +124,7 @@ function AutomationRow({
         <div className="flex flex-col gap-0.5">
           <code className="text-foreground text-xs">{automation.cron}</code>
           {preview.ok && (
-            <span className="text-foreground-weak text-xs">
+            <span className="text-foreground-weak text-sm">
               {preview.humanReadable}{" "}
               <span className="text-foreground-muted">(UTC)</span>
             </span>

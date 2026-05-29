@@ -141,7 +141,7 @@ export default async function WorkspacePage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Agents
@@ -174,7 +174,7 @@ export default async function WorkspacePage({
           <h2 className="text-foreground text-sm font-medium">
             Add your Tembo API key
           </h2>
-          <p className="text-foreground-weak text-sm">
+          <p className="text-foreground-weak text-base">
             TAS needs a Tembo API key to invoke Tembo services on this
             workspace&apos;s behalf. Until it&apos;s set, agents can&apos;t run.
           </p>

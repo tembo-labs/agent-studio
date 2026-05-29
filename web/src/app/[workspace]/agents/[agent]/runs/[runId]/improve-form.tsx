@@ -72,7 +72,7 @@ export function ImproveForm({
         onSubmit={handleSubmit}
         className={`flex flex-col gap-3 ${improvements.length > 0 ? "mt-4" : ""}`}
       >
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           Describe what should change about this agent, and it will be
           submitted for approval.
         </p>
@@ -91,7 +91,7 @@ export function ImproveForm({
             {pending ? "Asking Tembo…" : "Open a PR"}
           </Button>
           {pending && (
-            <span className="text-foreground-weak text-xs">
+            <span className="text-foreground-weak text-sm">
               Creating a Tembo session — this may take a moment.
             </span>
           )}
@@ -111,7 +111,7 @@ function ResultBanner({ result }: { result: ImproveResult }) {
         <span className="text-foreground font-medium">
           Tembo Session created
         </span>
-        <span className="text-foreground-weak text-xs">
+        <span className="text-foreground-weak text-sm">
           Status: {result.status}
         </span>
         <a

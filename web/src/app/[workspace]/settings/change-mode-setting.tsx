@@ -30,7 +30,7 @@ export function ChangeModeSetting() {
         )}
       >
         <span>YOLO</span>
-        <span className="text-[10px] uppercase tracking-wide">soon</span>
+        <span className="text-xs uppercase tracking-wide">soon</span>
       </button>
     </div>
   );

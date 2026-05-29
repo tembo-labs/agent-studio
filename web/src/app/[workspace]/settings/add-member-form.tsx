@@ -36,7 +36,7 @@ export function AddMemberForm({ workspaceSlug }: { workspaceSlug: string }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <p className="text-foreground-muted text-xs">
+        <p className="text-foreground-muted text-sm">
           The user must have signed in to TAS at least once. We don&apos;t
           email invitations.
         </p>

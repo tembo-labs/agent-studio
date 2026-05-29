@@ -140,7 +140,7 @@ export function ComposioConnectionsSection({
         )}
 
         {allSlots.length === 0 ? (
-          <p className="text-foreground-weak text-sm">
+          <p className="text-foreground-weak text-base">
             No agents in this workspace declare a{" "}
             <code className="bg-surface rounded px-1 py-0.5 text-xs">
               connections:
@@ -210,7 +210,7 @@ function AddAnotherConnectionForm({
         <span className="text-foreground text-sm font-medium">
           Add another Composio connection
         </span>
-        <span className="text-foreground-muted text-xs">
+        <span className="text-foreground-muted text-sm">
           Pre-authorize a toolkit before an agent declares it, or attach a
           second account of a toolkit you already use (e.g. a second Gmail).
           Name distinguishes the slot when you have more than one of a
@@ -221,7 +221,7 @@ function AddAnotherConnectionForm({
         <div className="flex min-w-[200px] flex-1 flex-col gap-1">
           <label
             htmlFor="add-toolkit"
-            className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
+            className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
           >
             Toolkit
           </label>
@@ -230,7 +230,7 @@ function AddAnotherConnectionForm({
         <div className="flex min-w-[140px] flex-1 flex-col gap-1">
           <label
             htmlFor="add-name"
-            className="text-foreground-weak text-xs font-medium uppercase tracking-wide"
+            className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
           >
             Name
           </label>
@@ -357,11 +357,11 @@ function ComposioConnectionRow({
                       key={t.slug}
                       className="border-border-weak border-l-2 pl-2"
                     >
-                      <code className="text-foreground text-[11px]">
+                      <code className="text-foreground text-xs">
                         {t.slug}
                       </code>
                       {t.description && (
-                        <p className="text-foreground-weak mt-0.5 text-[11px]">
+                        <p className="text-foreground-weak mt-0.5 text-xs">
                           {t.description}
                         </p>
                       )}
@@ -370,7 +370,7 @@ function ComposioConnectionRow({
                 </ul>
               </details>
             ) : (
-              <p className="text-foreground-weak text-xs">
+              <p className="text-foreground-weak text-sm">
                 No tools cached yet — click Refresh to populate.
               </p>
             )

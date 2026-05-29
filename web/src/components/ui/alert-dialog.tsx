@@ -103,7 +103,7 @@ const AlertDialogDescription = forwardRef<
 >(({ className, ...props }, ref) => (
   <Description
     ref={ref}
-    className={cn("text-foreground-weak text-sm leading-6", className)}
+    className={cn("text-foreground-weak text-base leading-6", className)}
     {...props}
   />
 ));

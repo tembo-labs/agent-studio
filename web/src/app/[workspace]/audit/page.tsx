@@ -80,12 +80,12 @@ export default async function AuditPage({
   ]);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Audit
         </h1>
-        <p className="text-foreground-weak text-sm">
+        <p className="text-foreground-weak text-base">
           Who changed what, when, and why across{" "}
           <span className="text-foreground font-medium">{workspace.name}</span>.
           Append-only — corrections appear as new events that reference the

@@ -51,7 +51,7 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
           . You can watch the Tembo session, and the PR status will appear on
           the Improvements page once it&apos;s open.
         </p>
-        <p className="text-foreground-weak text-xs">Status: {s.status}</p>
+        <p className="text-foreground-weak text-sm">Status: {s.status}</p>
         <div className="flex flex-wrap gap-3 pt-1">
           <a
             href={s.htmlUrl}

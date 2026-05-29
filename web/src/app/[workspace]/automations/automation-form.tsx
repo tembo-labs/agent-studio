@@ -148,7 +148,7 @@ export function AutomationForm({
           placeholder="0 9 * * 1-5"
           className="font-mono"
         />
-        <p className="text-foreground-muted text-xs">
+        <p className="text-foreground-muted text-sm">
           Five-field cron (minute, hour, day-of-month, month, day-of-week).
           Times are UTC.
         </p>
@@ -194,7 +194,7 @@ export function AutomationForm({
             </option>
           ))}
         </select>
-        <p className="text-foreground-muted text-xs">
+        <p className="text-foreground-muted text-sm">
           Scheduled runs use this user&apos;s Composio connections. If the
           agent declares a toolkit this user hasn&apos;t authorized, the run
           fails — pick someone who has the connections you need (or
@@ -212,7 +212,7 @@ export function AutomationForm({
           className="h-4 w-4"
         />
         <span className="text-foreground">Enabled</span>
-        <span className="text-foreground-weak text-xs">
+        <span className="text-foreground-weak text-sm">
           (turn off to pause without deleting)
         </span>
       </label>

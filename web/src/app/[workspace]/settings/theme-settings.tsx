@@ -119,7 +119,7 @@ function SidePicker({
     <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-border-weak)] bg-surface-raised p-4">
       <div className="flex flex-col">
         <span className="text-sm font-medium text-foreground">{title}</span>
-        <span className="text-xs text-foreground-weak">{description}</span>
+        <span className="text-sm text-foreground-weak">{description}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

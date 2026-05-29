@@ -87,14 +87,14 @@ export function RenameComposioConnectionForm({
       {state.error && (
         <p
           role="alert"
-          className="text-sentiment-negative max-w-[220px] text-right text-[11px] leading-tight"
+          className="text-sentiment-negative max-w-[220px] text-right text-xs leading-tight"
         >
           {state.error}
         </p>
       )}
-      <p className="text-foreground-muted max-w-[220px] text-right text-[11px] leading-tight">
+      <p className="text-foreground-muted max-w-[220px] text-right text-xs leading-tight">
         Update any agent file that references{" "}
-        <code className="bg-surface rounded px-1 py-0.5 text-[10px]">
+        <code className="bg-surface rounded px-1 py-0.5 text-xs">
           {currentName}
         </code>{" "}
         to the new name.
