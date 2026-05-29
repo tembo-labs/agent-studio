@@ -11,6 +11,18 @@ Each phase folder under [`context/`](./context/) contains a PRFAQ-style
 `USER_STORIES.md`, and a `DEMO_SCRIPT.md`. The repo's
 [`CHANGELOG.md`](./CHANGELOG.md) tracks what has actually shipped.
 
+**Phase numbers are construction milestones, not release versions.**
+Shipping is on [CalVer](https://calver.org/) — dated tags like
+`v2026.5.29` — so a release can carry work from any phase (or none).
+Phase scope is tracked as **GitHub Issues** (label
+[`roadmap`](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aroadmap)):
+the [0.5](https://github.com/tembo/agent-studio/milestone/1) and
+[0.6](https://github.com/tembo/agent-studio/milestone/2) milestones hold
+scheduled stories, and roadmap issues with
+[no milestone](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aroadmap)
+are the backlog. The `context/` docs hold design rationale; the issues
+hold status.
+
 ## [Phase 0.1 — Foundation](./context/shipped/0.1/) · *The trustworthy floor*
 
 > **Shipped May 2026.**
@@ -83,9 +95,9 @@ deliberate org-admin action.
 | 0.2 | Authoring velocity (shipped) | [`context/shipped/0.2/`](./context/shipped/0.2/) |
 | 0.3 | Operational surface (shipped) | [`context/shipped/0.3/`](./context/shipped/0.3/) |
 | 0.4 | Governance depth (shipped) | [`context/shipped/0.4/`](./context/shipped/0.4/) |
-| 0.5 | Adaptive intelligence (planned) | [`context/0.5/`](./context/0.5/) |
-| 0.6 | Mycelium (planned) | [`context/0.6/`](./context/0.6/) |
-| —   | Backlog (unscheduled, no milestone) | [`context/backlog/`](./context/backlog/) |
+| 0.5 | Adaptive intelligence (planned) | [`context/0.5/`](./context/0.5/) · [issues](https://github.com/tembo/agent-studio/milestone/1) |
+| 0.6 | Mycelium (planned) | [`context/0.6/`](./context/0.6/) · [issues](https://github.com/tembo/agent-studio/milestone/2) |
+| —   | Backlog (unscheduled, no milestone) | [`context/backlog/`](./context/backlog/) · [issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aroadmap) |
 
 Shipped phase folders moved under [`context/shipped/`](./context/shipped/) — see [`context/README.md`](./context/README.md) for the convention.
 

@@ -1,8 +1,44 @@
 # Changelog
 
 All notable changes to Tembo Agent Studio. Format loosely follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
-match the phase numbers in [`ROADMAP.md`](./ROADMAP.md).
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+**Versioning:** as of `v2026.5.29` releases use [CalVer](https://calver.org/)
+(`vYYYY.M.D`). The `0.1`–`0.4` entries below are phase numbers from
+[`ROADMAP.md`](./ROADMAP.md), which remain the *construction* milestones;
+they are no longer release versions. Phase scope now lives in
+[GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aroadmap).
+
+## [v2026.5.29] — First CalVer release — shipped 2026-05-29
+
+The cutover to date-based releases. Everything through Phase 0.4
+(Governance depth) is captured below; this tag marks the first release
+cut from `main` under the new scheme and ships one new capability on top
+of v0.4.
+
+### Added
+- **Native-MCP OAuth token auto-refresh.** The runner now refreshes
+  expiring native-MCP access tokens *before* a run reads them, instead
+  of letting an expired token reach the agent and 401 mid-run. For any
+  active oauth2 native connection (e.g. Attio) whose `token_expires_at`
+  is at/near expiry, it spends the stored `refresh_token` (granted via
+  `offline_access`) for a fresh token at the provider's discovered token
+  endpoint, re-encrypts the credentials, and bumps `token_expires_at`.
+  A rejected refresh (dead refresh token) proactively flips the
+  connection to `stale` so the UI prompts Reconnect; transient failures
+  are logged and the run proceeds on the existing token. Best-effort and
+  per-connection. `crypto.rs` gained an `encrypt()` twin to its existing
+  `decrypt()`; refresh lives in the runtime (`native_oauth.rs`) so no
+  plaintext round-trips through the web container.
+
+### Changed
+- **Roadmap tracking moved to GitHub Issues.** Phase 0.5 / 0.6 user
+  stories and the backlog are now issues (label `roadmap`; 0.5 and 0.6
+  milestones, backlog = no milestone). The `context/*/USER_STORIES.md`
+  docs are redirect pointers to the issues and retain design rationale +
+  out-of-scope notes.
+- **Version files adopt CalVer.** `api/Cargo.toml` and
+  `web/package.json` move from the long-stale `0.1.0` to `2026.5.29`.
 
 ## [v0.4] — Governance depth — shipped May 2026
 
