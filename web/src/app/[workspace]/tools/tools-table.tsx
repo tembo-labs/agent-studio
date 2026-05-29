@@ -20,14 +20,30 @@ import { ToolDetailDrawer } from "./tool-detail-drawer";
 type Props = {
   workspaceSlug: string;
   tools: McpTool[];
+  /** Initial filter state, normally read from URL search params on
+   *  the server page. Lets a deep link from a Connections row land
+   *  with the table already narrowed to that one connection's
+   *  tools. */
+  initialSearch?: string;
+  initialSource?: SourceFilter;
+  initialProvider?: string;
+  initialConnection?: string;
 };
 
 type SourceFilter = "all" | McpTool["source"];
 
-export function ToolsTable({ workspaceSlug, tools }: Props) {
-  const [search, setSearch] = useState("");
-  const [source, setSource] = useState<SourceFilter>("all");
-  const [provider, setProvider] = useState<string>("all");
+export function ToolsTable({
+  workspaceSlug,
+  tools,
+  initialSearch = "",
+  initialSource = "all",
+  initialProvider = "all",
+  initialConnection = "all",
+}: Props) {
+  const [search, setSearch] = useState(initialSearch);
+  const [source, setSource] = useState<SourceFilter>(initialSource);
+  const [provider, setProvider] = useState<string>(initialProvider);
+  const [connection, setConnection] = useState<string>(initialConnection);
   const [selected, setSelected] = useState<McpTool | null>(null);
 
   // Provider options derived from the data so the dropdown only
@@ -49,11 +65,35 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
   const effectiveProvider =
     provider === "all" || providerOptions.includes(provider) ? provider : "all";
 
+  // Connection-name options are scoped to the currently selected
+  // source + provider so a user with work + personal Attio sees both
+  // names; if they switch provider to slack, the list reflects slack's
+  // slot names instead.
+  const connectionOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tools) {
+      if (source !== "all" && t.source !== source) continue;
+      if (effectiveProvider !== "all" && t.provider !== effectiveProvider)
+        continue;
+      set.add(t.connectionName);
+    }
+    return Array.from(set).sort();
+  }, [tools, source, effectiveProvider]);
+  const effectiveConnection =
+    connection === "all" || connectionOptions.includes(connection)
+      ? connection
+      : "all";
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return tools.filter((t) => {
       if (source !== "all" && t.source !== source) return false;
       if (effectiveProvider !== "all" && t.provider !== effectiveProvider)
+        return false;
+      if (
+        effectiveConnection !== "all" &&
+        t.connectionName !== effectiveConnection
+      )
         return false;
       if (!needle) return true;
       // Substring against the user-visible fields. We don't bother
@@ -66,7 +106,7 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
         (t.description?.toLowerCase().includes(needle) ?? false)
       );
     });
-  }, [tools, search, source, effectiveProvider]);
+  }, [tools, search, source, effectiveProvider, effectiveConnection]);
 
   const totalCount = tools.length;
   const visibleCount = filtered.length;
@@ -129,6 +169,27 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
             ))}
           </select>
         </div>
+        <div className="flex min-w-[140px] flex-col gap-1">
+          <label
+            htmlFor="tools-connection"
+            className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
+          >
+            Connection
+          </label>
+          <select
+            id="tools-connection"
+            value={effectiveConnection}
+            onChange={(e) => setConnection(e.target.value)}
+            className="bg-input border-border text-foreground rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)]"
+          >
+            <option value="all">All connections</option>
+            {connectionOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="text-foreground-weak text-base">
@@ -162,7 +223,7 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
               otherwise an empty cell in a column with a fixed width
               still claims slack space from siblings, and Description
               ended up squeezed even though Tool was set narrow. */}
-          <table className="w-full table-fixed border-collapse text-sm">
+          <table className="w-full table-fixed border-collapse text-base">
             <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
               <tr>
                 <th className="w-[220px] px-3 py-2 text-left font-medium">
@@ -197,15 +258,15 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
                   <td className="px-3 py-2 align-top">
                     <CopyableSlug
                       slug={t.slug}
-                      className="text-foreground break-all text-xs font-medium"
+                      className="text-foreground break-all text-sm font-medium"
                     />
                     {t.displayName && t.displayName !== t.slug && (
-                      <div className="text-foreground-weak mt-0.5 text-xs">
+                      <div className="text-foreground-weak mt-0.5 text-sm">
                         {t.displayName}
                       </div>
                     )}
                   </td>
-                  <td className="text-foreground-weak px-3 py-2 align-top text-xs leading-snug">
+                  <td className="text-foreground-weak px-3 py-2 align-top text-sm leading-snug">
                     {t.description ?? "—"}
                   </td>
                   <td className="px-3 py-2 align-top whitespace-nowrap">
@@ -216,12 +277,12 @@ export function ToolsTable({ workspaceSlug, tools }: Props) {
                       {t.source === "composio" ? "Composio" : "Native MCP"}
                     </Badge>
                   </td>
-                  <td className="text-foreground px-3 py-2 align-top text-xs">
+                  <td className="text-foreground px-3 py-2 align-top text-sm">
                     {t.source === "composio"
                       ? toolkitLabel(t.provider)
                       : t.provider}
                   </td>
-                  <td className="text-foreground-muted px-3 py-2 align-top text-xs">
+                  <td className="text-foreground-muted px-3 py-2 align-top text-sm">
                     <code>{t.connectionName}</code>
                   </td>
                 </tr>

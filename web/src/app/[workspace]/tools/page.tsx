@@ -21,10 +21,13 @@ export const dynamic = "force-dynamic";
 
 export default async function ToolsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspace: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { workspace: slug } = await params;
+  const sp = await searchParams;
 
   const session = await getServerSession();
   if (!session) notFound();
@@ -33,6 +36,20 @@ export default async function ToolsPage({
   if (!workspace) notFound();
 
   const tools = await listToolsForUser(workspace.id, session.user.id);
+
+  // URL params seed the table's initial filter state. Connections
+  // rows link here with ?source=…&provider=…&connection=… to land
+  // the user on a pre-filtered view of just that connection's tools.
+  const sourceParam = typeof sp.source === "string" ? sp.source : undefined;
+  const initialSource: "all" | "composio" | "native-mcp" =
+    sourceParam === "composio" || sourceParam === "native-mcp"
+      ? sourceParam
+      : "all";
+  const initialProvider =
+    typeof sp.provider === "string" ? sp.provider : "all";
+  const initialConnection =
+    typeof sp.connection === "string" ? sp.connection : "all";
+  const initialSearch = typeof sp.q === "string" ? sp.q : "";
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
@@ -57,7 +74,14 @@ export default async function ToolsPage({
 
       <hr className="border-[var(--color-border-weak)]" />
 
-      <ToolsTable workspaceSlug={workspace.slug} tools={tools} />
+      <ToolsTable
+        workspaceSlug={workspace.slug}
+        tools={tools}
+        initialSource={initialSource}
+        initialProvider={initialProvider}
+        initialConnection={initialConnection}
+        initialSearch={initialSearch}
+      />
     </div>
   );
 }

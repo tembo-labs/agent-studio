@@ -189,33 +189,20 @@ function ProviderRow({
         </p>
 
         {toolCount > 0 ? (
-          <details className="text-xs">
-            <summary className="text-foreground-weak hover:text-foreground cursor-pointer select-none">
-              <span className="text-foreground font-medium">{toolCount}</span>{" "}
-              tools available
-              {lastRefreshed && (
-                <>
-                  {" · refreshed "}
-                  <LocalTime iso={lastRefreshed.toISOString()} style="relative" />
-                </>
-              )}
-            </summary>
-            <ul className="mt-2 max-h-80 space-y-1.5 overflow-y-auto pr-2">
-              {tools.map((t) => (
-                <li
-                  key={t.slug}
-                  className="border-border-weak border-l-2 pl-2"
-                >
-                  <code className="text-foreground text-xs">{t.slug}</code>
-                  {t.description && (
-                    <p className="text-foreground-weak mt-0.5 text-xs">
-                      {t.description}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </details>
+          <p className="text-foreground-weak text-sm">
+            <Link
+              href={`/${workspaceSlug}/tools?source=native-mcp&provider=${encodeURIComponent(provider.slug)}&connection=${encodeURIComponent(connection.name)}`}
+              className="text-foreground hover:text-foreground-title font-medium hover:underline"
+            >
+              {toolCount} tools available
+            </Link>
+            {lastRefreshed && (
+              <>
+                {" · refreshed "}
+                <LocalTime iso={lastRefreshed.toISOString()} style="relative" />
+              </>
+            )}
+          </p>
         ) : (
           <p className="text-foreground-weak text-sm">
             No tools cached yet — click Refresh to populate.
