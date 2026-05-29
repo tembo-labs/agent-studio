@@ -297,6 +297,21 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
     // `{provider: {name: {mcp_url, access_token}}}`. Independent of
     // Composio; an agent can mix both sources in its spec.
     let native_mcp_connections_json: Option<String> = {
+        // Refresh-before-use: mint fresh access tokens for any native
+        // connections at/near expiry before we read and hand them to
+        // the wrapper. Best-effort — a failed refresh falls through to
+        // the existing stale-marking path if the token then 401s.
+        if let Err(e) = crate::native_oauth::refresh_expiring_native_connections(
+            &state.db,
+            &state.encryption_key,
+            &state.http,
+            ctx.workspace_id,
+            &ctx.acting_user_id,
+        )
+        .await
+        {
+            tracing::warn!(?e, "native MCP refresh sweep errored; proceeding with existing tokens");
+        }
         let rows = list_active_native_connections(
             &state.db,
             &state.encryption_key,

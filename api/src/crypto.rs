@@ -1,10 +1,12 @@
-//! AES-256-GCM decryption that mirrors the TS web/src/lib/crypto.ts
-//! layout (nonce || ciphertext || tag). The TS side encrypts; the Rust
-//! side decrypts to invoke provider APIs without round-tripping the
-//! plaintext through the web container.
+//! AES-256-GCM crypto that mirrors the TS web/src/lib/crypto.ts
+//! layout (nonce || ciphertext || tag). The web side is the primary
+//! encryptor; the Rust side decrypts to invoke provider APIs without
+//! round-tripping the plaintext through the web container, and
+//! re-encrypts when the runtime itself mints new secrets (e.g. a
+//! refreshed native-MCP OAuth token).
 
 use aes_gcm::{
-    aead::{Aead, KeyInit},
+    aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
 };
 use anyhow::{anyhow, Context};
@@ -36,6 +38,23 @@ impl MasterKey {
         }
         let key = Key::<Aes256Gcm>::clone_from_slice(&bytes);
         Ok(Self(key))
+    }
+
+    /// Encrypt `plaintext` into the same `nonce || ciphertext || tag`
+    /// layout the web side produces, so a blob written here is
+    /// interchangeable with one written by crypto.ts. A fresh random
+    /// 12-byte nonce is generated per call (AES-GCM is catastrophic on
+    /// nonce reuse — never make this deterministic).
+    pub fn encrypt(&self, plaintext: &str) -> anyhow::Result<Vec<u8>> {
+        let cipher = Aes256Gcm::new(&self.0);
+        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let ciphertext = cipher
+            .encrypt(&nonce, plaintext.as_bytes())
+            .map_err(|e| anyhow!("encrypt failed: {e}"))?;
+        let mut out = Vec::with_capacity(NONCE_LEN + ciphertext.len());
+        out.extend_from_slice(nonce.as_slice());
+        out.extend_from_slice(&ciphertext);
+        Ok(out)
     }
 
     pub fn decrypt(&self, blob: &[u8]) -> anyhow::Result<String> {

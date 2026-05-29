@@ -9,6 +9,7 @@ use tracing_subscriber::EnvFilter;
 
 mod auth;
 mod crypto;
+mod native_oauth;
 mod pricing;
 mod routes;
 mod runs;
