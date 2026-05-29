@@ -45,7 +45,7 @@ larger than the phase could absorb and moved to v0.4 — see the
 "Deferred from the v0.3 plan" section in the phase
 [`README.md`](./context/shipped/0.3/) for the full set of carve-outs.
 
-## [Phase 0.4 — Governance depth](./context/0.4/) · *Audit and access*
+## [Phase 0.4 — Governance depth](./context/shipped/0.4/) · *Audit and access*
 
 Build the controls organizations need to scale usage from one team to
 many. An immutable `who/when/why` changelog records every change, run,
@@ -82,7 +82,7 @@ deliberate org-admin action.
 | 0.1 | Foundation (shipped) | [`context/shipped/0.1/`](./context/shipped/0.1/) |
 | 0.2 | Authoring velocity (shipped) | [`context/shipped/0.2/`](./context/shipped/0.2/) |
 | 0.3 | Operational surface (shipped) | [`context/shipped/0.3/`](./context/shipped/0.3/) |
-| 0.4 | Governance depth (in flight) | [`context/0.4/`](./context/0.4/) |
+| 0.4 | Governance depth (shipped) | [`context/shipped/0.4/`](./context/shipped/0.4/) |
 | 0.5 | Adaptive intelligence (planned) | [`context/0.5/`](./context/0.5/) |
 | 0.6 | Mycelium (planned) | [`context/0.6/`](./context/0.6/) |
 | —   | Backlog (unscheduled, no milestone) | [`context/backlog/`](./context/backlog/) |

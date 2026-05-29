@@ -8,7 +8,7 @@ Format: Connextra (**As a** *role*, **I want** *capability*, **so that** *benefi
 - **Workspace Admin** — runs one team's TAS workspace.
 - **Support Engineer** — first-line incident response.
 
-Governance personas (Compliance Stakeholder, Org Admin) live in [v0.4 (Governance depth)](../../0.4/).
+Governance personas (Compliance Stakeholder, Org Admin) live in [v0.4 (Governance depth)](../0.4/).
 
 ---
 
@@ -241,7 +241,7 @@ Governance personas (Compliance Stakeholder, Org Admin) live in [v0.4 (Governanc
 - AV scanning on file uploads — pilot-feedback bucket.
 - Workspace-scoped data residency controls — out of scope until enterprise demand validates priority.
 - Custom dashboard widgets per workspace — promising; gather pilot signal before promoting.
-- Structured-event-level audit and access control — explicitly moved to [v0.4 (Governance depth)](../../0.4/).
+- Structured-event-level audit and access control — explicitly moved to [v0.4 (Governance depth)](../0.4/).
 - Saved log queries and log export from the v0.3 log explorer — defer to v0.4 governance alongside audit export.
 - Topology-map editing (drag-to-connect, in-map node creation) — out of scope; v0.2's chat-to-PR remains the authoring path.
 - Per-user notification preferences for tasks inbox — v0.4 once RBAC lands.

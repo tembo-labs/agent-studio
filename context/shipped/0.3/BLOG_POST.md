@@ -26,7 +26,7 @@ v0.3's per-agent dashboard answers it: this run, this history, these recent chan
 
 ## What v0.3 Is Not
 
-- Not the audit release. Immutable `who/when/why`, RBAC, and policy templates are [v0.4 (Governance depth)](../../0.4/).
+- Not the audit release. Immutable `who/when/why`, RBAC, and policy templates are [v0.4 (Governance depth)](../0.4/).
 - Not the learning release. Correction-to-code is [v0.5 (Adaptive intelligence)](../../0.5/).
 - Not a Datadog replacement. Operational dashboards target triage, not SRE-grade observability.
 

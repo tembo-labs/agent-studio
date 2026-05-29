@@ -4,9 +4,53 @@ All notable changes to Tembo Agent Studio. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
 match the phase numbers in [`ROADMAP.md`](./ROADMAP.md).
 
-## [v0.4] — Governance depth — in progress
+## [v0.4] — Governance depth — shipped May 2026
 
 ### Added
+- **Native MCP connections.** Second connection substrate alongside
+  Composio: TAS-managed OAuth straight to the provider's official
+  MCP server. The user clicks Connect and TAS performs MCP-spec
+  discovery + Dynamic Client Registration (RFC 7591) + PKCE under
+  the hood — no per-provider OAuth-app setup, no `build.attio.com`
+  side quest. `lib/mcp-providers.ts` is a one-line-per-provider
+  catalog (today: Attio); everything else (auth URL, token URL,
+  scopes, DCR endpoint) is read from `/.well-known/oauth-protected-
+  resource`. Agent spec `connections:` entries dispatch by
+  `source:` (`composio` default, `native-mcp` opt-in); the Python
+  wrapper builds one `MCPToolset` per declared (provider, name)
+  slot with the user's bearer token in `Authorization` headers and
+  honors `tools:` narrowing on native entries via
+  `FilteredToolset`. Rust runner decrypts the `workspace_connection`
+  row per acting user and ships the credentials as
+  `TAS_NATIVE_MCP_CONNECTIONS` env.
+- **Unified tool catalog + Tools tab.** Normalized
+  `workspace_mcp_tool` table (migrations 0029 + 0030) caches every
+  tool exposed by any connection, indexed by source + provider +
+  connection name. Primed on connect, refreshable from a per-row
+  button on the Connections page, cleared on disconnect. New
+  workspace-level `/<workspace>/tools` page lists everything in a
+  searchable, filterable table with click-to-copy slugs — kills
+  the "is it `RUN_BASIC_REPORT` or `run-basic-report`?" guessing
+  game that the kebab-case-vs-UPPER_SNAKE_CASE split between
+  Attio's MCP and Composio's REST wrappers used to force on you.
+- **Lean CAP prompt + canonical agent guidance.** Tembo Coding
+  Agent prompts dropped ~16KB by replacing the inline canonical-
+  guidance block with a pointer at the on-disk files (Sync agent
+  guidance pushes the canonical content to the customer repo on
+  demand; a scheduled refresh lives in
+  `context/backlog/`). `PYDANTIC_GUIDE` learned both connection
+  substrates, the slug-case gotcha, and a Switching-from-Composio-
+  to-Native-MCP recipe.
+- **Test foundation (Vitest + Polly.js + Playwright/Cucumber).**
+  `pnpm test` runs unit + integration in ~300ms covering the RBAC
+  policy + the workspace-authorize funnel (the v0.4-02 deny-test
+  exit-bar item — operator is denied workspace_admin actions,
+  no-session short-circuits before workspace lookup so existence
+  isn't leaked). `pnpm test:bdd` drives a real Chromium through
+  Gherkin-style feature files via Cucumber.js — pilots: anon
+  redirects to sign-in, signed-in workspace_admin lands on the
+  dashboard (seeded via direct Postgres write + HMAC-signed
+  session cookie). HTTP fixtures recorded as Polly.js cassettes.
 - **Immutable audit changelog (US-0.4-01).** Append-only
   `audit_event` table records actor / when / source / target /
   payload for the event types that don't already live in another
@@ -54,10 +98,13 @@ match the phase numbers in [`ROADMAP.md`](./ROADMAP.md).
 
 ### Scope moves
 - **API-level deny test in CI → v0.4+.** The v0.4-02 AC asks for
-  CI-verified API enforcement. The policy unit
-  (`web/scripts/rbac-policy.test.mjs`) covers the role-ordering
-  invariant; an HTTP-level integration deny test is deferred
-  until we set up a session-aware test harness.
+  CI-verified API enforcement. Vitest deny-tests on the
+  `authorizeWorkspace` funnel land in v0.4 itself
+  (`web/src/lib/auth-server.test.ts`); the GitHub Actions workflow
+  that would run them on every PR is in
+  [`context/backlog/`](./context/backlog/USER_STORIES.md) — the
+  enforcement is locked in by code + test, CI is the missing
+  enforcement of the test.
 - **US-0.4-03 (org-level policy templates) → Backlog.** Needs an
   org concept (a scope above workspace) plus a generic policy
   resolver substrate; the rest of v0.4 ships cleanly without it.

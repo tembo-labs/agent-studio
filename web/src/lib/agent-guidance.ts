@@ -34,7 +34,7 @@ export type GuidanceFile = {
 // we're shipping; coding agents pass this through to PR bodies so
 // reviewers can spot if a PR was authored against a now-deprecated
 // TAS version.
-export const TAS_APP_VERSION = "0.2";
+export const TAS_APP_VERSION = "0.4";
 
 const CARGO_AI_GUIDE: string = `# Cargo AI Agent Guide
 
