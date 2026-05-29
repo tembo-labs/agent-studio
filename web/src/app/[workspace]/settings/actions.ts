@@ -406,7 +406,7 @@ export async function disconnectComposioConnectionAction(
   });
 
   revalidatePath(`/${slug}/settings`);
-  revalidatePath(`/${slug}/connections`);
+  revalidatePath(`/${slug}/connections`, "layout");
   return { message: "Connection removed." };
 }
 
@@ -470,7 +470,7 @@ export async function refreshComposioToolsAction(
     return { error: `Refresh failed: ${(e as Error).message.slice(0, 160)}` };
   }
 
-  revalidatePath(`/${slug}/connections`);
+  revalidatePath(`/${slug}/connections`, "layout");
   return { message: "Tools refreshed." };
 }
 
@@ -536,7 +536,7 @@ export async function renameComposioConnectionAction(
   });
 
   revalidatePath(`/${slug}/settings`);
-  revalidatePath(`/${slug}/connections`);
+  revalidatePath(`/${slug}/connections`, "layout");
   return { message: "Renamed." };
 }
 

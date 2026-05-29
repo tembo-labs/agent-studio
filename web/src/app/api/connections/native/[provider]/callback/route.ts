@@ -26,7 +26,7 @@ function back(
   status: "ok" | "error",
   detail?: string,
 ): NextResponse {
-  const target = new URL(`/${slug}/connections`, getPublicOrigin());
+  const target = new URL(`/${slug}/connections/native-mcp`, getPublicOrigin());
   target.searchParams.set("native_mcp", provider);
   target.searchParams.set("result", status);
   if (detail) target.searchParams.set("detail", detail.slice(0, 200));

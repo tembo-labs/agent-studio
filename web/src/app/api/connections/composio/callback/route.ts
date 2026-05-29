@@ -33,7 +33,7 @@ function backToConnections(
   // landing is on the canonical host even if Composio bounces the
   // browser to a request.url that resolved to 0.0.0.0 inside the
   // container.
-  const target = new URL(`/${slug}/connections`, getPublicOrigin());
+  const target = new URL(`/${slug}/connections/composio`, getPublicOrigin());
   target.searchParams.set("composio", toolkit);
   target.searchParams.set("result", status);
   if (detail) target.searchParams.set("detail", detail.slice(0, 200));

@@ -84,7 +84,7 @@ export async function disconnectNativeMcpConnectionAction(
     payload: { provider: row.type, name: row.name, source: "native-mcp" },
   });
 
-  revalidatePath(`/${slug}/connections`);
+  revalidatePath(`/${slug}/connections`, "layout");
   return { message: "Connection disconnected." };
 }
 
@@ -145,7 +145,7 @@ export async function refreshNativeMcpToolsAction(
     };
   }
 
-  revalidatePath(`/${slug}/connections`);
+  revalidatePath(`/${slug}/connections`, "layout");
   return { message: "Tools refreshed." };
 }
 
@@ -235,6 +235,6 @@ export async function renameNativeMcpConnectionAction(
     },
   });
 
-  revalidatePath(`/${slug}/connections`);
+  revalidatePath(`/${slug}/connections`, "layout");
   return { message: "Connection renamed." };
 }
