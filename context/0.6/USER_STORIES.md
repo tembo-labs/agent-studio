@@ -2,7 +2,7 @@
 
 > **Migrated to GitHub Issues on 2026-05-29.** These stories are now
 > tracked as issues under the **[0.6 — Mycelium milestone](https://github.com/tembo/agent-studio/milestone/2)**
-> (label [`roadmap`](https://github.com/tembo/agent-studio/labels/roadmap)).
+> (label [`enhancement`](https://github.com/tembo/agent-studio/labels/enhancement)).
 > This file is kept as the design-rationale pointer; the issues are the
 > canonical, status-bearing list. Edit scope in the issues, not here.
 

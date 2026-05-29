@@ -7,7 +7,7 @@ All notable changes to Tembo Agent Studio. Format loosely follows
 (`vYYYY.M.D`). The `0.1`–`0.4` entries below are phase numbers from
 [`ROADMAP.md`](./ROADMAP.md), which remain the *construction* milestones;
 they are no longer release versions. Phase scope now lives in
-[GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aroadmap).
+[GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
 ## [v2026.5.29] — First CalVer release — shipped 2026-05-29
 
@@ -33,7 +33,7 @@ of v0.4.
 
 ### Changed
 - **Roadmap tracking moved to GitHub Issues.** Phase 0.5 / 0.6 user
-  stories and the backlog are now issues (label `roadmap`; 0.5 and 0.6
+  stories and the backlog are now issues (label `enhancement`; 0.5 and 0.6
   milestones, backlog = no milestone). The `context/*/USER_STORIES.md`
   docs are redirect pointers to the issues and retain design rationale +
   out-of-scope notes.

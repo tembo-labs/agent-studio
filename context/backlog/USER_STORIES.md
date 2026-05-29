@@ -1,12 +1,12 @@
 # Backlog — User Stories
 
 > **Migrated to GitHub Issues on 2026-05-29.** Backlog items are now
-> tracked as issues with the [`roadmap`](https://github.com/tembo/agent-studio/labels/roadmap)
+> tracked as issues with the [`enhancement`](https://github.com/tembo/agent-studio/labels/enhancement)
 > label and **no milestone** — that's what distinguishes backlog
 > (unscheduled) from a scheduled phase (0.5 / 0.6 milestones).
 >
 > Live view:
-> [open roadmap issues with no milestone](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aroadmap).
+> [open enhancement issues with no milestone](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aenhancement).
 >
 > This file is kept as the design-rationale pointer; the issues are the
 > canonical, status-bearing list. When a backlog item gets sized and
@@ -29,7 +29,7 @@
   intentionally out of scope for that phase from the start. They inform
   the phase's intent but don't represent active backlog, and are **not**
   filed as issues (see each phase's `USER_STORIES.md`).
-- **Backlog (`roadmap` label, no milestone)** — stories that *don't have
+- **Backlog (`enhancement` label, no milestone)** — stories that *don't have
   a phase yet*. Either originally planned and cut, or surfaced
   mid-development without a natural home. Assign a milestone when sized
   and scheduled.

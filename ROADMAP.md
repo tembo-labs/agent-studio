@@ -15,11 +15,11 @@ Each phase folder under [`context/`](./context/) contains a PRFAQ-style
 Shipping is on [CalVer](https://calver.org/) — dated tags like
 `v2026.5.29` — so a release can carry work from any phase (or none).
 Phase scope is tracked as **GitHub Issues** (label
-[`roadmap`](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aroadmap)):
+[`enhancement`](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement)):
 the [0.5](https://github.com/tembo/agent-studio/milestone/1) and
 [0.6](https://github.com/tembo/agent-studio/milestone/2) milestones hold
-scheduled stories, and roadmap issues with
-[no milestone](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aroadmap)
+scheduled stories, and enhancement issues with
+[no milestone](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aenhancement)
 are the backlog. The `context/` docs hold design rationale; the issues
 hold status.
 
@@ -97,7 +97,7 @@ deliberate org-admin action.
 | 0.4 | Governance depth (shipped) | [`context/shipped/0.4/`](./context/shipped/0.4/) |
 | 0.5 | Adaptive intelligence (planned) | [`context/0.5/`](./context/0.5/) · [issues](https://github.com/tembo/agent-studio/milestone/1) |
 | 0.6 | Mycelium (planned) | [`context/0.6/`](./context/0.6/) · [issues](https://github.com/tembo/agent-studio/milestone/2) |
-| —   | Backlog (unscheduled, no milestone) | [`context/backlog/`](./context/backlog/) · [issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aroadmap) |
+| —   | Backlog (unscheduled, no milestone) | [`context/backlog/`](./context/backlog/) · [issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aenhancement) |
 
 Shipped phase folders moved under [`context/shipped/`](./context/shipped/) — see [`context/README.md`](./context/README.md) for the convention.
 
