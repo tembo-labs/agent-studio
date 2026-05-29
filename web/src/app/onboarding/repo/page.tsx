@@ -16,6 +16,8 @@ import {
   userIsMember,
 } from "@/lib/workspace";
 
+import { SignOutLink } from "../sign-out-link";
+
 import { ConnectRepoForm } from "./connect-repo-form";
 
 export const dynamic = "force-dynamic";
@@ -83,6 +85,7 @@ export default async function OnboardingRepoPage({
             <ConnectRepoForm workspaceSlug={workspace.slug} />
           </CardContent>
         </Card>
+        <SignOutLink email={session.user.email} />
       </div>
     </main>
   );
