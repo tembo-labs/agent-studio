@@ -185,10 +185,11 @@ export function DailyTrend({ daily }: { daily: AgentDailyRunBands[] }) {
  * honest — a sparse gap is meaningful (no runs that day), and styling
  * it the same as a day full of "other"-status runs would be a lie.
  *
- * Within a populated box, bands stack top-to-bottom in time order:
- * earliest runs at the top, latest at the bottom. The success/failure
- * pattern stripes downward, which mirrors how operators tend to read
- * timelines (top first, scroll for "what happened later").
+ * Within a populated box, bands stripe left-to-right in time order:
+ * earliest runs on the left, latest on the right. Reading direction
+ * matches the outer 30-day strip (oldest-on-the-left), so the eye
+ * can zoom in from "which day" to "what time of day" without
+ * flipping orientation.
  */
 function DayBox({ day }: { day: AgentDailyRunBands }) {
   if (day.total === 0) {
@@ -212,7 +213,7 @@ function DayBox({ day }: { day: AgentDailyRunBands }) {
   return (
     <div
       title={title}
-      className="flex flex-1 flex-col overflow-hidden rounded-sm"
+      className="flex flex-1 flex-row overflow-hidden rounded-sm"
     >
       {day.bands.map((band, i) => (
         <div
