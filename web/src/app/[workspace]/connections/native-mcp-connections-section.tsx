@@ -215,6 +215,20 @@ function ProviderRow({
           connectionId={connection.id}
           label={toolCount > 0 ? "Refresh tools" : "Refresh"}
         />
+        <Link
+          // Same authorize endpoint the first-time Connect uses —
+          // re-running discovery + DCR + PKCE replaces the row's
+          // tokens via the callback's saveNativeConnection upsert.
+          // Needed for Native MCP because tokens expire (Attio's
+          // are hours), and reconnecting beats waiting for the
+          // next run to fail with a 401.
+          href={`/api/connections/native/${provider.slug}/authorize?workspace=${encodeURIComponent(
+            workspaceSlug,
+          )}${connection.name !== "default" ? `&name=${encodeURIComponent(connection.name)}` : ""}`}
+          className="text-foreground hover:text-foreground-title text-sm font-medium hover:underline"
+        >
+          Reconnect
+        </Link>
         <RenameNativeMcpConnectionForm
           workspaceSlug={workspaceSlug}
           connectionId={connection.id}
