@@ -46,9 +46,9 @@ Today you can:
 
 - Self-host the whole stack via `docker compose up` (build from source)
   or from prebuilt images (`compose.release.yaml`). Deploy to a managed
-  host: the full stack on [Railway](./guides/RAILWAY_DEPLOY.md), or the
-  web tier on [Vercel](./guides/VERCEL_DEPLOY.md) with the api on a
-  long-lived host.
+  host: the full stack on [Railway](./guides/RAILWAY_DEPLOY.md) or
+  [AWS](./guides/AWS_DEPLOY.md) (EC2 or ECS), or the web tier on
+  [Vercel](./guides/VERCEL_DEPLOY.md) with the api on a long-lived host.
 - Sign in with Google and connect a GitHub repository as the workspace's
   source of truth.
 - List, create, edit (via chat-to-PR), and run agents in two frameworks —
@@ -80,6 +80,8 @@ and [`ROADMAP.md`](./ROADMAP.md) for where it's headed.
 
 - [`guides/RAILWAY_DEPLOY.md`](./guides/RAILWAY_DEPLOY.md) — run the full
   stack on Railway from the published GHCR images.
+- [`guides/AWS_DEPLOY.md`](./guides/AWS_DEPLOY.md) — single EC2 box, or
+  ECS Fargate + RDS, from the published images.
 - [`guides/VERCEL_DEPLOY.md`](./guides/VERCEL_DEPLOY.md) — deploy the web
   tier on Vercel with the api on Fly/Render and managed Postgres.
 
