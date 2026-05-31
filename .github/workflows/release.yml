@@ -10,9 +10,9 @@
 #
 # Each image is signed (cosign keyless) and scanned (Trivy, report-only),
 # carries SBOM + provenance attestations, and the published version is
-# written back as the compose.release.yaml default. Customers consume the
-# images via compose.release.yaml. Postgres is the upstream official
-# image and is never republished here.
+# proposed as a PR bumping the compose.release.yaml default. Customers
+# consume the images via compose.release.yaml. Postgres is the upstream
+# official image and is never republished here.
 #
 # Scope: linux/amd64. Multi-arch (arm64 via a native runner) is a
 # deliberate later step — see the image-publishing strategy.
@@ -129,7 +129,9 @@ jobs:
           category: ${{ matrix.image }}
 
   # Keep compose.release.yaml's default tag in lockstep with the release
-  # just published, so the out-of-box pin never goes stale.
+  # just published, so the out-of-box pin never goes stale. Opens a PR
+  # rather than pushing to main, so it works under branch protection and
+  # the bump stays reviewable.
   bump-compose:
     needs: images
     # Only on a real tag push (not a manual re-publish, which could point
@@ -137,28 +139,36 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # push the bump branch
+      pull-requests: write # open the PR
     steps:
       - name: Check out main
         uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Rewrite the TAS_VERSION default
+      - name: Open a PR bumping the TAS_VERSION default
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           sed -E -i "s/(TAS_VERSION:-)[^}]+/\1${VERSION}/g" compose.release.yaml
-
-      - name: Commit if changed
-        run: |
-          set -euo pipefail
           if git diff --quiet -- compose.release.yaml; then
-            echo "compose.release.yaml already at ${GITHUB_REF_NAME#v}; nothing to do."
+            echo "compose.release.yaml already at ${VERSION}; nothing to do."
             exit 0
           fi
+          BRANCH="release/bump-compose-${VERSION}"
+          TITLE="release: bump compose.release.yaml default to ${VERSION}"
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${BRANCH}"
           git add compose.release.yaml
-          git commit -m "release: bump compose.release.yaml default to ${GITHUB_REF_NAME#v} [skip ci]"
-          git push origin main
+          git commit -m "${TITLE}"
+          # force-with-lease so re-running the same tag updates the branch
+          # cleanly instead of failing on a non-fast-forward.
+          git push --force-with-lease origin "${BRANCH}"
+          # Create the PR, or no-op if one is already open for this branch.
+          gh pr create --base main --head "${BRANCH}" --title "${TITLE}" \
+            --body "Automated: keep \`compose.release.yaml\`'s default pin in lockstep with the \`${GITHUB_REF_NAME}\` release, so customers deploying from published images get the matching version out of the box. The api applies DB migrations on boot." \
+            || echo "PR already exists for ${BRANCH}; branch updated."
