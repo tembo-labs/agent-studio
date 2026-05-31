@@ -9,6 +9,40 @@ All notable changes to Tembo Agent Studio. Format loosely follows
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.5.31] — Container image publishing — shipped 2026-05-31
+
+Makes TAS deployable from prebuilt images instead of a source build, and
+hardens the supply chain around them.
+
+### Added
+- **Container images published to GHCR.** A release workflow
+  (`.github/workflows/release.yml`) builds and pushes `tas-api` +
+  `tas-web` to `ghcr.io/tembo/` on every `v*` tag, tagged
+  `<version>` / `<major>.<minor>` / `latest`. Images are **cosign**
+  keyless-signed and carry SBOM + provenance attestations; **Trivy**
+  scans each image (report-only). A `compose.release.yaml` runs the
+  stack from those images (`docker compose -f compose.release.yaml pull
+  && up -d`), pinned by `TAS_VERSION` and kept in lockstep with each
+  release via an auto-opened PR. Customers no longer compile Rust/Node
+  on their host.
+- **Onboarding sign-out link.** A "Signed in as … Not you? Sign out"
+  affordance on both onboarding steps (`/onboarding` and
+  `/onboarding/repo`) so someone who authenticated with the wrong
+  Google account can recover without an app shell to hang a user menu
+  off of.
+- **Dependabot** enabled for GitHub Actions + npm.
+
+### Changed
+- **api image runs as a non-root user** (uid 1001), matching web. The
+  run path writes nothing to disk (spec via stdin, result via stdout),
+  so no writable app dir is needed.
+
+### Fixed
+- **postcss bumped to ≥ 8.5.10** via a pnpm override to clear
+  GHSA-qx2v-qp2m-jg93 (a CSS-stringify XSS in the copy Next pins
+  transitively). Not reachable in TAS — build-time, dev-authored CSS —
+  resolved to clear the alert and de-dupe to one postcss.
+
 ## [v2026.5.29] — First CalVer release — shipped 2026-05-29
 
 The cutover to date-based releases. Everything through Phase 0.4

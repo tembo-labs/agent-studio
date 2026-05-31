@@ -1,6 +1,6 @@
 [package]
 name = "tas-api"
-version = "2026.5.29"
+version = "2026.5.31"
 edition = "2021"
 description = "Tembo Agent Studio — runtime + orchestration API"
 license = "MIT"
