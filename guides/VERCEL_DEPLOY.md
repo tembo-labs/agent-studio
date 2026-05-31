@@ -44,13 +44,19 @@ no manual migration step is needed — just hand over the URL.
 ## 2. The api tier (Rust)
 
 Pick a host that supports long-lived Rust processes with outbound
-network access:
+network access. Either build from `api/Dockerfile` or — simpler — deploy
+the **published image** `ghcr.io/tembo/tas-api:<version>` (signed +
+scanned; see the [main README](../README.md#running-from-published-images-no-source-build)):
 
-- **Fly.io** — `fly launch` against `api/Dockerfile` is the path of
-  least resistance.
-- **Render** — point at `api/Dockerfile`, set the start command to
-  `tas-api`.
-- **Railway** — same shape; bring the Dockerfile.
+- **Fly.io** — `fly launch` against `api/Dockerfile`, or `fly deploy
+  --image ghcr.io/tembo/tas-api:<version>`.
+- **Render** — point at `api/Dockerfile` (start command `tas-api`), or
+  deploy the published image directly.
+- **Railway** — same shape; bring the Dockerfile or the image.
+
+> If you want the **whole stack** on Railway (web included) rather than
+> the Vercel split, follow [`RAILWAY_DEPLOY.md`](./RAILWAY_DEPLOY.md)
+> instead — it runs all three tiers from the published images.
 
 ### Required env on the api host
 
@@ -141,7 +147,7 @@ host picks up requests on the next webhook / scheduled-run tick.
   longer-lived process). Track via the audit timeline — every
   scheduled fire writes an event.
 - **Event triggers** (Composio webhooks) terminate at
-  `/api/hooks/composio/{slug}` on the web tier. Vercel's free tier
+  `/api/hooks/composio/{workspace}` on the web tier. Vercel's free tier
   has a 10s function timeout; that's fine for webhook verification
   + enqueue, but won't accommodate any inline work. Keep
   `/api/hooks/*` handlers thin (verify → POST `/internal/runs` →
