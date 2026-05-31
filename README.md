@@ -44,9 +44,11 @@ compilers.
 
 Today you can:
 
-- Self-host the whole stack via `docker compose up`, or deploy the
-  web tier on Vercel and the api tier on a long-lived host — see
-  [`guides/VERCEL_DEPLOY.md`](./guides/VERCEL_DEPLOY.md).
+- Self-host the whole stack via `docker compose up` (build from source)
+  or from prebuilt images (`compose.release.yaml`). Deploy to a managed
+  host: the full stack on [Railway](./guides/RAILWAY_DEPLOY.md), or the
+  web tier on [Vercel](./guides/VERCEL_DEPLOY.md) with the api on a
+  long-lived host.
 - Sign in with Google and connect a GitHub repository as the workspace's
   source of truth.
 - List, create, edit (via chat-to-PR), and run agents in two frameworks —
@@ -76,6 +78,8 @@ and [`ROADMAP.md`](./ROADMAP.md) for where it's headed.
 
 ## Guides
 
+- [`guides/RAILWAY_DEPLOY.md`](./guides/RAILWAY_DEPLOY.md) — run the full
+  stack on Railway from the published GHCR images.
 - [`guides/VERCEL_DEPLOY.md`](./guides/VERCEL_DEPLOY.md) — deploy the web
   tier on Vercel with the api on Fly/Render and managed Postgres.
 
@@ -126,8 +130,12 @@ docker compose -f compose.release.yaml up -d
 ```
 
 Images (`ghcr.io/tembo/tas-api`, `ghcr.io/tembo/tas-web`) are published
-per release tag by `.github/workflows/release.yml`. Upgrading is `bump
-TAS_VERSION → pull → up -d`; the API applies any new migrations on boot.
+per release tag by `.github/workflows/release.yml` — signed (cosign),
+scanned (Trivy), with SBOM + provenance. Upgrading is `bump TAS_VERSION
+→ pull → up -d`; the API applies any new migrations on boot.
+
+To run these images on a managed host instead of your own box, see
+[`guides/RAILWAY_DEPLOY.md`](./guides/RAILWAY_DEPLOY.md).
 
 ### Developing without Docker
 
