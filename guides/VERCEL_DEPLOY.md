@@ -27,7 +27,7 @@ both tiers connect to the same database.
 
 ## 1. Postgres
 
-Spin up a managed Postgres 16 instance with the `pgcrypto` extension
+Spin up a managed Postgres 16-or-newer instance with the `pgcrypto` extension
 available (TAS uses `gen_random_uuid()`). Recommended providers:
 
 - **Neon** — generous free tier, branch-friendly for staging.

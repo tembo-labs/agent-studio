@@ -33,7 +33,7 @@ Connect. Only `web` sits behind the ALB.
 
 ## 1. RDS Postgres
 
-- Postgres **16**, in private subnets, with automated backups enabled
+- Postgres **16 or newer** (18 recommended), in private subnets, with automated backups enabled
   (the whole reason we're here).
 - `gen_random_uuid()` is built in (PG13+); no extension setup needed.
 - Security group: inbound `5432` from the ECS **task** security group

@@ -27,13 +27,13 @@ public on GHCR, so there's no registry auth to configure:
 - `ghcr.io/tembo/tas-api`
 - `ghcr.io/tembo/tas-web`
 
-Postgres is Railway's managed plugin — the upstream `postgres:16` image
+Postgres is Railway's managed plugin — the upstream `postgres` image
 is never republished by TAS.
 
 ## 1. Project + Postgres
 
 1. Create a new Railway project.
-2. **Add → Database → PostgreSQL.** Railway provisions Postgres 16 and
+2. **Add → Database → PostgreSQL.** Railway provisions PostgreSQL (16 or newer) and
    exposes a `DATABASE_URL` you reference from the other services as
    `${{Postgres.DATABASE_URL}}` (the private-network URL — use this, not
    the public one).

@@ -19,7 +19,11 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # Bumping this major (e.g. 18 -> 19 later) is NOT a tag swap for an
+    # existing deployment: Postgres data dirs aren't compatible across
+    # majors, so an upgrade needs pg_upgrade or dump/restore. Or point
+    # DATABASE_URL at managed Postgres and drop this service.
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tas}
