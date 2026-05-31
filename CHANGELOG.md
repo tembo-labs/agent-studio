@@ -42,6 +42,11 @@ hardens the supply chain around them.
   no configuration.
 
 ### Fixed
+- **Client auth base URL is resolved at runtime** from the browser
+  origin instead of the build-time `NEXT_PUBLIC_BETTER_AUTH_URL` (which
+  is inlined when the image is built, so a prebuilt GHCR image baked
+  `http://localhost:3000` and sign-in failed on any real domain). Fixes
+  sign-in for every image-based deploy.
 - **postcss bumped to ≥ 8.5.10** via a pnpm override to clear
   GHSA-qx2v-qp2m-jg93 (a CSS-stringify XSS in the copy Next pins
   transitively). Not reachable in TAS — build-time, dev-authored CSS —
