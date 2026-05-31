@@ -112,6 +112,23 @@ API on boot via `sqlx::migrate!()`. The first migration
 (`0001_better_auth.sql`) creates the `user`, `session`, `account`, and
 `verification` tables that better-auth expects.
 
+### Running from published images (no source build)
+
+For a deploy that pulls prebuilt images from GHCR instead of compiling
+from source, use `compose.release.yaml`:
+
+```bash
+cp .env.example .env
+# Set BETTER_AUTH_SECRET, TAS_ENCRYPTION_KEY, INTERNAL_API_TOKEN.
+# Pin a release with TAS_VERSION (defaults to the current version).
+docker compose -f compose.release.yaml pull
+docker compose -f compose.release.yaml up -d
+```
+
+Images (`ghcr.io/tembo/tas-api`, `ghcr.io/tembo/tas-web`) are published
+per release tag by `.github/workflows/release.yml`. Upgrading is `bump
+TAS_VERSION → pull → up -d`; the API applies any new migrations on boot.
+
 ### Developing without Docker
 
 ```bash

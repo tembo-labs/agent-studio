@@ -1,0 +1,83 @@
+# Tembo Agent Studio — release deployment using prebuilt images.
+#
+# Runs TAS from images published to GHCR by .github/workflows/release.yml,
+# so the host never compiles Rust/Node from source.
+#
+# Usage:
+#   cp .env.example .env            # fill in secrets
+#   docker compose -f compose.release.yaml pull
+#   docker compose -f compose.release.yaml up -d
+#
+# Version: defaults to the pin below. Override per deploy by setting
+# TAS_VERSION in .env (e.g. TAS_VERSION=2026.5.29). The api applies
+# database migrations on boot, so upgrading is just:
+#   (bump TAS_VERSION) docker compose -f compose.release.yaml pull && \
+#     docker compose -f compose.release.yaml up -d
+#
+# The image owner defaults to `tembo`; override with TAS_IMAGE_OWNER if
+# you publish to your own GHCR namespace (e.g. a fork).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tas}
+      POSTGRES_DB: ${POSTGRES_DB:-tas}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tas} -d ${POSTGRES_DB:-tas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ghcr.io/${TAS_IMAGE_OWNER:-tembo}/tas-api:${TAS_VERSION:-2026.5.29}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-tas}:${POSTGRES_PASSWORD:-tas}@postgres:5432/${POSTGRES_DB:-tas}
+      TAS_ENCRYPTION_KEY: ${TAS_ENCRYPTION_KEY:?TAS_ENCRYPTION_KEY must be set in .env}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}
+      RUST_LOG: ${RUST_LOG:-info,tas_api=debug}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  web:
+    image: ghcr.io/${TAS_IMAGE_OWNER:-tembo}/tas-web:${TAS_VERSION:-2026.5.29}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-tas}:${POSTGRES_PASSWORD:-tas}@postgres:5432/${POSTGRES_DB:-tas}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in .env}
+      TAS_ENCRYPTION_KEY: ${TAS_ENCRYPTION_KEY:?TAS_ENCRYPTION_KEY must be set in .env}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      API_INTERNAL_URL: http://api:8080
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}
+      NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      TAS_INSTANCE_NAME: ${TAS_INSTANCE_NAME:-Tembo Agent Studio}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}
+      GOOGLE_CONNECTIONS_CLIENT_ID: ${GOOGLE_CONNECTIONS_CLIENT_ID:-}
+      GOOGLE_CONNECTIONS_CLIENT_SECRET: ${GOOGLE_CONNECTIONS_CLIENT_SECRET:-}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+volumes:
+  postgres_data:
