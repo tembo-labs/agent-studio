@@ -8,12 +8,14 @@
 #   ghcr.io/<owner>/tas-api:2026.5      ghcr.io/<owner>/tas-web:2026.5
 #   ghcr.io/<owner>/tas-api:latest      ghcr.io/<owner>/tas-web:latest
 #
-# Customers consume these via compose.release.yaml (no source build).
-# Postgres is the upstream official image and is never republished here.
+# Each image is signed (cosign keyless) and scanned (Trivy, report-only),
+# carries SBOM + provenance attestations, and the published version is
+# written back as the compose.release.yaml default. Customers consume the
+# images via compose.release.yaml. Postgres is the upstream official
+# image and is never republished here.
 #
-# Scope (step 1 / MVP): linux/amd64 only, build + push + SBOM/provenance.
-# Multi-arch (arm64 via a native runner), cosign signing, and a Trivy
-# gate are the next hardening pass — see the image-publishing strategy.
+# Scope: linux/amd64. Multi-arch (arm64 via a native runner) is a
+# deliberate later step — see the image-publishing strategy.
 
 name: Release images
 
@@ -28,14 +30,14 @@ on:
         description: "Existing git tag to (re)build, e.g. v2026.5.29"
         required: true
 
-permissions:
-  contents: read
-  packages: write
-  id-token: write # reserved for cosign keyless signing (next pass)
-
 jobs:
   images:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+      id-token: write # cosign keyless signing + provenance
+      security-events: write # upload Trivy SARIF to the Security tab
     strategy:
       fail-fast: false
       matrix:
@@ -52,6 +54,9 @@ jobs:
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -74,6 +79,7 @@ jobs:
             latest=auto
 
       - name: Build and push ${{ matrix.image }}
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
@@ -85,3 +91,74 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: true
           sbom: true
+
+      - name: Sign image (cosign keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+        # Signs by immutable digest, so every tag pointing at it is covered.
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Scan image (Trivy, report to log)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "0" # report-only — never blocks the release
+          ignore-unfixed: true
+
+      - name: Scan image (Trivy, SARIF for Security tab)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        # continue-on-error: code scanning upload needs GitHub Advanced
+        # Security on private repos; if it's unavailable the table report
+        # above is still in the job log, so don't fail the release.
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: ${{ matrix.image }}
+
+  # Keep compose.release.yaml's default tag in lockstep with the release
+  # just published, so the out-of-box pin never goes stale.
+  bump-compose:
+    needs: images
+    # Only on a real tag push (not a manual re-publish, which could point
+    # at an older tag and move the default backwards).
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Rewrite the TAS_VERSION default
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -E -i "s/(TAS_VERSION:-)[^}]+/\1${VERSION}/g" compose.release.yaml
+
+      - name: Commit if changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- compose.release.yaml; then
+            echo "compose.release.yaml already at ${GITHUB_REF_NAME#v}; nothing to do."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compose.release.yaml
+          git commit -m "release: bump compose.release.yaml default to ${GITHUB_REF_NAME#v} [skip ci]"
+          git push origin main

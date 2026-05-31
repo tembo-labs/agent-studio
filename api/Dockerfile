@@ -57,6 +57,18 @@ COPY --from=builder /app/tas-api /usr/local/bin/tas-api
 COPY --from=builder /opt/cargo-ai/bin/cargo-ai /usr/local/bin/cargo-ai
 COPY scripts/run_pydantic.py /usr/local/bin/run_pydantic.py
 
+# Drop to a non-root user for the runtime. The run path shells out to
+# cargo-ai and the pydantic venv but writes nothing to disk (spec in via
+# stdin, result out via stdout — see runs/pydantic.rs `env_clear()`), so
+# no app-owned writable dir is needed; the binaries + venv under
+# /usr/local/bin and /opt are world read+execute. A real passwd entry
+# (--create-home) keeps getpwuid-based HOME lookups working even though
+# the subprocess env is cleared.
+RUN groupadd --system --gid 1001 tas \
+    && useradd --system --uid 1001 --gid tas --create-home --home-dir /home/tas tas
+ENV HOME=/home/tas
+
 ENV API_BIND_ADDR=0.0.0.0:8080
 EXPOSE 8080
+USER tas
 CMD ["tas-api"]
