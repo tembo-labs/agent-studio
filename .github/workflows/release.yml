@@ -135,8 +135,11 @@ jobs:
   bump-compose:
     needs: images
     # Only on a real tag push (not a manual re-publish, which could point
-    # at an older tag and move the default backwards).
-    if: github.event_name == 'push'
+    # at an older tag and move the default backwards), and only for
+    # stable releases — a prerelease tag (e.g. v2026.5.31-beta, which
+    # carries a `-`) publishes images but must not become the default
+    # customer pin.
+    if: github.event_name == 'push' && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     permissions:
       contents: write # push the bump branch
