@@ -31,8 +31,12 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
+    // Default to the IPv6 unspecified address, which is dual-stack on
+    // Linux (binds IPv4 too via v4-mapped addrs) — so plain Docker
+    // Compose keeps working while IPv6-only private networks (e.g.
+    // Railway service-to-service) reach the api with no config.
     let bind_addr: SocketAddr = std::env::var("API_BIND_ADDR")
-        .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
+        .unwrap_or_else(|_| "[::]:8080".to_string())
         .parse()
         .context("API_BIND_ADDR must be a valid socket address")?;
 

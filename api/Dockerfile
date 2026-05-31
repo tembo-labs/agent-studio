@@ -68,7 +68,10 @@ RUN groupadd --system --gid 1001 tas \
     && useradd --system --uid 1001 --gid tas --create-home --home-dir /home/tas tas
 ENV HOME=/home/tas
 
-ENV API_BIND_ADDR=0.0.0.0:8080
+# [::] is dual-stack on Linux (serves IPv4 + IPv6), so Compose keeps
+# working and IPv6-only private networks (e.g. Railway) reach the api
+# with no extra config. Override API_BIND_ADDR to pin a single stack.
+ENV API_BIND_ADDR=[::]:8080
 EXPOSE 8080
 USER tas
 CMD ["tas-api"]
