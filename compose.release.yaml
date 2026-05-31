@@ -32,7 +32,10 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # postgres:18+ stores data in a version subdir under
+      # /var/lib/postgresql (not /var/lib/postgresql/data) — mount the
+      # parent so the image manages the layout.
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tas} -d ${POSTGRES_DB:-tas}"]
       interval: 5s
