@@ -36,6 +36,10 @@ hardens the supply chain around them.
 - **api image runs as a non-root user** (uid 1001), matching web. The
   run path writes nothing to disk (spec via stdin, result via stdout),
   so no writable app dir is needed.
+- **api defaults to a dual-stack bind** (`API_BIND_ADDR=[::]:8080`).
+  Serves IPv4 + IPv6, so Docker Compose is unchanged while IPv6-only
+  private networks (e.g. Railway service-to-service) reach the api with
+  no configuration.
 
 ### Fixed
 - **postcss bumped to ≥ 8.5.10** via a pnpm override to clear
