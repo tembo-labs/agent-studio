@@ -107,6 +107,12 @@ needs **no** load balancer — it's internal only.
   `https://<domain>`, and the Google OAuth client's authorized redirect
   URI to `https://<domain>/api/auth/callback/google`.
 
+> **Sign-in requires the Google OAuth client.** Email/password is
+> disabled, so the stack deploys but no one can log in until it exists.
+> Order: domain/ALB up → set `BETTER_AUTH_URL` → create the Google
+> **Web application** client with the redirect URI above → set
+> `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` → web redeploys.
+
 ## 6. Deploy + verify
 
 Bring up the `api` service first (it migrates the RDS schema on boot),

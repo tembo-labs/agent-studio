@@ -114,6 +114,12 @@ For the Google OAuth client, set the authorized redirect URI to:
 ${BETTER_AUTH_URL}/api/auth/callback/google
 ```
 
+> **Required for sign-in.** Email/password auth is disabled, so without a
+> Google OAuth client the deploy shows a "configuration needed" login
+> screen and no one can log in. Set `BETTER_AUTH_URL` to the final public
+> URL first, register the redirect URI above on a Google **Web
+> application** client, then set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+
 ### Connect a custom domain
 
 Vercel → **Settings → Domains**. Attach your domain and update
