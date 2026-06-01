@@ -1,7 +1,9 @@
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
+import { genericOAuth } from "better-auth/plugins";
 import { Pool } from "pg";
 
+import { genericOAuthConfigs } from "@/lib/auth-providers";
 import { isInstanceAdminEmail } from "@/lib/config";
 import {
   hasPendingInvite,
@@ -20,6 +22,10 @@ const secret =
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
+// Microsoft (Entra ID) + generic OIDC both run through the genericOAuth
+// plugin; Google stays a built-in social provider below.
+const oauthConfigs = genericOAuthConfigs();
+
 export const auth = betterAuth({
   database: new Pool({ connectionString: databaseUrl }),
   secret,
@@ -33,6 +39,10 @@ export const auth = betterAuth({
             clientSecret: googleClientSecret,
           },
         }
+      : undefined,
+  plugins:
+    oauthConfigs.length > 0
+      ? [genericOAuth({ config: oauthConfigs })]
       : undefined,
   // Closed-instance gate. A new account may only be created for an
   // instance admin or an invited email — everyone else is rejected at

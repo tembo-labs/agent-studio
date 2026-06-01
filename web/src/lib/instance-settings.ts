@@ -46,10 +46,27 @@ export async function getStoredInstanceName(): Promise<string | null> {
   }
 }
 
-/** Persist the instance name. Empty string clears it (→ env fallback). */
+/**
+ * First run = no user accounts exist yet. While true, the pre-sign-in
+ * setup screen may set the instance name (no admin to gate on yet). On a
+ * DB error we return false — fail closed, don't open anonymous setup.
+ */
+export async function isFirstRun(): Promise<boolean> {
+  try {
+    const { rows } = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM "user"`,
+    );
+    return (rows[0]?.n ?? "0") === "0";
+  } catch {
+    return false;
+  }
+}
+
+/** Persist the instance name. Empty string clears it (→ env fallback).
+ *  updatedBy is null for the pre-sign-in first-run setup (no user yet). */
 export async function setInstanceName(
   name: string,
-  updatedBy: string,
+  updatedBy: string | null,
 ): Promise<void> {
   const trimmed = name.trim();
   await db.query(
