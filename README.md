@@ -78,6 +78,9 @@ and [`ROADMAP.md`](./ROADMAP.md) for where it's headed.
 
 ## Guides
 
+- [`guides/CUSTOMER_SETUP.md`](./guides/CUSTOMER_SETUP.md) — start here.
+  Zero-to-running checklist of everything to procure and do, from accounts
+  and keys through first sign-in and creating your first agent.
 - [`guides/RAILWAY_DEPLOY.md`](./guides/RAILWAY_DEPLOY.md) — run the full
   stack on Railway from the published GHCR images.
 - [`guides/AWS_DEPLOY.md`](./guides/AWS_DEPLOY.md) — ECS Fargate + RDS,
