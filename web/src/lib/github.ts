@@ -2,13 +2,17 @@ import "server-only";
 
 import { updateTag } from "next/cache";
 
-// Accept the forms a user is likely to paste:
-//   https://github.com/owner/repo
-//   https://github.com/owner/repo.git
-//   git@github.com:owner/repo.git
+// Accept the forms a user is likely to paste — the github.com host is
+// optional, and so is the scheme (https://) and www., so the bare
+// `github.com/owner/repo` we show as the placeholder works too:
 //   owner/repo
+//   github.com/owner/repo
+//   www.github.com/owner/repo
+//   https://github.com/owner/repo[.git][/]
+//   http://github.com/owner/repo
+//   git@github.com:owner/repo.git
 const REPO_RE =
-  /^(?:https?:\/\/github\.com\/|git@github\.com:)?([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/;
+  /^(?:(?:https?:\/\/)?(?:www\.)?github\.com\/|git@github\.com:)?([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/;
 
 export type ParsedRepo = { owner: string; name: string };
 
