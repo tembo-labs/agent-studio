@@ -49,14 +49,14 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
             <span className="text-foreground-muted text-sm">(you)</span>
           )}
         </div>
-        <div className="text-foreground-weak flex items-center gap-2 text-xs">
+        <div className="text-foreground-weak flex items-center gap-2 text-sm">
           {member.name && <span className="truncate">{member.email}</span>}
           <span className="text-foreground-muted">
             joined <LocalTime iso={member.joinedAt.toISOString()} />
           </span>
         </div>
         {(changeState.error || removeState.error) && (
-          <p className="text-sentiment-negative text-xs" role="alert">
+          <p className="text-sentiment-negative text-sm" role="alert">
             {changeState.error ?? removeState.error}
           </p>
         )}
@@ -78,7 +78,7 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
                 e.currentTarget.form?.requestSubmit();
               }}
               disabled={changePending}
-              className="bg-input text-foreground hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-1 px-2 text-xs focus:outline-none transition-[background-color,box-shadow,color] duration-150"
+              className="bg-input text-foreground hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-1 px-2 text-sm focus:outline-none transition-[background-color,box-shadow,color] duration-150"
             >
               {ROLE_DESCRIPTIONS.map((r) => (
                 <option key={r.role} value={r.role}>
@@ -100,7 +100,7 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
             <button
               type="submit"
               disabled={removePending}
-              className="text-foreground-weak hover:text-sentiment-negative text-xs disabled:opacity-60"
+              className="text-foreground-weak hover:text-sentiment-negative text-sm disabled:opacity-60"
             >
               {removePending ? "Removing…" : "Remove"}
             </button>

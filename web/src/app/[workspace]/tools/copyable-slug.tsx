@@ -39,7 +39,7 @@ export function CopyableSlug({
     <span className="inline-flex items-baseline gap-1">
       <code
         className={
-          className ?? "text-foreground text-xs font-medium"
+          className ?? "text-foreground text-sm font-medium"
         }
       >
         {slug}

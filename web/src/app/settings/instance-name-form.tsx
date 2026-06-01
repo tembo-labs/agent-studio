@@ -41,7 +41,7 @@ export function InstanceNameForm({
           maxLength={120}
           autoComplete="off"
         />
-        <p className="text-foreground-weak text-xs">
+        <p className="text-foreground-weak text-sm">
           Shown on the sign-in screen and the app header. Leave blank to use
           the default (<span className="font-medium">{envFallback}</span>).
         </p>

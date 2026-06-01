@@ -32,7 +32,7 @@ export function OnboardingForm({ isFirst = true }: { isFirst?: boolean }) {
   return (
     <Card className="w-full max-w-md p-3">
       <CardHeader className="px-1 pb-3 pt-1">
-        <CardTitle className="text-foreground-title text-base">
+        <CardTitle className="text-foreground-title text-lg">
           {isFirst ? "Create your first workspace" : "New workspace"}
         </CardTitle>
       </CardHeader>
@@ -53,7 +53,7 @@ export function OnboardingForm({ isFirst = true }: { isFirst?: boolean }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <p className="text-foreground-muted text-xs">
+            <p className="text-foreground-muted text-sm">
               We&apos;ll use this to derive your workspace URL (e.g.{" "}
               <code className="bg-surface rounded px-1 py-0.5">acme-platform</code>
               ). You can change it later.

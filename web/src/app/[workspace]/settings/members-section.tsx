@@ -76,7 +76,7 @@ export function MembersSection({
                       <span className="text-foreground truncate text-sm">
                         {inv.email}
                       </span>
-                      <span className="text-foreground-weak text-xs">
+                      <span className="text-foreground-weak text-sm">
                         Invited{" "}
                         <LocalTime iso={inv.createdAt.toISOString()} /> · not
                         yet signed in
@@ -121,10 +121,10 @@ export function MembersSection({
         )}
 
         <details>
-          <summary className="text-foreground-weak hover:text-foreground cursor-pointer text-xs">
+          <summary className="text-foreground-weak hover:text-foreground cursor-pointer text-sm">
             Role reference
           </summary>
-          <dl className="mt-2 flex flex-col gap-1.5 text-xs">
+          <dl className="mt-2 flex flex-col gap-1.5 text-sm">
             {ROLE_DESCRIPTIONS.map((r) => (
               <div key={r.role} className="flex items-baseline gap-2">
                 <Badge variant={roleVariant(r.role)} size="small">

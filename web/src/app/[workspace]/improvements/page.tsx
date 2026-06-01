@@ -125,17 +125,17 @@ function ImprovementRow({
           {improvement.improvementText}
         </span>
       </td>
-      <td className="text-foreground px-3 py-2 align-top text-xs">
+      <td className="text-foreground px-3 py-2 align-top text-sm">
         {improvementSubmitterLabel(improvement)}
       </td>
       <td className="px-3 py-2 align-top">
         <StatusBadge status={improvement.status} />
       </td>
-      <td className="text-foreground-weak px-3 py-2 align-top text-xs">
+      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
         <LocalTime iso={improvement.createdAt.toISOString()} style="relative" />
       </td>
       <td className="px-3 py-2 align-top">
-        <div className="flex flex-wrap gap-2 text-xs">
+        <div className="flex flex-wrap gap-2 text-sm">
           <Link href={runHref} className="text-foreground hover:underline">
             Run
           </Link>

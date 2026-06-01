@@ -32,13 +32,13 @@ export default async function OnboardingPage() {
       <main className="bg-surface flex min-h-screen flex-col items-center justify-center px-6 py-12">
         <div className="flex w-full max-w-md flex-col items-center gap-6">
           <div className="space-y-1 text-center">
-            <p className="text-foreground-weak text-xs font-medium uppercase tracking-widest">
+            <p className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
               {instanceName}
             </p>
-            <h1 className="text-foreground-title text-lg font-medium">
+            <h1 className="text-foreground-title text-2xl font-semibold">
               You&apos;re not in a workspace yet
             </h1>
-            <p className="text-foreground-weak text-sm">
+            <p className="text-foreground-weak text-base">
               This instance is invite-only. Ask an admin to invite{" "}
               <span className="text-foreground font-medium">
                 {session.user.email}
@@ -58,15 +58,15 @@ export default async function OnboardingPage() {
     <main className="bg-surface flex min-h-screen flex-col items-center justify-center px-6 py-12">
       <div className="flex w-full max-w-md flex-col items-center gap-6">
         <div className="space-y-1 text-center">
-          <p className="text-foreground-weak text-xs font-medium uppercase tracking-widest">
+          <p className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
             {instanceName}
           </p>
-          <h1 className="text-foreground-title text-lg font-medium">
+          <h1 className="text-foreground-title text-2xl font-semibold">
             {isFirst
               ? `Welcome, ${session.user.name ?? session.user.email}`
               : "Create a workspace"}
           </h1>
-          <p className="text-foreground-weak text-sm">
+          <p className="text-foreground-weak text-base">
             A workspace pairs a Git repo and a Tembo API key with the team that
             uses them. You&apos;ll add those next.
           </p>

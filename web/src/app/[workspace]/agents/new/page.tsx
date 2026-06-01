@@ -40,7 +40,7 @@ export default async function NewAgentPage({
             github.com/{repo.owner}/{repo.name}
           </span>{" "}
           on{" "}
-          <code className="bg-surface rounded px-1 py-0.5 text-xs">
+          <code className="bg-surface rounded px-1 py-0.5 text-sm">
             {repo.defaultBranch}
           </code>{" "}
           for your team to review.

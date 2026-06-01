@@ -13,7 +13,7 @@ export function SignOutLink({ email }: { email: string }) {
   const [pending, startTransition] = useTransition();
 
   return (
-    <p className="text-foreground-weak text-xs">
+    <p className="text-foreground-weak text-sm">
       Signed in as {email}. Not you?{" "}
       <button
         type="button"

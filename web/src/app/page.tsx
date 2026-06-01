@@ -80,7 +80,7 @@ export default async function Home() {
         )}
       </div>
 
-      <p className="text-foreground-muted absolute bottom-4 right-4 text-xs">
+      <p className="text-foreground-muted absolute bottom-4 right-4 text-sm">
         powered by{" "}
         <a
           href={POWERED_BY_HREF}

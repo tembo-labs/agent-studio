@@ -45,7 +45,7 @@ export function DeleteAgentButton({ workspaceSlug, agentName }: Props) {
           <AlertDialogTitle>Delete this agent?</AlertDialogTitle>
           <AlertDialogDescription>
             Removes{" "}
-            <code className="bg-surface text-foreground rounded px-1 py-0.5 text-xs">
+            <code className="bg-surface text-foreground rounded px-1 py-0.5 text-sm">
               {agentName}
             </code>{" "}
             from the connected repo on the default branch. The deletion is

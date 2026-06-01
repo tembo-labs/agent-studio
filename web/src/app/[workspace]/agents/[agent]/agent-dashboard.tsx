@@ -151,12 +151,12 @@ function FailureGroups({
               </span>
               <Link
                 href={`/${workspaceSlug}/agents/${encodeURIComponent(agentName)}/runs/${f.exampleRunId}`}
-                className="text-foreground-weak hover:text-foreground shrink-0 text-xs hover:underline"
+                className="text-foreground-weak hover:text-foreground shrink-0 text-sm hover:underline"
               >
                 Last <LocalTime iso={f.lastSeen.toISOString()} style="relative" /> →
               </Link>
             </div>
-            <pre className="text-foreground-weak overflow-hidden whitespace-pre-wrap break-words font-mono text-xs leading-5">
+            <pre className="text-foreground-weak overflow-hidden whitespace-pre-wrap break-words font-mono text-sm leading-5">
               {f.errorPrefix}
             </pre>
           </li>

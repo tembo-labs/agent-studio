@@ -32,7 +32,7 @@ export function SyncGuidanceForm({
         <p className="text-foreground-weak text-sm">{state.message}</p>
       )}
       {state.error && (
-        <p className="text-sentiment-negative text-xs">{state.error}</p>
+        <p className="text-sentiment-negative text-sm">{state.error}</p>
       )}
     </div>
   );

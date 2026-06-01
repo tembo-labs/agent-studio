@@ -158,7 +158,7 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
         <button
           type="button"
           onClick={() => setAdvanced(true)}
-          className="text-foreground-weak hover:text-foreground w-fit text-xs underline-offset-2 hover:underline"
+          className="text-foreground-weak hover:text-foreground w-fit text-sm underline-offset-2 hover:underline"
         >
           Advanced: change framework
         </button>

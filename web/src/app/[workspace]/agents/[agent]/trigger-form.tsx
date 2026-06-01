@@ -84,7 +84,7 @@ export function TriggerForm({
           type="button"
           onClick={() => setExpanded(false)}
           disabled={pending}
-          className="text-foreground-weak hover:text-foreground text-xs hover:underline"
+          className="text-foreground-weak hover:text-foreground text-sm hover:underline"
         >
           Cancel
         </button>
@@ -93,7 +93,7 @@ export function TriggerForm({
       <input type="hidden" name="agent" value={agentName} />
 
       <label className="flex flex-col gap-1">
-        <span className="text-foreground text-xs font-medium">Connection</span>
+        <span className="text-foreground text-sm font-medium">Connection</span>
         <select
           name="connection_id"
           value={connectionId}
@@ -108,14 +108,14 @@ export function TriggerForm({
           ))}
         </select>
         {state.fieldErrors?.connection && (
-          <span className="text-sentiment-negative text-xs">
+          <span className="text-sentiment-negative text-sm">
             {state.fieldErrors.connection}
           </span>
         )}
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-foreground text-xs font-medium">
+        <span className="text-foreground text-sm font-medium">
           Composio trigger slug
         </span>
         <input
@@ -141,14 +141,14 @@ export function TriggerForm({
           .
         </span>
         {state.fieldErrors?.triggerType && (
-          <span className="text-sentiment-negative text-xs">
+          <span className="text-sentiment-negative text-sm">
             {state.fieldErrors.triggerType}
           </span>
         )}
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-foreground text-xs font-medium">
+        <span className="text-foreground text-sm font-medium">
           Config (JSON object)
         </span>
         <textarea
@@ -158,17 +158,17 @@ export function TriggerForm({
           onChange={(e) => setConfig(e.target.value)}
           disabled={pending}
           spellCheck={false}
-          className="bg-input text-foreground-strong placeholder:text-foreground-weak hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-2 px-3 font-mono text-xs leading-5 focus:outline-none transition-[background-color,box-shadow,color] duration-150 resize-y"
+          className="bg-input text-foreground-strong placeholder:text-foreground-weak hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled rounded-lg shadow-[0_0_0_1px_var(--color-border)] py-2 px-3 font-mono text-sm leading-5 focus:outline-none transition-[background-color,box-shadow,color] duration-150 resize-y"
         />
         <span className="text-foreground-weak text-sm">
           Per-trigger config. Use{" "}
-          <code className="bg-surface rounded px-1 py-0.5 text-xs">
+          <code className="bg-surface rounded px-1 py-0.5 text-sm">
             {"{}"}
           </code>{" "}
           when the trigger has no required fields.
         </span>
         {state.fieldErrors?.config && (
-          <span className="text-sentiment-negative text-xs">
+          <span className="text-sentiment-negative text-sm">
             {state.fieldErrors.config}
           </span>
         )}

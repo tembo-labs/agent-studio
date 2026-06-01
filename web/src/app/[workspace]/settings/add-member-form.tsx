@@ -103,7 +103,7 @@ export function AddMemberForm({ workspaceSlug }: { workspaceSlug: string }) {
             readOnly
             value={state.template}
             rows={6}
-            className="bg-input text-foreground-strong w-full resize-none rounded-lg p-2 font-mono text-xs shadow-[0_0_0_1px_var(--color-border)]"
+            className="bg-input text-foreground-strong w-full resize-none rounded-lg p-2 font-mono text-sm shadow-[0_0_0_1px_var(--color-border)]"
           />
         </div>
       )}

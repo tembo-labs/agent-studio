@@ -67,7 +67,7 @@ export function FaviconPicker({
                 aria-hidden
                 className="text-foreground h-8 w-8"
               />
-              <span className="text-foreground text-xs font-medium">
+              <span className="text-foreground text-sm font-medium">
                 {FAVICON_LABELS[kind]}
               </span>
             </button>
@@ -112,7 +112,7 @@ export function FaviconPicker({
                 +
               </span>
             )}
-            <span className="text-foreground text-xs font-medium">
+            <span className="text-foreground text-sm font-medium">
               {currentKind === "custom" ? "Custom (change)" : "Upload"}
             </span>
           </label>

@@ -71,7 +71,7 @@ export function RenameComposioConnectionForm({
           autoFocus
           spellCheck={false}
           autoComplete="off"
-          className="bg-input border-border text-foreground w-28 rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)]"
+          className="bg-input border-border text-foreground w-28 rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)]"
         />
         <Button type="submit" variant="primary" size="small" disabled={pending}>
           {pending ? "…" : "Save"}
@@ -89,14 +89,14 @@ export function RenameComposioConnectionForm({
       {state.error && (
         <p
           role="alert"
-          className="text-sentiment-negative max-w-[220px] text-right text-xs leading-tight"
+          className="text-sentiment-negative max-w-[220px] text-right text-sm leading-tight"
         >
           {state.error}
         </p>
       )}
-      <p className="text-foreground-muted max-w-[220px] text-right text-xs leading-tight">
+      <p className="text-foreground-muted max-w-[220px] text-right text-sm leading-tight">
         Update any agent file that references{" "}
-        <code className="bg-surface rounded px-1 py-0.5 text-xs">
+        <code className="bg-surface rounded px-1 py-0.5 text-sm">
           {currentName}
         </code>{" "}
         to the new name.

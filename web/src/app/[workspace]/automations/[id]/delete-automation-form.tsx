@@ -58,7 +58,7 @@ export function DeleteAutomationForm({
             <AlertDialogTitle>Delete this automation?</AlertDialogTitle>
             <AlertDialogDescription>
               Removes{" "}
-              <code className="bg-surface text-foreground rounded px-1 py-0.5 text-xs">
+              <code className="bg-surface text-foreground rounded px-1 py-0.5 text-sm">
                 {name}
               </code>
               . The agent file itself is untouched, and past runs stay in

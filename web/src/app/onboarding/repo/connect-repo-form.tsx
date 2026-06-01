@@ -94,7 +94,7 @@ export function ConnectRepoForm({ workspaceSlug }: { workspaceSlug: string }) {
                 Repository permissions
               </strong>{" "}
               →{" "}
-              <code className="bg-surface rounded px-1 py-0.5 text-xs">
+              <code className="bg-surface rounded px-1 py-0.5 text-sm">
                 Contents: Read and write
               </code>
               .
@@ -112,7 +112,7 @@ export function ConnectRepoForm({ workspaceSlug }: { workspaceSlug: string }) {
               github.com/settings/tokens/new
             </a>{" "}
             with the{" "}
-            <code className="bg-surface rounded px-1 py-0.5 text-xs">repo</code>{" "}
+            <code className="bg-surface rounded px-1 py-0.5 text-sm">repo</code>{" "}
             scope.
           </p>
         </div>

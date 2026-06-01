@@ -241,7 +241,7 @@ function CronPreview({
 }) {
   if (!preview.ok) return null;
   return (
-    <div className="text-foreground-weak flex flex-col gap-0.5 text-xs">
+    <div className="text-foreground-weak flex flex-col gap-0.5 text-sm">
       <span>
         <span className="text-foreground">{preview.humanReadable}</span>{" "}
         <span className="text-foreground-muted">(UTC)</span>
@@ -256,6 +256,6 @@ function CronPreview({
 
 function FieldError({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-sentiment-negative text-xs">{children}</span>
+    <span className="text-sentiment-negative text-sm">{children}</span>
   );
 }

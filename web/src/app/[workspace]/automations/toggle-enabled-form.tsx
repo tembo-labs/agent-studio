@@ -30,7 +30,7 @@ export function ToggleEnabledForm({
   };
 
   return (
-    <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+    <label className="flex cursor-pointer items-center gap-1.5 text-sm">
       <input
         type="checkbox"
         checked={enabled}

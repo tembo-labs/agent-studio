@@ -60,7 +60,7 @@ export default async function OnboardingRepoPage({
     <main className="bg-surface flex min-h-screen flex-col items-center justify-center px-6 py-12">
       <div className="flex w-full max-w-md flex-col items-center gap-6">
         <div className="space-y-1 text-center">
-          <p className="text-foreground-weak text-xs font-medium uppercase tracking-widest">
+          <p className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
             {instanceName}
           </p>
           <h1 className="text-foreground-title text-lg font-medium">

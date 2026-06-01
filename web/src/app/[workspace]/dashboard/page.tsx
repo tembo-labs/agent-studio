@@ -117,7 +117,7 @@ export default async function DashboardPage({
               </span>
               <Link
                 href={`/${workspace.slug}/improvements`}
-                className="text-foreground-weak hover:text-foreground text-xs"
+                className="text-foreground-weak hover:text-foreground text-sm"
               >
                 View all →
               </Link>
@@ -147,11 +147,11 @@ export default async function DashboardPage({
                           </Link>
                           <StatusBadge status={i.status} />
                         </div>
-                        <p className="text-foreground-weak line-clamp-2 text-xs leading-5">
+                        <p className="text-foreground-weak line-clamp-2 text-sm leading-5">
                           {i.improvementText}
                         </p>
                       </div>
-                      <div className="text-foreground-weak flex shrink-0 flex-col items-end gap-1 text-xs">
+                      <div className="text-foreground-weak flex shrink-0 flex-col items-end gap-1 text-sm">
                         <span>
                           <LocalTime iso={i.createdAt.toISOString()} />
                         </span>

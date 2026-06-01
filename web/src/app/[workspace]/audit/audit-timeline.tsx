@@ -173,7 +173,7 @@ export function AuditTimeline({
       {/* Filter row */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide">
+          <span className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide">
             Source
           </span>
           {ALL_AUDIT_SOURCES.map((s) => (
@@ -187,7 +187,7 @@ export function AuditTimeline({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide">
+          <span className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide">
             Window
           </span>
           {SINCE_PRESETS.map((p) => (
@@ -204,7 +204,7 @@ export function AuditTimeline({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide">
+          <span className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide">
             Actor
           </span>
           <Select
@@ -222,7 +222,7 @@ export function AuditTimeline({
         <div className="flex flex-wrap items-center gap-2">
           <label
             htmlFor="audit-agent"
-            className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide"
+            className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide"
           >
             Agent
           </label>
@@ -262,7 +262,7 @@ export function AuditTimeline({
             // Content-Disposition: attachment so the browser saves
             // regardless of how the link gets opened.
             download
-            className="text-foreground-weak hover:text-foreground text-xs hover:underline"
+            className="text-foreground-weak hover:text-foreground text-sm hover:underline"
           >
             Export JSON →
           </a>
@@ -326,10 +326,10 @@ function AuditRow({
   const tone = SOURCE_TONE[entry.source];
   return (
     <tr className="hover:bg-surface-secondary transition-colors">
-      <td className="text-foreground-weak px-3 py-2 align-top text-xs">
+      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
         <LocalTime iso={entry.at} style="relative" />
       </td>
-      <td className="text-foreground px-3 py-2 align-top text-xs">
+      <td className="text-foreground px-3 py-2 align-top text-sm">
         {entry.actorDisplayName ?? (
           <span className="text-foreground-muted italic">System</span>
         )}
@@ -339,7 +339,7 @@ function AuditRow({
           {SOURCE_LABELS[entry.source]}
         </Badge>
       </td>
-      <td className="text-foreground px-3 py-2 align-top text-xs">
+      <td className="text-foreground px-3 py-2 align-top text-sm">
         <div className="flex flex-col gap-0.5">
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="font-medium">{eventLabel}</span>
@@ -367,7 +367,7 @@ function TargetLink({
     return (
       <Link
         href={`/${workspaceSlug}/agents/${encodeURIComponent(entry.agentName)}/runs/${entry.targetId}`}
-        className="text-foreground-weak hover:underline text-xs"
+        className="text-foreground-weak hover:underline text-sm"
       >
         on {entry.agentName} →
       </Link>
@@ -377,7 +377,7 @@ function TargetLink({
     return (
       <Link
         href={`/${workspaceSlug}/improvements`}
-        className="text-foreground-weak hover:underline text-xs"
+        className="text-foreground-weak hover:underline text-sm"
       >
         on {entry.agentName} →
       </Link>
@@ -387,7 +387,7 @@ function TargetLink({
     return (
       <Link
         href={`/${workspaceSlug}/agents/${encodeURIComponent(entry.agentName)}`}
-        className="text-foreground-weak hover:underline text-xs"
+        className="text-foreground-weak hover:underline text-sm"
       >
         on {entry.agentName} →
       </Link>
@@ -429,7 +429,7 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
     case "improvement.merged":
     case "improvement.closed":
       return (
-        <span className="text-foreground-weak truncate text-xs">
+        <span className="text-foreground-weak truncate text-sm">
           {String(p.improvementText ?? "")}
         </span>
       );
@@ -534,7 +534,7 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center rounded-full border px-2.5 py-1 text-xs transition-colors ${
+      className={`flex items-center rounded-full border px-2.5 py-1 text-sm transition-colors ${
         active
           ? "border-foreground bg-surface-raised text-foreground"
           : "border-border bg-surface text-foreground-weak hover:text-foreground"

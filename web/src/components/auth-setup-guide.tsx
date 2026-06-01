@@ -8,7 +8,7 @@ import { getConfiguredAuthProviders } from "@/lib/auth-providers";
 import { getPublicOrigin } from "@/lib/config";
 
 const code =
-  "bg-surface text-foreground rounded px-1 py-0.5 font-mono text-xs break-all";
+  "bg-surface text-foreground rounded px-1 py-0.5 font-mono text-sm break-all";
 
 type ProviderGuide = {
   id: string;
@@ -87,15 +87,15 @@ export function AuthSetupGuide() {
                 {g.name}
               </span>
               {configured.has(g.id) && (
-                <span className="text-sentiment-positive text-xs font-medium">
+                <span className="text-sentiment-positive text-sm font-medium">
                   configured ✓
                 </span>
               )}
             </div>
-            <p className="text-foreground-weak text-xs">
+            <p className="text-foreground-weak text-sm">
               Redirect URI: <code className={code}>{redirectUri(g)}</code>
             </p>
-            <p className="text-foreground-weak text-xs">
+            <p className="text-foreground-weak text-sm">
               Env:{" "}
               {g.envVars.map((v, i) => (
                 <span key={v}>

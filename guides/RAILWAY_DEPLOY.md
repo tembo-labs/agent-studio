@@ -90,8 +90,10 @@ needed.
 | `BETTER_AUTH_URL` | The generated domain, e.g. `https://tas-web-production.up.railway.app`. |
 | `NEXT_PUBLIC_BETTER_AUTH_URL` | Same value as `BETTER_AUTH_URL`. |
 | `API_INTERNAL_URL` | `http://api.railway.internal:8080` (the api service's private domain + port). |
-| `GOOGLE_CLIENT_ID` | OAuth 2.0 client from [Google Cloud Console](https://console.cloud.google.com/apis/credentials). |
+| `GOOGLE_CLIENT_ID` | OAuth 2.0 client from [Google Cloud Console](https://console.cloud.google.com/apis/credentials). Redirect URI `https://<web-domain>/api/auth/callback/google`. |
 | `GOOGLE_CLIENT_SECRET` | Same. |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` / `MICROSOFT_TENANT_ID` | Optional — Microsoft Entra ID sign-in. Redirect URI `https://<web-domain>/api/auth/oauth2/callback/microsoft`. Tenant defaults to `common`. |
+| `OIDC_DISCOVERY_URL` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_PROVIDER_NAME` | Optional — any OIDC IdP (Okta/Auth0/Keycloak/…). Redirect URI `https://<web-domain>/api/auth/oauth2/callback/oidc`. |
 | `INSTANCE_ADMIN_EMAILS` | **Required to bootstrap.** Comma-separated emails granted instance-admin. The instance is invite-only — only these admins can sign in to a fresh instance and create workspaces / invite others. Set yours or no one can get in. |
 | `TAS_INSTANCE_NAME` | Optional brand label on the login screen. |
 

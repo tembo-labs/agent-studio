@@ -63,7 +63,7 @@ export function SignInButtons({ providers }: { providers: Provider[] }) {
         </Button>
       ))}
       {error && (
-        <p className="text-sentiment-negative text-xs" role="alert">
+        <p className="text-sentiment-negative text-sm" role="alert">
           {error}
         </p>
       )}

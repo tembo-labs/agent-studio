@@ -226,14 +226,14 @@ function FailedReason({
           rest of the page (Improve form, recent runs) off-screen; the
           Copy button above is the escape hatch for sharing the full
           text elsewhere. */}
-      <pre className="text-foreground max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5">
+      <pre className="text-foreground max-h-96 overflow-auto whitespace-pre-wrap font-mono text-sm leading-5">
         {run.errorMessage}
       </pre>
       {/* Two investigation jumps. "Similar runs" pulls every failed
           run on this agent with the same error prefix in /runs;
           "Failure groups" jumps to the per-agent dashboard's
           grouped-by-error rollup. Same data, two pivots. */}
-      <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
+      <div className="flex flex-wrap items-center gap-3 pt-1 text-sm">
         {errorSearchTerm && (
           <Link
             href={similarHref}

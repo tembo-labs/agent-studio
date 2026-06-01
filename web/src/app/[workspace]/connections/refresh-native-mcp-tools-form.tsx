@@ -42,7 +42,7 @@ export function RefreshNativeMcpToolsForm({
         </button>
       </form>
       {state.error && (
-        <p className="text-sentiment-negative max-w-xs text-right text-xs">
+        <p className="text-sentiment-negative max-w-xs text-right text-sm">
           {state.error}
         </p>
       )}

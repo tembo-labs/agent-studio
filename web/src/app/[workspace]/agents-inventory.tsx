@@ -269,7 +269,7 @@ function FacetPills({
             key={key}
             type="button"
             onClick={() => onChange(key === "all" ? null : (key as StatusBucket))}
-            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm transition-colors ${
               isActive
                 ? "border-foreground bg-surface-raised text-foreground"
                 : "border-border bg-surface text-foreground-weak hover:text-foreground"
@@ -277,7 +277,7 @@ function FacetPills({
           >
             {label}
             <span
-              className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${
+              className={`rounded-full px-1.5 py-0.5 text-sm font-medium ${
                 isActive
                   ? "bg-surface text-foreground-weak"
                   : "bg-surface-secondary text-foreground-muted"
@@ -317,7 +317,7 @@ function SortableTh({
         }`}
       >
         {label}
-        <span className="text-xs" aria-hidden>
+        <span className="text-sm" aria-hidden>
           {active ? (dir === "asc" ? "↑" : "↓") : "↕"}
         </span>
       </button>
@@ -339,12 +339,12 @@ function InventoryRow({
           <StatusCell bucket="invalid" />
         </td>
         <td className="px-3 py-2 align-middle">
-          <span className="text-foreground font-mono text-xs">
+          <span className="text-foreground font-mono text-sm">
             {agent.filename}
           </span>
         </td>
         <td
-          className="text-sentiment-negative px-3 py-2 align-middle text-xs"
+          className="text-sentiment-negative px-3 py-2 align-middle text-sm"
           colSpan={5}
         >
           {agent.error}
@@ -369,16 +369,16 @@ function InventoryRow({
             {agent.frameworkLabel}
           </Badge>
         </td>
-        <td className="text-foreground-muted px-3 py-2 align-middle text-xs">
+        <td className="text-foreground-muted px-3 py-2 align-middle text-sm">
           —
         </td>
-        <td className="text-foreground-muted px-3 py-2 text-right align-middle text-xs">
+        <td className="text-foreground-muted px-3 py-2 text-right align-middle text-sm">
           —
         </td>
-        <td className="text-foreground-muted px-3 py-2 text-right align-middle text-xs">
+        <td className="text-foreground-muted px-3 py-2 text-right align-middle text-sm">
           —
         </td>
-        <td className="text-foreground-weak px-3 py-2 text-right align-middle text-xs">
+        <td className="text-foreground-weak px-3 py-2 text-right align-middle text-sm">
           <PendingLinks agent={agent} />
         </td>
       </tr>
@@ -405,20 +405,20 @@ function InventoryRow({
           {agent.frameworkLabel}
         </Badge>
       </td>
-      <td className="text-foreground-weak px-3 py-2 align-middle font-mono text-xs">
+      <td className="text-foreground-weak px-3 py-2 align-middle font-mono text-sm">
         {agent.model ?? "—"}
       </td>
-      <td className="text-foreground px-3 py-2 text-right align-middle font-mono text-xs">
+      <td className="text-foreground px-3 py-2 text-right align-middle font-mono text-sm">
         {agent.runs30d.toLocaleString("en-US")}
       </td>
-      <td className="px-3 py-2 text-right align-middle font-mono text-xs">
+      <td className="px-3 py-2 text-right align-middle font-mono text-sm">
         {successRate === null ? (
           <span className="text-foreground-muted">—</span>
         ) : (
           <SuccessCell rate={successRate} failed={agent.failed30d} />
         )}
       </td>
-      <td className="text-foreground-weak px-3 py-2 text-right align-middle text-xs">
+      <td className="text-foreground-weak px-3 py-2 text-right align-middle text-sm">
         {agent.lastRun ? (
           <span
             title={new Date(agent.lastRun.createdAtIso).toLocaleString()}
@@ -450,7 +450,7 @@ function SuccessCell({ rate, failed }: { rate: number; failed: number }) {
 function StatusCell({ bucket }: { bucket: StatusBucket }) {
   const meta = STATUS_META[bucket];
   return (
-    <span className="text-foreground-weak inline-flex items-center gap-1.5 text-xs">
+    <span className="text-foreground-weak inline-flex items-center gap-1.5 text-sm">
       <span
         className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dotClass}`}
         aria-hidden

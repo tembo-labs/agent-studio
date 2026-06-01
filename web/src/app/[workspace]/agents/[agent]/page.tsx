@@ -207,7 +207,7 @@ export default async function AgentDetailPage({
           title="Definition"
           description="Edits go through Git. Framework and model changes go through the same review path as any other change — never edited in a live console."
         >
-          <pre className="bg-surface border-border text-foreground overflow-x-auto rounded-lg border p-4 font-mono text-xs leading-5">
+          <pre className="bg-surface border-border text-foreground overflow-x-auto rounded-lg border p-4 font-mono text-sm leading-5">
             {raw}
           </pre>
         </Section>
@@ -266,7 +266,7 @@ function RecentRuns({
             </Link>
             <Link
               href={`/${workspaceSlug}/agents/${encodeURIComponent(agentName)}/runs/${run.id}`}
-              className="text-foreground-weak hover:text-foreground text-xs"
+              className="text-foreground-weak hover:text-foreground text-sm"
             >
               Open →
             </Link>
@@ -336,12 +336,12 @@ function AutomationsSection({
                   <span className="text-foreground truncate text-sm font-medium">
                     {a.name}
                   </span>
-                  <span className="text-foreground-weak truncate text-xs">
+                  <span className="text-foreground-weak truncate text-sm">
                     {preview.ok ? preview.humanReadable : a.cron}{" "}
                     <span className="text-foreground-muted">(UTC)</span>
                   </span>
                 </Link>
-                <span className="text-foreground-muted shrink-0 text-xs">
+                <span className="text-foreground-muted shrink-0 text-sm">
                   {next ? (
                     <>
                       Next{" "}

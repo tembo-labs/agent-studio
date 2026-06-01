@@ -122,7 +122,7 @@ function AutomationRow({
       </td>
       <td className="px-3 py-2 align-top">
         <div className="flex flex-col gap-0.5">
-          <code className="text-foreground text-xs">{automation.cron}</code>
+          <code className="text-foreground text-sm">{automation.cron}</code>
           {preview.ok && (
             <span className="text-foreground-weak text-sm">
               {preview.humanReadable}{" "}
@@ -131,14 +131,14 @@ function AutomationRow({
           )}
         </div>
       </td>
-      <td className="text-foreground-weak px-3 py-2 align-top text-xs">
+      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
         {nextFire ? (
           <LocalTime iso={nextFire.toISOString()} style="relative" />
         ) : (
           <span className="text-foreground-muted">—</span>
         )}
       </td>
-      <td className="text-foreground-weak px-3 py-2 align-top text-xs">
+      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
         {automation.lastFiredAt ? (
           <LocalTime iso={automation.lastFiredAt.toISOString()} style="relative" />
         ) : (
@@ -148,7 +148,7 @@ function AutomationRow({
       <td className="px-3 py-2 align-top">
         <StatusBadge automation={automation} />
         {automation.lastFireError && (
-          <p className="text-sentiment-negative mt-1 max-w-[220px] text-xs leading-4">
+          <p className="text-sentiment-negative mt-1 max-w-[220px] text-sm leading-4">
             {automation.lastFireError}
           </p>
         )}
@@ -162,7 +162,7 @@ function AutomationRow({
           />
           <Link
             href={editHref}
-            className="text-foreground-weak hover:text-foreground text-xs"
+            className="text-foreground-weak hover:text-foreground text-sm"
           >
             Edit
           </Link>

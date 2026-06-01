@@ -28,7 +28,7 @@ export function ImprovementHistory({
             </p>
             <StatusBadge status={i.status} />
           </div>
-          <div className="text-foreground-weak flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <div className="text-foreground-weak flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <span className="text-foreground font-medium">
               {improvementSubmitterLabel(i)}
             </span>

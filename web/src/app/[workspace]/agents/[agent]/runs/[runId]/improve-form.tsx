@@ -131,7 +131,7 @@ function ResultBanner({ result }: { result: ImproveResult }) {
       <span className="text-sentiment-negative font-medium">
         Couldn&apos;t create the task
       </span>
-      <span className="text-foreground whitespace-pre-wrap text-xs leading-5">
+      <span className="text-foreground whitespace-pre-wrap text-sm leading-5">
         {result.error}
       </span>
     </div>

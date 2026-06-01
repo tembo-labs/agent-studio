@@ -153,7 +153,7 @@ export async function AppShell({
 
           {(failingAgents.length > 0 || missingConnections.length > 0) && (
             <div className="mt-6 flex flex-col gap-1.5">
-              <span className="text-foreground-muted px-2 text-xs font-medium uppercase tracking-widest">
+              <span className="text-foreground-muted px-2 text-sm font-medium uppercase tracking-widest">
                 Action needed
               </span>
               {failingAgents.map((f) => {
@@ -168,7 +168,7 @@ export async function AppShell({
                       className="text-sentiment-negative mt-0.5 shrink-0"
                     />
                     <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
-                      <span className="text-sentiment-negative text-xs leading-tight">
+                      <span className="text-sentiment-negative text-sm leading-tight">
                         <span className="font-semibold">{f.agentName}</span>{" "}
                         failed{" "}
                         <span className="font-semibold">{f.failures}×</span> in
@@ -228,7 +228,7 @@ export async function AppShell({
                       className="mt-0.5 shrink-0 text-[var(--color-icon-sentiment-caution)]"
                     />
                     <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
-                      <span className="text-xs leading-tight text-[var(--color-foreground-sentiment-caution)]">
+                      <span className="text-sm leading-tight text-[var(--color-foreground-sentiment-caution)]">
                         <span className="font-semibold">{labelWithSlot}</span>{" "}
                         for{" "}
                         <span className="font-semibold">{m.agentName}</span>

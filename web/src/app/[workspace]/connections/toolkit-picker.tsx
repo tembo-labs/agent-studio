@@ -158,7 +158,7 @@ export function ToolkitPicker({
               <span className="text-foreground min-w-0 flex-1 truncate text-sm">
                 {t.name}
               </span>
-              <span className="text-foreground-muted shrink-0 font-mono text-xs">
+              <span className="text-foreground-muted shrink-0 font-mono text-sm">
                 {t.slug}
               </span>
             </li>

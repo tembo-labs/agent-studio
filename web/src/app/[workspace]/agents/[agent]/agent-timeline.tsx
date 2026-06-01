@@ -26,7 +26,7 @@ export function AgentTimeline({ workspaceSlug, agentName, entries }: Props) {
       title="Timeline"
       description="Recent changes and runs for this agent. Same data, finer slice, of the workspace-wide audit log."
       actions={
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-3 text-sm">
           <a
             href={exportHref}
             download
@@ -52,7 +52,7 @@ export function AgentTimeline({ workspaceSlug, agentName, entries }: Props) {
           {entries.map((e) => (
             <li
               key={`${e.origin}:${e.id}`}
-              className="flex items-baseline justify-between gap-3 py-2 text-xs"
+              className="flex items-baseline justify-between gap-3 py-2 text-sm"
             >
               <div className="flex min-w-0 items-baseline gap-2">
                 <Badge variant={SOURCE_TONE[e.source]} size="small">

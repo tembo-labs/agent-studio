@@ -261,7 +261,7 @@ function TopFailingAgents({
                 </div>
                 <Link
                   href={`/${workspaceSlug}/agents/${encodeURIComponent(r.agentName)}/runs/${r.exampleRunId}`}
-                  className="text-foreground-weak hover:text-foreground shrink-0 text-xs hover:underline"
+                  className="text-foreground-weak hover:text-foreground shrink-0 text-sm hover:underline"
                 >
                   Last <LocalTime iso={r.lastSeen.toISOString()} style="relative" /> →
                 </Link>

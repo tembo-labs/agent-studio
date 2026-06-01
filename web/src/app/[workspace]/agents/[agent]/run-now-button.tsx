@@ -111,7 +111,7 @@ export function RunNowButton({ workspaceSlug, agentName }: Props) {
         </AlertDialogContent>
       </AlertDialog>
       {state.error && (
-        <p className="text-sentiment-negative max-w-xs text-right text-xs">
+        <p className="text-sentiment-negative max-w-xs text-right text-sm">
           {state.error}
         </p>
       )}

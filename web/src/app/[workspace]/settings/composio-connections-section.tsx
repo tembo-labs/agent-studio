@@ -142,7 +142,7 @@ export function ComposioConnectionsSection({
         {allSlots.length === 0 ? (
           <p className="text-foreground-weak text-base">
             No agents in this workspace declare a{" "}
-            <code className="bg-surface rounded px-1 py-0.5 text-xs">
+            <code className="bg-surface rounded px-1 py-0.5 text-sm">
               connections:
             </code>{" "}
             field yet. Once an agent does, the toolkit it needs shows up
@@ -333,7 +333,7 @@ function ComposioConnectionRow({
           <span className="text-foreground text-sm font-medium">
             {toolkitLabel(toolkit)}
           </span>
-          <span className="text-foreground-muted truncate text-xs">
+          <span className="text-foreground-muted truncate text-sm">
             {subtitle}
           </span>
           {connection && (

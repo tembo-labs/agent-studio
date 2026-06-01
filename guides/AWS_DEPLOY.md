@@ -82,8 +82,9 @@ sit in plaintext task JSON):
 | `BETTER_AUTH_URL` | `https://<your-domain>` |
 | `NEXT_PUBLIC_BETTER_AUTH_URL` | `https://<your-domain>` |
 | `API_INTERNAL_URL` | `http://api.<namespace>:8080` (Service Connect DNS) |
-| `GOOGLE_CLIENT_ID` | OAuth 2.0 client |
+| `GOOGLE_CLIENT_ID` | OAuth 2.0 client. Redirect URI `https://<domain>/api/auth/callback/google`. |
 | `GOOGLE_CLIENT_SECRET` | from Secrets Manager |
+| `MICROSOFT_*` / `OIDC_*` | Optional alternative providers (Entra ID / any OIDC IdP). Redirect URIs `https://<domain>/api/auth/oauth2/callback/{microsoft,oidc}`. See `.env.example`. |
 | `INSTANCE_ADMIN_EMAILS` | **Required to bootstrap** — comma-separated instance-admin emails. The instance is invite-only; only these admins can sign in to a fresh deployment and create workspaces / invite others. |
 | `TAS_INSTANCE_NAME` | optional brand label |
 

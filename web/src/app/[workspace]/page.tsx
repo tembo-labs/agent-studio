@@ -154,7 +154,7 @@ export default async function WorkspacePage({
         <div className="border-sentiment-positive bg-[var(--color-sentiment-positive-subtle)] rounded-lg border px-3 py-2 text-sm">
           <span className="text-foreground">
             Deleted{" "}
-            <code className="bg-surface rounded px-1 py-0.5 text-xs">
+            <code className="bg-surface rounded px-1 py-0.5 text-sm">
               {deletedAgentName}
             </code>
             . The file&apos;s gone from the repo; restore it from{" "}

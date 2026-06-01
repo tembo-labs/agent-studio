@@ -103,8 +103,10 @@ environments (Production, Preview, Development) unless noted.
 | `TAS_ENCRYPTION_KEY` | Must match the value on the api host byte-for-byte. |
 | `INTERNAL_API_TOKEN` | Must match the value on the api host byte-for-byte. |
 | `API_INTERNAL_URL` | The api host's public URL from step 2 (e.g. `https://tas-api.fly.dev`). The web tier sends `/internal/runs` requests here. |
-| `GOOGLE_CLIENT_ID` | OAuth 2.0 client from [Google Cloud Console](https://console.cloud.google.com/apis/credentials). |
+| `GOOGLE_CLIENT_ID` | OAuth 2.0 client from [Google Cloud Console](https://console.cloud.google.com/apis/credentials). Redirect URI `${BETTER_AUTH_URL}/api/auth/callback/google`. |
 | `GOOGLE_CLIENT_SECRET` | Same. |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` / `MICROSOFT_TENANT_ID` | Optional — Microsoft Entra ID. Redirect URI `${BETTER_AUTH_URL}/api/auth/oauth2/callback/microsoft`. Tenant defaults to `common`. |
+| `OIDC_DISCOVERY_URL` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_PROVIDER_NAME` | Optional — any OIDC IdP (Okta/Auth0/Keycloak/…). Redirect URI `${BETTER_AUTH_URL}/api/auth/oauth2/callback/oidc`. |
 | `INSTANCE_ADMIN_EMAILS` | **Required to bootstrap.** Comma-separated instance-admin emails. The instance is invite-only — only these admins can sign in to a fresh deployment and create workspaces / invite others. |
 | `TAS_INSTANCE_NAME` | Optional brand label shown on the login screen. |
 | `TEMBO_API_URL` | Defaults to `https://api.tembo.io`. Override for staging. |

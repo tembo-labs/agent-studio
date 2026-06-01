@@ -61,7 +61,7 @@ export function UserMenu({ name, email, isInstanceAdmin }: Props) {
         aria-expanded={open}
         className="hover:bg-interactive-state-hover flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors"
       >
-        <span className="text-foreground text-xs font-medium leading-tight">
+        <span className="text-foreground text-sm font-medium leading-tight">
           {name ?? email}
         </span>
         {name && (

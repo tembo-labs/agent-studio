@@ -183,7 +183,7 @@ export function RunsList({
       {/* Filter row */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide">
+          <span className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide">
             Status
           </span>
           {ALL_STATUSES.map((s) => (
@@ -197,7 +197,7 @@ export function RunsList({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide">
+          <span className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide">
             Trigger
           </span>
           {ALL_TRIGGERS.map((t) => (
@@ -211,7 +211,7 @@ export function RunsList({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide">
+          <span className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide">
             Agent
           </span>
           <Select
@@ -226,7 +226,7 @@ export function RunsList({
         <div className="flex flex-wrap items-center gap-2">
           <label
             htmlFor="run-search"
-            className="text-foreground-weak w-20 shrink-0 text-xs uppercase tracking-wide"
+            className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide"
           >
             Search
           </label>
@@ -350,7 +350,7 @@ function RunRow({
           <span className="text-foreground-weak text-sm">Manual</span>
         )}
       </td>
-      <td className="text-foreground max-w-md px-3 py-2 align-top text-xs">
+      <td className="text-foreground max-w-md px-3 py-2 align-top text-sm">
         {run.userMessagePreview ? (
           <div className="truncate">{run.userMessagePreview}</div>
         ) : !run.errorMessagePreview ? (
@@ -360,15 +360,15 @@ function RunRow({
           // Failed runs surface their error inline so a triager can
           // scan failures without clicking into each row. Two-line
           // clamp keeps the column from ballooning on verbose stacks.
-          <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-xs leading-4">
+          <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-sm leading-4">
             {run.errorMessagePreview}
           </div>
         )}
       </td>
-      <td className="text-foreground-weak px-3 py-2 align-top text-xs">
+      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
         <QueuedAt iso={run.createdAt} />
       </td>
-      <td className="text-foreground-weak relative px-3 py-2 align-top text-xs">
+      <td className="text-foreground-weak relative px-3 py-2 align-top text-sm">
         {durationMs !== null && maxDurationMs > 0 ? (
           <>
             <span
@@ -386,7 +386,7 @@ function RunRow({
           <span className="text-foreground-muted">—</span>
         )}
       </td>
-      <td className="text-foreground-weak relative px-3 py-2 align-top text-xs">
+      <td className="text-foreground-weak relative px-3 py-2 align-top text-sm">
         {run.costUsd !== null && maxCostUsd > 0 ? (
           <>
             <span

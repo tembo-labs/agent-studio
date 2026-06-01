@@ -448,9 +448,9 @@
 	--font-weight-medium: 520;
 	--font-weight-bold: 600;
 
-	--text-xs: 11px;
-	--text-xs--line-height: 14px;
-	--text-xs--letter-spacing: -0.2px;
+	--text-sm: 11px;
+	--text-sm--line-height: 14px;
+	--text-sm--letter-spacing: -0.2px;
 	--text-sm: 13px;
 	--text-sm--line-height: 16px;
 	--text-sm--letter-spacing: -0.2px;

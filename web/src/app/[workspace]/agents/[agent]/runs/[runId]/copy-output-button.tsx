@@ -36,7 +36,7 @@ export function CopyOutputButton({ text }: { text: string }) {
       onClick={handleCopy}
       aria-label="Copy output to clipboard"
       title={label}
-      className="bg-surface text-foreground-weak hover:text-foreground hover:bg-surface-raised border-border inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs shadow-sm transition-colors"
+      className="bg-surface text-foreground-weak hover:text-foreground hover:bg-surface-raised border-border inline-flex h-7 items-center gap-1 rounded-md border px-2 text-sm shadow-sm transition-colors"
     >
       {state === "copied" ? (
         <IconCheckmark1 size={14} />

@@ -178,7 +178,7 @@ export function ChatThread({
             <span className="text-sentiment-negative font-medium">
               Couldn&apos;t send
             </span>
-            <span className="text-foreground whitespace-pre-wrap text-xs leading-5">
+            <span className="text-foreground whitespace-pre-wrap text-sm leading-5">
               {error}
             </span>
           </div>
@@ -206,7 +206,7 @@ function RunBubble({ run }: { run: ChatRun }) {
           <p className="whitespace-pre-wrap text-sm leading-5">
             {run.userMessage}
           </p>
-          <span className="text-foreground-on-accent/70 text-xs">
+          <span className="text-foreground-on-accent/70 text-sm">
             <LocalTime iso={run.createdAt.toISOString()} />
           </span>
         </div>
@@ -254,14 +254,14 @@ function ImprovementBubble({
       <div className="flex justify-end">
         <div className="bg-interactive text-foreground-on-accent flex max-w-[80%] flex-col gap-1 rounded-lg px-3 py-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-foreground-on-accent/80 text-xs uppercase tracking-wide">
+            <span className="text-foreground-on-accent/80 text-sm uppercase tracking-wide">
               Change request
             </span>
           </div>
           <p className="whitespace-pre-wrap text-sm leading-5">
             {improvement.improvementText}
           </p>
-          <span className="text-foreground-on-accent/70 text-xs">
+          <span className="text-foreground-on-accent/70 text-sm">
             {improvementSubmitterLabel(improvement)} ·{" "}
             <LocalTime iso={improvement.createdAt.toISOString()} />
             {runHref && (
@@ -290,7 +290,7 @@ function ImprovementBubble({
                 href={improvement.prUrl}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-foreground text-xs font-medium hover:underline"
+                className="text-foreground text-sm font-medium hover:underline"
               >
                 PR #{improvement.prNumber} ↗
               </a>
