@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 
-// Bare /<workspace>/settings → /<workspace>/settings/api-keys. The
-// SettingsNav still highlights "API keys" when the user lands on
-// the bare path (handled in the nav's active-link check) so a
-// momentary URL flicker doesn't leave the rail confused.
+// Bare /<workspace>/settings → /<workspace>/settings/providers. The
+// SettingsNav highlights "LLM Providers" on the bare path (handled in
+// the nav's active-link check) so a momentary URL flicker doesn't
+// leave the rail confused.
 
 export default async function SettingsIndex({
   params,
@@ -11,5 +11,5 @@ export default async function SettingsIndex({
   params: Promise<{ workspace: string }>;
 }) {
   const { workspace: slug } = await params;
-  redirect(`/${slug}/settings/api-keys`);
+  redirect(`/${slug}/settings/providers`);
 }

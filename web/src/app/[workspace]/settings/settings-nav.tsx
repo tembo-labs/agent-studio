@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Left rail for the Settings shell. Five sub-pages, sorted by how
-// often an operator opens them (API keys lead, danger-zone-ish
-// "deleted agents" trails). Active item highlights on prefix-match
-// so a nested sub-route in the future doesn't need a separate
-// special case.
+// Left rail for the Settings shell, sorted by how often an operator
+// opens them (provider/integration keys lead, danger-zone-ish "deleted
+// agents" trails). Active item highlights on prefix-match so a nested
+// sub-route in the future doesn't need a separate special case.
 
 type Item = { slug: string; label: string };
 
 const ITEMS: Item[] = [
-  { slug: "api-keys", label: "API keys" },
+  { slug: "providers", label: "LLM Providers" },
+  { slug: "integrations", label: "Integrations" },
   { slug: "repository", label: "Repository" },
   { slug: "appearance", label: "Appearance" },
   { slug: "members", label: "Members" },
@@ -35,7 +35,7 @@ export function SettingsNav({ workspaceSlug }: { workspaceSlug: string }) {
         const isActive =
           pathname === href ||
           pathname.startsWith(`${href}/`) ||
-          (pathname === base && item.slug === "api-keys");
+          (pathname === base && item.slug === "providers");
         return (
           <Link
             key={item.slug}

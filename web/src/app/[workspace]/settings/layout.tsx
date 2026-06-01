@@ -14,7 +14,7 @@ import { SettingsNav } from "./settings-nav";
 // sidebar. Sub-pages under settings/* render into `children`.
 //
 // Membership check lands here (rather than per-sub-page) so a
-// stranger hitting /settings/api-keys directly hits the same
+// stranger hitting a /settings/* sub-page directly hits the same
 // notFound() as the workspace root. Workspace-admin gating for
 // mutating actions stays at the server-action layer where it
 // belongs.
