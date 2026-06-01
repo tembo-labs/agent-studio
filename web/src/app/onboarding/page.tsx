@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { getInstanceName } from "@/lib/config";
+import { getInstanceName } from "@/lib/instance-settings";
 import { getServerSession } from "@/lib/session";
 import { listWorkspacesForUser } from "@/lib/workspace";
 
@@ -18,7 +18,7 @@ export default async function OnboardingPage() {
   const workspaces = await listWorkspacesForUser(session.user.id);
   const isFirst = workspaces.length === 0;
 
-  const instanceName = getInstanceName();
+  const instanceName = await getInstanceName();
 
   return (
     <main className="bg-surface flex min-h-screen flex-col items-center justify-center px-6 py-12">

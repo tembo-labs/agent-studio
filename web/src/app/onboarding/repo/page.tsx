@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getInstanceName } from "@/lib/config";
+import { getInstanceName } from "@/lib/instance-settings";
 import { getServerSession } from "@/lib/session";
 import {
   getWorkspaceBySlug,
@@ -54,7 +54,7 @@ export default async function OnboardingRepoPage({
     redirect(`/${workspace.slug}`);
   }
 
-  const instanceName = getInstanceName();
+  const instanceName = await getInstanceName();
 
   return (
     <main className="bg-surface flex min-h-screen flex-col items-center justify-center px-6 py-12">

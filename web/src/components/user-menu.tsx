@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
@@ -13,9 +14,11 @@ import { authClient } from "@/lib/auth-client";
 type Props = {
   name: string | null;
   email: string;
+  /** Show the instance-settings link (INSTANCE_ADMIN_EMAILS allowlist). */
+  isInstanceAdmin?: boolean;
 };
 
-export function UserMenu({ name, email }: Props) {
+export function UserMenu({ name, email, isInstanceAdmin }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -73,6 +76,16 @@ export function UserMenu({ name, email }: Props) {
           role="menu"
           className="bg-surface-raised border-border absolute bottom-full left-0 right-0 z-20 mb-1 rounded-lg border p-1 shadow-[0_8px_24px_0_rgba(0,0,0,0.12)]"
         >
+          {isInstanceAdmin && (
+            <Link
+              role="menuitem"
+              href="/settings"
+              onClick={() => setOpen(false)}
+              className="hover:bg-interactive-state-hover text-foreground flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors"
+            >
+              Instance settings
+            </Link>
+          )}
           <button
             type="button"
             role="menuitem"

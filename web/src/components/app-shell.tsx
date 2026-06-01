@@ -7,7 +7,8 @@ import { UserMenu } from "@/components/user-menu";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { toolkitLabel } from "@/lib/composio";
 import { getMcpProvider } from "@/lib/mcp-providers";
-import { getInstanceName } from "@/lib/config";
+import { getInstanceName } from "@/lib/instance-settings";
+import { isInstanceAdminEmail } from "@/lib/instance";
 import type { Workspace } from "@/lib/workspace";
 import {
   IconAgent,
@@ -68,7 +69,7 @@ type Props = {
   children: ReactNode;
 };
 
-export function AppShell({
+export async function AppShell({
   workspace,
   workspaces,
   user,
@@ -76,7 +77,8 @@ export function AppShell({
   failingAgents,
   children,
 }: Props) {
-  const instanceName = getInstanceName();
+  const instanceName = await getInstanceName();
+  const isInstanceAdmin = isInstanceAdminEmail(user.email);
   const home = `/${workspace.slug}`;
 
   return (
@@ -242,7 +244,11 @@ export function AppShell({
         </nav>
 
         <div className="px-2 py-2">
-          <UserMenu name={user.name ?? null} email={user.email} />
+          <UserMenu
+            name={user.name ?? null}
+            email={user.email}
+            isInstanceAdmin={isInstanceAdmin}
+          />
         </div>
       </aside>
 

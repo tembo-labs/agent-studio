@@ -1,5 +1,11 @@
-export function getInstanceName(): string {
-  return process.env.TAS_INSTANCE_NAME?.trim() || "Tembo Agent Studio";
+export const DEFAULT_INSTANCE_NAME = "Tembo Agent Studio";
+
+// Env-only instance name. The DB-backed value (set via instance
+// settings) takes precedence — see `getInstanceName` in
+// `@/lib/instance-settings`, which falls back to this. Kept sync so it
+// can be used where a DB read isn't available (build env, fallbacks).
+export function getInstanceNameFromEnv(): string {
+  return process.env.TAS_INSTANCE_NAME?.trim() || DEFAULT_INSTANCE_NAME;
 }
 
 export function isGoogleConfigured(): boolean {

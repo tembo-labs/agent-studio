@@ -3,11 +3,8 @@ import { redirect } from "next/navigation";
 import { AuthConfigNeeded } from "@/components/auth-config-needed";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  POWERED_BY_HREF,
-  getInstanceName,
-  isGoogleConfigured,
-} from "@/lib/config";
+import { POWERED_BY_HREF, isGoogleConfigured } from "@/lib/config";
+import { getInstanceName } from "@/lib/instance-settings";
 import { getServerSession } from "@/lib/session";
 import { listWorkspacesForUser } from "@/lib/workspace";
 
@@ -15,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await getServerSession();
-  const instanceName = getInstanceName();
+  const instanceName = await getInstanceName();
 
   if (session) {
     const workspaces = await listWorkspacesForUser(session.user.id);
