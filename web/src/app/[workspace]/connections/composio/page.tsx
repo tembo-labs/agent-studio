@@ -123,7 +123,7 @@ export default async function ComposioConnectionsPage({
             Composio connections require a workspace-level Composio API
             key.{" "}
             <Link
-              href={`/${workspace.slug}/settings/integrations`}
+              href={`/${workspace.slug}/settings/composio`}
               className="text-foreground underline underline-offset-2"
             >
               Set it in Settings →

@@ -8,15 +8,13 @@ import {
   getWorkspaceRepo,
 } from "@/lib/workspace";
 
-import { ChangeModeSetting } from "../change-mode-setting";
 import { DisconnectRepoForm } from "../disconnect-repo-form";
-import { SyncGuidanceForm } from "../sync-guidance-form";
 
 export const dynamic = "force-dynamic";
 
-// Repository: GitHub connection + agent-guidance refresh +
-// improvements delivery mode. Grouped because all three concern
-// "what TAS writes into the repo and how."
+// Repository: the workspace's GitHub connection. Agent-guidance refresh
+// and improvements-delivery moved to the Tembo Coding Agent tab — both
+// configure the coding agent, not the repo link itself.
 
 export default async function RepositoryPage({
   params,
@@ -65,26 +63,6 @@ export default async function RepositoryPage({
               </Link>
             </p>
           )}
-        </Section>
-      </div>
-
-      {repo && (
-        <div className="py-6">
-          <Section
-            title="Agent guidance"
-            description="Writes (or refreshes) AGENTS.md and the per-framework AGENT_GUIDE.md files into the connected repo. These tell the Tembo Coding Agent how to write valid agent files. Safe to click repeatedly — it only commits when the files are missing or out of date."
-          >
-            <SyncGuidanceForm workspaceSlug={workspace.slug} />
-          </Section>
-        </div>
-      )}
-
-      <div className="pt-6">
-        <Section
-          title="Improvements delivery"
-          description="How edits from the Improve form ship to your repo. YOLO commits directly to the default branch and is coming in a later release."
-        >
-          <ChangeModeSetting />
         </Section>
       </div>
     </div>

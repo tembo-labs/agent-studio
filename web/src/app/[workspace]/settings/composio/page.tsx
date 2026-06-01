@@ -11,11 +11,11 @@ import { SecretKeyForm } from "../secret-key-form";
 
 export const dynamic = "force-dynamic";
 
-// Integrations: external-service credentials. Composio (connections +
-// the trigger webhook secret) first, then Tembo (chat-to-PR authoring)
-// last. Distinct from LLM Providers — none of these are needed to run
-// an agent.
-export default async function IntegrationsPage({
+// Composio integration: the workspace API key that authenticates Tool
+// Router sessions, plus the HMAC secret used to verify inbound trigger
+// webhooks. Per-user OAuth for individual toolkits happens at
+// /connections, not here.
+export default async function ComposioSettingsPage({
   params,
 }: {
   params: Promise<{ workspace: string }>;
@@ -24,12 +24,10 @@ export default async function IntegrationsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const [composioPreview, composioWebhookSecretPreview, temboPreview] =
-    await Promise.all([
-      getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
-      getWorkspaceSecretPreview(workspace.id, "composio_webhook_secret"),
-      getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
-    ]);
+  const [composioPreview, composioWebhookSecretPreview] = await Promise.all([
+    getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
+    getWorkspaceSecretPreview(workspace.id, "composio_webhook_secret"),
+  ]);
   const webhookUrl = `${getPublicOrigin()}/api/hooks/composio/${workspace.slug}`;
 
   return (
@@ -57,7 +55,7 @@ export default async function IntegrationsPage({
         </Section>
       </div>
 
-      <div className="py-6">
+      <div className="pt-6">
         <Section
           title="Composio webhook secret"
           description={
@@ -83,38 +81,6 @@ export default async function IntegrationsPage({
                     last4: composioWebhookSecretPreview.last4,
                     updatedAt:
                       composioWebhookSecretPreview.updatedAt.toISOString(),
-                  }
-                : null
-            }
-          />
-        </Section>
-      </div>
-
-      <div className="pt-6">
-        <Section
-          title="Tembo API key"
-          description={
-            <>
-              Powers chat-to-PR authoring (new agents, chat-to-edit, Improve)
-              through Tembo. Not needed to run agents. Scoped to{" "}
-              <span className="text-foreground font-medium">
-                {workspace.name}
-              </span>{" "}
-              only.
-            </>
-          }
-        >
-          <SecretKeyForm
-            workspaceSlug={workspace.slug}
-            kind="tembo_api_key"
-            label="Tembo API key"
-            placeholder="tembo_pk_…"
-            maskedPrefix="tembo_"
-            preview={
-              temboPreview
-                ? {
-                    last4: temboPreview.last4,
-                    updatedAt: temboPreview.updatedAt.toISOString(),
                   }
                 : null
             }
