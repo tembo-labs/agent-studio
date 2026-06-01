@@ -30,6 +30,7 @@ import {
   getWorkspaceRepo,
   getWorkspaceRole,
   getWorkspaceSecretPreview,
+  isTemboConfigured,
 } from "@/lib/workspace";
 
 import { AgentDashboard } from "./agent-dashboard";
@@ -75,6 +76,7 @@ export default async function AgentDetailPage({
     composioWebhookSecretPreview,
     timeline,
     currentUserRole,
+    temboConfigured,
   ] = await Promise.all([
     listRecentRunsForAgent(workspace.id, canonicalName, 10),
     listAutomationsForAgent(workspace.id, canonicalName),
@@ -87,6 +89,7 @@ export default async function AgentDetailPage({
     getWorkspaceSecretPreview(workspace.id, "composio_webhook_secret"),
     listAuditTimeline(workspace.id, { agentName: canonicalName }, 20),
     getWorkspaceRole(workspace.id, session.user.id),
+    isTemboConfigured(workspace.id),
   ]);
   const canEdit = meetsMinRole(currentUserRole, "operator");
 
@@ -126,7 +129,7 @@ export default async function AgentDetailPage({
                 View source
               </a>
             </Button>
-            {agent.ok && canEdit && (
+            {agent.ok && canEdit && temboConfigured && (
               <Button asChild variant="secondary">
                 <Link
                   href={`/${workspace.slug}/agents/${encodeURIComponent(canonicalName)}/chat`}

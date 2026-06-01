@@ -198,7 +198,7 @@ export default async function WorkspacePage({
         <AgentsInventory
           agents={inventoryAgents}
           newAgentHref={`/${workspace.slug}/agents/new`}
-          canEdit={canEdit}
+          canCreate={canEdit && Boolean(apiKeyPreview)}
         />
       )}
     </div>

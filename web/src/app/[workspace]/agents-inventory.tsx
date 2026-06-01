@@ -72,11 +72,12 @@ type SortDir = "asc" | "desc";
 type Props = {
   agents: InventoryAgent[];
   newAgentHref: string;
-  /** Viewers see the inventory but not the "New agent" button. */
-  canEdit: boolean;
+  /** Show the "New agent" button. Requires operator+ AND a Tembo API
+   *  key (chat-to-create runs through Tembo CAP). */
+  canCreate: boolean;
 };
 
-export function AgentsInventory({ agents, newAgentHref, canEdit }: Props) {
+export function AgentsInventory({ agents, newAgentHref, canCreate }: Props) {
   const [query, setQuery] = useState("");
   // null = "all" (no facet selected). Selecting a pill switches the
   // visible rows to that bucket only.
@@ -151,7 +152,7 @@ export function AgentsInventory({ agents, newAgentHref, canEdit }: Props) {
           className="max-w-sm"
           aria-label="Search agents"
         />
-        {canEdit && (
+        {canCreate && (
           <Button asChild>
             <Link href={newAgentHref}>
               <IconPlusLarge size={16} />
@@ -168,7 +169,7 @@ export function AgentsInventory({ agents, newAgentHref, canEdit }: Props) {
           {agents.length === 0 ? (
             <>
               <p>No agents yet.</p>
-              {canEdit && (
+              {canCreate && (
                 <Link
                   href={newAgentHref}
                   className="text-foreground font-medium hover:underline"

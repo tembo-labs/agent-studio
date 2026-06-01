@@ -9,7 +9,7 @@ import { listImprovementsForRun } from "@/lib/improvements-api";
 import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
 import { getRun, type RunRecord } from "@/lib/runs-api";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug } from "@/lib/workspace";
+import { getWorkspaceBySlug, isTemboConfigured } from "@/lib/workspace";
 
 import { CopyOutputButton } from "./copy-output-button";
 import { ImproveForm } from "./improve-form";
@@ -43,6 +43,10 @@ export default async function RunDetailPage({
     workspace.id,
     storedImprovements,
   );
+
+  // "Improve the Agent" opens a Tembo CAP task — hide it when no Tembo
+  // API key is set (the run + its output still render).
+  const temboConfigured = await isTemboConfigured(workspace.id);
 
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;
   const totalTokens =
@@ -179,16 +183,17 @@ export default async function RunDetailPage({
           nothing to improve on yet, and the form pulling the eye away
           from the streaming output feels wrong. Fade it in two seconds
           after the output settles so the user finishes reading first. */}
-      {(run.status === "succeeded" || run.status === "failed") && (
-        <>
-          <hr className="border-[var(--color-border-weak)]" />
-          <ImproveForm
-            workspaceSlug={workspace.slug}
-            runId={run.id}
-            improvements={improvements}
-          />
-        </>
-      )}
+      {(run.status === "succeeded" || run.status === "failed") &&
+        temboConfigured && (
+          <>
+            <hr className="border-[var(--color-border-weak)]" />
+            <ImproveForm
+              workspaceSlug={workspace.slug}
+              runId={run.id}
+              improvements={improvements}
+            />
+          </>
+        )}
     </div>
   );
 }
