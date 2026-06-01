@@ -9,12 +9,14 @@ import {
 } from "@/lib/workspace";
 
 import { DisconnectRepoForm } from "../disconnect-repo-form";
+import { SyncGuidanceForm } from "../sync-guidance-form";
 
 export const dynamic = "force-dynamic";
 
-// Repository: the workspace's GitHub connection. Agent-guidance refresh
-// and improvements-delivery moved to the Tembo Coding Agent tab — both
-// configure the coding agent, not the repo link itself.
+// Repository: the workspace's GitHub connection + the agent-guidance
+// refresh (both are direct repo writes via the GitHub token — no Tembo
+// needed). Improvements-delivery lives on the Tembo Coding Agent tab
+// since it governs how the coding agent's PRs land.
 
 export default async function RepositoryPage({
   params,
@@ -65,6 +67,17 @@ export default async function RepositoryPage({
           )}
         </Section>
       </div>
+
+      {repo && (
+        <div className="pt-6">
+          <Section
+            title="Agent guidance"
+            description="Writes (or refreshes) AGENTS.md and the per-framework AGENT_GUIDE.md files into the connected repo. These tell the Tembo Coding Agent how to write valid agent files. Safe to click repeatedly — it only commits when the files are missing or out of date."
+          >
+            <SyncGuidanceForm workspaceSlug={workspace.slug} />
+          </Section>
+        </div>
+      )}
     </div>
   );
 }

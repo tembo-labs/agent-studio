@@ -3,20 +3,19 @@ import { notFound } from "next/navigation";
 import { Section } from "@/components/section";
 import {
   getWorkspaceBySlug,
-  getWorkspaceRepo,
   getWorkspaceSecretPreview,
 } from "@/lib/workspace";
 
 import { ChangeModeSetting } from "../change-mode-setting";
 import { SecretKeyForm } from "../secret-key-form";
-import { SyncGuidanceForm } from "../sync-guidance-form";
 
 export const dynamic = "force-dynamic";
 
-// Tembo Coding Agent: everything that configures the chat-to-PR
-// authoring loop — the API key, the agent-guidance files the coding
-// agent reads, and how its edits land in the repo. None of this is
-// needed to *run* an agent (that's LLM Providers).
+// Tembo Coding Agent: the chat-to-PR authoring config — the API key and
+// how the coding agent's edits land in the repo (Improvements delivery).
+// None of this is needed to *run* an agent (that's LLM Providers). The
+// agent-guidance file refresh lives on Repository (a direct repo write,
+// no Tembo needed).
 export default async function TemboSettingsPage({
   params,
 }: {
@@ -26,10 +25,10 @@ export default async function TemboSettingsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const [temboPreview, repo] = await Promise.all([
-    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
-    getWorkspaceRepo(workspace.id),
-  ]);
+  const temboPreview = await getWorkspaceSecretPreview(
+    workspace.id,
+    "tembo_api_key",
+  );
 
   return (
     <div className="divide-y divide-[var(--color-border-weak)]">
@@ -65,17 +64,6 @@ export default async function TemboSettingsPage({
           />
         </Section>
       </div>
-
-      {repo && (
-        <div className="py-6">
-          <Section
-            title="Agent guidance"
-            description="Writes (or refreshes) AGENTS.md and the per-framework AGENT_GUIDE.md files into the connected repo. These tell the Tembo Coding Agent how to write valid agent files. Safe to click repeatedly — it only commits when the files are missing or out of date."
-          >
-            <SyncGuidanceForm workspaceSlug={workspace.slug} />
-          </Section>
-        </div>
-      )}
 
       <div className="pt-6">
         <Section
