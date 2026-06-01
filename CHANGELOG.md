@@ -31,6 +31,20 @@ hardens the supply chain around them.
   Google account can recover without an app shell to hang a user menu
   off of.
 - **Dependabot** enabled for GitHub Actions + npm.
+- **Instance-admin role + root `/settings`.** Deployment-level admin via
+  the `INSTANCE_ADMIN_EMAILS` allowlist, and a root `/settings` surface
+  (instance-admin only) with an editable, DB-backed instance name
+  (`instance_settings`, migration 0031; env fallback).
+- **Invite-only instance + workspace invitations.** Account creation is
+  rejected unless the email is an instance admin or has a pending invite.
+  Workspace admins invite by email (migration 0032) and get a copy-paste
+  template; invitees auto-join their workspace(s) on first sign-in.
+  Workspace creation is instance-admin-only. `INSTANCE_ADMIN_EMAILS` is
+  the required bootstrap env (without it nobody can sign in to a fresh
+  instance).
+- **Build fix:** `api/build.rs` (`rerun-if-changed=migrations`) so new
+  migrations actually embed in the image — `sqlx::migrate!` is
+  compile-time, and a migration-only change otherwise got cached out.
 
 ### Changed
 - **api image runs as a non-root user** (uid 1001), matching web. The
