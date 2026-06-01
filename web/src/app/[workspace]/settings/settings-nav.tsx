@@ -11,12 +11,12 @@ import { usePathname } from "next/navigation";
 type Item = { slug: string; label: string };
 
 const ITEMS: Item[] = [
+  { slug: "members", label: "Members" },
+  { slug: "repository", label: "Repository" },
   { slug: "providers", label: "LLM Providers" },
   { slug: "composio", label: "Composio" },
   { slug: "tembo", label: "Tembo Coding Agent" },
-  { slug: "repository", label: "Repository" },
   { slug: "appearance", label: "Appearance" },
-  { slug: "members", label: "Members" },
   { slug: "deleted-agents", label: "Deleted agents" },
 ];
 
@@ -36,7 +36,7 @@ export function SettingsNav({ workspaceSlug }: { workspaceSlug: string }) {
         const isActive =
           pathname === href ||
           pathname.startsWith(`${href}/`) ||
-          (pathname === base && item.slug === "providers");
+          (pathname === base && item.slug === "members");
         return (
           <Link
             key={item.slug}
