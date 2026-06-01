@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { isInstanceAdminEmail } from "@/lib/instance";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
 
@@ -33,17 +35,31 @@ export default async function SettingsLayout({
   if (!workspace) notFound();
   if (!(await userIsMember(workspace.id, session.user.id))) notFound();
 
+  const isInstanceAdmin = isInstanceAdminEmail(session.user.email);
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
-          Settings
+          Workspace Settings
         </h1>
         <p className="text-foreground-weak text-base">
           Manage{" "}
           <span className="text-foreground font-medium">{workspace.name}</span>
           &apos;s repository, credentials, and branding.
         </p>
+        {isInstanceAdmin && (
+          <p className="text-foreground-weak text-sm">
+            You&apos;re also authorized to edit{" "}
+            <Link
+              href="/settings"
+              className="text-foreground font-medium underline underline-offset-2 hover:text-foreground-title"
+            >
+              Instance Settings
+            </Link>
+            .
+          </p>
+        )}
       </div>
 
       <hr className="border-[var(--color-border-weak)]" />
