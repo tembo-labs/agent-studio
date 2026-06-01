@@ -25,9 +25,15 @@ type WorkspaceOption = {
 type Props = {
   current: WorkspaceOption;
   workspaces: WorkspaceOption[];
+  /** Only instance admins can create workspaces. */
+  canCreateWorkspace?: boolean;
 };
 
-export function WorkspaceSwitcher({ current, workspaces }: Props) {
+export function WorkspaceSwitcher({
+  current,
+  workspaces,
+  canCreateWorkspace,
+}: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -103,16 +109,23 @@ export function WorkspaceSwitcher({ current, workspaces }: Props) {
               </button>
             );
           })}
-          <div className="border-border my-1 border-t" />
-          <Link
-            href="/onboarding"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className="hover:bg-interactive-state-hover text-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors"
-          >
-            <IconPlusSmall size={14} className="text-foreground-muted shrink-0" />
-            <span>Create workspace</span>
-          </Link>
+          {canCreateWorkspace && (
+            <>
+              <div className="border-border my-1 border-t" />
+              <Link
+                href="/onboarding"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="hover:bg-interactive-state-hover text-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors"
+              >
+                <IconPlusSmall
+                  size={14}
+                  className="text-foreground-muted shrink-0"
+                />
+                <span>Create workspace</span>
+              </Link>
+            </>
+          )}
         </div>
       )}
     </div>

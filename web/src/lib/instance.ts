@@ -7,22 +7,13 @@ import { getServerSession } from "@/lib/session";
 // admins are defined by an env allowlist: the operator who configures
 // the deployment lists the admin emails alongside the other env.
 //
-// Mirrors lib/auth-server.ts `authorizeWorkspace` so instance-scoped
-// routes/actions funnel through one gate.
-
-export function getInstanceAdminEmails(): string[] {
-  return (process.env.INSTANCE_ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-export function isInstanceAdminEmail(
-  email: string | null | undefined,
-): boolean {
-  if (!email) return false;
-  return getInstanceAdminEmails().includes(email.trim().toLowerCase());
-}
+// The pure email checks live in lib/config (no session/DB deps) so the
+// closed-instance account gate in lib/auth can use them without a cycle.
+// Re-exported here so callers have one import for instance-admin logic.
+// `authorizeInstance` adds the session-aware gate, mirroring
+// lib/auth-server.ts `authorizeWorkspace`.
+export { getInstanceAdminEmails, isInstanceAdminEmail } from "@/lib/config";
+import { isInstanceAdminEmail } from "@/lib/config";
 
 export type AuthorizeInstanceResult =
   | { ok: true; userId: string; email: string }

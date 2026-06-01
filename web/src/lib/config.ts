@@ -12,6 +12,24 @@ export function isGoogleConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
+// Instance admins, by env allowlist. Pure (no DB/session) so the auth
+// account-creation gate can import it without a cycle through
+// lib/session → lib/auth. lib/instance re-exports these alongside the
+// session-aware authorizeInstance().
+export function getInstanceAdminEmails(): string[] {
+  return (process.env.INSTANCE_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isInstanceAdminEmail(
+  email: string | null | undefined,
+): boolean {
+  if (!email) return false;
+  return getInstanceAdminEmails().includes(email.trim().toLowerCase());
+}
+
 // Connection-level OAuth apps are separate from the sign-in Google
 // app (different scope, different consent screen). Returning the
 // configured ones lets the Settings → Connections section surface

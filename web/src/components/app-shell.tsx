@@ -99,6 +99,7 @@ export async function AppShell({
           <WorkspaceSwitcher
             current={{ slug: workspace.slug, name: workspace.name }}
             workspaces={workspaces}
+            canCreateWorkspace={isInstanceAdmin}
           />
         </div>
 

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { listPendingInvitations } from "@/lib/invitations";
 import { getServerSession } from "@/lib/session";
 import {
   getWorkspaceBySlug,
@@ -29,9 +30,10 @@ export default async function MembersPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const [members, currentUserRole] = await Promise.all([
+  const [members, currentUserRole, pendingInvitations] = await Promise.all([
     listWorkspaceMembers(workspace.id),
     getWorkspaceRole(workspace.id, session.user.id),
+    listPendingInvitations(workspace.id),
   ]);
   if (!currentUserRole) notFound();
 
@@ -39,6 +41,7 @@ export default async function MembersPage({
     <MembersSection
       workspaceSlug={workspace.slug}
       members={members}
+      pendingInvitations={pendingInvitations}
       currentUserRole={currentUserRole}
       currentUserId={session.user.id}
     />

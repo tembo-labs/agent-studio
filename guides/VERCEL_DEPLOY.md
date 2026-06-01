@@ -105,6 +105,7 @@ environments (Production, Preview, Development) unless noted.
 | `API_INTERNAL_URL` | The api host's public URL from step 2 (e.g. `https://tas-api.fly.dev`). The web tier sends `/internal/runs` requests here. |
 | `GOOGLE_CLIENT_ID` | OAuth 2.0 client from [Google Cloud Console](https://console.cloud.google.com/apis/credentials). |
 | `GOOGLE_CLIENT_SECRET` | Same. |
+| `INSTANCE_ADMIN_EMAILS` | **Required to bootstrap.** Comma-separated instance-admin emails. The instance is invite-only — only these admins can sign in to a fresh deployment and create workspaces / invite others. |
 | `TAS_INSTANCE_NAME` | Optional brand label shown on the login screen. |
 | `TEMBO_API_URL` | Defaults to `https://api.tembo.io`. Override for staging. |
 

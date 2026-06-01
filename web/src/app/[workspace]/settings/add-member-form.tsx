@@ -8,18 +8,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ROLE_DESCRIPTIONS, type WorkspaceRole } from "@/lib/rbac";
 
-import { addMemberAction, type MemberFormState } from "./actions";
+import { inviteMemberAction, type MemberFormState } from "./actions";
 
 const INITIAL: MemberFormState = {};
 
 export function AddMemberForm({ workspaceSlug }: { workspaceSlug: string }) {
   const [state, formAction, pending] = useActionState(
-    addMemberAction,
+    inviteMemberAction,
     INITIAL,
   );
   useActionToast(state);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<WorkspaceRole>("operator");
+  const [copied, setCopied] = useState(false);
+
+  async function copyTemplate() {
+    if (!state.template) return;
+    await navigator.clipboard.writeText(state.template);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
@@ -39,8 +47,8 @@ export function AddMemberForm({ workspaceSlug }: { workspaceSlug: string }) {
           onChange={(e) => setEmail(e.target.value)}
         />
         <p className="text-foreground-muted text-sm">
-          The user must have signed in to TAS at least once. We don&apos;t
-          email invitations.
+          We don&apos;t send email yet — after inviting, copy the message and
+          send it. They join automatically when they sign in with this email.
         </p>
       </div>
 
@@ -72,9 +80,33 @@ export function AddMemberForm({ workspaceSlug }: { workspaceSlug: string }) {
 
       <div>
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? "Adding…" : "Add member"}
+          {pending ? "Inviting…" : "Send invite"}
         </Button>
       </div>
+
+      {state.template && (
+        <div className="border-border bg-surface flex flex-col gap-2 rounded-lg border p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-foreground text-sm font-medium">
+              Copy this to {state.invitedEmail}
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="small"
+              onClick={copyTemplate}
+            >
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          </div>
+          <textarea
+            readOnly
+            value={state.template}
+            rows={6}
+            className="bg-input text-foreground-strong w-full resize-none rounded-lg p-2 font-mono text-xs shadow-[0_0_0_1px_var(--color-border)]"
+          />
+        </div>
+      )}
     </form>
   );
 }

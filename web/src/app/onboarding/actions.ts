@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { isInstanceAdminEmail } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
 import { createWorkspace, type CreateWorkspaceError } from "@/lib/workspace";
 
@@ -26,6 +27,10 @@ export async function createWorkspaceAction(
   const session = await getServerSession();
   if (!session) {
     redirect("/");
+  }
+  // Only instance admins can create workspaces.
+  if (!isInstanceAdminEmail(session.user.email)) {
+    return { error: "Only an instance admin can create workspaces." };
   }
 
   const name = String(formData.get("name") ?? "").trim();

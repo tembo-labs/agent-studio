@@ -92,6 +92,7 @@ needed.
 | `API_INTERNAL_URL` | `http://api.railway.internal:8080` (the api service's private domain + port). |
 | `GOOGLE_CLIENT_ID` | OAuth 2.0 client from [Google Cloud Console](https://console.cloud.google.com/apis/credentials). |
 | `GOOGLE_CLIENT_SECRET` | Same. |
+| `INSTANCE_ADMIN_EMAILS` | **Required to bootstrap.** Comma-separated emails granted instance-admin. The instance is invite-only — only these admins can sign in to a fresh instance and create workspaces / invite others. Set yours or no one can get in. |
 | `TAS_INSTANCE_NAME` | Optional brand label on the login screen. |
 
 ### Sign-in: Google OAuth (required)

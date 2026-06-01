@@ -84,6 +84,7 @@ sit in plaintext task JSON):
 | `API_INTERNAL_URL` | `http://api.<namespace>:8080` (Service Connect DNS) |
 | `GOOGLE_CLIENT_ID` | OAuth 2.0 client |
 | `GOOGLE_CLIENT_SECRET` | from Secrets Manager |
+| `INSTANCE_ADMIN_EMAILS` | **Required to bootstrap** — comma-separated instance-admin emails. The instance is invite-only; only these admins can sign in to a fresh deployment and create workspaces / invite others. |
 | `TAS_INSTANCE_NAME` | optional brand label |
 
 > Pulling from GHCR needs no credentials (the images are public). To keep

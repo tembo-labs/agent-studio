@@ -1,9 +1,12 @@
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { type PendingInvitation } from "@/lib/invitations";
 import { ROLE_DESCRIPTIONS, type WorkspaceRole } from "@/lib/rbac";
 import { type WorkspaceMember } from "@/lib/workspace";
 
+import { revokeInvitationAction } from "./actions";
 import { AddMemberForm } from "./add-member-form";
 import { MemberRow } from "./member-row";
 
@@ -16,6 +19,8 @@ import { MemberRow } from "./member-row";
 type Props = {
   workspaceSlug: string;
   members: WorkspaceMember[];
+  /** Pending (unaccepted) invitations; admin-only. */
+  pendingInvitations: PendingInvitation[];
   /** Current viewer's role; gates the admin-only controls. */
   currentUserRole: WorkspaceRole;
   /** Current viewer's user id; used to mark the "(you)" row. */
@@ -25,6 +30,7 @@ type Props = {
 export function MembersSection({
   workspaceSlug,
   members,
+  pendingInvitations,
   currentUserRole,
   currentUserId,
 }: Props) {
@@ -34,7 +40,7 @@ export function MembersSection({
       title="Members"
       description={
         canManage
-          ? "Add a member by email or change their role. Roles enforce at the API layer, not just the UI."
+          ? "Invite a member by email or change their role. Invitees join on their first sign-in. Roles enforce at the API layer, not just the UI."
           : "Workspace members and their roles. Ask a workspace admin to change yours."
       }
     >
@@ -51,10 +57,62 @@ export function MembersSection({
           ))}
         </ul>
 
+        {canManage && pendingInvitations.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-foreground text-sm font-medium">
+              Pending invitations
+            </h3>
+            <ul className="border-border bg-surface divide-border-weak divide-y overflow-hidden rounded-lg border">
+              {pendingInvitations.map((inv) => {
+                const label =
+                  ROLE_DESCRIPTIONS.find((r) => r.role === inv.role)?.label ??
+                  inv.role;
+                return (
+                  <li
+                    key={inv.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2"
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-foreground truncate text-sm">
+                        {inv.email}
+                      </span>
+                      <span className="text-foreground-weak text-xs">
+                        Invited{" "}
+                        <LocalTime iso={inv.createdAt.toISOString()} /> · not
+                        yet signed in
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={roleVariant(inv.role)} size="small">
+                        {label}
+                      </Badge>
+                      <form action={revokeInvitationAction}>
+                        <input
+                          type="hidden"
+                          name="workspace"
+                          value={workspaceSlug}
+                        />
+                        <input
+                          type="hidden"
+                          name="invitationId"
+                          value={inv.id}
+                        />
+                        <Button type="submit" variant="ghost" size="small">
+                          Revoke
+                        </Button>
+                      </form>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {canManage && (
           <details className="bg-surface border-border rounded-lg border p-3">
             <summary className="text-foreground cursor-pointer text-sm font-medium">
-              Add a member
+              Invite a member
             </summary>
             <div className="mt-3">
               <AddMemberForm workspaceSlug={workspaceSlug} />

@@ -25,8 +25,10 @@ import {
   restoreAgent,
   type RestoreAgentError,
 } from "@/lib/workspace-agents";
+import { getPublicOrigin } from "@/lib/config";
+import { getInstanceName } from "@/lib/instance-settings";
+import { createInvitation, revokeInvitation } from "@/lib/invitations";
 import {
-  addWorkspaceMemberByEmail,
   changeMemberRole,
   DEFAULT_FAVICON_KINDS,
   disconnectWorkspaceRepo,
@@ -577,6 +579,9 @@ export async function syncGuidanceAction(
 export type MemberFormState = {
   message?: string;
   error?: string;
+  /** Copy-paste invite text, set after a successful invitation. */
+  template?: string;
+  invitedEmail?: string;
 };
 
 const MEMBER_EMPTY: MemberFormState = {};
@@ -586,7 +591,7 @@ const MEMBER_EMPTY: MemberFormState = {};
  * invitee must have signed in to TAS at least once so a user row
  * exists; we don't email invitations from TAS itself today.
  */
-export async function addMemberAction(
+export async function inviteMemberAction(
   _prev: MemberFormState,
   formData: FormData,
 ): Promise<MemberFormState> {
@@ -602,38 +607,54 @@ export async function addMemberAction(
   if (auth.denied) return { error: DENIED_MESSAGE };
   const { workspace, userId } = auth;
 
-  const result = await addWorkspaceMemberByEmail(workspace.id, email, role);
+  const result = await createInvitation(workspace.id, email, role, userId);
   if (!result.ok) {
     switch (result.error) {
-      case "user-not-found":
-        return {
-          error:
-            "No TAS user with that email. Ask them to sign in once, then try again.",
-        };
+      case "bad-email":
+        return { error: "That doesn't look like a valid email address." };
+      case "bad-role":
+        return { error: "Pick a role." };
       case "already-member":
         return {
           error:
-            "That user is already a member of this workspace. Change their role on the member row instead.",
+            "That person is already a member. Change their role on the member row instead.",
         };
+      case "already-invited":
+        return { error: "That email already has a pending invitation." };
     }
   }
 
-  await writeAuditEvent({
-    workspaceId: workspace.id,
-    actorUserId: userId,
-    source: "policy_change",
-    kind: "member.added",
-    targetType: "member",
-    targetId: result.member.userId,
-    agentName: null,
-    payload: {
-      target: { name: result.member.name, email: result.member.email },
-      role,
-    },
-  });
+  // Build the copy-paste invite (no email infra yet — the admin sends it).
+  const [instanceName] = await Promise.all([getInstanceName()]);
+  const origin = getPublicOrigin();
+  const template = [
+    `You've been invited to the "${workspace.name}" workspace on ${instanceName}.`,
+    ``,
+    `To join, sign in with this email (${email}) at:`,
+    origin,
+    ``,
+    `You'll be added automatically on your first sign-in.`,
+  ].join("\n");
 
   revalidatePath(`/${slug}/settings`);
-  return MEMBER_EMPTY;
+  return {
+    message: `Invited ${email}.`,
+    template,
+    invitedEmail: email,
+  };
+}
+
+// Plain form action (fire-and-forget) so it can be used directly in a
+// server-rendered <form action={...}> on each pending-invite row.
+export async function revokeInvitationAction(formData: FormData): Promise<void> {
+  const slug = String(formData.get("workspace") ?? "");
+  const invitationId = String(formData.get("invitationId") ?? "");
+
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return;
+
+  await revokeInvitation(invitationId, auth.workspace.id);
+  revalidatePath(`/${slug}/settings`);
 }
 
 /**
