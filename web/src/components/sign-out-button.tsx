@@ -18,6 +18,7 @@ export function SignOutButton() {
       onClick={() =>
         startTransition(async () => {
           await authClient.signOut();
+          router.push("/");
           router.refresh();
         })
       }

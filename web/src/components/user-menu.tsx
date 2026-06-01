@@ -48,6 +48,9 @@ export function UserMenu({ name, email, isInstanceAdmin }: Props) {
   function handleSignOut() {
     startTransition(async () => {
       await authClient.signOut();
+      // Leave the now-unauthed page — refreshing it would 404 on a
+      // protected route. Land on / (the sign-in screen).
+      router.push("/");
       router.refresh();
     });
   }
