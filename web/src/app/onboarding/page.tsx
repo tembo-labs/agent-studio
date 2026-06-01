@@ -67,8 +67,8 @@ export default async function OnboardingPage() {
               : "Create a workspace"}
           </h1>
           <p className="text-foreground-weak text-base">
-            A workspace pairs a Git repo and a Tembo API key with the team that
-            uses them. You&apos;ll add those next.
+            A workspace pairs a Git repo with the team that uses it. You&apos;ll
+            connect the repo next; API keys live in Settings.
           </p>
         </div>
         <OnboardingForm isFirst={isFirst} />

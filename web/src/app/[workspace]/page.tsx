@@ -175,8 +175,10 @@ export default async function WorkspacePage({
             Add your Tembo API key
           </h2>
           <p className="text-foreground-weak text-base">
-            TAS needs a Tembo API key to invoke Tembo services on this
-            workspace&apos;s behalf. Until it&apos;s set, agents can&apos;t run.
+            A Tembo API key powers chat-to-PR authoring — creating, editing,
+            and improving agents through Tembo. Until it&apos;s set, those
+            features stay hidden. (Running an existing agent uses your
+            Anthropic or OpenAI key, set separately.)
           </p>
           <div>
             <Link
