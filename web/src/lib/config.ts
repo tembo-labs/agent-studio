@@ -58,3 +58,11 @@ export function getPublicOrigin(): string {
 }
 
 export const POWERED_BY_HREF = "https://github.com/tembo/agent-studio";
+
+// Running release version, surfaced in the login footer ("powered by
+// Tembo Agent Studio <version>"). Set from the deployed image tag via
+// the TAS_VERSION env (compose passes it through). Null when unset
+// (e.g. a from-source dev build) so the footer just omits it.
+export function getAppVersion(): string | null {
+  return process.env.TAS_VERSION?.trim() || null;
+}

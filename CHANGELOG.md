@@ -33,6 +33,9 @@ Microsoft Entra sign-in for self-hosted instances.
   agents on the next rebuild of a given image tag.
 
 ### Added
+- **Version on the login screen.** The footer now reads "powered by Tembo Agent
+  Studio `<version>`", sourced from the deployed image tag (`TAS_VERSION`), so
+  operators can see at a glance which release an instance is running.
 - **`guides/CUSTOMER_SETUP.md`** — a zero-to-running checklist covering
   everything a new customer must procure and do: infra, auth provider, LLM
   keys, secrets, deploy env, first-run instance-admin bootstrap, per-workspace

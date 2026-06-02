@@ -5,7 +5,11 @@ import { SetupInstanceNameForm } from "@/components/setup-instance-name-form";
 import { SignInButtons } from "@/components/sign-in-buttons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getConfiguredAuthProviders } from "@/lib/auth-providers";
-import { getInstanceNameFromEnv, POWERED_BY_HREF } from "@/lib/config";
+import {
+  getAppVersion,
+  getInstanceNameFromEnv,
+  POWERED_BY_HREF,
+} from "@/lib/config";
 import {
   getInstanceName,
   getStoredInstanceName,
@@ -58,6 +62,7 @@ export default async function Home({
 
   const providers = getConfiguredAuthProviders();
   const firstRun = await isFirstRun();
+  const version = getAppVersion();
 
   const signInCard =
     providers.length > 0 ? (
@@ -127,6 +132,7 @@ export default async function Home({
         >
           Tembo Agent Studio
         </a>
+        {version && <span className="ml-1">{version}</span>}
       </p>
     </main>
   );

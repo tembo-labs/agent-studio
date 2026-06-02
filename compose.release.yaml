@@ -76,6 +76,9 @@ services:
       API_INTERNAL_URL: http://api:8080
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}
       NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      # Surfaced in the login footer ("powered by … <version>"). Matches
+      # the image tag this stack is pinned to.
+      TAS_VERSION: ${TAS_VERSION:-2026.6.2}
       TAS_INSTANCE_NAME: ${TAS_INSTANCE_NAME:-Tembo Agent Studio}
       INSTANCE_ADMIN_EMAILS: ${INSTANCE_ADMIN_EMAILS:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
