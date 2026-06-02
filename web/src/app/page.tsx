@@ -16,9 +16,37 @@ import { listWorkspacesForUser } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+// Sign-in lands back here with `?error=<code>` when an OAuth callback
+// fails. The codes come from better-auth (e.g. `email_is_missing`), our
+// invite-only gate, or the identity provider itself — all opaque to a
+// first-time admin. Translate the common ones to actionable copy and
+// always surface the raw code for support.
+function describeAuthError(raw: string): string {
+  const code = raw.toLowerCase();
+  if (code.includes("invite")) {
+    return "This instance is invite-only. Ask an admin to invite your email address, then try again.";
+  }
+  if (code.includes("email_is_missing") || code.includes("email_not_found")) {
+    return "Your sign-in provider didn't share an email address. For Microsoft Entra, make sure the account has an email or UPN set, then try again.";
+  }
+  if (code.includes("oauth_code_verification_failed")) {
+    return "Couldn't complete sign-in with your provider (token exchange failed). Check the provider's client secret and that the redirect URI matches this site.";
+  }
+  if (code.includes("unable_to_create_user")) {
+    return "Your account couldn't be created. If this instance is invite-only, ask an admin to invite your email first.";
+  }
+  return `Sign-in failed (${raw}). If this instance is invite-only, ask an admin to invite your email.`;
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) {
   const session = await getServerSession();
   const instanceName = await getInstanceName();
+  const { error } = await searchParams;
+  const errorCode = Array.isArray(error) ? error[0] : error;
 
   if (session) {
     const workspaces = await listWorkspacesForUser(session.user.id);
@@ -53,6 +81,15 @@ export default async function Home() {
         <h1 className="text-foreground-title text-center text-lg font-medium">
           {instanceName}
         </h1>
+
+        {errorCode && (
+          <div
+            role="alert"
+            className="border-sentiment-negative/30 bg-sentiment-negative/10 text-foreground w-full max-w-md rounded-lg border px-3 py-2 text-sm"
+          >
+            {describeAuthError(errorCode)}
+          </div>
+        )}
 
         {firstRun ? (
           <div className="flex w-full flex-col gap-4">

@@ -68,13 +68,72 @@ export function isAnyAuthConfigured(): boolean {
   return getConfiguredAuthProviders().length > 0;
 }
 
+type OAuthUserInfo = {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+  name?: string;
+  image?: string;
+};
+
 export type GenericOAuthProviderConfig = {
   providerId: string;
   discoveryUrl: string;
   clientId: string;
   clientSecret: string;
   scopes: string[];
+  getUserInfo?: (tokens: {
+    idToken?: string;
+  }) => Promise<OAuthUserInfo | null>;
 };
+
+/**
+ * Microsoft Entra commonly omits the `email` claim from both the
+ * id_token and the userinfo endpoint — the address instead rides in
+ * `preferred_username` (or `upn`). better-auth's default getUserInfo
+ * discards the id_token entirely when it lacks `email`, then falls
+ * through to the userinfo endpoint, which doesn't carry those fields
+ * either — so sign-in dies with `email_is_missing`. Decode the id_token
+ * ourselves and synthesize the email from the first claim that actually
+ * looks like one. The token was just exchanged over TLS using our client
+ * secret, so reading the (unverified) payload here is safe.
+ */
+async function microsoftGetUserInfo(tokens: {
+  idToken?: string;
+}): Promise<OAuthUserInfo | null> {
+  const idToken = tokens.idToken;
+  if (!idToken) return null;
+  const payload = idToken.split(".")[1];
+  if (!payload) return null;
+  let claims: Record<string, unknown>;
+  try {
+    claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+  const sub = typeof claims.sub === "string" ? claims.sub : undefined;
+  // Prefer a real `email`, then the UPN-style claims, and only accept a
+  // value that looks like an address (Entra's preferred_username can be
+  // a GUID for some account types).
+  const email = [claims.email, claims.preferred_username, claims.upn].find(
+    (v): v is string => typeof v === "string" && v.includes("@"),
+  );
+  if (!sub || !email) return null;
+  const name =
+    (typeof claims.name === "string" && claims.name) ||
+    (typeof claims.preferred_username === "string" &&
+      claims.preferred_username) ||
+    email;
+  return {
+    id: sub,
+    email,
+    // Entra authenticated the user against the org directory; treat the
+    // address as verified so gating / account-linking behave normally.
+    emailVerified: true,
+    name,
+    image: typeof claims.picture === "string" ? claims.picture : undefined,
+  };
+}
 
 /** genericOAuth plugin config entries (Microsoft + generic OIDC). */
 export function genericOAuthConfigs(): GenericOAuthProviderConfig[] {
@@ -86,6 +145,7 @@ export function genericOAuthConfigs(): GenericOAuthProviderConfig[] {
       clientId: process.env.MICROSOFT_CLIENT_ID!,
       clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
       scopes: ["openid", "profile", "email"],
+      getUserInfo: microsoftGetUserInfo,
     });
   }
   if (oidcConfigured()) {
