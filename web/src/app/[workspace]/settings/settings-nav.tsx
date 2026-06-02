@@ -18,6 +18,7 @@ const ITEMS: Item[] = [
   { slug: "tembo", label: "Tembo Coding Agent" },
   { slug: "appearance", label: "Appearance" },
   { slug: "deleted-agents", label: "Deleted agents" },
+  { slug: "version", label: "Version" },
 ];
 
 export function SettingsNav({ workspaceSlug }: { workspaceSlug: string }) {
