@@ -17,15 +17,24 @@ export default function VersionPage() {
           title="Running version"
           description="The Tembo Agent Studio release this instance is running. Baked into the deployed image, so it always reflects what's actually live."
         >
-          {version ? (
-            <div className="flex flex-col gap-3 text-sm">
-              <div className="flex items-baseline gap-2">
-                <span className="text-foreground-weak">Tembo Agent Studio</span>
-                <span className="text-foreground font-mono text-base font-medium">
+          <div className="border-border bg-surface-secondary flex flex-wrap items-center justify-between gap-4 rounded-lg border px-5 py-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-foreground-muted text-xs font-medium uppercase tracking-wide">
+                Tembo Agent Studio
+              </span>
+              {version ? (
+                <span className="text-foreground-title font-mono text-2xl font-semibold">
                   {version}
                 </span>
-              </div>
-              <div className="flex gap-4">
+              ) : (
+                <span className="text-foreground-title text-2xl font-semibold">
+                  Development build
+                </span>
+              )}
+            </div>
+
+            {version ? (
+              <div className="flex gap-4 text-sm">
                 <a
                   href={`${POWERED_BY_HREF}/releases/tag/v${version}`}
                   target="_blank"
@@ -43,13 +52,13 @@ export default function VersionPage() {
                   Changelog
                 </a>
               </div>
-            </div>
-          ) : (
-            <p className="text-foreground-weak text-sm">
-              Development build — no version is baked in. A version appears on
-              instances running a published release image.
-            </p>
-          )}
+            ) : (
+              <span className="text-foreground-muted max-w-[16rem] text-sm">
+                From-source / local builds aren&apos;t versioned. A version
+                appears on instances running a published release image.
+              </span>
+            )}
+          </div>
         </Section>
       </div>
     </div>
