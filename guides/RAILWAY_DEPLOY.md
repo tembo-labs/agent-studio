@@ -129,8 +129,19 @@ Google redirect URI to match.
 ## 5. Operational notes
 
 - **Upgrades.** Bump the image tag on both services to the new version
-  and redeploy; the api applies any new migrations on boot. Pin
-  versions rather than `latest` so a redeploy is reproducible.
+  and redeploy; the api applies any new migrations on boot. Changing the
+  image in service settings only *stages* it on Railway — you must
+  redeploy for the new image to actually roll. The running version is
+  shown in the login-screen footer (baked into the image), so you can
+  confirm what's live without guessing.
+- **Pin versions for production; `latest` only for throwaway instances.**
+  Point the services at an explicit tag (e.g. `ghcr.io/tembo/tas-web:2026.6.2`)
+  rather than `:latest`. Pinning gives reproducible deploys and trivial
+  rollback (re-point to the previous tag), and prevents an unrelated
+  restart from silently jumping versions. `:latest` tracks the newest
+  release but still needs a manual redeploy to pick it up *and* gives up
+  those guarantees — fine for a personal/dogfood box, not for a customer
+  instance.
 - **Scheduled runs** (the `automation` cron) and **event triggers**
   (Composio webhooks at `/api/hooks/composio/{slug}`) run on the web
   service — keep it on a plan that doesn't sleep, or scheduled fires
