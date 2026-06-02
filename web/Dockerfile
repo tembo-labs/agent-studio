@@ -21,10 +21,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
 FROM base AS runner
+# Bake the release version into the image so the running app can report
+# it (login footer) without a separate, drift-prone env var. The release
+# workflow passes the git tag; empty on local/from-source builds, in
+# which case the footer just omits the version.
+ARG TAS_VERSION=
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    TAS_VERSION=${TAS_VERSION}
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

@@ -34,8 +34,10 @@ Microsoft Entra sign-in for self-hosted instances.
 
 ### Added
 - **Version on the login screen.** The footer now reads "powered by Tembo Agent
-  Studio `<version>`", sourced from the deployed image tag (`TAS_VERSION`), so
-  operators can see at a glance which release an instance is running.
+  Studio `<version>`" so operators can see at a glance which release an instance
+  is running. The version is **baked into the image at build time** (web
+  Dockerfile `TAS_VERSION` build-arg), so it always matches the running image —
+  no env var to set or keep in sync per instance.
 - **`guides/CUSTOMER_SETUP.md`** — a zero-to-running checklist covering
   everything a new customer must procure and do: infra, auth provider, LLM
   keys, secrets, deploy env, first-run instance-admin bootstrap, per-workspace

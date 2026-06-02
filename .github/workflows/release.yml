@@ -87,6 +87,11 @@ jobs:
           # Omitting `platforms` builds for the runner arch (amd64).
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Bake the release version into the image (consumed by the web
+          # Dockerfile's TAS_VERSION ARG; api ignores it). metadata-action
+          # derives `version` as the bare CalVer, e.g. 2026.6.2.
+          build-args: |
+            TAS_VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: true
