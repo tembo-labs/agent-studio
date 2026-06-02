@@ -9,6 +9,24 @@ All notable changes to Tembo Agent Studio. Format loosely follows
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.2] — Reproducible runtime + setup guide — shipped 2026-06-02
+
+A small maintenance release: lock the last floating runtime dependency so a
+rebuilt image tag is reproducible, and ship a start-here setup guide.
+
+### Changed
+- **Pinned `composio==0.13.1`** in the api runtime image. It was the one
+  unpinned Python dep (pydantic-ai and pyyaml were already pinned); since
+  Composio ships frequently, an unpinned bump could break connection-using
+  agents on the next rebuild of a given image tag.
+
+### Added
+- **`guides/CUSTOMER_SETUP.md`** — a zero-to-running checklist covering
+  everything a new customer must procure and do: infra, auth provider, LLM
+  keys, secrets, deploy env, first-run instance-admin bootstrap, per-workspace
+  setup, and creating the first agent. Linked from the README as the
+  start-here guide.
+
 ## [v2026.5.31] — Container image publishing — shipped 2026-05-31
 
 Makes TAS deployable from prebuilt images instead of a source build, and
