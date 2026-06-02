@@ -9,10 +9,22 @@ All notable changes to Tembo Agent Studio. Format loosely follows
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
-## [v2026.6.2] — Reproducible runtime + setup guide — shipped 2026-06-02
+## [v2026.6.2] — Reproducible runtime, setup guide, Microsoft sign-in fix — shipped 2026-06-02
 
 A small maintenance release: lock the last floating runtime dependency so a
-rebuilt image tag is reproducible, and ship a start-here setup guide.
+rebuilt image tag is reproducible, ship a start-here setup guide, and fix
+Microsoft Entra sign-in for self-hosted instances.
+
+### Fixed
+- **Microsoft Entra sign-in.** Entra commonly omits the `email` claim from both
+  the id_token and the userinfo endpoint (the address lives in
+  `preferred_username`/`upn`), which made better-auth fail sign-in with
+  `email_is_missing`. The Microsoft provider now decodes the id_token and
+  derives the email from `email ?? preferred_username ?? upn`.
+- **Opaque sign-in errors.** Failed OAuth callbacks redirected back with a bare
+  `?error=<code>` and no UI feedback; the sign-in page now renders an actionable
+  message (invite-only, missing email, token exchange, …) and surfaces the raw
+  code for support.
 
 ### Changed
 - **Pinned `composio==0.13.1`** in the api runtime image. It was the one
