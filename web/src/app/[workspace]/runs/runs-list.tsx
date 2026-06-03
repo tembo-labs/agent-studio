@@ -415,6 +415,8 @@ function QueuedAt({ iso }: { iso: string }) {
     const id = setInterval(() => force((n) => n + 1), 60_000);
     return () => clearInterval(id);
   }, []);
+  // Relative labels intentionally use the current browser clock while rendering.
+  // eslint-disable-next-line react-hooks/purity
   const ms = Date.now() - new Date(iso).getTime();
   if (ms < RELATIVE_MS) return <span>{formatRelativeAgo(ms)}</span>;
   return <LocalTime iso={iso} style="relative" />;

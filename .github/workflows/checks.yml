@@ -2,11 +2,8 @@ name: checks
 
 # Lightweight CI gate. Runs on PRs and pushes to main, and is also
 # callable (workflow_call) so the internal deploy pipeline can require it
-# before shipping. Blocking checks are the ones that are green today:
-# web typecheck + api clippy (compile + lint errors). eslint runs as
-# advisory until the pre-existing React-19 hooks errors are cleaned up
-# (see the repo's lint backlog) — flipping it to blocking is a one-line
-# change once those are resolved.
+# before shipping. Blocking checks cover web typecheck, web eslint, and
+# api clippy (compile + lint errors).
 
 on:
   pull_request:
@@ -40,9 +37,8 @@ jobs:
         run: pnpm install --frozen-lockfile --config.minimum-release-age=0
       - name: Typecheck (blocking)
         run: npx tsc --noEmit
-      - name: Lint (advisory)
+      - name: Lint (blocking)
         run: npx eslint .
-        continue-on-error: true
 
   api:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,18 @@ const STYLES: Record<Exclude<Style, "relative">, Intl.DateTimeFormatOptions> = {
   time: { timeStyle: "short" },
 };
 
+function subscribeMounted() {
+  return () => {};
+}
+
+function getMountedSnapshot() {
+  return true;
+}
+
+function getServerMountedSnapshot() {
+  return false;
+}
+
 type Props = {
   iso: string;
   /** "relative" renders "3 min ago" / "yesterday" / "Mar 12"; the
@@ -29,14 +41,17 @@ type Props = {
 };
 
 export function LocalTime({ iso, style = "datetime", className }: Props) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    subscribeMounted,
+    getMountedSnapshot,
+    getServerMountedSnapshot,
+  );
   const [hovering, setHovering] = useState(false);
   // Tick once a minute so "3 min ago" advances without a remount.
   // Cheap (one component-local setInterval) and bounded by mount
   // lifecycle; only active in relative mode.
   const [, setTick] = useState(0);
   useEffect(() => {
-    setMounted(true);
     if (style !== "relative") return;
     const id = setInterval(() => setTick((n) => n + 1), 60_000);
     return () => clearInterval(id);

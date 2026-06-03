@@ -63,6 +63,8 @@ export default async function AuditPage({
   const sinceKey: SinceKey =
     typeof sp.since === "string" && isSinceKey(sp.since) ? sp.since : "30d";
   const sinceMs = SINCE_PRESETS[sinceKey];
+  // Server component: compute the selected audit window from request time.
+  // eslint-disable-next-line react-hooks/purity
   const since = sinceMs === null ? undefined : new Date(Date.now() - sinceMs);
 
   const [initial, actors] = await Promise.all([
