@@ -2,12 +2,10 @@
 
 import { redirect } from "next/navigation";
 
+import { authorizeWorkspace } from "@/lib/auth-server";
 import { ensureRepoReadme } from "@/lib/repo-init";
-import { getServerSession } from "@/lib/session";
 import {
   connectWorkspaceRepo,
-  getWorkspaceBySlug,
-  userIsMember,
   type ConnectWorkspaceRepoError,
 } from "@/lib/workspace";
 
@@ -34,20 +32,18 @@ export async function connectRepoAction(
   _prev: ConnectRepoFormState,
   formData: FormData,
 ): Promise<ConnectRepoFormState> {
-  const session = await getServerSession();
-  if (!session) redirect("/");
-
   const slug = String(formData.get("workspace") ?? "");
   const repo = String(formData.get("repo") ?? "").trim();
   const token = String(formData.get("token") ?? "").trim();
 
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) redirect("/onboarding");
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (!auth.ok) {
+    if (auth.reason === "no-workspace") redirect("/onboarding");
+    redirect("/");
+  }
+  const { workspace, userId } = auth;
 
-  const isMember = await userIsMember(workspace.id, session.user.id);
-  if (!isMember) redirect("/");
-
-  const result = await connectWorkspaceRepo(workspace.id, session.user.id, {
+  const result = await connectWorkspaceRepo(workspace.id, userId, {
     repo,
     token,
   });
