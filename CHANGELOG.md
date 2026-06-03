@@ -9,6 +9,25 @@ All notable changes to Tembo Agent Studio. Format loosely follows
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.4] — Workspace deletion, invite auto-join, LLM-key CTA — shipped 2026-06-03
+
+### Fixed
+- **Invited existing users now join automatically.** Inviting someone who
+  already had an account previously left a pending invite with no way to accept
+  it — on sign-in they were prompted to create their own workspace instead of
+  landing in the one they were invited to. Existing users are now added to the
+  workspace at invite time, and any already-pending invite resolves on the
+  user's next sign-in. (Recommended upgrade for instances using invitations.)
+
+### Added
+- **Delete a workspace** — Settings → **Danger** tab, with a type-to-confirm
+  step, gated to workspace admins. Removes all workspace data (members, runs,
+  schedules, connections, secrets, settings, audit, invitations); the GitHub
+  repository and its agent files are not touched.
+- **Sidebar CTA when no LLM provider key is set** — a workspace with neither an
+  Anthropic nor OpenAI key now shows an "Action needed" card linking to
+  Settings → LLM Providers, since agents can't run without one.
+
 ## [v2026.6.3] — Security hardening, dashboard runs, version surfacing — shipped 2026-06-03
 
 A security-focused release (several authorization/tenant-isolation fixes), plus
