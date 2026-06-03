@@ -22,11 +22,17 @@ export async function generateMetadata({
   params: Promise<{ workspace: string }>;
 }): Promise<Metadata> {
   const { workspace: slug } = await params;
-  // Point at our favicon route handler — the handler resolves the
-  // workspace's chosen default or streams the custom blob. We deliberately
-  // don't await getWorkspaceBySlug here just to read favicon_kind because
-  // the handler does that for itself; this keeps metadata generation fast.
-  const href = `/api/workspaces/${encodeURIComponent(slug)}/favicon`;
+  // Point at our favicon route handler — it resolves the workspace's
+  // chosen default or streams the custom blob. Append a `?v=<kind>`
+  // cache-buster: browsers cache favicons per-origin hard (a hard
+  // refresh won't clear them), so without a changing URL a stale entry
+  // (e.g. from before the icon was wired up, or the previous choice)
+  // sticks. Keying on faviconKind changes the URL whenever the default
+  // kind changes; custom uploads stay fresh via the route's
+  // must-revalidate header.
+  const ws = await getWorkspaceBySlug(slug);
+  const v = ws ? encodeURIComponent(ws.faviconKind) : "default";
+  const href = `/api/workspaces/${encodeURIComponent(slug)}/favicon?v=${v}`;
   return {
     icons: { icon: href, shortcut: href, apple: href },
   };
