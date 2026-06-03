@@ -2,8 +2,8 @@ name: checks
 
 # Lightweight CI gate. Runs on PRs and pushes to main, and is also
 # callable (workflow_call) so the internal deploy pipeline can require it
-# before shipping. Blocking checks cover web typecheck, web eslint, and
-# api clippy (compile + lint errors).
+# before shipping. Blocking checks cover web typecheck + tests (vitest) +
+# eslint, and api clippy + tests (cargo test).
 
 on:
   pull_request:
@@ -37,6 +37,8 @@ jobs:
         run: pnpm install --frozen-lockfile --config.minimum-release-age=0
       - name: Typecheck (blocking)
         run: npx tsc --noEmit
+      - name: Test (blocking)
+        run: pnpm test
       - name: Lint (blocking)
         run: npx eslint .
 
@@ -58,3 +60,5 @@ jobs:
       # build on compile errors and clippy *errors*.
       - name: Clippy (blocking)
         run: cargo clippy --all-targets
+      - name: Test (blocking)
+        run: cargo test
