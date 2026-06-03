@@ -23,7 +23,12 @@ export type CreateInvitationError =
   | "already-invited";
 
 export type CreateInvitationResult =
-  | { ok: true; invitation: PendingInvitation }
+  // The invitee already had an account, so they were added to the
+  // workspace immediately (no pending invite, nothing to send).
+  | { ok: true; joinedDirectly: true }
+  // Brand-new email — a pending invite was created; the admin shares
+  // the sign-in link and the user joins on first sign-in.
+  | { ok: true; joinedDirectly: false; invitation: PendingInvitation }
   | { ok: false; error: CreateInvitationError };
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -57,6 +62,24 @@ export async function createInvitation(
     return { ok: false, error: "already-invited" };
   }
 
+  // If the invitee already has an account, there's no "accept" step in
+  // TAS — skip the pending-invite dance and add them to the workspace
+  // right now. (The already-member check above means we only land here
+  // when they exist but aren't yet in this workspace.)
+  const existingUser = await db.query<{ id: string }>(
+    `SELECT id FROM "user" WHERE lower(email) = $1 LIMIT 1`,
+    [email],
+  );
+  if ((existingUser.rowCount ?? 0) > 0) {
+    await db.query(
+      `INSERT INTO workspace_member (workspace_id, user_id, role)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (workspace_id, user_id) DO NOTHING`,
+      [workspaceId, existingUser.rows[0].id, role],
+    );
+    return { ok: true, joinedDirectly: true };
+  }
+
   const { rows } = await db.query<{ id: string; created_at: Date }>(
     `INSERT INTO workspace_invitation (workspace_id, email, role, invited_by)
      VALUES ($1, $2, $3, $4)
@@ -65,6 +88,7 @@ export async function createInvitation(
   );
   return {
     ok: true,
+    joinedDirectly: false,
     invitation: {
       id: rows[0].id,
       email,
@@ -173,4 +197,23 @@ export async function resolvePendingInvitesForUser(
   } finally {
     client.release();
   }
+}
+
+/**
+ * Resolve pending invites for an existing user by id (looks up their
+ * email, then delegates). Safety net for invites that predate the
+ * "add existing users directly" path in createInvitation — called when
+ * the user lands on `/`, so a stuck pending invite clears on their next
+ * visit. Idempotent and a no-op when there's nothing pending.
+ */
+export async function resolvePendingInvitesForUserId(
+  userId: string,
+): Promise<number> {
+  const { rows } = await db.query<{ email: string }>(
+    `SELECT email FROM "user" WHERE id = $1 LIMIT 1`,
+    [userId],
+  );
+  const email = rows[0]?.email;
+  if (!email) return 0;
+  return resolvePendingInvitesForUser(userId, email);
 }

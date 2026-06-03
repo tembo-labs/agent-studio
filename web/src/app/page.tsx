@@ -15,6 +15,7 @@ import {
   getStoredInstanceName,
   isFirstRun,
 } from "@/lib/instance-settings";
+import { resolvePendingInvitesForUserId } from "@/lib/invitations";
 import { getServerSession } from "@/lib/session";
 import { listWorkspacesForUser } from "@/lib/workspace";
 
@@ -53,6 +54,14 @@ export default async function Home({
   const errorCode = Array.isArray(error) ? error[0] : error;
 
   if (session) {
+    // Auto-join any pending workspace invites for this account before
+    // resolving where to land — covers users invited after they already
+    // had an account (there's no separate "accept invite" step).
+    try {
+      await resolvePendingInvitesForUserId(session.user.id);
+    } catch (e) {
+      console.error("[invites] resolve on landing failed:", e);
+    }
     const workspaces = await listWorkspacesForUser(session.user.id);
     if (workspaces.length === 0) {
       redirect("/onboarding");

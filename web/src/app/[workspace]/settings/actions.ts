@@ -624,6 +624,12 @@ export async function inviteMemberAction(
     }
   }
 
+  // Existing account → added straight to the workspace, no invite to send.
+  if (result.joinedDirectly) {
+    revalidatePath(`/${slug}/settings`);
+    return { message: `Added ${email} to the workspace.`, invitedEmail: email };
+  }
+
   // Build the copy-paste invite (no email infra yet — the admin sends it).
   const [instanceName] = await Promise.all([getInstanceName()]);
   const origin = getPublicOrigin();
