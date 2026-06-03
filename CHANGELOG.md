@@ -3,8 +3,11 @@
 All notable changes to Tembo Agent Studio. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-**Versioning:** as of `v2026.5.29` releases use [CalVer](https://calver.org/)
-(`vYYYY.M.D`). The `0.1`–`0.4` entries below are phase numbers from
+**Versioning:** releases use a year.month [CalVer](https://calver.org/) tag plus
+a release counter — `vYYYY.M.N`. `YYYY.M` is the year and month; `N` increments
+once per release within that month and is **not** the day of the month (the
+earliest 2026 tags happened to line up with the date, but it's just a counter).
+The `0.1`–`0.4` entries below are phase numbers from
 [`ROADMAP.md`](./ROADMAP.md), which remain the *construction* milestones;
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).

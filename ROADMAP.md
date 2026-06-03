@@ -12,8 +12,9 @@ Each phase folder under [`context/`](./context/) contains a PRFAQ-style
 [`CHANGELOG.md`](./CHANGELOG.md) tracks what has actually shipped.
 
 **Phase numbers are construction milestones, not release versions.**
-Shipping is on [CalVer](https://calver.org/) — dated tags like
-`v2026.5.29` — so a release can carry work from any phase (or none).
+Shipping is on [CalVer](https://calver.org/) — year.month tags with a
+per-month release counter, like `v2026.6.4` — so a release can carry work
+from any phase (or none).
 Phase scope is tracked as **GitHub Issues** (label
 [`enhancement`](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement)):
 the [0.5](https://github.com/tembo/agent-studio/milestone/1) and
