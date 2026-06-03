@@ -19,6 +19,16 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Tembo Agent Studio",
   description: "Self-hosted control plane for running and governing agents.",
+  // Default icon for non-workspace pages (login, onboarding). Workspace
+  // routes override this in their layout's generateMetadata with the
+  // workspace's chosen favicon. We deliberately ship no app/favicon.ico:
+  // that file convention injects a competing `/favicon.ico` <link> on
+  // every page that the browser preferred over the workspace icon.
+  icons: {
+    icon: "/favicons/default-tembo.svg",
+    shortcut: "/favicons/default-tembo.svg",
+    apple: "/favicons/default-tembo.svg",
+  },
 };
 
 export default function RootLayout({
