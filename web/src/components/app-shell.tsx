@@ -66,6 +66,9 @@ type Props = {
    * doesn't grow unbounded.
    */
   failingAgents: FailingAgentAlert[];
+  /** False when the workspace has neither an Anthropic nor OpenAI key —
+   *  agents can't run, so the sidebar shows a "add an LLM key" CTA. */
+  hasLlmProvider: boolean;
   children: ReactNode;
 };
 
@@ -75,6 +78,7 @@ export async function AppShell({
   user,
   missingConnections,
   failingAgents,
+  hasLlmProvider,
   children,
 }: Props) {
   const instanceName = await getInstanceName();
@@ -151,11 +155,32 @@ export async function AppShell({
             icon={<IconSettingsSliderHor />}
           />
 
-          {(failingAgents.length > 0 || missingConnections.length > 0) && (
+          {(!hasLlmProvider ||
+            failingAgents.length > 0 ||
+            missingConnections.length > 0) && (
             <div className="mt-6 flex flex-col gap-1.5">
               <span className="text-foreground-muted px-2 text-sm font-medium uppercase tracking-widest">
                 Action needed
               </span>
+              {!hasLlmProvider && (
+                <div className="flex items-start gap-2 rounded-md bg-[var(--color-sentiment-caution-subtle)] px-2 py-2">
+                  <IconExclamationTriangle
+                    size={14}
+                    className="mt-0.5 shrink-0 text-[var(--color-icon-sentiment-caution)]"
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+                    <span className="text-sm leading-tight text-[var(--color-foreground-sentiment-caution)]">
+                      <span className="font-semibold">LLM provider needed</span>{" "}
+                      — add an Anthropic or OpenAI key to run agents
+                    </span>
+                    <Button asChild variant="orange" size="small">
+                      <Link href={`/${workspace.slug}/settings/providers`}>
+                        Add a key
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
               {failingAgents.map((f) => {
                 const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(f.agentName)}`;
                 return (

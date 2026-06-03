@@ -10,6 +10,7 @@ import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
+  getWorkspaceSecretPreview,
   listWorkspacesForUser,
   touchWorkspaceLastVisited,
   userIsMember,
@@ -69,13 +70,23 @@ export default async function WorkspaceLayout({
     myConnections,
     myNativeConnections,
     failingAgents,
+    anthropicKey,
+    openaiKey,
   ] = await Promise.all([
     listWorkspacesForUser(session.user.id),
     listAgents(workspace.id).catch(() => null),
     listConnectionsForUser(workspace.id, session.user.id).catch(() => []),
     listNativeConnectionsForUser(workspace.id, session.user.id).catch(() => []),
     listFailingAgents24h(workspace.id).catch(() => []),
+    getWorkspaceSecretPreview(workspace.id, "anthropic_api_key").catch(
+      () => null,
+    ),
+    getWorkspaceSecretPreview(workspace.id, "openai_api_key").catch(() => null),
   ]);
+  // Agents run on the workspace's own provider keys; with neither set,
+  // every run fails immediately. Surface a sidebar CTA so a new
+  // workspace's first job is obvious.
+  const hasLlmProvider = anthropicKey !== null || openaiKey !== null;
   const switcherList = workspaces.map((w) => ({ slug: w.slug, name: w.name }));
   // Two parallel slot sets — one per substrate. An agent's
   // `connections:` entry dispatches by its `source:` field, so a
@@ -137,6 +148,7 @@ export default async function WorkspaceLayout({
       user={session.user}
       missingConnections={missingConnections}
       failingAgents={failingAlerts}
+      hasLlmProvider={hasLlmProvider}
     >
       {children}
       <Toaster />
