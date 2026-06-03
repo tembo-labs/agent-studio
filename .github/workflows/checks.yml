@@ -25,7 +25,12 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+      # Pin explicitly: action-setup looks for `packageManager` in the
+      # repo-root package.json, but ours lives in web/. Keep in sync with
+      # web/package.json's packageManager field.
       - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
