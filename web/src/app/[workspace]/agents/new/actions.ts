@@ -182,8 +182,11 @@ export async function createFromChatAction(
 function formatCapError(error: CapError): string {
   switch (error.kind) {
     case "missing_tembo_key":
-      return "Tembo API key not set for this workspace.";
+      return "Tembo API key not set for this workspace. Add it under Settings → Tembo Coding Agent.";
     case "http":
+      if (error.status === 401 || error.status === 403) {
+        return "Tembo rejected the API key (it may have been rotated or revoked). Update it under Settings → Tembo Coding Agent.";
+      }
       return `POST ${error.url} → ${error.status}\n${error.body.slice(0, 600) || "(no body)"}`;
     case "network":
       return `Could not reach Tembo CAP: ${error.message}`;
