@@ -51,8 +51,8 @@ export default async function TemboSettingsPage({
             workspaceSlug={workspace.slug}
             kind="tembo_api_key"
             label="Tembo API key"
-            placeholder="tembo_pk_…"
-            maskedPrefix="tembo_"
+            placeholder="Paste your Tembo API key"
+            maskedPrefix=""
             preview={
               temboPreview
                 ? {
