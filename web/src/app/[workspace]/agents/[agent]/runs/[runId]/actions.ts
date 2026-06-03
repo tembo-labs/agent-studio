@@ -49,7 +49,7 @@ export async function improveAgentAction(args: {
   }
   const { workspace, userId } = auth;
 
-  const run = await getRun(args.runId);
+  const run = await getRun(args.runId, workspace.id);
   if (!run || run.workspaceId !== workspace.id) notFound();
 
   const repo = await getWorkspaceRepo(workspace.id);
