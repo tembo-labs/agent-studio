@@ -42,6 +42,8 @@ export default async function DashboardPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
+  // Server component: compute the rolling window from the request-time clock.
+  // eslint-disable-next-line react-hooks/purity
   const since = new Date(Date.now() - WEEK_MS);
   // Refresh open PR statuses before reading counts so the headline
   // numbers reflect reality. listOpenImprovements returns every non-

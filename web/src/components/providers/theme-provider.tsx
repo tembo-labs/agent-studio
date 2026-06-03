@@ -19,7 +19,7 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
 } from "react";
 
 type ThemeMode = "system" | "light" | "dark";
@@ -55,31 +55,44 @@ function applyClass(resolved: ResolvedMode) {
   document.documentElement.classList.toggle("dark", resolved === "dark");
 }
 
+function subscribeTheme(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("storage", callback);
+  window.addEventListener(STORE_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(STORE_EVENT, callback);
+  };
+}
+
+function getThemeServerSnapshot(): ThemeMode {
+  return "system";
+}
+
+function subscribeSystem(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
+}
+
+function getSystemServerSnapshot(): ResolvedMode {
+  return "light";
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Initialise from the same source the boot script uses. SSR gets
-  // "system" so the markup is deterministic; the post-mount effect
-  // re-syncs from localStorage on the client.
-  const [theme, setThemeState] = useState<ThemeMode>("system");
-  const [systemMode, setSystemMode] = useState<ResolvedMode>("light");
-
-  useEffect(() => {
-    setThemeState(readStored());
-    setSystemMode(readSystem());
-
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setSystemMode(mq.matches ? "dark" : "light");
-    mq.addEventListener("change", onChange);
-
-    const onStorage = () => setThemeState(readStored());
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(STORE_EVENT, onStorage);
-
-    return () => {
-      mq.removeEventListener("change", onChange);
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(STORE_EVENT, onStorage);
-    };
-  }, []);
+  // Read browser theme state as external stores so hydration uses the
+  // same deterministic server snapshot as the pre-hydration boot script.
+  const theme = useSyncExternalStore(
+    subscribeTheme,
+    readStored,
+    getThemeServerSnapshot,
+  );
+  const systemMode = useSyncExternalStore(
+    subscribeSystem,
+    readSystem,
+    getSystemServerSnapshot,
+  );
 
   const resolvedTheme: ResolvedMode = theme === "system" ? systemMode : theme;
 
@@ -94,7 +107,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* localStorage unavailable */
     }
-    setThemeState(mode);
   }, []);
 
   const value = useMemo(

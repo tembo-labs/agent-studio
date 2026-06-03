@@ -89,6 +89,9 @@ export function AuditTimeline({
   const [appended, setAppended] = useState<LoadedAuditEntry[]>([]);
   const [more, setMore] = useState<boolean>(initial.length >= PAGE_SIZE);
   useEffect(() => {
+    // Server props changed after URL filter navigation; discard client-only
+    // appended pages so rows never mix filter contexts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAppended([]);
     setMore(initial.length >= PAGE_SIZE);
   }, [filtersKey, initial.length]);
@@ -138,6 +141,8 @@ export function AuditTimeline({
   const sinceIso = useMemo(() => {
     const preset = SINCE_PRESETS.find((p) => p.key === since);
     if (!preset || preset.ms === null) return undefined;
+    // Client-side filter preset needs the current browser clock when applied.
+    // eslint-disable-next-line react-hooks/purity
     return new Date(Date.now() - preset.ms).toISOString();
   }, [since]);
 
