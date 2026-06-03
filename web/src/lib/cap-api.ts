@@ -9,12 +9,13 @@ import {
 } from "@/lib/agent-guidance";
 import type { Framework } from "@/lib/agent-framework";
 
-// Thin client for the Tembo Coding Agent Platform task API. The
-// hosted docs at https://docs.tembo.io/api/create-session call it
-// "session" but the live API (and the @tembo-io/sdk) use "task" —
-// POST /task/create. POSTs a free-text prompt + repo URL and returns
-// a task record with an htmlUrl the user can follow to track the
-// change. The task is what eventually opens the PR.
+// Thin client for the Tembo Coding Agent Platform task API. The task
+// endpoints live under the **/public-api** namespace and authenticate
+// with the workspace's Tembo API key as `Authorization: Bearer` — the
+// bare `/task/create` path hits a different internal auth gate that
+// rejects the public key ("Invalid token"). POSTs a free-text prompt +
+// repo URL to POST /public-api/task/create and returns a task record
+// with an htmlUrl the user can follow; the task is what opens the PR.
 
 const DEFAULT_TEMBO_API_URL = "https://api.tembo.io";
 
@@ -59,7 +60,7 @@ export async function createTemboTask(args: {
     queueRightAway: true,
   };
 
-  const url = `${baseUrl}/task/create`;
+  const url = `${baseUrl}/public-api/task/create`;
   // Log the outbound payload so the docker logs make it obvious what
   // we sent when CAP rejects us. v0.2 integration is brittle by
   // design until we settle the contract.
