@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { AgentsIcon } from "@/components/agents-icon";
 import { SidebarNavItem } from "@/components/sidebar-nav-item";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -11,7 +12,6 @@ import { getInstanceName } from "@/lib/instance-settings";
 import { isInstanceAdminEmail } from "@/lib/instance";
 import type { Workspace } from "@/lib/workspace";
 import {
-  IconAgent,
   IconApiConnection,
   IconCalendarRepeat,
   IconChatBubbles,
@@ -121,7 +121,7 @@ export async function AppShell({
           <SidebarNavItem
             href={home}
             label="Agents"
-            icon={<IconAgent />}
+            icon={<AgentsIcon />}
             matchPrefix
           />
           <SidebarNavItem
