@@ -8,6 +8,10 @@ import {
   redirectUriFor,
   type McpProviderSlug,
 } from "@/lib/mcp-providers";
+import {
+  noRedirectFetchInit,
+  trustedOAuthUrl,
+} from "@/lib/native-oauth-security";
 import { fetchNativeMcpTools } from "@/lib/native-mcp-tools";
 import { replaceToolsForConnection } from "@/lib/mcp-tools";
 import { verifyNativeMcpState } from "@/lib/oauth-state";
@@ -114,8 +118,23 @@ export async function GET(
     scope?: string;
     token_type?: string;
   };
+  let tokenEndpoint: URL;
   try {
-    const tokenRes = await fetch(state.tokenEndpoint, {
+    tokenEndpoint = await trustedOAuthUrl(
+      state.tokenEndpoint,
+      provider,
+      "Token endpoint",
+    );
+  } catch (e) {
+    return back(
+      state.workspaceSlug,
+      provider.slug,
+      "error",
+      `Token endpoint is not trusted: ${(e as Error).message}`,
+    );
+  }
+  try {
+    const tokenRes = await fetch(tokenEndpoint, noRedirectFetchInit({
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -128,7 +147,7 @@ export async function GET(
         client_id: state.clientId,
         code_verifier: state.pkceVerifier,
       }).toString(),
-    });
+    }));
     if (!tokenRes.ok) {
       const body = await tokenRes.text().catch(() => "");
       return back(
