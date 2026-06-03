@@ -55,6 +55,7 @@ async fn main() -> anyhow::Result<()> {
     let internal_token = auth::InternalToken::from_env()?;
     let http = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .context("failed to build reqwest client")?;
 

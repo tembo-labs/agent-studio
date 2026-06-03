@@ -27,6 +27,7 @@ use anyhow::{anyhow, Context};
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use crate::crypto::MasterKey;
 
@@ -34,6 +35,8 @@ use crate::crypto::MasterKey;
 /// so a token can't die mid-run between the sweep and the agent's
 /// first tool call.
 const REFRESH_SKEW_SECS: i64 = 120;
+const ATTIO_MCP_ORIGIN: &str = "https://mcp.attio.com";
+const ATTIO_OAUTH_ORIGINS: &[&str] = &["https://app.attio.com"];
 
 #[derive(Deserialize)]
 struct ProtectedResourceMeta {
@@ -136,7 +139,7 @@ async fn refresh_one(
 
     // Public client (token_endpoint_auth_method=none) → no secret.
     let res = http
-        .post(&token_endpoint)
+        .post(token_endpoint)
         .header("Accept", "application/json")
         .form(&[
             ("grant_type", "refresh_token"),
@@ -181,8 +184,9 @@ async fn refresh_one(
         .refresh_token
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| refresh_token.to_string());
-    let expires_at: Option<DateTime<Utc>> =
-        token.expires_in.map(|secs| Utc::now() + Duration::seconds(secs));
+    let expires_at: Option<DateTime<Utc>> = token
+        .expires_in
+        .map(|secs| Utc::now() + Duration::seconds(secs));
 
     // Same JSON shape as the web `ConnectionCredentials` / what
     // saveNativeConnection persists, so a blob written here round-trips
@@ -223,16 +227,19 @@ async fn refresh_one(
 async fn discover_token_endpoint(
     http: &reqwest::Client,
     mcp_url: &str,
-) -> anyhow::Result<String> {
-    let origin = reqwest::Url::parse(mcp_url)
-        .context("bad mcp_server_url")?
-        .origin()
-        .ascii_serialization();
+) -> anyhow::Result<reqwest::Url> {
+    let mcp_url = parse_trusted_https_url(mcp_url, "mcp_server_url")?;
+    assert_public_endpoint_host(&mcp_url, "mcp_server_url").await?;
+    let origin = mcp_url.origin().ascii_serialization();
+    let allowed_oauth_origins = allowed_oauth_origins_for_mcp_origin(&origin).ok_or_else(|| {
+        anyhow!("mcp_server_url origin is not in the native-MCP provider allowlist")
+    })?;
 
     // RFC 9728: protected-resource metadata lives at the origin.
-    let pr_url = format!("{origin}/.well-known/oauth-protected-resource");
+    let pr_url = reqwest::Url::parse(&format!("{origin}/.well-known/oauth-protected-resource"))
+        .context("failed to build protected-resource metadata URL")?;
     let pr: ProtectedResourceMeta = http
-        .get(&pr_url)
+        .get(pr_url)
         .header("Accept", "application/json")
         .send()
         .await
@@ -243,17 +250,23 @@ async fn discover_token_endpoint(
         .await
         .context("protected-resource metadata not JSON")?;
 
-    let as_base = pr
+    let as_base_raw = pr
         .authorization_servers
         .and_then(|v| v.into_iter().next())
         .ok_or_else(|| anyhow!("no authorization_servers in protected-resource metadata"))?;
+    let as_base = parse_trusted_oauth_url(
+        &as_base_raw,
+        allowed_oauth_origins,
+        "authorization server URL",
+    )?;
+    assert_public_endpoint_host(&as_base, "authorization server URL").await?;
 
-    let as_meta_url = format!(
-        "{}/.well-known/oauth-authorization-server",
-        as_base.trim_end_matches('/')
-    );
+    let mut as_meta_url = as_base;
+    as_meta_url.set_path("/.well-known/oauth-authorization-server");
+    as_meta_url.set_query(None);
+    as_meta_url.set_fragment(None);
     let asm: AuthServerMeta = http
-        .get(&as_meta_url)
+        .get(as_meta_url)
         .header("Accept", "application/json")
         .send()
         .await
@@ -264,7 +277,174 @@ async fn discover_token_endpoint(
         .await
         .context("authorization-server metadata not JSON")?;
 
-    asm.token_endpoint
+    let token_endpoint = asm
+        .token_endpoint
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| anyhow!("authorization-server metadata missing token_endpoint"))
+        .ok_or_else(|| anyhow!("authorization-server metadata missing token_endpoint"))?;
+    let token_endpoint =
+        parse_trusted_oauth_url(&token_endpoint, allowed_oauth_origins, "token endpoint")?;
+    assert_public_endpoint_host(&token_endpoint, "token endpoint").await?;
+    Ok(token_endpoint)
+}
+
+fn allowed_oauth_origins_for_mcp_origin(origin: &str) -> Option<&'static [&'static str]> {
+    match origin {
+        ATTIO_MCP_ORIGIN => Some(ATTIO_OAUTH_ORIGINS),
+        _ => None,
+    }
+}
+
+fn parse_trusted_oauth_url(
+    raw_url: &str,
+    allowed_origins: &[&str],
+    label: &str,
+) -> anyhow::Result<reqwest::Url> {
+    let url = parse_trusted_https_url(raw_url, label)?;
+    let origin = url.origin().ascii_serialization();
+    if !allowed_origins.iter().any(|allowed| *allowed == origin) {
+        return Err(anyhow!("{label} is not on an allowed provider origin"));
+    }
+    Ok(url)
+}
+
+fn parse_trusted_https_url(raw_url: &str, label: &str) -> anyhow::Result<reqwest::Url> {
+    let url =
+        reqwest::Url::parse(raw_url).with_context(|| format!("{label} is not a valid URL"))?;
+    if url.scheme() != "https" {
+        return Err(anyhow!("{label} must use https"));
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(anyhow!("{label} must not include credentials"));
+    }
+    let host = url
+        .host_str()
+        .filter(|host| !host.is_empty())
+        .ok_or_else(|| anyhow!("{label} must include a host"))?;
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        if !is_public_ip(ip) {
+            return Err(anyhow!("{label} resolves to a non-public IP address"));
+        }
+    }
+    Ok(url)
+}
+
+async fn assert_public_endpoint_host(url: &reqwest::Url, label: &str) -> anyhow::Result<()> {
+    let host = url
+        .host_str()
+        .ok_or_else(|| anyhow!("{label} must include a host"))?;
+    if host.parse::<IpAddr>().is_ok() {
+        return Ok(());
+    }
+    let port = url
+        .port_or_known_default()
+        .ok_or_else(|| anyhow!("{label} must include a known port"))?;
+    let mut addrs = tokio::net::lookup_host((host, port))
+        .await
+        .with_context(|| format!("{label} DNS lookup failed"))?;
+    let mut saw_addr = false;
+    for addr in &mut addrs {
+        saw_addr = true;
+        if !is_public_ip(addr.ip()) {
+            return Err(anyhow!(
+                "{label} resolves to a non-public IP address ({})",
+                addr.ip()
+            ));
+        }
+    }
+    if !saw_addr {
+        return Err(anyhow!("{label} did not resolve to any IP addresses"));
+    }
+    Ok(())
+}
+
+fn is_public_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => is_public_ipv4(ip),
+        IpAddr::V6(ip) => is_public_ipv6(ip),
+    }
+}
+
+fn is_public_ipv4(ip: Ipv4Addr) -> bool {
+    let octets = ip.octets();
+    !matches!(
+        octets,
+        [0, _, _, _]
+            | [10, _, _, _]
+            | [100, 64..=127, _, _]
+            | [127, _, _, _]
+            | [169, 254, _, _]
+            | [172, 16..=31, _, _]
+            | [192, 0, 0, _]
+            | [192, 0, 2, _]
+            | [192, 168, _, _]
+            | [198, 18..=19, _, _]
+            | [198, 51, 100, _]
+            | [203, 0, 113, _]
+            | [224..=239, _, _, _]
+            | [240..=255, _, _, _]
+    )
+}
+
+fn is_public_ipv6(ip: Ipv6Addr) -> bool {
+    if let Some(mapped) = ip.to_ipv4_mapped() {
+        return is_public_ipv4(mapped);
+    }
+
+    let segments = ip.segments();
+    let first = segments[0];
+    !(ip.is_unspecified()
+        || ip.is_loopback()
+        || (first & 0xfe00) == 0xfc00
+        || (first & 0xffc0) == 0xfe80
+        || (first & 0xff00) == 0xff00
+        || (segments[0] == 0x0064 && segments[1] == 0xff9b && segments[2] == 0)
+        || (segments[0] == 0x0064 && segments[1] == 0xff9b && segments[2] == 0x0001)
+        || (segments[0] == 0x0100 && segments[1] == 0)
+        || (segments[0] == 0x2001 && segments[1] <= 0x01ff)
+        || (segments[0] == 0x2001 && segments[1] == 0x0002)
+        || (segments[0] == 0x2001 && segments[1] == 0x0db8))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn blocks_private_and_metadata_ipv4() {
+        assert!(!is_public_ip("127.0.0.1".parse().unwrap()));
+        assert!(!is_public_ip("169.254.169.254".parse().unwrap()));
+        assert!(!is_public_ip("10.1.2.3".parse().unwrap()));
+        assert!(is_public_ip("8.8.8.8".parse().unwrap()));
+    }
+
+    #[test]
+    fn blocks_private_ipv6() {
+        assert!(!is_public_ip("::1".parse().unwrap()));
+        assert!(!is_public_ip("fc00::1".parse().unwrap()));
+        assert!(!is_public_ip("fe80::1".parse().unwrap()));
+        assert!(!is_public_ip("::ffff:169.254.169.254".parse().unwrap()));
+        assert!(is_public_ip("2606:4700:4700::1111".parse().unwrap()));
+    }
+
+    #[test]
+    fn enforces_https_and_allowed_oauth_origin() {
+        assert!(parse_trusted_oauth_url(
+            "https://app.attio.com/oidc/token",
+            ATTIO_OAUTH_ORIGINS,
+            "token endpoint"
+        )
+        .is_ok());
+        assert!(parse_trusted_oauth_url(
+            "http://app.attio.com/oidc/token",
+            ATTIO_OAUTH_ORIGINS,
+            "token endpoint"
+        )
+        .is_err());
+        assert!(parse_trusted_oauth_url(
+            "https://evil.example/oidc/token",
+            ATTIO_OAUTH_ORIGINS,
+            "token endpoint"
+        )
+        .is_err());
+    }
 }

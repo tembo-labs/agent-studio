@@ -5,10 +5,14 @@ import { authorizeWorkspace } from "@/lib/auth-server";
 import { getPublicOrigin } from "@/lib/config";
 import {
   getMcpProvider,
-  protectedResourceUrl,
   redirectUriFor,
   type McpProviderSlug,
 } from "@/lib/mcp-providers";
+import {
+  noRedirectFetchInit,
+  trustedOAuthUrl,
+  trustedProviderMcpOrigin,
+} from "@/lib/native-oauth-security";
 import { signNativeMcpState } from "@/lib/oauth-state";
 
 // Native-MCP OAuth authorize handler. URL shape:
@@ -108,10 +112,23 @@ export async function GET(
   const { workspace, userId } = auth;
 
   // ── Step 1: protected-resource discovery ────────────────────────
-  const prMetaUrl = protectedResourceUrl(provider.mcpServerUrl);
+  let mcpOrigin: string;
+  try {
+    mcpOrigin = await trustedProviderMcpOrigin(provider);
+  } catch (e) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `Provider MCP URL is not trusted: ${(e as Error).message}`,
+    );
+  }
+  const prMetaUrl = `${mcpOrigin}/.well-known/oauth-protected-resource`;
   let prMeta: ProtectedResourceMetadata;
   try {
-    const res = await fetch(prMetaUrl, { headers: { Accept: "application/json" } });
+    const res = await fetch(
+      prMetaUrl,
+      noRedirectFetchInit({ headers: { Accept: "application/json" } }),
+    );
     if (!res.ok) {
       return back(
         workspace.slug,
@@ -127,21 +144,41 @@ export async function GET(
       `Discovery fetch failed: ${(e as Error).message}`,
     );
   }
-  const authServerUrl = prMeta.authorization_servers?.[0];
-  if (!authServerUrl) {
+  const authServerUrlRaw = prMeta.authorization_servers?.[0];
+  if (!authServerUrlRaw) {
     return back(
       workspace.slug,
       provider.slug,
       `${provider.displayName} MCP didn't advertise an authorization server.`,
     );
   }
+  let authServerUrl: URL;
+  try {
+    authServerUrl = await trustedOAuthUrl(
+      authServerUrlRaw,
+      provider,
+      "Authorization server URL",
+    );
+  } catch (e) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `Authorization server URL is not trusted: ${(e as Error).message}`,
+    );
+  }
   const scopes = prMeta.scopes_supported ?? [];
 
   // ── Step 2: authorization-server discovery ──────────────────────
-  const asMetaUrl = `${authServerUrl.replace(/\/+$/, "")}/.well-known/oauth-authorization-server`;
+  const asMetaUrl = new URL(
+    "/.well-known/oauth-authorization-server",
+    authServerUrl,
+  );
   let asMeta: AuthServerMetadata;
   try {
-    const res = await fetch(asMetaUrl, { headers: { Accept: "application/json" } });
+    const res = await fetch(
+      asMetaUrl,
+      noRedirectFetchInit({ headers: { Accept: "application/json" } }),
+    );
     if (!res.ok) {
       return back(
         workspace.slug,
@@ -168,6 +205,32 @@ export async function GET(
       `${provider.displayName} authorization server is missing required endpoints.`,
     );
   }
+  let authorizationEndpoint: URL;
+  let tokenEndpoint: URL;
+  let registrationEndpoint: URL;
+  try {
+    authorizationEndpoint = await trustedOAuthUrl(
+      asMeta.authorization_endpoint,
+      provider,
+      "Authorization endpoint",
+    );
+    tokenEndpoint = await trustedOAuthUrl(
+      asMeta.token_endpoint,
+      provider,
+      "Token endpoint",
+    );
+    registrationEndpoint = await trustedOAuthUrl(
+      asMeta.registration_endpoint,
+      provider,
+      "Registration endpoint",
+    );
+  } catch (e) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `Authorization server endpoint is not trusted: ${(e as Error).message}`,
+    );
+  }
   if (
     !(asMeta.code_challenge_methods_supported ?? []).some((m) => m === "S256")
   ) {
@@ -192,7 +255,7 @@ export async function GET(
   const redirectUri = redirectUriFor(provider.slug as McpProviderSlug);
   let clientId: string;
   try {
-    const dcrRes = await fetch(asMeta.registration_endpoint, {
+    const dcrRes = await fetch(registrationEndpoint, noRedirectFetchInit({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -205,7 +268,7 @@ export async function GET(
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
       }),
-    });
+    }));
     if (!dcrRes.ok) {
       const body = await dcrRes.text().catch(() => "");
       return back(
@@ -247,10 +310,10 @@ export async function GET(
     connectionName,
     pkceVerifier,
     clientId,
-    tokenEndpoint: asMeta.token_endpoint,
+    tokenEndpoint: tokenEndpoint.toString(),
   });
 
-  const authorizeUrl = new URL(asMeta.authorization_endpoint);
+  const authorizeUrl = new URL(authorizationEndpoint);
   authorizeUrl.searchParams.set("client_id", clientId);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("response_type", "code");

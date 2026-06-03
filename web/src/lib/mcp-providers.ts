@@ -25,6 +25,9 @@ export type McpProvider = {
    *  bearer token at run time. The /.well-known endpoints are
    *  derived from this URL's origin. */
   mcpServerUrl: string;
+  /** Exact OAuth authorization-server origins this provider is allowed
+   *  to advertise through protected-resource discovery. */
+  oauthAuthorizationServerOrigins: string[];
 };
 
 export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
@@ -32,6 +35,7 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     slug: "attio",
     displayName: "Attio",
     mcpServerUrl: "https://mcp.attio.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://app.attio.com"],
   },
 };
 
