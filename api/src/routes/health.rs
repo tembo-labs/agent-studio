@@ -1,4 +1,4 @@
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::Serialize;
 
 use crate::AppState;
@@ -10,7 +10,10 @@ pub struct HealthResponse {
 }
 
 pub async fn health(State(state): State<AppState>) -> (StatusCode, Json<HealthResponse>) {
-    let db = match sqlx::query_scalar::<_, i32>("SELECT 1").fetch_one(&state.db).await {
+    let db = match sqlx::query_scalar::<_, i32>("SELECT 1")
+        .fetch_one(&state.db)
+        .await
+    {
         Ok(_) => "ok",
         Err(err) => {
             tracing::warn!(?err, "db health check failed");
@@ -18,6 +21,10 @@ pub async fn health(State(state): State<AppState>) -> (StatusCode, Json<HealthRe
         }
     };
 
-    let status_code = if db == "ok" { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+    let status_code = if db == "ok" {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
     (status_code, Json(HealthResponse { status: "ok", db }))
 }

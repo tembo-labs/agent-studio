@@ -283,7 +283,10 @@ fn parse_stale_markers(stderr: &str) -> (Vec<StaleConnectionMarker>, String) {
             match serde_json::from_str::<Vec<StaleConnectionMarker>>(payload) {
                 Ok(parsed) => markers.extend(parsed),
                 Err(e) => {
-                    tracing::warn!(?e, "stale-connection marker failed to parse — keeping line in stderr");
+                    tracing::warn!(
+                        ?e,
+                        "stale-connection marker failed to parse — keeping line in stderr"
+                    );
                     cleaned.push(line);
                 }
             }

@@ -3,7 +3,7 @@ name: checks
 # Lightweight CI gate. Runs on PRs and pushes to main, and is also
 # callable (workflow_call) so the internal deploy pipeline can require it
 # before shipping. Blocking checks cover web typecheck + tests (vitest) +
-# eslint, and api clippy + tests (cargo test).
+# eslint, and api fmt + clippy + tests (cargo test).
 
 on:
   pull_request:
@@ -51,10 +51,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: api
+      - name: Format (blocking)
+        run: cargo fmt --check
       # No `-D warnings`: there's a pre-existing clippy lint
       # (enum_variant_names) we haven't addressed. This still fails the
       # build on compile errors and clippy *errors*.

@@ -76,10 +76,7 @@ pub async fn create_run(
         Some("schedule") => "schedule",
         Some("event") => "event",
         Some(other) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!("unknown trigger: {other}"),
-            ));
+            return Err((StatusCode::BAD_REQUEST, format!("unknown trigger: {other}")));
         }
     };
 

@@ -253,8 +253,7 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
     // `${workspace_id}:${acting_user_id}` so Composio's vault stays
     // isolated per (workspace, user) — mirrors what the web side
     // hands to composio.connectedAccounts.link.
-    let composio_user_id =
-        format!("{}:{}", ctx.workspace_id, ctx.acting_user_id);
+    let composio_user_id = format!("{}:{}", ctx.workspace_id, ctx.acting_user_id);
     // Pre-resolved nested `{toolkit_slug: {name: connection_id}}`
     // map for the acting user's ACTIVE composio connections.
     // Composio's Tool Router session needs the explicit
@@ -262,13 +261,10 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
     // otherwise sessions report the toolkits as inactive even when
     // the user authorized them.
     let composio_connected_accounts_json: Option<String> = if composio_key.is_some() {
-        let triples = list_active_composio_connections(
-            &state.db,
-            ctx.workspace_id,
-            &ctx.acting_user_id,
-        )
-        .await
-        .unwrap_or_default();
+        let triples =
+            list_active_composio_connections(&state.db, ctx.workspace_id, &ctx.acting_user_id)
+                .await
+                .unwrap_or_default();
         if triples.is_empty() {
             None
         } else {
@@ -310,7 +306,10 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
         )
         .await
         {
-            tracing::warn!(?e, "native MCP refresh sweep errored; proceeding with existing tokens");
+            tracing::warn!(
+                ?e,
+                "native MCP refresh sweep errored; proceeding with existing tokens"
+            );
         }
         let rows = list_active_native_connections(
             &state.db,
@@ -404,7 +403,9 @@ fn extract_emit_reply(stdout: &str) -> String {
     const ACTION_NAME: &str = ": _tas_emit_output] ";
     let mut out = String::new();
     for line in stdout.lines() {
-        let Some(idx) = line.find(ACTION_NAME) else { continue };
+        let Some(idx) = line.find(ACTION_NAME) else {
+            continue;
+        };
         let mut content = &line[idx + ACTION_NAME.len()..];
         if is_action_progress_noise(content) {
             continue;
@@ -425,9 +426,7 @@ fn extract_emit_reply(stdout: &str) -> String {
 // noise, not agent content. Match by prefix so cargo-ai can add
 // trailing context (duration, exit code, etc.) without breaking us.
 fn is_action_progress_noise(content: &str) -> bool {
-    content == "started"
-        || content.starts_with("step ")
-        || content.starts_with("completed")
+    content == "started" || content.starts_with("step ") || content.starts_with("completed")
 }
 
 // Common output framing across providers. When the user supplied a
@@ -445,13 +444,11 @@ fn render_output(user_message: &str, text: &str) -> String {
 }
 
 async fn mark_running(state: &AppState, run_id: Uuid) -> anyhow::Result<()> {
-    sqlx::query(
-        "UPDATE run SET status = 'running', started_at = $1 WHERE id = $2",
-    )
-    .bind(Utc::now())
-    .bind(run_id)
-    .execute(&state.db)
-    .await?;
+    sqlx::query("UPDATE run SET status = 'running', started_at = $1 WHERE id = $2")
+        .bind(Utc::now())
+        .bind(run_id)
+        .execute(&state.db)
+        .await?;
     Ok(())
 }
 
@@ -539,11 +536,7 @@ Run complete · 3.7s total
     }
 }
 
-async fn mark_failed(
-    state: &AppState,
-    run_id: Uuid,
-    reason: &str,
-) -> anyhow::Result<()> {
+async fn mark_failed(state: &AppState, run_id: Uuid, reason: &str) -> anyhow::Result<()> {
     sqlx::query(
         "UPDATE run SET status = 'failed', error_message = $1, completed_at = $2 WHERE id = $3",
     )

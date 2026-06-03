@@ -322,8 +322,10 @@ mod tests {
         let steps = actions[0]["run"].as_array().unwrap();
         assert_eq!(steps.len(), 2);
         // serde_json::Map iteration is insertion order; both fields land.
-        let field_names: Vec<&str> =
-            steps.iter().map(|s| s["args"][1].as_str().unwrap()).collect();
+        let field_names: Vec<&str> = steps
+            .iter()
+            .map(|s| s["args"][1].as_str().unwrap())
+            .collect();
         assert!(field_names.contains(&"greeting"));
         assert!(field_names.contains(&"mood"));
     }

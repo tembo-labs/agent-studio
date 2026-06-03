@@ -52,11 +52,7 @@ fn rate(pattern: &str, input: f64, output: f64) -> ModelRate {
 /// pricing tables (callers persist None which renders as "—" in
 /// the UI). Model strings look like `provider:model-name` —
 /// matching the same shape the TS-side helper consumes.
-pub fn estimate_run_cost(
-    model: &str,
-    tokens_input: i32,
-    tokens_output: i32,
-) -> Option<f64> {
+pub fn estimate_run_cost(model: &str, tokens_input: i32, tokens_output: i32) -> Option<f64> {
     let (prefix, rates): (&str, &Lazy<Vec<ModelRate>>) =
         if let Some(rest) = model.strip_prefix("anthropic:") {
             return cost_in_table(rest, tokens_input, tokens_output, &ANTHROPIC_RATES);
@@ -91,16 +87,15 @@ mod tests {
 
     #[test]
     fn anthropic_sonnet() {
-        let c = estimate_run_cost("anthropic:claude-sonnet-4-6", 1_000_000, 1_000_000)
-            .expect("priced");
+        let c =
+            estimate_run_cost("anthropic:claude-sonnet-4-6", 1_000_000, 1_000_000).expect("priced");
         // 3 + 15 = 18 USD for 1M in + 1M out
         assert!((c - 18.0).abs() < 1e-9, "expected ~18.0, got {c}");
     }
 
     #[test]
     fn openai_gpt_4o_mini() {
-        let c = estimate_run_cost("openai:gpt-4o-mini", 1_000_000, 1_000_000)
-            .expect("priced");
+        let c = estimate_run_cost("openai:gpt-4o-mini", 1_000_000, 1_000_000).expect("priced");
         // 0.15 + 0.6 = 0.75
         assert!((c - 0.75).abs() < 1e-9, "expected ~0.75, got {c}");
     }

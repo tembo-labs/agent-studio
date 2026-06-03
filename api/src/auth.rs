@@ -15,10 +15,9 @@ pub struct InternalToken(pub String);
 
 impl InternalToken {
     pub fn from_env() -> anyhow::Result<Self> {
-        let v = std::env::var("INTERNAL_API_TOKEN")
-            .map_err(|_| anyhow::anyhow!(
-                "INTERNAL_API_TOKEN must be set to gate /internal/* routes"
-            ))?;
+        let v = std::env::var("INTERNAL_API_TOKEN").map_err(|_| {
+            anyhow::anyhow!("INTERNAL_API_TOKEN must be set to gate /internal/* routes")
+        })?;
         if v.trim().is_empty() {
             return Err(anyhow::anyhow!("INTERNAL_API_TOKEN must not be empty"));
         }
@@ -26,10 +25,7 @@ impl InternalToken {
     }
 }
 
-pub async fn require_internal_token(
-    req: Request,
-    next: Next,
-) -> Result<Response, StatusCode> {
+pub async fn require_internal_token(req: Request, next: Next) -> Result<Response, StatusCode> {
     let expected = req
         .extensions()
         .get::<InternalToken>()
@@ -45,9 +41,7 @@ pub async fn require_internal_token(
         .map(|v| v.trim());
 
     match presented {
-        Some(t) if constant_time_eq(t.as_bytes(), expected.as_bytes()) => {
-            Ok(next.run(req).await)
-        }
+        Some(t) if constant_time_eq(t.as_bytes(), expected.as_bytes()) => Ok(next.run(req).await),
         _ => Err(StatusCode::UNAUTHORIZED),
     }
 }
