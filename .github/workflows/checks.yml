@@ -1,0 +1,59 @@
+name: checks
+
+# Lightweight CI gate. Runs on PRs and pushes to main, and is also
+# callable (workflow_call) so the internal deploy pipeline can require it
+# before shipping. Blocking checks are the ones that are green today:
+# web typecheck + api clippy (compile + lint errors). eslint runs as
+# advisory until the pre-existing React-19 hooks errors are cleaned up
+# (see the repo's lint backlog) — flipping it to blocking is a one-line
+# change once those are resolved.
+
+on:
+  pull_request:
+  # main pushes run checks via the deploy-internal pipeline (workflow_call
+  # below), so no standalone push trigger here — avoids a duplicate run.
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install deps
+        run: pnpm install --frozen-lockfile --config.minimum-release-age=0
+      - name: Typecheck (blocking)
+        run: npx tsc --noEmit
+      - name: Lint (advisory)
+        run: npx eslint .
+        continue-on-error: true
+
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: api
+      # No `-D warnings`: there's a pre-existing clippy lint
+      # (enum_variant_names) we haven't addressed. This still fails the
+      # build on compile errors and clippy *errors*.
+      - name: Clippy (blocking)
+        run: cargo clippy --all-targets

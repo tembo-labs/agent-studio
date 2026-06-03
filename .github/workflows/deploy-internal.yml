@@ -1,0 +1,112 @@
+name: deploy-internal
+
+# Continuous deployment of `main` to Tembo's internal dogfood instance on
+# Railway. On every push to main we: (1) run the checks gate, (2) build +
+# push `:edge` images to GHCR, then (3) point the Railway services at the
+# exact image digest just built and trigger a deploy.
+#
+# Scoped to the canonical repo only (forks lack the Railway token and
+# shouldn't deploy). Customer/production instances stay pinned to explicit
+# release tags — this pipeline only moves the dogfood box, which may run
+# unreleased main.
+#
+# Required repo config (Settings → Secrets and variables → Actions):
+#   secret  RAILWAY_TOKEN            — a Railway project/environment token
+#                                      (NOT an account token). Without it,
+#                                      the build still runs and the deploy
+#                                      step skips.
+#   var     RAILWAY_ENVIRONMENT_ID   — Railway environment UUID
+#   var     RAILWAY_WEB_SERVICE_ID   — web service UUID
+#   var     RAILWAY_API_SERVICE_ID   — api service UUID
+
+on:
+  push:
+    branches: [main]
+
+# A newer commit supersedes an in-flight deploy.
+concurrency:
+  group: deploy-internal
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    if: github.repository == 'tembo/agent-studio'
+    uses: ./.github/workflows/checks.yml
+
+  build-and-deploy:
+    needs: checks
+    if: github.repository == 'tembo/agent-studio'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push :edge to GHCR
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: tas-api
+            context: ./api
+            service_var: RAILWAY_API_SERVICE_ID
+          - image: tas-web
+            context: ./web
+            service_var: RAILWAY_WEB_SERVICE_ID
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Short SHA
+        id: vars
+        run: echo "sha7=$(echo "${{ github.sha }}" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.image }}:edge
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:edge
+          # Baked version for the login footer / Settings → Version. Only
+          # the web Dockerfile consumes TAS_VERSION; api ignores it.
+          build-args: |
+            TAS_VERSION=edge-${{ steps.vars.outputs.sha7 }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+      - name: Point Railway at the new digest + deploy
+        # Skips cleanly until RAILWAY_TOKEN is configured, so the first
+        # run (before the secret is added) is still green on the build.
+        if: ${{ env.RAILWAY_TOKEN != '' }}
+        env:
+          ENV_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+          SERVICE_ID: ${{ vars[matrix.service_var] }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          rw() {
+            curl -fsS https://backboard.railway.app/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$1"
+          }
+          echo "Pinning $SERVICE_ID → $IMAGE"
+          # Pin to the immutable digest (not :edge) so Railway always
+          # rolls exactly what we just built — a moved tag wouldn't
+          # reliably force a re-pull.
+          rw "$(jq -nc --arg s "$SERVICE_ID" --arg e "$ENV_ID" --arg img "$IMAGE" \
+            '{query:"mutation($s:String!,$e:String!,$i:ServiceInstanceUpdateInput!){serviceInstanceUpdate(serviceId:$s,environmentId:$e,input:$i)}",variables:{s:$s,e:$e,i:{source:{image:$img}}}}')"
+          echo
+          echo "Deploying $SERVICE_ID"
+          rw "$(jq -nc --arg s "$SERVICE_ID" --arg e "$ENV_ID" \
+            '{query:"mutation($s:String!,$e:String!){serviceInstanceDeployV2(serviceId:$s,environmentId:$e)}",variables:{s:$s,e:$e}}')"
+          echo
