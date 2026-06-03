@@ -113,6 +113,11 @@ Generate each with `openssl rand -base64 32`:
   connections.
 - [ ] *(Optional)* **Settings → Tembo Coding Agent** — add the Tembo key to enable
   chat-to-PR authoring.
+  - [ ] **Authorize the repo in Tembo, too.** For Tembo to open PRs against
+    your agents repo, that repo must be connected in Tembo's own dashboard
+    under **Source Control**:
+    `https://app.tembo.io/<your-tembo-workspace>/settings/integrations?category=Source+Control`.
+    Without this, authoring requests fail even with a valid Tembo API key.
 - [ ] **Settings → Members** — invite teammates. TAS gives you a copy-paste invite
   template; invited users drop straight into the workspace on first sign-in.
 
