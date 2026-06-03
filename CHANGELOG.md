@@ -9,6 +9,38 @@ All notable changes to Tembo Agent Studio. Format loosely follows
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.3] — Security hardening, dashboard runs, version surfacing — shipped 2026-06-03
+
+A security-focused release (several authorization/tenant-isolation fixes), plus
+dashboard and CI improvements. **Recommended upgrade for all instances.**
+
+### Fixed (security)
+- **Reject an insecure placeholder `BETTER_AUTH_SECRET` at runtime** — the app
+  now refuses to start with the dev placeholder secret, so a misconfigured
+  deploy can't run with a guessable session-signing key (#52).
+- **Tenant scoping on the run-detail endpoint** — `get_run` now enforces the
+  caller's workspace, preventing cross-workspace run reads (#58).
+- **Authorization check on repo connect** — `connectRepoAction` was missing a
+  role check; added it so only authorized members can connect a repo (#55).
+- **Mass-assignment fix** — `owner_user_id` can no longer be set from request
+  input (#56).
+- **SSRF + token exfiltration fix** — closed a server-side request forgery /
+  token-leak path (#57).
+
+### Added
+- **Settings → Version tab** — shows the running release (release builds link to
+  their GitHub release; edge/CD builds link to the commit).
+- **Recent runs on the dashboard** — the latest runs workspace-wide, above
+  Improvements, with fully clickable rows linking to the run.
+
+### Changed
+- **CI checks gate + tests on PRs.** A `checks` workflow now runs on every PR:
+  web typecheck + vitest + eslint (now blocking after the lint cleanup in #54),
+  and api `cargo fmt --check` + clippy + `cargo test`. A separate pipeline
+  continuously deploys `main` to Tembo's internal instance behind that gate.
+- **Docs:** Railway guide documents pinning explicit version tags for
+  production vs. `:latest` for throwaway instances.
+
 ## [v2026.6.2] — Reproducible runtime, setup guide, Microsoft sign-in fix — shipped 2026-06-02
 
 A small maintenance release: lock the last floating runtime dependency so a
