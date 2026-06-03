@@ -30,7 +30,7 @@ export default async function RunDetailPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const run = await getRun(runId);
+  const run = await getRun(runId, workspace.id);
   if (!run) notFound();
   // Defense against URL guessing for other workspaces' runs.
   if (run.workspaceId !== workspace.id) notFound();

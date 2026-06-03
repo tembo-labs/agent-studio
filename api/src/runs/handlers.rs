@@ -1,12 +1,12 @@
 //! HTTP surface for the runs subsystem. Two endpoints:
 //!
 //!   POST /internal/runs      — web triggers a run, returns run id
-//!   GET  /internal/runs/:id  — web polls for status + output
+//!   GET  /internal/runs/:id?workspace_id=... — web polls for status + output
 //!
 //! Both gated by the bearer middleware in `crate::auth`.
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -174,18 +174,26 @@ pub struct RunRecord {
     pub automation_id: Option<Uuid>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GetRunQuery {
+    pub workspace_id: Uuid,
+}
+
 pub async fn get_run(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    Query(query): Query<GetRunQuery>,
 ) -> Result<Json<RunRecord>, StatusCode> {
     let row: Option<RunRecord> = sqlx::query_as(
         r#"SELECT id, workspace_id, agent_name, agent_path, model, status,
                   output, error_message, created_by, created_at,
                   started_at, completed_at, tokens_input, tokens_output,
                   trigger, automation_id
-             FROM run WHERE id = $1"#,
+             FROM run
+             WHERE id = $1 AND workspace_id = $2"#,
     )
     .bind(id)
+    .bind(query.workspace_id)
     .fetch_optional(&state.db)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

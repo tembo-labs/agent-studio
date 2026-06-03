@@ -124,12 +124,19 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
   return { runId: body.run_id };
 }
 
-export async function getRun(runId: string): Promise<RunRecord | null> {
-  const res = await fetch(`${API_URL}/internal/runs/${encodeURIComponent(runId)}`, {
-    method: "GET",
-    headers: { ...authHeader() },
-    cache: "no-store",
-  });
+export async function getRun(
+  runId: string,
+  workspaceId: string,
+): Promise<RunRecord | null> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const res = await fetch(
+    `${API_URL}/internal/runs/${encodeURIComponent(runId)}?${params}`,
+    {
+      method: "GET",
+      headers: { ...authHeader() },
+      cache: "no-store",
+    },
+  );
   if (res.status === 404) return null;
   if (!res.ok) {
     const text = await res.text().catch(() => "");
