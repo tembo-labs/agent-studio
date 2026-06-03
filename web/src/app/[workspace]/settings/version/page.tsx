@@ -9,6 +9,12 @@ export const dynamic = "force-dynamic";
 // informational, visible to any workspace member.
 export default function VersionPage() {
   const version = getAppVersion();
+  // Release builds are CalVer (e.g. 2026.6.2) and link to their GitHub
+  // release; edge/CD builds are `edge-<sha>` and link to the commit.
+  const isRelease = version ? /^\d{4}\.\d+\.\d+$/.test(version) : false;
+  const edgeSha = version?.startsWith("edge-")
+    ? version.slice("edge-".length)
+    : null;
 
   return (
     <div className="divide-y divide-[var(--color-border-weak)]">
@@ -35,14 +41,25 @@ export default function VersionPage() {
 
             {version ? (
               <div className="flex gap-4 text-sm">
-                <a
-                  href={`${POWERED_BY_HREF}/releases/tag/v${version}`}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="text-foreground hover:text-foreground-title underline underline-offset-2"
-                >
-                  Release notes
-                </a>
+                {isRelease ? (
+                  <a
+                    href={`${POWERED_BY_HREF}/releases/tag/v${version}`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-foreground hover:text-foreground-title underline underline-offset-2"
+                  >
+                    Release notes
+                  </a>
+                ) : edgeSha ? (
+                  <a
+                    href={`${POWERED_BY_HREF}/commit/${edgeSha}`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-foreground hover:text-foreground-title underline underline-offset-2"
+                  >
+                    View commit
+                  </a>
+                ) : null}
                 <a
                   href={`${POWERED_BY_HREF}/blob/main/CHANGELOG.md`}
                   target="_blank"
