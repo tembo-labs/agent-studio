@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { writeAuditEvent } from "@/lib/audit-db";
 import {
@@ -31,6 +31,7 @@ import { createInvitation, revokeInvitation } from "@/lib/invitations";
 import {
   changeMemberRole,
   DEFAULT_FAVICON_KINDS,
+  deleteWorkspace,
   disconnectWorkspaceRepo,
   getWorkspaceSecretPlaintext,
   getWorkspaceSecretPreview,
@@ -761,4 +762,34 @@ export async function removeMemberAction(
 
   revalidatePath(`/${slug}/settings`);
   return MEMBER_EMPTY;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Danger zone — delete workspace
+
+export type DeleteWorkspaceState = { error?: string };
+
+/**
+ * Permanently delete a workspace. Workspace-admin only, and the caller
+ * must type the workspace name exactly to confirm. On success we redirect
+ * to `/` — the workspace and all its data (including audit rows) are gone,
+ * so there's nothing left to audit or revalidate in place.
+ */
+export async function deleteWorkspaceAction(
+  _prev: DeleteWorkspaceState,
+  formData: FormData,
+): Promise<DeleteWorkspaceState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const confirm = String(formData.get("confirm") ?? "").trim();
+
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace } = auth;
+
+  if (confirm !== workspace.name) {
+    return { error: "Type the workspace name exactly to confirm." };
+  }
+
+  await deleteWorkspace(workspace.id);
+  redirect("/");
 }

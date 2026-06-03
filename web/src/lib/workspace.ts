@@ -394,6 +394,34 @@ export async function getWorkspaceRole(
   return isWorkspaceRole(role) ? role : null;
 }
 
+/**
+ * Permanently delete a workspace and everything scoped to it. Every
+ * workspace-scoped table FKs to workspace(id) ON DELETE CASCADE, so one
+ * DELETE removes members, secrets, repo, runs, agent-deletion records,
+ * connections, automations, improvements, audit, and invitations. The
+ * exception is workspace_trigger, whose connection_id is ON DELETE
+ * RESTRICT to workspace_composio_connection — left to the cascade's
+ * ordering that RESTRICT could abort the delete, so we remove triggers
+ * explicitly first, in the same transaction. Does NOT touch the GitHub
+ * repo — agent specs live there and are untouched.
+ */
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`DELETE FROM workspace_trigger WHERE workspace_id = $1`, [
+      workspaceId,
+    ]);
+    await client.query(`DELETE FROM workspace WHERE id = $1`, [workspaceId]);
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export type CreateWorkspaceResult =
   | { ok: true; workspace: Workspace }
   | { ok: false; error: CreateWorkspaceError };

@@ -19,6 +19,7 @@ const ITEMS: Item[] = [
   { slug: "appearance", label: "Appearance" },
   { slug: "deleted-agents", label: "Deleted agents" },
   { slug: "version", label: "Version" },
+  { slug: "danger", label: "Danger" },
 ];
 
 export function SettingsNav({ workspaceSlug }: { workspaceSlug: string }) {
