@@ -61,6 +61,9 @@ export function FaviconPicker({
                   : "bg-surface-raised border-border hover:border-border-strong flex w-full flex-col items-center gap-1.5 rounded-lg border px-2 py-3 transition-colors"
               }
             >
+              {/* Curated local favicon SVGs — tiny static icons where
+                  Next's Image optimization adds nothing. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/favicons/${kind}.svg`}
                 alt=""
@@ -98,6 +101,9 @@ export function FaviconPicker({
               }}
             />
             {currentKind === "custom" ? (
+              // User-uploaded favicon preview — an arbitrary/data URL, so
+              // Next's Image host-whitelist + optimization doesn't fit.
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={customSrc}
                 alt=""

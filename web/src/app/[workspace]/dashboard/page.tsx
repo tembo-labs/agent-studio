@@ -117,13 +117,21 @@ export default async function DashboardPage({
               return (
                 <li
                   key={r.id}
-                  className="flex items-start justify-between gap-4 px-3 py-2.5 text-sm"
+                  className="hover:bg-surface-secondary relative flex items-start justify-between gap-4 px-3 py-2.5 text-sm transition-colors"
                 >
-                  <div className="flex min-w-0 flex-col gap-0.5">
+                  {/* Stretched link: the whole row navigates to the run.
+                      It sits behind the nested agent link (z-10), so that
+                      sublink keeps working — no invalid nested anchors. */}
+                  <Link
+                    href={runHref}
+                    aria-label={`Open run for ${r.agentName}`}
+                    className="absolute inset-0"
+                  />
+                  <div className="relative flex min-w-0 flex-col gap-0.5">
                     <div className="flex items-center gap-2">
                       <Link
                         href={agentHref}
-                        className="text-foreground font-medium hover:underline"
+                        className="text-foreground relative z-10 font-medium hover:underline"
                       >
                         {r.agentName}
                       </Link>
@@ -135,13 +143,10 @@ export default async function DashboardPage({
                       </p>
                     )}
                   </div>
-                  <div className="text-foreground-weak flex shrink-0 flex-col items-end gap-1 text-sm">
+                  <div className="text-foreground-weak relative flex shrink-0 flex-col items-end gap-1 text-sm">
                     <span>
                       <LocalTime iso={r.createdAt.toISOString()} style="relative" />
                     </span>
-                    <Link href={runHref} className="hover:underline">
-                      Run →
-                    </Link>
                   </div>
                 </li>
               );
