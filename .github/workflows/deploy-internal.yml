@@ -94,8 +94,10 @@ jobs:
         run: |
           set -euo pipefail
           rw() {
+            # Project tokens authenticate via the Project-Access-Token
+            # header (Authorization: Bearer is for account/team tokens).
             curl -fsS https://backboard.railway.app/graphql/v2 \
-              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Project-Access-Token: $RAILWAY_TOKEN" \
               -H "Content-Type: application/json" \
               -d "$1"
           }
