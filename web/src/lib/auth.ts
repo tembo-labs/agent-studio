@@ -3,6 +3,7 @@ import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins";
 import { Pool } from "pg";
 
+import { resolveAuthSecret } from "@/lib/auth-secret";
 import { genericOAuthConfigs } from "@/lib/auth-providers";
 import { isInstanceAdminEmail } from "@/lib/config";
 import {
@@ -15,9 +16,9 @@ import {
 // and the build environment legitimately has no DATABASE_URL. Misconfigured
 // runtimes will fail loudly on the first request instead.
 const databaseUrl = process.env.DATABASE_URL ?? "postgres://placeholder";
-const secret =
-  process.env.BETTER_AUTH_SECRET ??
-  "dev-only-insecure-secret-replace-via-env-BETTER_AUTH_SECRET";
+// Never fall back to a usable default secret: a missing/placeholder secret
+// at runtime would let anyone with the (public) repo forge sessions.
+const secret = resolveAuthSecret();
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
