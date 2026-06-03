@@ -12,6 +12,35 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.5] — Tembo authoring fix + favicon fixes — shipped 2026-06-03
+
+### Fixed
+- **Tembo Coding Agent authoring (the "Invalid token" 401).** Requests now hit
+  `POST /public-api/task/create`, where the workspace's Tembo API key
+  authenticates as `Authorization: Bearer`. We were calling the bare
+  `/task/create` path, which a different internal auth gate rejected with
+  "Unauthorized - Invalid token" — so new-agent / chat-to-edit / Improve failed
+  even with a valid key. **This is the fix that unblocks authoring.**
+- **Workspace favicon blank in production.** The favicon route's redirect used
+  the container's internal address (`https://0.0.0.0:8080/…`) behind the proxy,
+  which the browser can't reach; it now emits a relative `Location`. Also
+  cache-busts the default and per-workspace favicon URLs so a stale per-origin
+  favicon entry clears (and switching a workspace's favicon actually updates).
+- **Tembo API key field** no longer shows a misleading `tembo_` prefix in the
+  masked preview/placeholder — keys are prefix-less.
+
+### Added
+- **Actionable Tembo auth errors.** A rejected/rotated key now surfaces "Tembo
+  rejected the API key — update it under Settings → Tembo Coding Agent" instead
+  of a raw 401, across the new-agent / chat / Improve flows.
+- **Setup guide:** the agents repo must also be authorized in Tembo (Settings →
+  Integrations → Source Control) for the coding agent to open PRs.
+
+### Changed
+- Sidebar agents icon matched to Tembo's (#61).
+- Docs: clarified CalVer is year.month + a per-month release counter (not the
+  day of the month).
+
 ## [v2026.6.4] — Workspace deletion, invite auto-join, LLM-key CTA — shipped 2026-06-03
 
 ### Fixed
