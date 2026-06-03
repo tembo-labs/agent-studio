@@ -15,6 +15,7 @@ import {
   updateAutomation,
 } from "@/lib/automations-api";
 import { validateCron } from "@/lib/cron";
+import { userIsMember } from "@/lib/workspace";
 import { getAgentByName } from "@/lib/workspace-agents";
 
 export type AutomationFormState = {
@@ -22,7 +23,7 @@ export type AutomationFormState = {
   fieldErrors?: Partial<Record<"name" | "agent" | "cron", string>>;
 };
 
-const EMPTY: AutomationFormState = {};
+const INVALID_OWNER_MESSAGE = "Choose a workspace member to run this automation.";
 
 // Both create and update share these field-level checks.
 type ParsedForm = {
@@ -65,6 +66,14 @@ async function validate(
   return null;
 }
 
+async function validateOwnerUserId(
+  workspaceId: string,
+  ownerUserId: string,
+): Promise<AutomationFormState | null> {
+  if (await userIsMember(workspaceId, ownerUserId)) return null;
+  return { error: INVALID_OWNER_MESSAGE };
+}
+
 export async function createAutomationAction(
   _prev: AutomationFormState,
   formData: FormData,
@@ -81,9 +90,12 @@ export async function createAutomationAction(
   if (invalid) return invalid;
 
   // Owner defaults to the creator when the form leaves the picker
-  // blank. Real workspace-member validation can land later — for v0.3
-  // we just trust the dropdown's value (or fall back to self).
+  // blank. Scheduled runs use this user's per-user credentials, so
+  // never trust the posted picker value without a membership check.
   const ownerUserId = parsed.ownerUserId || userId;
+  const invalidOwner = await validateOwnerUserId(workspace.id, ownerUserId);
+  if (invalidOwner) return invalidOwner;
+
   const created = await createAutomation({
     workspaceId: workspace.id,
     name: parsed.name,
@@ -136,6 +148,10 @@ export async function updateAutomationAction(
   const invalid = await validate(workspace.id, parsed);
   if (invalid) return invalid;
 
+  const ownerUserId = parsed.ownerUserId || existing.ownerUserId;
+  const invalidOwner = await validateOwnerUserId(workspace.id, ownerUserId);
+  if (invalidOwner) return invalidOwner;
+
   await updateAutomation({
     id,
     name: parsed.name,
@@ -147,7 +163,7 @@ export async function updateAutomationAction(
     // (e.g. an older client). The form's hidden default value should
     // always send the current owner so the edit doesn't accidentally
     // re-assign.
-    ownerUserId: parsed.ownerUserId || existing.ownerUserId,
+    ownerUserId,
   });
 
   await writeAuditEvent({
@@ -162,7 +178,7 @@ export async function updateAutomationAction(
       name: parsed.name,
       cron: parsed.cron,
       enabled: parsed.enabled,
-      ownerUserId: parsed.ownerUserId || existing.ownerUserId,
+      ownerUserId,
       agentChanged: existing.agentName !== parsed.agentName,
       previousAgent: existing.agentName,
     },
@@ -233,6 +249,7 @@ export async function toggleAutomationAction(formData: FormData): Promise<void> 
   if (!auth.ok) notFound();
   const { workspace, userId } = auth;
   if (workspace.id !== existing.workspaceId) notFound();
+  if (await validateOwnerUserId(workspace.id, existing.ownerUserId)) notFound();
 
   await updateAutomation({
     id,
@@ -256,4 +273,3 @@ export async function toggleAutomationAction(formData: FormData): Promise<void> 
   revalidatePath(`/${workspaceSlug}/automations`);
   revalidatePath(`/${workspaceSlug}/agents/${encodeURIComponent(existing.agentName)}`);
 }
-
