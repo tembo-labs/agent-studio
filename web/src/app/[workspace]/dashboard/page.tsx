@@ -14,7 +14,9 @@ import {
 import {
   getWorkspaceDailyRunBands30d,
   getWorkspaceStats30d,
+  listRunsForWorkspace,
   listWorkspaceTopFailingAgents30d,
+  type RunListItem,
 } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
@@ -47,14 +49,21 @@ export default async function DashboardPage({
   const open = await listOpenImprovements(workspace.id);
   await scanImprovementsForPRs(workspace.id, open);
 
-  const [stats, daily, topFailing, improvementCounts, recentImprovements] =
-    await Promise.all([
-      getWorkspaceStats30d(workspace.id),
-      getWorkspaceDailyRunBands30d(workspace.id),
-      listWorkspaceTopFailingAgents30d(workspace.id, 5),
-      countImprovementsSince(workspace.id, since),
-      listImprovements(workspace.id, 10),
-    ]);
+  const [
+    stats,
+    daily,
+    topFailing,
+    improvementCounts,
+    recentImprovements,
+    recentRuns,
+  ] = await Promise.all([
+    getWorkspaceStats30d(workspace.id),
+    getWorkspaceDailyRunBands30d(workspace.id),
+    listWorkspaceTopFailingAgents30d(workspace.id, 5),
+    countImprovementsSince(workspace.id, since),
+    listImprovements(workspace.id, 10),
+    listRunsForWorkspace(workspace.id, {}, { limit: 8 }),
+  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
@@ -77,6 +86,69 @@ export default async function DashboardPage({
         topFailing={topFailing}
         workspaceSlug={workspace.slug}
       />
+
+      <Section
+        title="Recent runs"
+        description="The latest agent runs across this workspace."
+        actions={
+          <Link
+            href={`/${workspace.slug}/runs`}
+            className="text-foreground-weak hover:text-foreground text-sm"
+          >
+            View all →
+          </Link>
+        }
+      >
+        {recentRuns.length === 0 ? (
+          <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
+            No runs yet. Trigger a run from an agent to see it here.
+          </p>
+        ) : (
+          <ul className="border-border divide-border-weak bg-surface divide-y overflow-hidden rounded-lg border">
+            {recentRuns.map((r) => {
+              const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(r.agentName)}`;
+              const runHref = `${agentHref}/runs/${r.id}`;
+              // Failed runs preview the error; everything else previews
+              // the input (empty for manual "Run now" with no message).
+              const preview =
+                r.status === "failed" && r.errorMessagePreview
+                  ? r.errorMessagePreview
+                  : r.userMessagePreview;
+              return (
+                <li
+                  key={r.id}
+                  className="flex items-start justify-between gap-4 px-3 py-2.5 text-sm"
+                >
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={agentHref}
+                        className="text-foreground font-medium hover:underline"
+                      >
+                        {r.agentName}
+                      </Link>
+                      <RunStatusBadge status={r.status} />
+                    </div>
+                    {preview && (
+                      <p className="text-foreground-weak line-clamp-2 text-sm leading-5">
+                        {preview}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-foreground-weak flex shrink-0 flex-col items-end gap-1 text-sm">
+                    <span>
+                      <LocalTime iso={r.createdAt.toISOString()} style="relative" />
+                    </span>
+                    <Link href={runHref} className="hover:underline">
+                      Run →
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Section>
 
       <Section
         title="Improvements"
@@ -209,6 +281,33 @@ const ACCENT_CLASS: Record<"green" | "blue" | "gray" | "red", string> = {
   gray: "text-foreground",
   red: "text-sentiment-negative",
 };
+
+type RunStatus = RunListItem["status"];
+
+const RUN_STATUS_LABELS: Record<RunStatus, string> = {
+  queued: "Queued",
+  running: "Running",
+  succeeded: "Succeeded",
+  failed: "Failed",
+};
+
+const RUN_STATUS_BADGE: Record<
+  RunStatus,
+  "green" | "red" | "yellow" | "blue" | "gray"
+> = {
+  queued: "yellow",
+  running: "blue",
+  succeeded: "green",
+  failed: "red",
+};
+
+function RunStatusBadge({ status }: { status: RunStatus }) {
+  return (
+    <Badge variant={RUN_STATUS_BADGE[status]} size="small">
+      {RUN_STATUS_LABELS[status]}
+    </Badge>
+  );
+}
 
 function StatusBadge({ status }: { status: ImprovementStatus }) {
   switch (status) {
