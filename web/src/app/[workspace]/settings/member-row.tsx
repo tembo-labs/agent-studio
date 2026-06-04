@@ -38,23 +38,31 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
   // Track the local select value so the user gets immediate feedback;
   // the role committed at the server might lag if there's an error.
   const [roleDraft, setRoleDraft] = useState<WorkspaceRole>(member.role);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const detailHref = `/${workspaceSlug}/settings/members/${member.userId}`;
 
   return (
-    <li className="flex items-start justify-between gap-3 px-3 py-2.5 text-sm">
+    <li
+      className={`relative flex items-start justify-between gap-3 px-3 py-2.5 text-sm ${
+        canManage ? "hover:bg-surface-secondary transition-colors" : ""
+      }`}
+    >
+      {/* Stretched link: clicking anywhere on the row opens the member
+          detail. The right-side controls are raised to z-10 so they
+          stay independently clickable. Admin-only (the detail page is
+          admin-gated). */}
+      {canManage && (
+        <Link
+          href={detailHref}
+          aria-label={`View ${member.name ?? member.email}`}
+          className="absolute inset-0"
+        />
+      )}
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          {canManage ? (
-            <Link
-              href={`/${workspaceSlug}/settings/members/${member.userId}`}
-              className="text-foreground truncate font-medium hover:underline"
-            >
-              {member.name ?? member.email}
-            </Link>
-          ) : (
-            <span className="text-foreground truncate font-medium">
-              {member.name ?? member.email}
-            </span>
-          )}
+          <span className="text-foreground truncate font-medium">
+            {member.name ?? member.email}
+          </span>
           {isSelf && (
             <span className="text-foreground-muted text-sm">(you)</span>
           )}
@@ -72,7 +80,7 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="relative z-10 flex shrink-0 items-center gap-3">
         {canManage ? (
           <form action={changeAction}>
             <input type="hidden" name="workspace" value={workspaceSlug} />
@@ -104,16 +112,36 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
         )}
 
         {canManage && (
-          <form action={removeAction}>
+          <form action={removeAction} className="flex items-center gap-2">
             <input type="hidden" name="workspace" value={workspaceSlug} />
             <input type="hidden" name="user_id" value={member.userId} />
-            <button
-              type="submit"
-              disabled={removePending}
-              className="text-foreground-weak hover:text-sentiment-negative text-sm disabled:opacity-60"
-            >
-              {removePending ? "Removing…" : "Remove"}
-            </button>
+            {confirmingRemove ? (
+              <>
+                <span className="text-foreground-weak text-sm">Remove?</span>
+                <button
+                  type="submit"
+                  disabled={removePending}
+                  className="text-sentiment-negative text-sm font-medium hover:underline disabled:opacity-60"
+                >
+                  {removePending ? "Removing…" : "Yes"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingRemove(false)}
+                  className="text-foreground-weak hover:text-foreground text-sm"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingRemove(true)}
+                className="text-sentiment-negative text-sm hover:underline"
+              >
+                Remove
+              </button>
+            )}
           </form>
         )}
       </div>
