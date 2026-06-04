@@ -305,7 +305,7 @@ function AppCard({
         <input type="hidden" name="id" value={app.id} />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Slack app ID" name="slack_app_id" defaultValue={app.slackAppId ?? ""} placeholder="A0123456789" />
-          <Field label="OAuth client ID" name="client_id" defaultValue={app.clientId ?? ""} placeholder="123…" />
+          <Field label="Client ID" name="client_id" defaultValue={app.clientId ?? ""} placeholder="123…" />
           <Field
             label={`Signing secret${app.hasSigningSecret ? " (set)" : ""}`}
             name="signing_secret"
@@ -313,7 +313,7 @@ function AppCard({
             placeholder={app.hasSigningSecret ? "•••• (leave blank to keep)" : "from Slack → Basic Information"}
           />
           <Field
-            label={`OAuth client secret${app.hasClientSecret ? " (set)" : ""}`}
+            label={`Client secret${app.hasClientSecret ? " (set)" : ""}`}
             name="client_secret"
             type="password"
             placeholder={app.hasClientSecret ? "•••• (leave blank to keep)" : "from Slack → Basic Information"}
