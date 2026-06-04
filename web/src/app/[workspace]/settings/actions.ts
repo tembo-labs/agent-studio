@@ -157,7 +157,10 @@ export async function saveSecretAction(
   });
 
   revalidatePath(`/${slug}/settings`);
-  revalidatePath(`/${slug}`);
+  // Layout-level so the sidebar's "Action needed" LLM-key CTA toggles
+  // without a manual refresh — it lives in the workspace layout, which
+  // a page-only revalidate wouldn't re-render.
+  revalidatePath(`/${slug}`, "layout");
   return { message: `${SETTINGS_KIND_LABELS[kind]} saved.` };
 }
 
@@ -190,7 +193,9 @@ export async function removeSecretAction(
   });
 
   revalidatePath(`/${slug}/settings`);
-  revalidatePath(`/${slug}`);
+  // Layout-level so the sidebar's "Action needed" LLM-key CTA appears
+  // immediately after the last provider key is removed.
+  revalidatePath(`/${slug}`, "layout");
   return { message: `${SETTINGS_KIND_LABELS[kind]} removed.` };
 }
 
