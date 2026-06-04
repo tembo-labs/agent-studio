@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Section } from "@/components/section";
 import { useActionToast } from "@/lib/use-action-toast";
 import type { SlackApp } from "@/lib/slack-apps";
+import { SLACK_BOT_SCOPES } from "@/lib/slack-scopes";
 
 import {
   createSlackAppAction,
@@ -42,16 +43,7 @@ function manifestJson(app: SlackApp, origin: string): string {
       },
       oauth_config: {
         redirect_urls: [`${base}/callback`],
-        scopes: {
-          bot: [
-            "commands",
-            "chat:write",
-            "app_mentions:read",
-            "im:history",
-            "users:read",
-            "users:read.email",
-          ],
-        },
+        scopes: { bot: [...SLACK_BOT_SCOPES] },
       },
       settings: {
         event_subscriptions: {
@@ -200,6 +192,8 @@ function AppCard({
   useActionToast(state);
   const [showManifest, setShowManifest] = useState(false);
   const base = `${origin}/api/slack/${app.id}`;
+  const credsSet =
+    app.hasSigningSecret && app.hasClientSecret && Boolean(app.clientId);
   const statusVariant =
     app.status === "installed"
       ? "green"
@@ -227,6 +221,37 @@ function AppCard({
           </button>
         </form>
       </div>
+
+      {app.status !== "installed" && (
+        <ol className="flex list-none flex-col gap-2 rounded-lg border border-[var(--color-border-weak)] bg-[var(--color-surface-secondary)] p-3 text-sm">
+          <li className="text-foreground font-medium">Finish setup</li>
+          <SetupStep done={Boolean(app.slackAppId)}>
+            Create the Slack app — open{" "}
+            <a
+              href="https://api.slack.com/apps?new_app=1"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline underline-offset-2"
+            >
+              api.slack.com → Create New App → From a manifest
+            </a>
+            , choose your Slack workspace, and paste the manifest below.
+          </SetupStep>
+          <SetupStep done={credsSet}>
+            In the new app&apos;s{" "}
+            <span className="font-medium">Basic Information</span>, copy the{" "}
+            <span className="font-medium">Signing Secret</span> and the{" "}
+            <span className="font-medium">App Credentials</span> (Client ID +
+            Client Secret) into the fields below, then{" "}
+            <span className="font-medium">Save</span>. (Optional: paste the
+            Slack App ID too.)
+          </SetupStep>
+          <SetupStep done={app.hasBotToken}>
+            Click <span className="font-medium">Add to Slack</span> to install
+            the bot into your Slack workspace.
+          </SetupStep>
+        </ol>
+      )}
 
       {/* Request URLs to paste into the Slack app config. */}
       <div className="flex flex-col gap-1 text-sm">
@@ -316,17 +341,41 @@ function AppCard({
           <Button type="submit" variant="secondary" size="small" disabled={pending}>
             {pending ? "Saving…" : "Save"}
           </Button>
-          {app.hasSigningSecret && app.hasClientSecret && !app.hasBotToken && (
+          {app.hasSigningSecret && app.hasClientSecret && app.clientId && (
             <a
-              href={`${base}/install`}
+              href={`${base}/install?ws=${encodeURIComponent(workspaceSlug)}`}
               className="text-foreground text-sm font-medium hover:underline"
             >
-              Add to Slack →
+              {app.hasBotToken ? "Reinstall" : "Add to Slack"} →
             </a>
           )}
         </div>
       </form>
     </div>
+  );
+}
+
+function SetupStep({
+  done,
+  children,
+}: {
+  done: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <li className="flex items-start gap-2">
+      <span
+        className={
+          done ? "text-sentiment-positive" : "text-foreground-muted"
+        }
+        aria-hidden
+      >
+        {done ? "✓" : "○"}
+      </span>
+      <span className={done ? "text-foreground-muted" : "text-foreground-weak"}>
+        {children}
+      </span>
+    </li>
   );
 }
 

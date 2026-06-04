@@ -174,3 +174,65 @@ function isComposioStatePayload(value: unknown): value is ComposioStatePayload {
     typeof v.nonce === "string"
   );
 }
+
+// Slack "Add to Slack" install state — proves the callback came from our
+// own /install step and carries which workspace_slack_app row (+ its
+// workspace) the resulting bot token should be stored against.
+
+export type SlackInstallStatePayload = {
+  /** Our workspace_slack_app row id. */
+  slackAppId: string;
+  workspaceId: string;
+  workspaceSlug: string;
+  nonce: string;
+};
+
+export function signSlackInstallState(
+  payload: Omit<SlackInstallStatePayload, "nonce">,
+): string {
+  const full: SlackInstallStatePayload = {
+    ...payload,
+    nonce: randomBytes(8).toString("base64url"),
+  };
+  const body = Buffer.from(JSON.stringify(full), "utf8");
+  const sig = createHmac("sha256", getSecret()).update(body).digest();
+  return Buffer.concat([body, sig]).toString("base64url");
+}
+
+export function verifySlackInstallState(
+  state: string,
+): SlackInstallStatePayload | null {
+  let combined: Buffer;
+  try {
+    combined = Buffer.from(state, "base64url");
+  } catch {
+    return null;
+  }
+  if (combined.length <= SIG_LEN) return null;
+  const body = combined.subarray(0, combined.length - SIG_LEN);
+  const sig = combined.subarray(combined.length - SIG_LEN);
+  const expected = createHmac("sha256", getSecret()).update(body).digest();
+  if (sig.length !== expected.length) return null;
+  if (!timingSafeEqual(sig, expected)) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body.toString("utf8"));
+  } catch {
+    return null;
+  }
+  if (!isSlackInstallStatePayload(parsed)) return null;
+  return parsed;
+}
+
+function isSlackInstallStatePayload(
+  value: unknown,
+): value is SlackInstallStatePayload {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.slackAppId === "string" &&
+    typeof v.workspaceId === "string" &&
+    typeof v.workspaceSlug === "string" &&
+    typeof v.nonce === "string"
+  );
+}

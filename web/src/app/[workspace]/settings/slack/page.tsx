@@ -21,10 +21,13 @@ export const dynamic = "force-dynamic";
 // then "Add to Slack" completes the OAuth install.
 export default async function SlackSettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspace: string }>;
+  searchParams: Promise<{ slack?: string; detail?: string }>;
 }) {
   const { workspace: slug } = await params;
+  const { slack: installResult, detail: installDetail } = await searchParams;
   const session = await getServerSession();
   if (!session) notFound();
   const workspace = await getWorkspaceBySlug(slug);
@@ -66,11 +69,25 @@ export default async function SlackSettingsPage({
   }));
 
   return (
-    <SlackAppsManager
-      workspaceSlug={workspace.slug}
-      origin={getPublicOrigin()}
-      apps={apps}
-      members={memberOptions}
-    />
+    <div className="flex flex-col gap-4">
+      {installResult === "installed" && (
+        <div className="border-sentiment-positive rounded-lg border bg-[var(--color-sentiment-positive-subtle)] px-3 py-2 text-sm">
+          <span className="text-foreground">Slack app installed.</span>
+        </div>
+      )}
+      {installResult === "error" && (
+        <div className="border-sentiment-negative rounded-lg border bg-[var(--color-input-error)] px-3 py-2 text-sm">
+          <span className="text-foreground">
+            Install failed{installDetail ? `: ${installDetail}` : "."}
+          </span>
+        </div>
+      )}
+      <SlackAppsManager
+        workspaceSlug={workspace.slug}
+        origin={getPublicOrigin()}
+        apps={apps}
+        members={memberOptions}
+      />
+    </div>
   );
 }
