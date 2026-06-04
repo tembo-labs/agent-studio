@@ -93,7 +93,7 @@ export async function listMemberActivity(
   }
   const runs30d = new Map(runs.rows.map((r) => [r.user_id, Number(r.n)]));
 
-  return members.rows.map((m) => {
+  const activity = members.rows.map((m) => {
     const labels = (connByUser.get(m.user_id) ?? []).sort((a, b) =>
       a.localeCompare(b),
     );
@@ -112,4 +112,12 @@ export async function listMemberActivity(
       runs30d: runs30d.get(m.user_id) ?? 0,
     };
   });
+
+  // Most active members (by 30-day runs) first; ties broken by name.
+  activity.sort(
+    (a, b) =>
+      b.runs30d - a.runs30d ||
+      (a.name ?? a.email).localeCompare(b.name ?? b.email),
+  );
+  return activity;
 }
