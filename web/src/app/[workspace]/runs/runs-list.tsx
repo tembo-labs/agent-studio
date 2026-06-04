@@ -401,41 +401,46 @@ function RunRow({
 // trigger=event *with* a slack_delivery row; other events are webhooks.
 function SourceCell({ run }: { run: LoadedRun }) {
   const who = run.createdByName ?? run.createdByEmail ?? null;
+  const slack = run.slack;
   return (
     <div className="flex flex-col gap-0.5">
-      {run.slack ? (
-        <span className="flex items-center gap-1.5">
+      <span className="flex items-center gap-1.5">
+        {slack ? (
           <Badge variant="green" size="small">
             Slack
           </Badge>
-          <span className="text-foreground-weak text-sm">{run.slack.appName}</span>
-        </span>
-      ) : run.trigger === "schedule" ? (
-        <Badge variant="blue" size="small">
-          Scheduled
-        </Badge>
-      ) : run.trigger === "event" ? (
-        <Badge variant="purple" size="small">
-          Event
-        </Badge>
-      ) : (
-        <span className="text-foreground-weak text-sm">Manual</span>
-      )}
+        ) : run.trigger === "schedule" ? (
+          <Badge variant="blue" size="small">
+            Scheduled
+          </Badge>
+        ) : run.trigger === "event" ? (
+          <Badge variant="purple" size="small">
+            Event
+          </Badge>
+        ) : (
+          <span className="text-foreground-weak text-sm">Manual</span>
+        )}
+        {/* For Slack, the bot name doubles as the deep link to the thread. */}
+        {slack &&
+          (slack.permalink ? (
+            <a
+              href={slack.permalink}
+              target="_blank"
+              rel="noreferrer noopener"
+              onClick={(e) => e.stopPropagation()}
+              title={`Open in Slack — ${slack.appName}`}
+              className="text-foreground-weak hover:text-foreground text-sm hover:underline"
+            >
+              {slack.appName} ↗
+            </a>
+          ) : (
+            <span className="text-foreground-muted text-sm">{slack.appName}</span>
+          ))}
+      </span>
       {who && (
         <span className="text-foreground-muted truncate text-sm" title={who}>
           {who}
         </span>
-      )}
-      {run.slack?.permalink && (
-        <a
-          href={run.slack.permalink}
-          target="_blank"
-          rel="noreferrer noopener"
-          onClick={(e) => e.stopPropagation()}
-          className="text-foreground-weak hover:text-foreground text-sm hover:underline"
-        >
-          View in Slack →
-        </a>
       )}
     </div>
   );
