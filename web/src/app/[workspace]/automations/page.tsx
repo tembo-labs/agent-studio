@@ -77,6 +77,7 @@ function AutomationTable({
             <th className="px-3 py-2 text-left font-medium">Schedule</th>
             <th className="px-3 py-2 text-left font-medium">Next fire</th>
             <th className="px-3 py-2 text-left font-medium">Last fire</th>
+            <th className="px-3 py-2 text-left font-medium">Run as</th>
             <th className="px-3 py-2 text-left font-medium">Status</th>
             <th className="px-3 py-2 text-right font-medium">Actions</th>
           </tr>
@@ -144,6 +145,9 @@ function AutomationRow({
         ) : (
           <span className="text-foreground-muted">Never</span>
         )}
+      </td>
+      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
+        {automation.ownerUserName ?? automation.ownerUserEmail ?? "—"}
       </td>
       <td className="px-3 py-2 align-top">
         <StatusBadge automation={automation} />
