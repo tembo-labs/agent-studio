@@ -12,6 +12,52 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.8] — Slack apps: launch agents from Slack — shipped 2026-06-04
+
+TAS can now host per-team Slack bots that launch a **label-scoped subset** of
+your agents — separating cheap routing from right-sized execution, so dozens of
+agents are reachable from Slack without dozens of channels or one expensive
+mega-agent.
+
+### Added
+- **TAS-managed Slack apps** (Settings → Slack apps, admin-only) — register one
+  bot per team (e.g. a sales bot and a support bot), each scoped to a subset of
+  agents by label. Coached setup: copy a prefilled Slack manifest, paste
+  credentials, then **Add to Slack** (OAuth) to install. Signing secret, client
+  secret, and bot token are AES-256-GCM encrypted; multi-app from day one.
+- **Launch agents from Slack** — slash command `/tas <agent> <input>`,
+  `@mentions`, and DMs. The run acts as the Slack user (matched by email),
+  falling back to the app's default owner, and the result posts back in-thread.
+- **Agent labels** — add `labels: [sales]` to an agent spec to group it in the
+  inventory and scope which Slack app may launch it. Documented as a TAS
+  extension field in [`AGENT_FORMAT.md`](./context/shipped/0.1/AGENT_FORMAT.md).
+- **Natural-language routing** — a Slack message that doesn't name an agent is
+  routed by a cheap Haiku 4.5 classifier to the best-fit scoped agent (or replies
+  with the menu when nothing fits).
+- **Agent picker modal + App Home directory** — `/tas` with no agent opens a
+  picker; the bot's Home tab lists every agent it can launch.
+- **"Run agent on this message" shortcut** — launch an agent with any Slack
+  message as its input, prefilled into the picker.
+- **Runs "Source" column** — the runs list now shows how each run was instigated
+  (Manual / Scheduled / Event / Slack), who it acted as, and — for Slack — a deep
+  link back to the originating conversation.
+- **Dashboard "Slack (30d)" column** — per-member count of Slack-launched runs,
+  with a per-bot breakdown on hover.
+
+### Changed
+- Slack replies render the agent's Markdown as Slack **mrkdwn** (bold, headings,
+  links, bullets, tables) and drop the leading `user>` transcript echo.
+- Dashboard **Team** rows append the email when two members share a first name.
+
+### Hardening
+- Per-Slack-user rate limit, replay dedupe on Slack retries, and an audit event
+  (`slack.dispatch`) per Slack-launched run.
+
+### Fixed
+- Slack Web API calls are now form-encoded — fixing the read methods that
+  silently ignore a JSON body, so the acting-user email→member mapping and the
+  message permalinks (the "View in Slack" links) work.
+
 ## [v2026.6.7] — Team visibility + admin management — shipped 2026-06-04
 
 A batch focused on workspace admins seeing and managing what members own.
