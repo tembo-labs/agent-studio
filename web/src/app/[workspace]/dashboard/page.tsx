@@ -74,6 +74,22 @@ export default async function DashboardPage({
   ]);
   const isAdmin = role === "workspace_admin";
 
+  // Disambiguate the Team table: when two members share a first name,
+  // append the email in parens so "Ry" and "Ry" are distinguishable.
+  // Members without a display name just show their email.
+  const firstNameCounts = new Map<string, number>();
+  for (const m of memberActivity) {
+    const first = m.name?.trim().split(/\s+/)[0]?.toLowerCase();
+    if (first) firstNameCounts.set(first, (firstNameCounts.get(first) ?? 0) + 1);
+  }
+  const memberLabel = (m: (typeof memberActivity)[number]): string => {
+    if (!m.name) return m.email;
+    const first = m.name.trim().split(/\s+/)[0]?.toLowerCase();
+    return first && (firstNameCounts.get(first) ?? 0) > 1
+      ? `${m.name} (${m.email})`
+      : m.name;
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
       <div className="flex flex-col gap-1">
@@ -123,11 +139,11 @@ export default async function DashboardPage({
                         href={`/${workspace.slug}/settings/members/${m.userId}`}
                         className="text-foreground font-medium hover:underline"
                       >
-                        {m.name ?? m.email}
+                        {memberLabel(m)}
                       </Link>
                     ) : (
                       <span className="text-foreground font-medium">
-                        {m.name ?? m.email}
+                        {memberLabel(m)}
                       </span>
                     )}
                   </td>
