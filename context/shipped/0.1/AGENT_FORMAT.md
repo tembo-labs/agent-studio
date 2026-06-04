@@ -153,6 +153,45 @@ The "From template" path in the create-agent UI is name-only — framework is im
 
 An earlier iteration of US-0.1-07 added a required `harness` field with values `claude-code | opencode | pi`. We reframed it: harness is a *different* concept (the coding-agent runtime driving a flow), and conflating it with "what kind of agent this is" obscured the v0.3+ multi-framework direction. Harness as a first-class field comes back when raw coding-agent flows ship — likely v0.3+, alongside multi-framework runtime support. Until then, the framework badge is the right answer to "what is this agent."
 
+## TAS extension fields
+
+The agent file is the system of record, but TAS layers a small amount of
+its own metadata onto the spec. These fields are **not** part of the
+upstream Pydantic AI `AgentSpec` schema — they are TAS extensions that the
+runtime is contractually required to ignore.
+
+| Field | Type | Added | Meaning |
+| --- | --- | --- | --- |
+| `labels` | `string[]` or comma string | v0.4 | Free-form tags. Group the agent in the inventory and **scope which TAS-managed Slack app may launch it** (a Slack app launches only agents whose labels intersect its own). Normalized lowercase + deduped. |
+
+Example:
+
+```yaml
+name: weekly-report
+model: anthropic:claude-sonnet-4-6
+labels: [sales, reporting]
+instructions: |
+  …
+```
+
+**Why this is safe — the allow-list passthrough contract.** The Pydantic
+runner (`api/scripts/run_pydantic.py`) does **not** load the spec through a
+strict pydantic model and does **not** splat the dict into `Agent(**spec)`.
+It hand-maps a fixed allow-list of fields (`model`, `instructions`, `name`,
+`model_settings`, `retries`, `instrument`, plus `connections`/`toolsets`)
+onto the `Agent(...)` constructor and ignores everything else. So an
+unknown top-level key like `labels:` reaches the wrapper in the raw spec,
+sits inertly in the parsed dict, and never hits a pydantic `extra="forbid"`
+boundary. The web parser (`web/src/lib/agent-format.ts`) reads `labels` for
+its own use but preserves the entire raw object for round-tripping, so the
+field survives edit → PR → run untouched.
+
+This passthrough is a **load-bearing guarantee**, not incidental behavior:
+any future change that swaps in a real `Agent.from_spec(**spec)`-style
+loader against a strict model must keep TAS extension fields on an explicit
+allow-list (or the model must permit extras), or labelled agents will start
+failing at run time. New TAS-metadata fields belong in the table above.
+
 ## Open questions
 
 - Should the v0.1 converter (Cargo AI JSON → `AgentSpec` YAML) be one-way only, or round-trippable? Lossless round-tripping is hard because the two formats have different action models (JSON Logic + run-steps vs. capabilities + tools).

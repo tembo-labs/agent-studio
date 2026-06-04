@@ -250,6 +250,16 @@ def build_agent(
     (despite some upstream docs still referencing it), so we hand-map
     the AgentSpec fields onto the Agent(...) constructor kwargs.
 
+    This hand-mapping is an explicit allow-list, and that is a
+    load-bearing contract: we read only the keys below and never
+    `Agent(**spec)`. Unknown top-level keys are ignored by design, which
+    is what lets TAS carry its own extension metadata in the spec file
+    (e.g. `labels:` for inventory grouping + Slack-app scoping) without it
+    reaching a pydantic `extra="forbid"` boundary. See
+    context/shipped/0.1/AGENT_FORMAT.md -> "TAS extension fields". If you
+    ever switch to a strict spec loader, keep TAS fields allow-listed or
+    labelled agents will fail at run time.
+
     `toolsets` is the Composio MCP toolset list when the agent
     declared `connections:`; otherwise None (no tools). When
     connections are present, we prepend an explanatory preamble to
