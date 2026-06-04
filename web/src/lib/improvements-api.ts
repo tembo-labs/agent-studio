@@ -147,6 +147,30 @@ export async function listPendingCreatesForWorkspace(
   return res.rows.map(rowToImprovement);
 }
 
+/**
+ * Dismiss a pending agent-create from the inventory: mark the create
+ * improvement `closed` so it drops out of listPendingCreatesForWorkspace.
+ * Scoped to the workspace and to non-terminal create rows so it can't
+ * touch edits or already-resolved rows. Returns whether a row changed.
+ * Does NOT touch the GitHub PR (if one is open) — that stays on GitHub
+ * for the user to merge or close there.
+ */
+export async function dismissPendingCreate(
+  workspaceId: string,
+  improvementId: string,
+): Promise<boolean> {
+  const res = await db.query(
+    `UPDATE improvement
+        SET status = 'closed', updated_at = now()
+      WHERE id = $1
+        AND workspace_id = $2
+        AND kind = 'create'
+        AND status IN ('submitted', 'pr_opened')`,
+    [improvementId, workspaceId],
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
 export async function setImprovementTask(input: {
   id: string;
   temboTaskId: string | null;

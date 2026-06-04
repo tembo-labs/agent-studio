@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 
 import { IconPlusLarge } from "central-icons";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+import { dismissPendingCreateAction } from "./inventory-actions";
 
 // Workspace agent inventory. Replaces the card grid (better for ~10
 // agents, falls apart past that) with a sortable / filterable table.
@@ -75,9 +77,18 @@ type Props = {
   /** Show the "New agent" button. Requires operator+ AND a Tembo API
    *  key (chat-to-create runs through Tembo CAP). */
   canCreate: boolean;
+  workspaceSlug: string;
+  /** Operator+; gates the "Dismiss" action on pending-create rows. */
+  canEdit: boolean;
 };
 
-export function AgentsInventory({ agents, newAgentHref, canCreate }: Props) {
+export function AgentsInventory({
+  agents,
+  newAgentHref,
+  canCreate,
+  workspaceSlug,
+  canEdit,
+}: Props) {
   const [query, setQuery] = useState("");
   // null = "all" (no facet selected). Selecting a pill switches the
   // visible rows to that bucket only.
@@ -231,6 +242,8 @@ export function AgentsInventory({ agents, newAgentHref, canCreate }: Props) {
                   key={rowKey(agent)}
                   agent={agent}
                   bucket={bucket}
+                  workspaceSlug={workspaceSlug}
+                  canEdit={canEdit}
                 />
               ))}
             </tbody>
@@ -329,9 +342,13 @@ function SortableTh({
 function InventoryRow({
   agent,
   bucket,
+  workspaceSlug,
+  canEdit,
 }: {
   agent: InventoryAgent;
   bucket: StatusBucket;
+  workspaceSlug: string;
+  canEdit: boolean;
 }) {
   if (agent.kind === "invalid") {
     return (
@@ -380,7 +397,16 @@ function InventoryRow({
           —
         </td>
         <td className="text-foreground-weak px-3 py-2 text-right align-middle text-sm">
-          <PendingLinks agent={agent} />
+          <span className="inline-flex flex-wrap items-center justify-end gap-3">
+            <PendingLinks agent={agent} />
+            {canEdit && (
+              <DismissPendingButton
+                workspaceSlug={workspaceSlug}
+                improvementId={agent.key}
+                agentName={agent.name}
+              />
+            )}
+          </span>
         </td>
       </tr>
     );
@@ -489,6 +515,65 @@ function PendingLinks({
         </a>
       ) : null}
     </span>
+  );
+}
+
+// Inline two-step confirm: "Dismiss" → "Dismiss? Yes / No". Marks the
+// pending create closed so it drops off the inventory. The GitHub PR (if
+// any) is left alone — the links above still reach it.
+function DismissPendingButton({
+  workspaceSlug,
+  improvementId,
+  agentName,
+}: {
+  workspaceSlug: string;
+  improvementId: string;
+  agentName: string;
+}) {
+  const [state, action, pending] = useActionState(dismissPendingCreateAction, {
+    error: undefined,
+  });
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="text-foreground-weak hover:text-sentiment-negative"
+        title={`Dismiss the pending "${agentName}" create`}
+      >
+        Dismiss
+      </button>
+    );
+  }
+
+  return (
+    <form action={action} className="inline-flex items-center gap-2">
+      <input type="hidden" name="workspace" value={workspaceSlug} />
+      <input type="hidden" name="improvementId" value={improvementId} />
+      <span
+        className={
+          state.error ? "text-sentiment-negative" : "text-foreground-weak"
+        }
+      >
+        {state.error ?? "Dismiss?"}
+      </span>
+      <button
+        type="submit"
+        disabled={pending}
+        className="text-sentiment-negative hover:underline disabled:opacity-60"
+      >
+        {pending ? "…" : "Yes"}
+      </button>
+      <button
+        type="button"
+        onClick={() => setConfirming(false)}
+        className="text-foreground-weak hover:text-foreground"
+      >
+        No
+      </button>
+    </form>
   );
 }
 
