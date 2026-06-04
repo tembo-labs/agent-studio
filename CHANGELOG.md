@@ -12,6 +12,22 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.6] — Dismiss pending agents + settings polish — shipped 2026-06-04
+
+### Added
+- **Dismiss pending agents** from the workspace home. In-flight chat-to-PR
+  creates can now be removed from the inventory via an inline confirm
+  (operator+); it stops tracking the create here and leaves the GitHub PR
+  alone (the PR / Tembo-session links still reach it).
+
+### Fixed
+- **Composio webhook secret field** no longer implies a `whsec_` prefix — those
+  secrets are prefix-less hex, so the masked preview/placeholder were
+  misleading (same class of fix as the Tembo API key field in v2026.6.5).
+- **Sidebar "Action needed" CTA** (the "add an LLM key" prompt) now updates
+  without a manual browser refresh when a provider key is added or removed — it
+  lives in the workspace layout, which now revalidates at layout level.
+
 ## [v2026.6.5] — Tembo authoring fix + favicon fixes — shipped 2026-06-03
 
 ### Fixed
