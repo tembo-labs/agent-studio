@@ -12,6 +12,32 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.7] — Team visibility + admin management — shipped 2026-06-04
+
+A batch focused on workspace admins seeing and managing what members own.
+
+### Added
+- **Team section on the dashboard** — a per-member table (Connections /
+  Automations / 30-day runs), sorted by run activity. Hover a count for the
+  underlying list (which toolkits are connected, which agents have
+  automations) via a styled, fast tooltip.
+- **Member detail view** — admins click a member (from Settings → Members or
+  the Team table) to see their tool connections, the automations that "Run as"
+  them, and their recent runs. Useful before offboarding (see #64).
+- **Admins can view + rename any member's connections** — a "Viewing" dropdown
+  on the Connections page (defaults to self). When viewing another member you
+  can Rename and Refresh; Connect/Reconnect/Disconnect are hidden since OAuth
+  must be performed by that member.
+- **Admin "Run as" in the manual Run-now dialog** — pick which member to run as;
+  the run uses that member's connections (same model as an automation owner).
+- **"Run as" owner column** on the automations list.
+
+### Changed
+- Member rows: **Remove** is red with a confirm step, and the whole row links to
+  the member detail view.
+- The Composio connection-rename action is now gated to owner-or-admin (parity
+  with the native-MCP rename).
+
 ## [v2026.6.6] — Dismiss pending agents + settings polish — shipped 2026-06-04
 
 ### Added
