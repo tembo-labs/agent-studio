@@ -16,9 +16,28 @@ export type { Framework } from "@/lib/agent-framework";
 type AgentSpecBase = {
   name: string;
   description?: string;
+  /**
+   * Optional labels for grouping + scoping. Normalized lowercase. Used
+   * to group the inventory and to scope which TAS-managed Slack app may
+   * launch the agent. Parsed from a `labels:` array or comma string.
+   */
+  labels: string[];
   /** Raw parsed object preserved for round-tripping. */
   raw: Record<string, unknown>;
 };
+
+/** Accept `labels: [sales, crm]` or `labels: "sales, crm"`; normalize. */
+function parseLabelsField(raw: unknown): string[] {
+  let values: string[] = [];
+  if (Array.isArray(raw)) {
+    values = raw.filter((v): v is string => typeof v === "string");
+  } else if (typeof raw === "string") {
+    values = raw.split(",");
+  }
+  return Array.from(
+    new Set(values.map((s) => s.trim().toLowerCase()).filter(Boolean)),
+  );
+}
 
 export type AgentConnectionSource = "composio" | "native-mcp";
 
@@ -281,7 +300,12 @@ export function parseAgentContent(
 
   const description =
     typeof obj.description === "string" ? obj.description : undefined;
-  const base: AgentSpecBase = { name, description, raw: obj };
+  const base: AgentSpecBase = {
+    name,
+    description,
+    labels: parseLabelsField(obj.labels),
+    raw: obj,
+  };
 
   const framework = detectFramework(obj);
   if (framework === null) {

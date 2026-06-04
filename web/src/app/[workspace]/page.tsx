@@ -103,6 +103,7 @@ export default async function WorkspacePage({
             name: a.spec.name,
             detailHref: `/${workspace.slug}/agents/${encodeURIComponent(a.spec.name)}`,
             frameworkLabel: FRAMEWORK_LABELS[a.spec.framework],
+            labels: a.spec.labels,
             model: a.spec.model ?? null,
             runs30d: s?.totalRuns30d ?? 0,
             succeeded30d: s?.succeeded30d ?? 0,

@@ -26,6 +26,8 @@ export type InventoryAgent =
       name: string;
       detailHref: string;
       frameworkLabel: string;
+      /** Spec labels (for grouping + Slack-app scoping). */
+      labels: string[];
       model: string | null;
       /** 30-day window. Zero when the agent has never run in that window. */
       runs30d: number;
@@ -420,12 +422,23 @@ function InventoryRow({
         <StatusCell bucket={bucket} />
       </td>
       <td className="px-3 py-2 align-middle">
-        <Link
-          href={agent.detailHref}
-          className="text-foreground hover:underline font-medium"
-        >
-          {agent.name}
-        </Link>
+        <div className="flex flex-col gap-1">
+          <Link
+            href={agent.detailHref}
+            className="text-foreground hover:underline font-medium"
+          >
+            {agent.name}
+          </Link>
+          {agent.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {agent.labels.map((l) => (
+                <Badge key={l} variant="gray" size="small">
+                  {l}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
       </td>
       <td className="px-3 py-2 align-middle">
         <Badge variant="gray" size="small">

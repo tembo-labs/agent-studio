@@ -2,6 +2,7 @@ import "server-only";
 
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { listAgents } from "@/lib/workspace-agents";
 
 // Data access for TAS-managed Slack apps (workspace_slack_app). One row
 // per Slack app TAS owns for a workspace — its identity, install, and the
@@ -224,6 +225,31 @@ export async function getSlackAppSecrets(
     clientSecret: r.client_secret ? decryptSecret(r.client_secret) : null,
     botToken: r.bot_token ? decryptSecret(r.bot_token) : null,
   };
+}
+
+export type ScopedAgent = { name: string; path: string; description?: string };
+
+/**
+ * Valid agents in the app's workspace whose labels intersect the app's
+ * scope — the registry its slash command, picker, and App Home expose.
+ * An app with no labels exposes nothing (agents must be opted in via a
+ * matching label), so a new bot can't accidentally launch everything.
+ */
+export async function listAgentsForSlackApp(
+  app: Pick<SlackApp, "workspaceId" | "agentLabels">,
+): Promise<ScopedAgent[]> {
+  if (app.agentLabels.length === 0) return [];
+  const labels = new Set(app.agentLabels);
+  const listing = await listAgents(app.workspaceId);
+  if (!listing.ok) return [];
+  const out: ScopedAgent[] = [];
+  for (const a of listing.agents) {
+    if (!a.ok) continue;
+    if (a.spec.labels.some((l) => labels.has(l))) {
+      out.push({ name: a.spec.name, path: a.path, description: a.spec.description });
+    }
+  }
+  return out;
 }
 
 /** Called by the OAuth callback once the app is installed into Slack. */
