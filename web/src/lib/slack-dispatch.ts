@@ -85,6 +85,76 @@ export function buildPickerView(
   };
 }
 
+/**
+ * The bot's App Home tab: a directory of the agents this app can launch
+ * plus a how-to. Published on app_home_opened. `scoped` is the app's
+ * label-scoped registry.
+ */
+export function buildHomeView(
+  appName: string,
+  scoped: { name: string; description?: string }[],
+): Record<string, unknown> {
+  const blocks: Record<string, unknown>[] = [
+    {
+      type: "header",
+      text: { type: "plain_text", text: `${appName} — what I can do` },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: "Launch an agent with `/tas <agent> <your message>`, or just *message me* and name the agent. Run `/tas` with no agent to pick from a menu.",
+      },
+    },
+    { type: "divider" },
+  ];
+
+  if (scoped.length === 0) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: "_No agents are assigned to this bot yet._ An admin can scope it in TAS → Settings → Slack apps: give the bot a label, then add a matching `labels:` line to an agent.",
+      },
+    });
+  } else {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Agents I can launch (${scoped.length})*`,
+      },
+    });
+    // Slack caps a view at 100 blocks; each agent is one section. Leave
+    // headroom for the preamble — 50 agents is far more than any bot's
+    // realistic scope.
+    for (const a of scoped.slice(0, 50)) {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: a.description
+            ? `• \`${a.name}\` — ${a.description}`
+            : `• \`${a.name}\``,
+        },
+      });
+    }
+    if (scoped.length > 50) {
+      blocks.push({
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `…and ${scoped.length - 50} more.`,
+          },
+        ],
+      });
+    }
+  }
+
+  return { type: "home", blocks };
+}
+
 export type DispatchResult =
   | {
       ok: true;

@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { postMessage } from "@/lib/slack-api";
-import { dispatchToAgent, parseCommand } from "@/lib/slack-dispatch";
+import { postMessage, publishHomeView } from "@/lib/slack-api";
+import {
+  buildHomeView,
+  dispatchToAgent,
+  parseCommand,
+} from "@/lib/slack-dispatch";
 import { authenticateSlackRequest } from "@/lib/slack-inbound";
 import { listAgentsForSlackApp, type SlackApp } from "@/lib/slack-apps";
 
@@ -24,6 +28,8 @@ type SlackEvent = {
   channel_type?: string;
   ts?: string;
   thread_ts?: string;
+  /** app_home_opened: which tab the user opened ("home" | "messages"). */
+  tab?: string;
 };
 
 type EventEnvelope = {
@@ -76,6 +82,15 @@ async function handleEvent(
   botToken: string,
   event: SlackEvent,
 ): Promise<void> {
+  // App Home tab opened → publish the agent directory for this user.
+  if (event.type === "app_home_opened") {
+    if (event.tab && event.tab !== "home") return;
+    if (!event.user) return;
+    const scoped = await listAgentsForSlackApp(app);
+    await publishHomeView(botToken, event.user, buildHomeView(app.name, scoped));
+    return;
+  }
+
   // Ignore anything we sent, and message edits/joins/etc. (subtypes).
   if (event.bot_id) return;
   const isMention = event.type === "app_mention";

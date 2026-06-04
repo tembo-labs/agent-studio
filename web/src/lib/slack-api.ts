@@ -70,6 +70,15 @@ export async function postResponseUrl(
   }
 }
 
+/** Publish the bot's App Home (the "Home" tab) for a given user. */
+export function publishHomeView(
+  token: string,
+  userId: string,
+  view: Record<string, unknown>,
+): Promise<SlackApiResult> {
+  return call("views.publish", token, { user_id: userId, view });
+}
+
 /** The Slack user's verified email — used to map them to a TAS member. */
 export async function getUserEmail(
   token: string,

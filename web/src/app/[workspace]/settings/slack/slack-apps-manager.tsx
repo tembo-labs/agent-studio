@@ -32,6 +32,11 @@ function manifestJson(app: SlackApp, origin: string): string {
       display_information: { name: app.name },
       features: {
         bot_user: { display_name: app.name, always_online: true },
+        app_home: {
+          home_tab_enabled: true,
+          messages_tab_enabled: true,
+          messages_tab_read_only_enabled: false,
+        },
         slash_commands: [
           {
             command: "/tas",
@@ -49,7 +54,7 @@ function manifestJson(app: SlackApp, origin: string): string {
       settings: {
         event_subscriptions: {
           request_url: `${base}/events`,
-          bot_events: ["app_mention", "message.im"],
+          bot_events: ["app_mention", "message.im", "app_home_opened"],
         },
         interactivity: { is_enabled: true, request_url: `${base}/interactivity` },
         org_deploy_enabled: false,
