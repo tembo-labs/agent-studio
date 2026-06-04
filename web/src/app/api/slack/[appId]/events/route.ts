@@ -12,6 +12,8 @@ import {
   listAgentsForSlackApp,
   type SlackApp,
 } from "@/lib/slack-apps";
+import { classifyMessage } from "@/lib/slack-router";
+import { getWorkspaceSecretPlaintext } from "@/lib/workspace";
 
 // Events API endpoint. Handles the one-time url_verification handshake
 // (pre-install, no bot token), then app_mention + message.im events.
@@ -91,6 +93,16 @@ function stripMentions(text: string): string {
   return text.replace(/^(?:\s*<@[^>]+>)+/, "").trim();
 }
 
+// The workspace's Anthropic key powers the NL router. Absent → no routing
+// (the caller falls back to the menu); never throws on a missing key.
+async function getAnthropicKey(workspaceId: string): Promise<string | null> {
+  try {
+    return await getWorkspaceSecretPlaintext(workspaceId, "anthropic_api_key");
+  } catch {
+    return null;
+  }
+}
+
 async function handleEvent(
   app: SlackApp,
   botToken: string,
@@ -122,16 +134,33 @@ async function handleEvent(
   const text = stripMentions(event.text ?? "");
   const { agentName } = parseCommand(text);
 
-  // Conversational opener ("Hi"), a bare mention, or a typo'd agent — none
-  // of these are an agent this bot can launch, and events carry no
-  // trigger_id so we can't open the picker modal. Reply with the menu
-  // instead of treating the first word as an agent and erroring.
   const scoped = await listAgentsForSlackApp(app);
   const matched = agentName
     ? scoped.find((a) => a.name === agentName)
     : undefined;
-  if (!matched) {
-    const text =
+
+  // Decide the dispatch text. An explicit `<agent> …` uses the raw text.
+  // Otherwise — a conversational message like "summarize last week's
+  // tickets" — ask the natural-language router to pick an agent + task.
+  let dispatchText: string | null = matched ? text : null;
+  if (!matched && scoped.length > 0 && text.trim()) {
+    const apiKey = await getAnthropicKey(app.workspaceId);
+    if (apiKey) {
+      const picked = await classifyMessage({
+        apiKey,
+        agents: scoped,
+        message: text,
+      });
+      if (picked.agentName) {
+        dispatchText = `${picked.agentName} ${picked.input}`.trim();
+      }
+    }
+  }
+
+  // Nothing resolved (greeting, bare mention, or the router declined) —
+  // events carry no trigger_id so we can't open the picker; show the menu.
+  if (!dispatchText) {
+    const reply =
       scoped.length === 0
         ? "No agents are assigned to this bot yet. An admin can scope it in TAS → Settings → Slack apps: give the bot one or more labels, then add a matching `labels:` line to an agent."
         : `Tell me which agent to run, e.g. \`${scoped[0].name} do the thing\`. I can launch:\n${scoped
@@ -140,7 +169,7 @@ async function handleEvent(
     await postMessage(botToken, {
       channel,
       thread_ts: threadTs ?? undefined,
-      text,
+      text: reply,
     });
     return;
   }
@@ -149,7 +178,7 @@ async function handleEvent(
     app,
     botToken,
     slackUserId: event.user,
-    text,
+    text: dispatchText,
     channel,
     threadTs,
   });
