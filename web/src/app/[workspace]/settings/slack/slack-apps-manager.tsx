@@ -46,6 +46,14 @@ function manifestJson(app: SlackApp, origin: string): string {
             should_escape: false,
           },
         ],
+        shortcuts: [
+          {
+            name: "Run agent on this message",
+            type: "message",
+            callback_id: "tas_run_on_message",
+            description: "Launch a TAS agent with this message as its input",
+          },
+        ],
       },
       oauth_config: {
         redirect_urls: [`${base}/callback`],

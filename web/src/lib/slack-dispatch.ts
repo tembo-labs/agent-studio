@@ -39,14 +39,21 @@ export function parseCommand(text: string): {
 // the run's reply lands where the command was invoked.
 export const PICKER_CALLBACK_ID = "tas_agent_picker";
 
+// Message shortcut ("Run agent on this message") — defined in the manifest,
+// handled by the interactivity route, which opens the picker prefilled with
+// the message text.
+export const MESSAGE_SHORTCUT_CALLBACK_ID = "tas_run_on_message";
+
 /**
  * A modal listing the app's scoped agents (static_select) + a free-text
  * input. Opened when a slash command / mention names no (or an unknown)
- * agent. `scoped` must be non-empty.
+ * agent, or from the message shortcut (with the message text prefilled).
+ * `scoped` must be non-empty.
  */
 export function buildPickerView(
   scoped: { name: string; description?: string }[],
   privateMetadata: { channel: string; threadTs: string | null },
+  initialInput?: string,
 ): Record<string, unknown> {
   return {
     type: "modal",
@@ -82,6 +89,7 @@ export function buildPickerView(
           type: "plain_text_input",
           action_id: "input",
           multiline: true,
+          ...(initialInput ? { initial_value: initialInput.slice(0, 3000) } : {}),
           placeholder: {
             type: "plain_text",
             text: "What should it do?",
