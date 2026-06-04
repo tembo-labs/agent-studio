@@ -73,8 +73,8 @@ export default async function ComposioSettingsPage({
             workspaceSlug={workspace.slug}
             kind="composio_webhook_secret"
             label="Composio webhook secret"
-            placeholder="whsec_…"
-            maskedPrefix="whsec_"
+            placeholder="Paste your Composio webhook secret"
+            maskedPrefix=""
             preview={
               composioWebhookSecretPreview
                 ? {
