@@ -77,24 +77,33 @@ export function SlackAppsManager({
     <div className="flex flex-col gap-8">
       <Section
         title="Slack apps"
-        description="A TAS-managed Slack bot that launches a label-scoped subset of this workspace's agents (slash command + picker). Create one bot per team — e.g. sales and support."
+        description="TAS-managed Slack bots that launch a label-scoped subset of this workspace's agents (slash command + picker). Run one bot per team — e.g. a sales bot and a support bot."
+      >
+        {apps.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {apps.map((app) => (
+              <AppCard
+                key={app.id}
+                app={app}
+                origin={origin}
+                workspaceSlug={workspaceSlug}
+                members={members}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-foreground-muted rounded-lg border border-dashed border-[var(--color-border)] px-3 py-6 text-center text-sm">
+            No Slack apps yet. Create one below.
+          </p>
+        )}
+      </Section>
+
+      <Section
+        title="Create a Slack app"
+        description="Each app is its own Slack bot with its own identity, install, and agent scope. Name it for the team it serves, pick a default owner, and list the agent labels it may launch."
       >
         <CreateForm workspaceSlug={workspaceSlug} members={members} />
       </Section>
-
-      {apps.length > 0 && (
-        <div className="flex flex-col gap-6">
-          {apps.map((app) => (
-            <AppCard
-              key={app.id}
-              app={app}
-              origin={origin}
-              workspaceSlug={workspaceSlug}
-              members={members}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -192,6 +201,9 @@ function AppCard({
   const [state, action, pending] = useActionState(updateSlackAppAction, INITIAL);
   useActionToast(state);
   const [showManifest, setShowManifest] = useState(false);
+  // Apps still being set up open expanded (they need attention); installed
+  // apps collapse to a compact row, expandable to edit.
+  const [expanded, setExpanded] = useState(app.status !== "installed");
   const base = `${origin}/api/slack/${app.id}`;
   const credsSet =
     app.hasSigningSecret && app.hasClientSecret && Boolean(app.clientId);
@@ -205,24 +217,48 @@ function AppCard({
   return (
     <div className="border-border bg-surface flex flex-col gap-4 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-foreground font-medium">{app.name}</span>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="group flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <span className="text-foreground-muted text-xs" aria-hidden>
+            {expanded ? "▾" : "▸"}
+          </span>
+          <span className="text-foreground group-hover:underline font-medium">
+            {app.name}
+          </span>
           <Badge variant={statusVariant} size="small">
             {app.status}
           </Badge>
+          <span className="text-foreground-muted truncate text-sm">
+            {app.agentLabels.length > 0
+              ? app.agentLabels.join(", ")
+              : "no labels"}
+          </span>
+        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          {!expanded && app.status !== "installed" && (
+            <span className="text-[var(--color-sentiment-caution)] text-sm">
+              Finish setup
+            </span>
+          )}
+          <form action={deleteSlackAppAction}>
+            <input type="hidden" name="workspace" value={workspaceSlug} />
+            <input type="hidden" name="id" value={app.id} />
+            <button
+              type="submit"
+              className="text-foreground-weak hover:text-sentiment-negative text-sm"
+            >
+              Delete
+            </button>
+          </form>
         </div>
-        <form action={deleteSlackAppAction}>
-          <input type="hidden" name="workspace" value={workspaceSlug} />
-          <input type="hidden" name="id" value={app.id} />
-          <button
-            type="submit"
-            className="text-foreground-weak hover:text-sentiment-negative text-sm"
-          >
-            Delete
-          </button>
-        </form>
       </div>
 
+      {expanded && (
+        <>
       {app.status !== "installed" && (
         <ol className="flex list-none flex-col gap-2 rounded-lg border border-[var(--color-border-weak)] bg-[var(--color-surface-secondary)] p-3 text-sm">
           <li className="text-foreground font-medium">Finish setup</li>
@@ -361,6 +397,8 @@ function AppCard({
           )}
         </div>
       </form>
+        </>
+      )}
     </div>
   );
 }
