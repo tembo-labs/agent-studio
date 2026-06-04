@@ -29,9 +29,18 @@ const INITIAL: RunNowFormState = {};
 type Props = {
   workspaceSlug: string;
   agentName: string;
+  /** Provided for workspace admins → a "Run as" picker. Members run as
+   *  themselves and don't get this. */
+  members?: { userId: string; name: string | null; email: string }[];
+  currentUserId: string;
 };
 
-export function RunNowButton({ workspaceSlug, agentName }: Props) {
+export function RunNowButton({
+  workspaceSlug,
+  agentName,
+  members,
+  currentUserId,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(runNowAction, INITIAL);
   useActionToast(state);
@@ -39,6 +48,8 @@ export function RunNowButton({ workspaceSlug, agentName }: Props) {
   // after each submission, including the returned-error path. Reset
   // when the dialog closes so reopening starts fresh.
   const [userMessage, setUserMessage] = useState("");
+  const [runAs, setRunAs] = useState(currentUserId);
+  const showRunAs = members !== undefined && members.length > 1;
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -46,7 +57,10 @@ export function RunNowButton({ workspaceSlug, agentName }: Props) {
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
-          if (!next) setUserMessage("");
+          if (!next) {
+            setUserMessage("");
+            setRunAs(currentUserId);
+          }
         }}
       >
         <AlertDialogTrigger asChild>
@@ -66,6 +80,34 @@ export function RunNowButton({ workspaceSlug, agentName }: Props) {
           <form action={formAction} className="flex flex-col gap-3">
             <input type="hidden" name="workspace" value={workspaceSlug} />
             <input type="hidden" name="agent" value={agentName} />
+            {showRunAs && (
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="run-as"
+                  className="text-foreground-weak text-sm"
+                >
+                  Run as
+                </label>
+                <select
+                  id="run-as"
+                  name="run_as"
+                  value={runAs}
+                  onChange={(e) => setRunAs(e.target.value)}
+                  disabled={pending}
+                  className="bg-input text-foreground hover:bg-input-hover focus:bg-input-active focus-visible:shadow-focus-ring disabled:bg-input-disabled rounded-lg px-3 py-2 text-sm leading-6 shadow-[0_0_0_1px_var(--color-border)] transition-[background-color,box-shadow,color] duration-150 focus:outline-none"
+                >
+                  {members!.map((m) => (
+                    <option key={m.userId} value={m.userId}>
+                      {(m.name ?? m.email) +
+                        (m.userId === currentUserId ? " (you)" : "")}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-foreground-muted text-sm">
+                  The run uses this member&apos;s connections.
+                </p>
+              </div>
+            )}
             <textarea
               name="user_message"
               rows={5}

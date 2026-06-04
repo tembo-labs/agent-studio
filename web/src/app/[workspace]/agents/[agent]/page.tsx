@@ -31,6 +31,7 @@ import {
   getWorkspaceRole,
   getWorkspaceSecretPreview,
   isTemboConfigured,
+  listWorkspaceMembers,
 } from "@/lib/workspace";
 
 import { AgentDashboard } from "./agent-dashboard";
@@ -92,6 +93,16 @@ export default async function AgentDetailPage({
     isTemboConfigured(workspace.id),
   ]);
   const canEdit = meetsMinRole(currentUserRole, "operator");
+  // Admins get a "Run as" picker in the Run-now dialog so a manual run
+  // can use another member's connections.
+  const runAsMembers =
+    currentUserRole === "workspace_admin"
+      ? (await listWorkspaceMembers(workspace.id)).map((m) => ({
+          userId: m.userId,
+          name: m.name,
+          email: m.email,
+        }))
+      : undefined;
 
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
 
@@ -148,6 +159,8 @@ export default async function AgentDetailPage({
               <RunNowButton
                 workspaceSlug={workspace.slug}
                 agentName={canonicalName}
+                members={runAsMembers}
+                currentUserId={session.user.id}
               />
             )}
           </div>

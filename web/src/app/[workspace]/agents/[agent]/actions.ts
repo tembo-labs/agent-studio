@@ -27,6 +27,7 @@ import {
   type DeleteAgentError,
 } from "@/lib/workspace-agents";
 import {
+  getWorkspaceRole,
   getWorkspaceSecretPlaintext,
   getWorkspaceSecretPreview,
 } from "@/lib/workspace";
@@ -102,13 +103,29 @@ export async function runNowAction(
   // Optional user input. Empty preserves the prior behavior (a "no
   // input" run that just exercises the agent's instructions).
   const userMessage = String(formData.get("user_message") ?? "");
+  const runAsRaw = String(formData.get("run_as") ?? "").trim();
 
   const auth = await authorizeWorkspace(slug, "operator");
   if (!auth.ok) {
     if (auth.reason === "denied") return { error: DENIED_MESSAGE };
     notFound();
   }
-  const { workspace, userId } = auth;
+  const { workspace, userId, role } = auth;
+
+  // Admins may run AS another member so the run executes against that
+  // member's connections (Composio / Native MCP). Everyone else runs as
+  // themselves.
+  let actingUserId = userId;
+  if (runAsRaw && runAsRaw !== userId) {
+    if (role !== "workspace_admin") {
+      return { error: "Only workspace admins can run as another member." };
+    }
+    const targetRole = await getWorkspaceRole(workspace.id, runAsRaw);
+    if (!targetRole) {
+      return { error: "That user isn't a member of this workspace." };
+    }
+    actingUserId = runAsRaw;
+  }
 
   // Pull the current agent definition off the repo. Both frameworks
   // are now passthrough — the runner gets the raw file bytes plus
@@ -140,7 +157,7 @@ export async function runNowAction(
   try {
     const res = await createRun({
       workspaceId: workspace.id,
-      userId,
+      userId: actingUserId,
       agentName: spec.name,
       agentPath: found.agent.path,
       model,
