@@ -6,8 +6,9 @@ import { getMcpProvider } from "@/lib/mcp-providers";
 
 // Per-member activity for the workspace dashboard's Team table:
 // connection count (active Composio + Native MCP), automations the
-// member owns ("Run as"), and runs they triggered in the last 30 days.
-// Also returns the connection labels and automation agent names so the
+// member owns ("Run as"), runs they triggered in the last 30 days, and
+// how many of those came in via a Slack bot. Also returns the connection
+// labels, automation agent names, and per-bot Slack counts so the
 // dashboard can show them on hover. Aggregated server-side so it's a
 // handful of queries, not N-per-member.
 
@@ -23,6 +24,10 @@ export type MemberActivity = {
   /** Distinct agent names this member owns automations for. */
   automationAgents: string[];
   runs30d: number;
+  /** Runs in the last 30 days that were launched from a Slack bot. */
+  slackRuns30d: number;
+  /** Per-bot breakdown of those Slack runs, e.g. "Sales bot (3)". */
+  slackBots: string[];
 };
 
 function slotLabel(label: string, name: string): string {
@@ -32,7 +37,7 @@ function slotLabel(label: string, name: string): string {
 export async function listMemberActivity(
   workspaceId: string,
 ): Promise<MemberActivity[]> {
-  const [members, composio, native, autos, runs] = await Promise.all([
+  const [members, composio, native, autos, runs, slack] = await Promise.all([
     db.query<{
       user_id: string;
       name: string | null;
@@ -67,6 +72,18 @@ export async function listMemberActivity(
         GROUP BY created_by`,
       [workspaceId],
     ),
+    // Slack-launched runs are exactly the runs with a slack_delivery row,
+    // attributed to the member they acted as (run.created_by). Broken out
+    // per bot so the hover can show which bots a member drove.
+    db.query<{ user_id: string; app_name: string; n: string }>(
+      `SELECT r.created_by AS user_id, a.name AS app_name, COUNT(*) AS n
+         FROM run r
+         JOIN slack_delivery d ON d.run_id = r.id
+         JOIN workspace_slack_app a ON a.id = d.slack_app_id
+        WHERE r.workspace_id = $1 AND r.created_at >= now() - interval '30 days'
+        GROUP BY r.created_by, a.name`,
+      [workspaceId],
+    ),
   ]);
 
   const connByUser = new Map<string, string[]>();
@@ -93,6 +110,17 @@ export async function listMemberActivity(
   }
   const runs30d = new Map(runs.rows.map((r) => [r.user_id, Number(r.n)]));
 
+  // Per user: total Slack runs + a "Bot (n)" label per bot.
+  const slackCount = new Map<string, number>();
+  const slackBots = new Map<string, string[]>();
+  for (const r of slack.rows) {
+    const n = Number(r.n);
+    slackCount.set(r.user_id, (slackCount.get(r.user_id) ?? 0) + n);
+    const arr = slackBots.get(r.user_id) ?? [];
+    arr.push(`${r.app_name} (${n})`);
+    slackBots.set(r.user_id, arr);
+  }
+
   const activity = members.rows.map((m) => {
     const labels = (connByUser.get(m.user_id) ?? []).sort((a, b) =>
       a.localeCompare(b),
@@ -110,6 +138,10 @@ export async function listMemberActivity(
       automations: autoCount.get(m.user_id) ?? 0,
       automationAgents: agents,
       runs30d: runs30d.get(m.user_id) ?? 0,
+      slackRuns30d: slackCount.get(m.user_id) ?? 0,
+      slackBots: (slackBots.get(m.user_id) ?? []).sort((a, b) =>
+        a.localeCompare(b),
+      ),
     };
   });
 

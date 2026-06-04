@@ -98,7 +98,7 @@ export default async function DashboardPage({
 
       <Section
         title="Team"
-        description="Connections, automations, and 30-day run activity per member. Hover a count for details."
+        description="Connections, automations, Slack-bot usage, and 30-day run activity per member. Hover a count for details."
       >
         <div className="border-border overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
@@ -107,6 +107,7 @@ export default async function DashboardPage({
                 <th className="px-3 py-2 text-left font-medium">Member</th>
                 <th className="px-3 py-2 text-right font-medium">Connections</th>
                 <th className="px-3 py-2 text-right font-medium">Automations</th>
+                <th className="px-3 py-2 text-right font-medium">Slack (30d)</th>
                 <th className="px-3 py-2 text-right font-medium">30d runs</th>
               </tr>
             </thead>
@@ -142,6 +143,13 @@ export default async function DashboardPage({
                       value={m.automations}
                       items={m.automationAgents}
                       empty="No automations"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-right align-middle">
+                    <CountCell
+                      value={m.slackRuns30d}
+                      items={m.slackBots}
+                      empty="No Slack runs"
                     />
                   </td>
                   <td className="text-foreground px-3 py-2 text-right align-middle font-mono">
