@@ -18,8 +18,9 @@ import {
   listWorkspaceTopFailingAgents30d,
   type RunListItem,
 } from "@/lib/runs-db";
+import { listMemberActivity } from "@/lib/member-stats";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug } from "@/lib/workspace";
+import { getWorkspaceBySlug, getWorkspaceRole } from "@/lib/workspace";
 
 import { WorkspaceDashboard } from "./workspace-dashboard";
 
@@ -58,6 +59,8 @@ export default async function DashboardPage({
     improvementCounts,
     recentImprovements,
     recentRuns,
+    memberActivity,
+    role,
   ] = await Promise.all([
     getWorkspaceStats30d(workspace.id),
     getWorkspaceDailyRunBands30d(workspace.id),
@@ -65,7 +68,10 @@ export default async function DashboardPage({
     countImprovementsSince(workspace.id, since),
     listImprovements(workspace.id, 10),
     listRunsForWorkspace(workspace.id, {}, { limit: 8 }),
+    listMemberActivity(workspace.id),
+    getWorkspaceRole(workspace.id, session.user.id),
   ]);
+  const isAdmin = role === "workspace_admin";
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
@@ -88,6 +94,64 @@ export default async function DashboardPage({
         topFailing={topFailing}
         workspaceSlug={workspace.slug}
       />
+
+      <Section
+        title="Team"
+        description="Connections, automations, and 30-day run activity per member. Hover a count for details."
+      >
+        <div className="border-border overflow-hidden rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Member</th>
+                <th className="px-3 py-2 text-right font-medium">Connections</th>
+                <th className="px-3 py-2 text-right font-medium">Automations</th>
+                <th className="px-3 py-2 text-right font-medium">30d runs</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--color-border-weak)]">
+              {memberActivity.map((m) => (
+                <tr
+                  key={m.userId}
+                  className="hover:bg-surface-secondary transition-colors"
+                >
+                  <td className="px-3 py-2 align-middle">
+                    {isAdmin ? (
+                      <Link
+                        href={`/${workspace.slug}/settings/members/${m.userId}`}
+                        className="text-foreground font-medium hover:underline"
+                      >
+                        {m.name ?? m.email}
+                      </Link>
+                    ) : (
+                      <span className="text-foreground font-medium">
+                        {m.name ?? m.email}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right align-middle">
+                    <CountCell
+                      value={m.connections}
+                      items={m.connectionLabels}
+                      empty="No connections"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-right align-middle">
+                    <CountCell
+                      value={m.automations}
+                      items={m.automationAgents}
+                      empty="No automations"
+                    />
+                  </td>
+                  <td className="text-foreground px-3 py-2 text-right align-middle font-mono">
+                    {m.runs30d.toLocaleString("en-US")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
 
       <Section
         title="Recent runs"
@@ -259,6 +323,34 @@ export default async function DashboardPage({
         </div>
       </Section>
     </div>
+  );
+}
+
+// Count with a hover (native title) listing the underlying items —
+// e.g. which toolkits are connected, or which agents have automations.
+function CountCell({
+  value,
+  items,
+  empty,
+}: {
+  value: number;
+  items: string[];
+  empty: string;
+}) {
+  if (value === 0) {
+    return (
+      <span title={empty} className="text-foreground-muted font-mono">
+        0
+      </span>
+    );
+  }
+  return (
+    <span
+      title={items.join("\n")}
+      className="text-foreground decoration-foreground-muted cursor-default font-mono underline decoration-dotted underline-offset-4"
+    >
+      {value}
+    </span>
   );
 }
 
