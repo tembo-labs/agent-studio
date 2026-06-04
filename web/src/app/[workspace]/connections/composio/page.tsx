@@ -7,6 +7,7 @@ import {
   type ComposioToolkit,
 } from "@/lib/composio";
 import { listConnectionsForUser } from "@/lib/composio-connections";
+import { resolveConnectionsView } from "@/lib/connections-view";
 import { listToolsForUser, type McpTool } from "@/lib/mcp-tools";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
@@ -41,12 +42,19 @@ export default async function ComposioConnectionsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
+  const requestedUser = typeof sp.user === "string" ? sp.user : undefined;
+  const view = await resolveConnectionsView(
+    workspace.id,
+    session.user.id,
+    requestedUser,
+  );
+
   const [composioPreview, myConnections, agentsListing, allTools] =
     await Promise.all([
       getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
-      listConnectionsForUser(workspace.id, session.user.id),
+      listConnectionsForUser(workspace.id, view.userId),
       listAgents(workspace.id),
-      listToolsForUser(workspace.id, session.user.id),
+      listToolsForUser(workspace.id, view.userId),
     ]);
 
   // Tool buckets keyed by `${source}:${provider}:${name}` so each
@@ -117,6 +125,18 @@ export default async function ComposioConnectionsPage({
 
   return (
     <>
+      {view.viewingOther && view.viewedMember && (
+        <div className="border-border bg-surface-secondary rounded-lg border px-3 py-2 text-sm">
+          <span className="text-foreground-weak">
+            Viewing{" "}
+            <span className="text-foreground font-medium">
+              {view.viewedMember.name ?? view.viewedMember.email}
+            </span>
+            &apos;s connections. You can rename and refresh them; connecting
+            and disconnecting must be done by that member.
+          </span>
+        </div>
+      )}
       {!composioPreview && (
         <div className="border-border bg-surface rounded-lg border px-3 py-2 text-sm">
           <span className="text-foreground-weak">
@@ -140,6 +160,7 @@ export default async function ComposioConnectionsPage({
         composioEnabled={Boolean(composioPreview)}
         banner={composioBanner}
         toolsBySlot={toolsBySlot}
+        viewingOther={view.viewingOther}
       />
     </>
   );

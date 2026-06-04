@@ -50,6 +50,10 @@ type Props = {
     result: "ok" | "error";
     detail?: string;
   };
+  /** Admin viewing another member: rename + refresh only — hide
+   *  Connect/Reconnect, Disconnect, placeholder "Connect" rows, and the
+   *  "Add another" form. */
+  viewingOther?: boolean;
 };
 
 export function NativeMcpConnectionsSection({
@@ -57,6 +61,7 @@ export function NativeMcpConnectionsSection({
   providers,
   catalog,
   banner,
+  viewingOther = false,
 }: Props) {
   return (
     <Section
@@ -92,14 +97,17 @@ export function NativeMcpConnectionsSection({
               provider={provider}
               connection={connection}
               tools={tools}
+              viewingOther={viewingOther}
             />
           ))}
         </ul>
 
-        <AddNativeMcpConnectionForm
-          workspaceSlug={workspaceSlug}
-          catalog={catalog}
-        />
+        {!viewingOther && (
+          <AddNativeMcpConnectionForm
+            workspaceSlug={workspaceSlug}
+            catalog={catalog}
+          />
+        )}
       </div>
     </Section>
   );
@@ -110,13 +118,18 @@ function ProviderRow({
   provider,
   connection,
   tools,
+  viewingOther = false,
 }: {
   workspaceSlug: string;
   provider: McpProvider;
   connection: WorkspaceConnection | null;
   tools: McpTool[];
+  viewingOther?: boolean;
 }) {
   if (!connection) {
+    // Placeholder "Connect" rows aren't actionable for an admin viewing
+    // someone else (OAuth must be the member) — drop them entirely.
+    if (viewingOther) return null;
     const authorizeHref = `/api/connections/native/${provider.slug}/authorize?workspace=${encodeURIComponent(
       workspaceSlug,
     )}`;
@@ -215,29 +228,33 @@ function ProviderRow({
           connectionId={connection.id}
           label={toolCount > 0 ? "Refresh tools" : "Refresh"}
         />
-        <Link
-          // Same authorize endpoint the first-time Connect uses —
-          // re-running discovery + DCR + PKCE replaces the row's
-          // tokens via the callback's saveNativeConnection upsert.
-          // Needed for Native MCP because tokens expire (Attio's
-          // are hours), and reconnecting beats waiting for the
-          // next run to fail with a 401.
-          href={`/api/connections/native/${provider.slug}/authorize?workspace=${encodeURIComponent(
-            workspaceSlug,
-          )}${connection.name !== "default" ? `&name=${encodeURIComponent(connection.name)}` : ""}`}
-          className="text-foreground hover:text-foreground-title text-sm font-medium hover:underline"
-        >
-          Reconnect
-        </Link>
+        {!viewingOther && (
+          <Link
+            // Same authorize endpoint the first-time Connect uses —
+            // re-running discovery + DCR + PKCE replaces the row's
+            // tokens via the callback's saveNativeConnection upsert.
+            // Needed for Native MCP because tokens expire (Attio's
+            // are hours), and reconnecting beats waiting for the
+            // next run to fail with a 401.
+            href={`/api/connections/native/${provider.slug}/authorize?workspace=${encodeURIComponent(
+              workspaceSlug,
+            )}${connection.name !== "default" ? `&name=${encodeURIComponent(connection.name)}` : ""}`}
+            className="text-foreground hover:text-foreground-title text-sm font-medium hover:underline"
+          >
+            Reconnect
+          </Link>
+        )}
         <RenameNativeMcpConnectionForm
           workspaceSlug={workspaceSlug}
           connectionId={connection.id}
           currentName={connection.name}
         />
-        <DisconnectNativeMcpConnectionForm
-          workspaceSlug={workspaceSlug}
-          connectionId={connection.id}
-        />
+        {!viewingOther && (
+          <DisconnectNativeMcpConnectionForm
+            workspaceSlug={workspaceSlug}
+            connectionId={connection.id}
+          />
+        )}
       </div>
     </li>
   );

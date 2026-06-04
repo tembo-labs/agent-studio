@@ -39,6 +39,10 @@ type Props = {
   /** Cached tool lists keyed by `${source}:${provider}:${connectionName}`.
    *  Connections page builds this once; we lift the per-row slice here. */
   toolsBySlot?: Map<string, McpTool[]>;
+  /** Admin viewing another member: allow rename + refresh only — hide
+   *  Connect/Reconnect, Disconnect, and the "Add another" form (those
+   *  act as the session user, not the member being viewed). */
+  viewingOther?: boolean;
 };
 
 type SlotKey = string; // `${toolkit}:${name}`
@@ -51,6 +55,7 @@ export function ComposioConnectionsSection({
   composioEnabled,
   banner,
   toolsBySlot,
+  viewingOther = false,
 }: Props) {
   // Index of slot → connection the current user has.
   const ownedSlots = new Map<SlotKey, WorkspaceComposioConnection>();
@@ -161,6 +166,7 @@ export function ComposioConnectionsSection({
                 workspaceSlug={workspaceSlug}
                 connection={owned}
                 enabled={composioEnabled}
+                viewingOther={viewingOther}
                 tools={
                   owned
                     ? toolsBySlot?.get(
@@ -173,7 +179,7 @@ export function ComposioConnectionsSection({
           })
         )}
 
-        {composioEnabled && (
+        {composioEnabled && !viewingOther && (
           <AddAnotherConnectionForm
             workspaceSlug={workspaceSlug}
             catalog={catalog}
@@ -266,6 +272,7 @@ function ComposioConnectionRow({
   connection,
   enabled,
   tools,
+  viewingOther = false,
 }: {
   toolkit: string;
   name: string;
@@ -274,6 +281,7 @@ function ComposioConnectionRow({
   connection: WorkspaceComposioConnection | undefined;
   enabled: boolean;
   tools: McpTool[];
+  viewingOther?: boolean;
 }) {
   const params = new URLSearchParams({
     workspace: workspaceSlug,
@@ -371,7 +379,7 @@ function ComposioConnectionRow({
             label={toolCount > 0 ? "Refresh tools" : "Refresh"}
           />
         )}
-        {enabled && (
+        {enabled && !viewingOther && (
           <Link
             href={authorizeHref}
             className="text-foreground hover:text-foreground-title text-sm font-medium hover:underline"
@@ -386,7 +394,7 @@ function ComposioConnectionRow({
             currentName={connection.name}
           />
         )}
-        {connection && (
+        {connection && !viewingOther && (
           <DisconnectComposioConnectionForm
             workspaceSlug={workspaceSlug}
             connectionId={connection.id}

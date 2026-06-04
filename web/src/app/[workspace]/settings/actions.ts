@@ -504,8 +504,14 @@ export async function renameComposioConnectionAction(
 
   const auth = await authorizeWorkspace(slug, "operator");
   if (auth.denied) return { error: DENIED_MESSAGE };
-  const { workspace, userId } = auth;
+  const { workspace, userId, role } = auth;
   const existing = await getComposioConnectionById(workspace.id, connectionId);
+  if (!existing) return { error: "Connection not found." };
+  // Operators may only rename their own connections; workspace admins
+  // may rename any member's (matches the native-MCP rename gate).
+  if (role !== "workspace_admin" && existing.userId !== userId) {
+    return { error: DENIED_MESSAGE };
+  }
   const result = await renameComposioConnection(
     workspace.id,
     connectionId,
