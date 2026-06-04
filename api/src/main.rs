@@ -13,6 +13,7 @@ mod native_oauth;
 mod pricing;
 mod routes;
 mod runs;
+mod slack_mrkdwn;
 mod workspace;
 
 #[derive(Clone)]

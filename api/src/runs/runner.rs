@@ -102,7 +102,8 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
             let body = if outcome.output.trim().is_empty() {
                 ":white_check_mark: Done (no output).".to_string()
             } else {
-                outcome.output.clone()
+                // Agent output is Markdown; Slack renders mrkdwn, so convert.
+                crate::slack_mrkdwn::to_mrkdwn(&outcome.output)
             };
             deliver_slack_result(state, ctx.run_id, &body).await;
         }
