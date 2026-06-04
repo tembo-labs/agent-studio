@@ -86,6 +86,21 @@ fn render_table(block: &[&str]) -> Option<Vec<String>> {
     Some(out)
 }
 
+/// Drop the leading "user> …" transcript echo that render_output prepends.
+/// In Slack the user already sees their own message in the thread, so the
+/// echo is redundant noise; strip through the blank line that ends it.
+pub fn strip_user_echo(s: &str) -> &str {
+    if let Some(rest) = s.strip_prefix("user> ") {
+        if let Some(idx) = rest.find("\n\n") {
+            return &rest[idx + 2..];
+        }
+        if let Some(nl) = rest.find('\n') {
+            return &rest[nl + 1..];
+        }
+    }
+    s
+}
+
 /// Convert Markdown to Slack mrkdwn.
 pub fn to_mrkdwn(input: &str) -> String {
     let lines: Vec<&str> = input.lines().collect();
@@ -172,5 +187,16 @@ mod tests {
     #[test]
     fn leaves_plain_text_alone() {
         assert_eq!(to_mrkdwn("just a sentence."), "just a sentence.");
+    }
+
+    #[test]
+    fn strips_the_user_echo() {
+        use super::strip_user_echo;
+        assert_eq!(
+            strip_user_echo("user> do we have prospects?\n\nYes, we do."),
+            "Yes, we do.",
+        );
+        // No echo → untouched.
+        assert_eq!(strip_user_echo("Just the reply."), "Just the reply.");
     }
 }
