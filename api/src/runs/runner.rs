@@ -99,6 +99,12 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
             {
                 tracing::error!(run_id = %ctx.run_id, ?e, "mark_succeeded failed");
             }
+            let body = if outcome.output.trim().is_empty() {
+                ":white_check_mark: Done (no output).".to_string()
+            } else {
+                outcome.output.clone()
+            };
+            deliver_slack_result(state, ctx.run_id, &body).await;
         }
         Err(e) => {
             let reason = format!("{e:#}");
@@ -106,6 +112,12 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
             if let Err(db_err) = mark_failed(state, ctx.run_id, &reason).await {
                 tracing::error!(run_id = %ctx.run_id, ?db_err, "mark_failed failed");
             }
+            deliver_slack_result(
+                state,
+                ctx.run_id,
+                &format!(":warning: Run failed: {reason}"),
+            )
+            .await;
         }
     }
 }
@@ -546,4 +558,98 @@ async fn mark_failed(state: &AppState, run_id: Uuid, reason: &str) -> anyhow::Re
     .execute(&state.db)
     .await?;
     Ok(())
+}
+
+// Slack's chat.postMessage caps text at 40k chars; keep replies readable
+// and well under the limit.
+const SLACK_TEXT_LIMIT: usize = 3500;
+
+#[derive(sqlx::FromRow)]
+struct SlackDeliveryRow {
+    channel: String,
+    thread_ts: Option<String>,
+    bot_token: Vec<u8>,
+}
+
+/// Post a Slack-dispatched run's result back into the thread it came from.
+/// Best-effort: no delivery row (the common case — most runs aren't from
+/// Slack), an already-delivered row, an uninstalled app, or a Slack API
+/// hiccup are all logged and swallowed so the run itself is never affected.
+async fn deliver_slack_result(state: &AppState, run_id: Uuid, body: &str) {
+    let row = match sqlx::query_as::<_, SlackDeliveryRow>(
+        "SELECT d.channel, d.thread_ts, a.bot_token \
+           FROM slack_delivery d \
+           JOIN workspace_slack_app a ON a.id = d.slack_app_id \
+          WHERE d.run_id = $1 AND d.delivered_at IS NULL AND a.bot_token IS NOT NULL",
+    )
+    .bind(run_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(r)) => r,
+        Ok(None) => return,
+        Err(e) => {
+            tracing::warn!(run_id = %run_id, ?e, "slack delivery lookup failed");
+            return;
+        }
+    };
+
+    let token = match state.encryption_key.decrypt(&row.bot_token) {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!(run_id = %run_id, ?e, "slack bot token decrypt failed");
+            return;
+        }
+    };
+
+    let text: String = if body.chars().count() > SLACK_TEXT_LIMIT {
+        let truncated: String = body.chars().take(SLACK_TEXT_LIMIT).collect();
+        format!("{truncated}\n…(truncated)")
+    } else {
+        body.to_string()
+    };
+
+    let mut payload = serde_json::json!({ "channel": row.channel, "text": text });
+    if let Some(ts) = &row.thread_ts {
+        payload["thread_ts"] = serde_json::Value::String(ts.clone());
+    }
+
+    let resp = state
+        .http
+        .post("https://slack.com/api/chat.postMessage")
+        .bearer_auth(&token)
+        .json(&payload)
+        .send()
+        .await;
+    match resp {
+        Ok(r) => {
+            // Slack returns 200 with {ok:false, error} on logical failures.
+            match r.json::<serde_json::Value>().await {
+                Ok(j) if j.get("ok").and_then(|v| v.as_bool()) == Some(true) => {}
+                Ok(j) => {
+                    tracing::warn!(
+                        run_id = %run_id,
+                        error = ?j.get("error"),
+                        "slack chat.postMessage returned not-ok"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(run_id = %run_id, ?e, "slack response parse failed");
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!(run_id = %run_id, ?e, "slack chat.postMessage send failed");
+            return;
+        }
+    }
+
+    if let Err(e) =
+        sqlx::query("UPDATE slack_delivery SET delivered_at = now() WHERE run_id = $1")
+            .bind(run_id)
+            .execute(&state.db)
+            .await
+    {
+        tracing::warn!(run_id = %run_id, ?e, "slack delivery mark failed");
+    }
 }
