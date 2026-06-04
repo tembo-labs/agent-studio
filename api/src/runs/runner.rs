@@ -644,11 +644,10 @@ async fn deliver_slack_result(state: &AppState, run_id: Uuid, body: &str) {
         }
     }
 
-    if let Err(e) =
-        sqlx::query("UPDATE slack_delivery SET delivered_at = now() WHERE run_id = $1")
-            .bind(run_id)
-            .execute(&state.db)
-            .await
+    if let Err(e) = sqlx::query("UPDATE slack_delivery SET delivered_at = now() WHERE run_id = $1")
+        .bind(run_id)
+        .execute(&state.db)
+        .await
     {
         tracing::warn!(run_id = %run_id, ?e, "slack delivery mark failed");
     }
