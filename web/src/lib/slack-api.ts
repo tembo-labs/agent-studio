@@ -70,6 +70,19 @@ export async function postResponseUrl(
   }
 }
 
+/** A web permalink to a specific message, for deep-linking from the UI. */
+export async function getPermalink(
+  token: string,
+  channel: string,
+  messageTs: string,
+): Promise<string | null> {
+  const res = await call<{ permalink?: string }>("chat.getPermalink", token, {
+    channel,
+    message_ts: messageTs,
+  });
+  return res.ok ? (res.permalink ?? null) : null;
+}
+
 /** Publish the bot's App Home (the "Home" tab) for a given user. */
 export function publishHomeView(
   token: string,

@@ -264,16 +264,25 @@ export async function recordSlackDelivery(args: {
   channel: string;
   threadTs: string | null;
   slackUserId: string | null;
+  permalink: string | null;
 }): Promise<void> {
   await db.query(
-    `INSERT INTO slack_delivery (run_id, slack_app_id, channel, thread_ts, slack_user_id)
-       VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO slack_delivery (run_id, slack_app_id, channel, thread_ts, slack_user_id, permalink)
+       VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (run_id) DO UPDATE
        SET slack_app_id = EXCLUDED.slack_app_id,
            channel = EXCLUDED.channel,
            thread_ts = EXCLUDED.thread_ts,
-           slack_user_id = EXCLUDED.slack_user_id`,
-    [args.runId, args.slackAppId, args.channel, args.threadTs, args.slackUserId],
+           slack_user_id = EXCLUDED.slack_user_id,
+           permalink = EXCLUDED.permalink`,
+    [
+      args.runId,
+      args.slackAppId,
+      args.channel,
+      args.threadTs,
+      args.slackUserId,
+      args.permalink,
+    ],
   );
 }
 

@@ -3,7 +3,7 @@ import "server-only";
 import { detectFormat } from "@/lib/agent-format";
 import { writeAuditEvent } from "@/lib/audit-db";
 import { createRun } from "@/lib/runs-api";
-import { getUserEmail } from "@/lib/slack-api";
+import { getPermalink, getUserEmail } from "@/lib/slack-api";
 import {
   countRecentSlackDispatches,
   listAgentsForSlackApp,
@@ -287,12 +287,18 @@ export async function dispatchToAgent(args: {
       specFormat: format,
       trigger: "event",
     });
+    // Deep-link target for the runs UI: the conversation that kicked this
+    // off. Best-effort — a missing permalink just means no link in the UI.
+    const permalink = threadTs
+      ? await getPermalink(botToken, channel, threadTs)
+      : null;
     await recordSlackDelivery({
       runId,
       slackAppId: app.id,
       channel,
       threadTs,
       slackUserId,
+      permalink,
     });
     // Provenance: who launched what, via which bot. Best-effort — the run
     // already exists, so an audit hiccup must not fail the dispatch.

@@ -28,5 +28,8 @@ export function toLoaded(r: RunListItem): LoadedRun {
     userMessagePreview: r.userMessagePreview,
     errorMessagePreview: r.errorMessagePreview,
     costUsd: r.costUsd,
+    createdByName: r.createdByName,
+    createdByEmail: r.createdByEmail,
+    slack: r.slack,
   };
 }

@@ -190,6 +190,19 @@ export type RunListItem = {
   // report token usage (cargo-ai today), or models not in the
   // pricing table.
   costUsd: number | null;
+  // Who the run acted as (run.created_by), resolved for display. Null
+  // when the user row was deleted.
+  createdByName: string | null;
+  createdByEmail: string | null;
+  // Present when the run was instigated from a Slack bot (a slack_delivery
+  // row exists). Lets the runs UI show "Slack · <bot>" and deep-link back
+  // to the originating conversation.
+  slack: {
+    appName: string;
+    slackUserId: string | null;
+    permalink: string | null;
+    channel: string;
+  } | null;
 };
 
 const LIST_RUNS_MAX_PAGE = 50;
@@ -204,23 +217,26 @@ export async function listRunsForWorkspace(
   // Track each filter as a SQL fragment that references positional
   // placeholders we push into `params`. We build the WHERE in order
   // so the query is deterministic + readable in pg logs.
-  const where: string[] = [`workspace_id = $1`];
+  // Columns are qualified with the `run` alias `r` because the query now
+  // LEFT JOINs slack_delivery / user / workspace_slack_app, several of
+  // which carry same-named columns (created_at, channel, name).
+  const where: string[] = [`r.workspace_id = $1`];
 
   if (filters.statuses && filters.statuses.length > 0) {
     params.push(filters.statuses);
-    where.push(`status = ANY($${params.length}::text[])`);
+    where.push(`r.status = ANY($${params.length}::text[])`);
   }
   if (filters.agentName && filters.agentName.trim()) {
     params.push(filters.agentName.trim());
-    where.push(`agent_name = $${params.length}`);
+    where.push(`r.agent_name = $${params.length}`);
   }
   if (filters.triggers && filters.triggers.length > 0) {
     params.push(filters.triggers);
-    where.push(`trigger = ANY($${params.length}::text[])`);
+    where.push(`r.trigger = ANY($${params.length}::text[])`);
   }
   if (filters.createdBy && filters.createdBy.trim()) {
     params.push(filters.createdBy.trim());
-    where.push(`created_by = $${params.length}`);
+    where.push(`r.created_by = $${params.length}`);
   }
   if (filters.search && filters.search.trim()) {
     // Single placeholder reused across the OR; ILIKE on user_message,
@@ -230,12 +246,12 @@ export async function listRunsForWorkspace(
     // input enforces that.
     params.push(`%${filters.search.trim()}%`);
     where.push(
-      `(user_message ILIKE $${params.length} OR output ILIKE $${params.length} OR error_message ILIKE $${params.length})`,
+      `(r.user_message ILIKE $${params.length} OR r.output ILIKE $${params.length} OR r.error_message ILIKE $${params.length})`,
     );
   }
   if (options.before) {
     params.push(options.before);
-    where.push(`created_at < $${params.length}`);
+    where.push(`r.created_at < $${params.length}`);
   }
 
   params.push(limit);
@@ -254,13 +270,25 @@ export async function listRunsForWorkspace(
     // pg returns NUMERIC as a string by default to preserve precision.
     // Parse on the way out.
     cost_usd: string | null;
+    created_by_name: string | null;
+    created_by_email: string | null;
+    slack_app_name: string | null;
+    slack_user_id: string | null;
+    slack_permalink: string | null;
+    slack_channel: string | null;
   }>(
-    `SELECT id, agent_name, status, trigger, automation_id,
-            created_at, started_at, completed_at, user_message,
-            error_message, cost_usd
-       FROM run
+    `SELECT r.id, r.agent_name, r.status, r.trigger, r.automation_id,
+            r.created_at, r.started_at, r.completed_at, r.user_message,
+            r.error_message, r.cost_usd,
+            u.name AS created_by_name, u.email AS created_by_email,
+            sa.name AS slack_app_name, sd.slack_user_id,
+            sd.permalink AS slack_permalink, sd.channel AS slack_channel
+       FROM run r
+       LEFT JOIN "user" u ON u.id = r.created_by
+       LEFT JOIN slack_delivery sd ON sd.run_id = r.id
+       LEFT JOIN workspace_slack_app sa ON sa.id = sd.slack_app_id
       WHERE ${where.join(" AND ")}
-      ORDER BY created_at DESC
+      ORDER BY r.created_at DESC
       LIMIT $${params.length}`,
     params,
   );
@@ -280,6 +308,16 @@ export async function listRunsForWorkspace(
         ? r.error_message.slice(0, 240)
         : null,
     costUsd: r.cost_usd === null ? null : Number(r.cost_usd),
+    createdByName: r.created_by_name,
+    createdByEmail: r.created_by_email,
+    slack: r.slack_channel
+      ? {
+          appName: r.slack_app_name ?? "Slack",
+          slackUserId: r.slack_user_id,
+          permalink: r.slack_permalink,
+          channel: r.slack_channel,
+        }
+      : null,
   }));
 }
 

@@ -260,7 +260,7 @@ export function RunsList({
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Status</th>
                 <th className="px-3 py-2 text-left font-medium">Agent</th>
-                <th className="px-3 py-2 text-left font-medium">Trigger</th>
+                <th className="px-3 py-2 text-left font-medium">Source</th>
                 <th className="px-3 py-2 text-left font-medium">Input</th>
                 <th className="px-3 py-2 text-left font-medium">Queued</th>
                 <th className="px-3 py-2 text-left font-medium">Duration</th>
@@ -338,17 +338,7 @@ function RunRow({
         </Link>
       </td>
       <td className="px-3 py-2 align-top">
-        {run.trigger === "schedule" ? (
-          <Badge variant="blue" size="small">
-            Scheduled
-          </Badge>
-        ) : run.trigger === "event" ? (
-          <Badge variant="purple" size="small">
-            Event
-          </Badge>
-        ) : (
-          <span className="text-foreground-weak text-sm">Manual</span>
-        )}
+        <SourceCell run={run} />
       </td>
       <td className="text-foreground max-w-md px-3 py-2 align-top text-sm">
         {run.userMessagePreview ? (
@@ -403,6 +393,51 @@ function RunRow({
         )}
       </td>
     </tr>
+  );
+}
+
+// Source = how the run was instigated + who it acted as, plus a deep link
+// back to the Slack conversation when one started it. Slack runs are
+// trigger=event *with* a slack_delivery row; other events are webhooks.
+function SourceCell({ run }: { run: LoadedRun }) {
+  const who = run.createdByName ?? run.createdByEmail ?? null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      {run.slack ? (
+        <span className="flex items-center gap-1.5">
+          <Badge variant="green" size="small">
+            Slack
+          </Badge>
+          <span className="text-foreground-weak text-sm">{run.slack.appName}</span>
+        </span>
+      ) : run.trigger === "schedule" ? (
+        <Badge variant="blue" size="small">
+          Scheduled
+        </Badge>
+      ) : run.trigger === "event" ? (
+        <Badge variant="purple" size="small">
+          Event
+        </Badge>
+      ) : (
+        <span className="text-foreground-weak text-sm">Manual</span>
+      )}
+      {who && (
+        <span className="text-foreground-muted truncate text-sm" title={who}>
+          {who}
+        </span>
+      )}
+      {run.slack?.permalink && (
+        <a
+          href={run.slack.permalink}
+          target="_blank"
+          rel="noreferrer noopener"
+          onClick={(e) => e.stopPropagation()}
+          className="text-foreground-weak hover:text-foreground text-sm hover:underline"
+        >
+          View in Slack →
+        </a>
+      )}
+    </div>
   );
 }
 
