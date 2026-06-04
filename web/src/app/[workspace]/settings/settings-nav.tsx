@@ -16,6 +16,7 @@ const ITEMS: Item[] = [
   { slug: "providers", label: "LLM Providers" },
   { slug: "composio", label: "Composio" },
   { slug: "tembo", label: "Tembo Coding Agent" },
+  { slug: "slack", label: "Slack apps" },
   { slug: "appearance", label: "Appearance" },
   { slug: "deleted-agents", label: "Deleted agents" },
   { slug: "version", label: "Version" },
