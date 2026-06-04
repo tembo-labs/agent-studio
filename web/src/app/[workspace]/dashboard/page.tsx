@@ -22,6 +22,7 @@ import { listMemberActivity } from "@/lib/member-stats";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, getWorkspaceRole } from "@/lib/workspace";
 
+import { CountCell } from "./count-cell";
 import { WorkspaceDashboard } from "./workspace-dashboard";
 
 export const dynamic = "force-dynamic";
@@ -323,34 +324,6 @@ export default async function DashboardPage({
         </div>
       </Section>
     </div>
-  );
-}
-
-// Count with a hover (native title) listing the underlying items —
-// e.g. which toolkits are connected, or which agents have automations.
-function CountCell({
-  value,
-  items,
-  empty,
-}: {
-  value: number;
-  items: string[];
-  empty: string;
-}) {
-  if (value === 0) {
-    return (
-      <span title={empty} className="text-foreground-muted font-mono">
-        0
-      </span>
-    );
-  }
-  return (
-    <span
-      title={items.join("\n")}
-      className="text-foreground decoration-foreground-muted cursor-default font-mono underline decoration-dotted underline-offset-4"
-    >
-      {value}
-    </span>
   );
 }
 
