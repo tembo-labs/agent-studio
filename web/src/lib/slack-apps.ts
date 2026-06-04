@@ -252,6 +252,29 @@ export async function listAgentsForSlackApp(
   return out;
 }
 
+/**
+ * Record where a Slack-dispatched run's result should be posted. The api
+ * runner reads this on completion (decrypts the app's bot token, posts to
+ * channel/thread). 1:1 with the run — re-dispatch of the same run id just
+ * updates the target.
+ */
+export async function recordSlackDelivery(args: {
+  runId: string;
+  slackAppId: string;
+  channel: string;
+  threadTs: string | null;
+}): Promise<void> {
+  await db.query(
+    `INSERT INTO slack_delivery (run_id, slack_app_id, channel, thread_ts)
+       VALUES ($1, $2, $3, $4)
+     ON CONFLICT (run_id) DO UPDATE
+       SET slack_app_id = EXCLUDED.slack_app_id,
+           channel = EXCLUDED.channel,
+           thread_ts = EXCLUDED.thread_ts`,
+    [args.runId, args.slackAppId, args.channel, args.threadTs],
+  );
+}
+
 /** Called by the OAuth callback once the app is installed into Slack. */
 export async function setSlackAppInstall(
   id: string,

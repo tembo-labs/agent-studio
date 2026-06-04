@@ -31,6 +31,9 @@ export type CreateRunInput = {
   framework?: "pydantic-agentspec" | "cargo-ai";
   specContent?: string;
   specFormat?: "yaml" | "json";
+  // Defaults to "manual" on the API side. Slack/webhook dispatch passes
+  // "event" so the run is attributed correctly in /runs.
+  trigger?: RunTrigger;
 };
 
 export type CreateRunResponse = { runId: string };
@@ -114,6 +117,7 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
       framework: input.framework,
       spec_content: input.specContent,
       spec_format: input.specFormat,
+      trigger: input.trigger,
     }),
   });
   if (!res.ok) {
