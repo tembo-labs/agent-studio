@@ -93,17 +93,25 @@ async function handleEvent(
   const text = stripMentions(event.text ?? "");
   const { agentName } = parseCommand(text);
 
-  // No agent named (or a bare mention) → events carry no trigger_id, so we
-  // can't open the picker modal. Reply with the menu instead.
-  if (!agentName) {
-    const scoped = await listAgentsForSlackApp(app);
+  // Conversational opener ("Hi"), a bare mention, or a typo'd agent — none
+  // of these are an agent this bot can launch, and events carry no
+  // trigger_id so we can't open the picker modal. Reply with the menu
+  // instead of treating the first word as an agent and erroring.
+  const scoped = await listAgentsForSlackApp(app);
+  const matched = agentName
+    ? scoped.find((a) => a.name === agentName)
+    : undefined;
+  if (!matched) {
     const list = scoped.length
       ? scoped.map((a) => `• \`${a.name}\``).join("\n")
       : "_No agents are assigned to this bot yet._";
+    const lead = scoped.length
+      ? `Tell me which agent to run, e.g. \`${scoped[0].name} do the thing\`. I can launch:`
+      : "No agents are assigned to this bot yet — an admin can scope agents to it in TAS → Settings → Slack apps.";
     await postMessage(botToken, {
       channel,
       thread_ts: threadTs ?? undefined,
-      text: `Tell me which agent to run, e.g. \`${scoped[0]?.name ?? "agent"} do the thing\`.\n${list}`,
+      text: `${lead}\n${list}`,
     });
     return;
   }
