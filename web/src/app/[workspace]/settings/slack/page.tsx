@@ -49,15 +49,28 @@ export default async function SlackSettingsPage({
     listWorkspaceMembers(workspace.id),
   ]);
 
+  // Disambiguate the owner picker: append the email only when a display
+  // name is shared by more than one member (so two "John Smith"s are
+  // distinguishable); otherwise just the name, or the email when unnamed.
+  const nameCounts = new Map<string, number>();
+  for (const m of members) {
+    if (m.name) nameCounts.set(m.name, (nameCounts.get(m.name) ?? 0) + 1);
+  }
+  const memberOptions = members.map((m) => ({
+    userId: m.userId,
+    label: m.name
+      ? (nameCounts.get(m.name) ?? 0) > 1
+        ? `${m.name} (${m.email})`
+        : m.name
+      : m.email,
+  }));
+
   return (
     <SlackAppsManager
       workspaceSlug={workspace.slug}
       origin={getPublicOrigin()}
       apps={apps}
-      members={members.map((m) => ({
-        userId: m.userId,
-        label: m.name ?? m.email,
-      }))}
+      members={memberOptions}
     />
   );
 }

@@ -36,6 +36,11 @@ export async function createSlackAppAction(
   const agentLabels = parseLabels(String(formData.get("agent_labels") ?? ""));
 
   if (!name) return { error: "Give the app a name." };
+  // Spaces are fine — it's the bot's display name, not a slug. Cap at
+  // Slack's app-name limit so the generated manifest stays valid.
+  if (name.length > 35) {
+    return { error: "Keep the name under 35 characters (Slack's limit)." };
+  }
   if (!defaultOwner) return { error: "Pick a default owner." };
 
   const auth = await authorizeWorkspace(slug, "workspace_admin");
