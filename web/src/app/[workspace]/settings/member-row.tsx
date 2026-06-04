@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useActionToast } from "@/lib/use-action-toast";
 
@@ -42,9 +43,18 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
     <li className="flex items-start justify-between gap-3 px-3 py-2.5 text-sm">
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <span className="text-foreground truncate font-medium">
-            {member.name ?? member.email}
-          </span>
+          {canManage ? (
+            <Link
+              href={`/${workspaceSlug}/settings/members/${member.userId}`}
+              className="text-foreground truncate font-medium hover:underline"
+            >
+              {member.name ?? member.email}
+            </Link>
+          ) : (
+            <span className="text-foreground truncate font-medium">
+              {member.name ?? member.email}
+            </span>
+          )}
           {isSelf && (
             <span className="text-foreground-muted text-sm">(you)</span>
           )}

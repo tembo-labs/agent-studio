@@ -163,6 +163,8 @@ export type RunListFilters = {
   agentName?: string;
   triggers?: RunTrigger[];
   search?: string;
+  /** Acting user (run.created_by) — used by the member-detail view. */
+  createdBy?: string;
 };
 
 export type RunListItem = {
@@ -215,6 +217,10 @@ export async function listRunsForWorkspace(
   if (filters.triggers && filters.triggers.length > 0) {
     params.push(filters.triggers);
     where.push(`trigger = ANY($${params.length}::text[])`);
+  }
+  if (filters.createdBy && filters.createdBy.trim()) {
+    params.push(filters.createdBy.trim());
+    where.push(`created_by = $${params.length}`);
   }
   if (filters.search && filters.search.trim()) {
     // Single placeholder reused across the OR; ILIKE on user_message,
