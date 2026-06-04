@@ -3,6 +3,7 @@
 import { useActionState, useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -280,12 +281,21 @@ function AppCard({
           {showManifest ? "Hide" : "Show"} app manifest
         </button>
         {showManifest && (
-          <textarea
-            readOnly
-            rows={14}
-            value={manifestJson(app, origin)}
-            className="bg-input text-foreground-strong mt-2 w-full resize-y rounded-lg p-2 font-mono text-sm shadow-[0_0_0_1px_var(--color-border)]"
-          />
+          <div className="relative mt-2">
+            <div className="absolute right-2 top-2 z-10">
+              <CopyButton
+                text={manifestJson(app, origin)}
+                label="Copy manifest"
+                ariaLabel="Copy app manifest to clipboard"
+              />
+            </div>
+            <textarea
+              readOnly
+              rows={14}
+              value={manifestJson(app, origin)}
+              className="bg-input text-foreground-strong w-full resize-y rounded-lg p-2 pr-28 font-mono text-sm shadow-[0_0_0_1px_var(--color-border)]"
+            />
+          </div>
         )}
       </div>
 
