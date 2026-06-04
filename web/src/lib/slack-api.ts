@@ -14,14 +14,24 @@ async function call<T = Record<string, unknown>>(
   body: Record<string, unknown>,
 ): Promise<SlackApiResult<T>> {
   try {
+    // Form-encode, not JSON: every Slack Web API method accepts
+    // application/x-www-form-urlencoded, but several read methods
+    // (users.info, chat.getPermalink, …) silently ignore a JSON body, so
+    // JSON-only would break them. Nested values (e.g. a `view` object for
+    // views.open/publish) go in as JSON strings, which Slack expects.
+    const form = new URLSearchParams();
+    for (const [key, value] of Object.entries(body)) {
+      if (value === undefined || value === null) continue;
+      form.set(key, typeof value === "string" ? value : JSON.stringify(value));
+    }
     const res = await fetch(`https://slack.com/api/${method}`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json; charset=utf-8",
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
         Authorization: `Bearer ${token}`,
       },
       cache: "no-store",
-      body: JSON.stringify(body),
+      body: form,
     });
     return (await res.json()) as SlackApiResult<T>;
   } catch (e) {
