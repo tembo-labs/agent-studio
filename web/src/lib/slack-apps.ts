@@ -263,16 +263,50 @@ export async function recordSlackDelivery(args: {
   slackAppId: string;
   channel: string;
   threadTs: string | null;
+  slackUserId: string | null;
 }): Promise<void> {
   await db.query(
-    `INSERT INTO slack_delivery (run_id, slack_app_id, channel, thread_ts)
-       VALUES ($1, $2, $3, $4)
+    `INSERT INTO slack_delivery (run_id, slack_app_id, channel, thread_ts, slack_user_id)
+       VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (run_id) DO UPDATE
        SET slack_app_id = EXCLUDED.slack_app_id,
            channel = EXCLUDED.channel,
-           thread_ts = EXCLUDED.thread_ts`,
-    [args.runId, args.slackAppId, args.channel, args.threadTs],
+           thread_ts = EXCLUDED.thread_ts,
+           slack_user_id = EXCLUDED.slack_user_id`,
+    [args.runId, args.slackAppId, args.channel, args.threadTs, args.slackUserId],
   );
+}
+
+/**
+ * Replay guard. Records that we've handled this Slack event envelope id;
+ * returns true if it's the first time (proceed) and false if we've already
+ * seen it (a Slack retry — skip to avoid a duplicate dispatch).
+ */
+export async function claimSlackEvent(
+  slackAppId: string,
+  eventId: string,
+): Promise<boolean> {
+  const res = await db.query(
+    `INSERT INTO slack_event_seen (slack_app_id, event_id)
+       VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [slackAppId, eventId],
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** Count this Slack user's dispatches for an app within the last N seconds. */
+export async function countRecentSlackDispatches(
+  slackAppId: string,
+  slackUserId: string,
+  seconds: number,
+): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `SELECT COUNT(*) AS n FROM slack_delivery
+      WHERE slack_app_id = $1 AND slack_user_id = $2
+        AND created_at > now() - make_interval(secs => $3)`,
+    [slackAppId, slackUserId, seconds],
+  );
+  return Number(rows[0]?.n ?? 0);
 }
 
 /** Called by the OAuth callback once the app is installed into Slack. */

@@ -7,7 +7,11 @@ import {
   parseCommand,
 } from "@/lib/slack-dispatch";
 import { authenticateSlackRequest } from "@/lib/slack-inbound";
-import { listAgentsForSlackApp, type SlackApp } from "@/lib/slack-apps";
+import {
+  claimSlackEvent,
+  listAgentsForSlackApp,
+  type SlackApp,
+} from "@/lib/slack-apps";
 
 // Events API endpoint. Handles the one-time url_verification handshake
 // (pre-install, no bot token), then app_mention + message.im events.
@@ -35,6 +39,8 @@ type SlackEvent = {
 type EventEnvelope = {
   type?: string;
   challenge?: string;
+  /** Stable id for the delivery; identical across Slack's retries. */
+  event_id?: string;
   event?: SlackEvent;
 };
 
@@ -66,7 +72,15 @@ export async function POST(
   if (!botToken) return new NextResponse(null, { status: 200 });
 
   const event = body.event;
-  if (event) void handleEvent(app, botToken, event);
+  if (event) {
+    const eventId = body.event_id;
+    void (async () => {
+      // Replay guard: a Slack retry carries the same event_id. Claim it
+      // first; if it's already been handled, skip to avoid a double run.
+      if (eventId && !(await claimSlackEvent(app.id, eventId))) return;
+      await handleEvent(app, botToken, event);
+    })();
+  }
 
   return new NextResponse(null, { status: 200 });
 }

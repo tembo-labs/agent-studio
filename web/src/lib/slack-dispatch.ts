@@ -1,15 +1,22 @@
 import "server-only";
 
 import { detectFormat } from "@/lib/agent-format";
+import { writeAuditEvent } from "@/lib/audit-db";
 import { createRun } from "@/lib/runs-api";
 import { getUserEmail } from "@/lib/slack-api";
 import {
+  countRecentSlackDispatches,
   listAgentsForSlackApp,
   recordSlackDelivery,
   type SlackApp,
 } from "@/lib/slack-apps";
 import { getAgentByName } from "@/lib/workspace-agents";
 import { listWorkspaceMembers } from "@/lib/workspace";
+
+// Per-user guard against runaway loops (a misbehaving integration, or a
+// user spamming the picker): at most this many dispatches per Slack user
+// per app per minute.
+const RATE_LIMIT_PER_MIN = 20;
 
 // The explicit-routing dispatcher: turn a Slack message into a TAS run.
 // "Explicit" = the agent is named (slash `/tas <agent> <input>`, or the
@@ -163,7 +170,16 @@ export type DispatchResult =
       /** Human label for who the run acts as, for the ack message. */
       actingAs: string;
     }
-  | { ok: false; reason: "no-agent" | "unknown-agent" | "agent-invalid" | "error"; message: string };
+  | {
+      ok: false;
+      reason:
+        | "no-agent"
+        | "unknown-agent"
+        | "agent-invalid"
+        | "rate-limited"
+        | "error";
+      message: string;
+    };
 
 /**
  * Resolve the Slack user to a TAS member by verified email, falling back
@@ -204,6 +220,18 @@ export async function dispatchToAgent(args: {
   const { agentName, input } = parseCommand(text);
   if (!agentName) {
     return { ok: false, reason: "no-agent", message: "No agent named." };
+  }
+
+  // Rate limit per Slack user, before any GitHub work — blunts runaway
+  // loops and spam.
+  const recent = await countRecentSlackDispatches(app.id, slackUserId, 60);
+  if (recent >= RATE_LIMIT_PER_MIN) {
+    return {
+      ok: false,
+      reason: "rate-limited",
+      message:
+        "You're launching agents very quickly — give the last few a moment to finish, then try again.",
+    };
   }
 
   // Scope gate: only agents whose labels intersect this app's labels.
@@ -256,7 +284,29 @@ export async function dispatchToAgent(args: {
       slackAppId: app.id,
       channel,
       threadTs,
+      slackUserId,
     });
+    // Provenance: who launched what, via which bot. Best-effort — the run
+    // already exists, so an audit hiccup must not fail the dispatch.
+    try {
+      await writeAuditEvent({
+        workspaceId: app.workspaceId,
+        actorUserId: acting.userId,
+        source: "dashboard_event",
+        kind: "slack.dispatch",
+        targetType: "run",
+        targetId: runId,
+        agentName: spec.name,
+        payload: {
+          slackAppId: app.id,
+          slackAppName: app.name,
+          slackUserId,
+          channel,
+        },
+      });
+    } catch {
+      // swallow — provenance is nice-to-have, not load-bearing
+    }
     return { ok: true, runId, agentName: spec.name, actingAs: acting.label };
   } catch (e) {
     return {
