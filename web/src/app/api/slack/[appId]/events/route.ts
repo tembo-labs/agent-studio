@@ -102,16 +102,16 @@ async function handleEvent(
     ? scoped.find((a) => a.name === agentName)
     : undefined;
   if (!matched) {
-    const list = scoped.length
-      ? scoped.map((a) => `• \`${a.name}\``).join("\n")
-      : "_No agents are assigned to this bot yet._";
-    const lead = scoped.length
-      ? `Tell me which agent to run, e.g. \`${scoped[0].name} do the thing\`. I can launch:`
-      : "No agents are assigned to this bot yet — an admin can scope agents to it in TAS → Settings → Slack apps.";
+    const text =
+      scoped.length === 0
+        ? "No agents are assigned to this bot yet. An admin can scope it in TAS → Settings → Slack apps: give the bot one or more labels, then add a matching `labels:` line to an agent."
+        : `Tell me which agent to run, e.g. \`${scoped[0].name} do the thing\`. I can launch:\n${scoped
+            .map((a) => `• \`${a.name}\``)
+            .join("\n")}`;
     await postMessage(botToken, {
       channel,
       thread_ts: threadTs ?? undefined,
-      text: `${lead}\n${list}`,
+      text,
     });
     return;
   }
