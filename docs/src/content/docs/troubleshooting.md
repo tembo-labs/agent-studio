@@ -1,0 +1,51 @@
+---
+title: Troubleshooting
+description: Common run failures and where to look when something isn't working.
+---
+
+When something's off, the [run detail page](/agent-studio/running-agents/) and
+the [Tool uses](/agent-studio/tools-and-tool-uses/) view are the first places to
+look — they show the agent's output and exactly which tools it called (even on
+failed runs).
+
+## Common issues
+
+**"LLM provider needed" / runs won't start.**
+The workspace has no Anthropic or OpenAI key. Add one under
+**Settings → API keys** ([Settings](/agent-studio/settings/)).
+
+**A connection-using agent fails with "no active connection".**
+The [acting user](/agent-studio/core-concepts/) hasn't authorized that service,
+or the agent declared a provider/slot nobody has connected. Use the sidebar
+**"Action needed → Connect"** prompt or authorize it under
+[Connections](/agent-studio/connections/).
+
+**A run fails with an auth/401 error mid-way.**
+The connection's credential expired or was revoked (the connection is marked
+stale). Reconnect it under [Connections](/agent-studio/connections/).
+
+**The agent narrates instead of acting, or truncates.**
+A lower-tier model may hedge on tool use, or the response hit the token cap. Try
+a more capable model or raise `max_tokens` in `model_settings`. See
+[Authoring agents → choosing a model](/agent-studio/authoring-agents/).
+
+**A declared `tools_module` "couldn't be loaded".**
+The sibling `.py` is missing from the repo, or it doesn't export a non-empty
+`tools = [...]` list. See [Sidecar Python tools](/agent-studio/sidecar-python-tools/).
+
+**"Improve the Agent" seems to do nothing.**
+Usually a stale browser tab from a previous deployment — hard-refresh and retry.
+Confirm a Tembo API key is set in [Settings](/agent-studio/settings/).
+
+**The wrong tool slug / tools don't appear.**
+Composio and Native MCP use different slugs for the same provider — make sure the
+agent's `tools:` list matches the connection's `source:`. See
+[Connections](/agent-studio/connections/).
+
+## Still stuck?
+
+Check the agent and workspace [dashboards](/agent-studio/dashboard-and-runs/) for
+failure groups, and the [Audit](/agent-studio/audit-and-roles/) timeline for what
+changed and when. For instance-level problems, see
+[Deploying & operating](/agent-studio/deploying-and-operating/) and the repo's
+`guides/`.

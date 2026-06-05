@@ -1,0 +1,64 @@
+name: deploy-docs
+
+# Build the user manual (docs/, Astro Starlight) and publish it to GitHub
+# Pages at https://tembo.github.io/agent-studio/.
+#
+# Independent of the app deploy (deploy-internal.yml): it only rebuilds when
+# docs change, and never touches the web/api services. Scoped to the
+# canonical repo so forks don't try to publish.
+#
+# One-time repo config: Settings → Pages → Build and deployment →
+# Source = "GitHub Actions". Without it the deploy step has no Pages site.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch:
+
+# Allow the deploy job to publish to Pages via OIDC.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One Pages deploy at a time; don't cancel an in-flight publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'tembo/agent-studio'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: docs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/dist
+
+  deploy:
+    needs: build
+    if: github.repository == 'tembo/agent-studio'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

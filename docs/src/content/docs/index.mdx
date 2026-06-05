@@ -1,0 +1,54 @@
+---
+title: Tembo Agent Studio
+description: Self-hosted control room for AI agents — definitions in Git, every change a PR, runs and audits inside your environment.
+template: splash
+hero:
+  tagline: A self-hosted control room for AI agents. Definitions live in Git, every change is a PR, and runs and audits stay inside your environment.
+  image:
+    file: ../../assets/logo.svg
+  actions:
+    - text: Get started
+      link: /agent-studio/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/tembo/agent-studio
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What is Tembo Agent Studio?
+
+Tembo Agent Studio (TAS) is a self-hosted control plane for AI agents. Agent
+definitions live as files in a Git repository you own, every change flows
+through a pull request, and runs, audit logs, and identity stay inside your
+environment. Agents inherit the discipline you already use for production code —
+version control, code review, audit logs, identity, and RBAC.
+
+<CardGrid stagger>
+  <Card title="Author from chat" icon="pencil">
+    Describe a change in plain language; TAS opens a pull request against your
+    repo. Humans and AI authors produce the same artifact — a reviewable diff.
+  </Card>
+  <Card title="Run & automate" icon="rocket">
+    Run agents on demand, on a schedule, or from external events, and inspect
+    every run's output, token cost, and the tools it called.
+  </Card>
+  <Card title="Connect your stack" icon="puzzle">
+    Authorize Slack, Gmail, Sheets, Notion, Attio, and ~1,000 more services, and
+    reference them from an agent's `connections:`.
+  </Card>
+  <Card title="Govern everything" icon="approve-check">
+    An append-only audit timeline, role-based access, and a per-agent health
+    dashboard keep adaptation explainable.
+  </Card>
+</CardGrid>
+
+## Where to next
+
+- New here? Start with [Getting started](/agent-studio/getting-started/).
+- Want the mental model first? Read [Core concepts](/agent-studio/core-concepts/).
+- Building an agent? See [Authoring agents](/agent-studio/authoring-agents/) and
+  [Sidecar Python tools](/agent-studio/sidecar-python-tools/).
