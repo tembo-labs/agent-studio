@@ -69,6 +69,11 @@ export function ComposioConnectionsSection({
   for (const t of catalog) {
     if (t.logo) logoBySlug.set(t.slug, t.logo);
   }
+  // Slugs Composio's catalog actually knows about. Used to flag a declared
+  // toolkit whose slug is wrong (e.g. `pylon` vs the real `pylon_mcp`) —
+  // connecting it would just fail. Only meaningful when the catalog loaded.
+  const catalogLoaded = catalog.length > 0;
+  const catalogSlugs = new Set(catalog.map((t) => t.slug));
 
   // Union of declared + owned slots, sorted so unfulfilled-declared
   // pairs surface first (they're the actionable ones), then owned,
@@ -167,6 +172,9 @@ export function ComposioConnectionsSection({
                 connection={owned}
                 enabled={composioEnabled}
                 viewingOther={viewingOther}
+                unknownToolkit={
+                  catalogLoaded && !owned && !catalogSlugs.has(slot.toolkit)
+                }
                 tools={
                   owned
                     ? toolsBySlot?.get(
@@ -273,6 +281,7 @@ function ComposioConnectionRow({
   enabled,
   tools,
   viewingOther = false,
+  unknownToolkit = false,
 }: {
   toolkit: string;
   name: string;
@@ -282,6 +291,8 @@ function ComposioConnectionRow({
   enabled: boolean;
   tools: McpTool[];
   viewingOther?: boolean;
+  /** Declared slug isn't in Composio's catalog — connecting would fail. */
+  unknownToolkit?: boolean;
 }) {
   const params = new URLSearchParams({
     workspace: workspaceSlug,
@@ -298,6 +309,16 @@ function ComposioConnectionRow({
       <span> · </span>
       Status: {connection.status} · updated{" "}
       <LocalTime iso={connection.updatedAt.toISOString()} style="relative" />
+    </>
+  ) : unknownToolkit ? (
+    <>
+      <span className="text-foreground-weak font-medium">{name}</span>
+      <span> · </span>
+      <span className="text-[var(--color-sentiment-caution)]">
+        Not a recognized Composio toolkit. Fix the{" "}
+        <code className="text-xs">connections:</code> slug in the agent&apos;s
+        spec (check Composio&apos;s catalog for the exact name).
+      </span>
     </>
   ) : enabled ? (
     <>
@@ -379,14 +400,21 @@ function ComposioConnectionRow({
             label={toolCount > 0 ? "Refresh tools" : "Refresh"}
           />
         )}
-        {enabled && !viewingOther && (
+        {enabled && !viewingOther && unknownToolkit ? (
+          <span
+            className="text-foreground-muted text-sm"
+            title="Composio doesn't recognize this toolkit slug"
+          >
+            Unknown toolkit
+          </span>
+        ) : enabled && !viewingOther ? (
           <Link
             href={authorizeHref}
             className="text-foreground hover:text-foreground-title text-sm font-medium hover:underline"
           >
             {connection ? "Reconnect" : "Connect"}
           </Link>
-        )}
+        ) : null}
         {connection && (
           <RenameComposioConnectionForm
             workspaceSlug={workspaceSlug}

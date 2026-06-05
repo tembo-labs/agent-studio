@@ -67,43 +67,58 @@ export function composioUserId(workspaceId: string, userId: string): string {
 }
 
 /**
- * Find or create a Composio-managed auth config for the given toolkit
- * on the *given Composio account*. The Composio dashboard lets you
- * register your own auth configs; if none exists, we auto-create a
- * `use_composio_managed_auth` one — the baseline flow that uses
- * Composio's pre-registered OAuth apps with each provider.
+ * Resolve the auth config to use when connecting a toolkit on the *given
+ * Composio account*. Resolution order:
  *
- * No cross-process cache because the answer is per-account and we
- * don't want to leak across workspaces. The list+create round trip
- * runs once per Connect click; that's fine.
+ *   1. An existing auth config for this toolkit (preferring a
+ *      Composio-managed one, but accepting a CUSTOM one the admin created
+ *      in the Composio dashboard — that's how bring-your-own-auth toolkits
+ *      like `pylon_mcp` are connected).
+ *   2. Otherwise auto-create a `use_composio_managed_auth` config — the
+ *      baseline that uses Composio's pre-registered OAuth apps. This works
+ *      only for toolkits Composio provides managed credentials for; for
+ *      BYO-only toolkits the create call 400s, and we re-throw with
+ *      actionable guidance.
+ *
+ * No cross-process cache (answer is per-account; don't leak across
+ * workspaces). The round trip runs once per Connect click.
  */
 async function getOrCreateManagedAuthConfigId(
   apiKey: string,
   toolkit: ComposioToolkit,
 ): Promise<string> {
   const c = makeClient(apiKey);
-  const list = await c.authConfigs.list({
-    toolkit,
-    isComposioManaged: true,
-  });
-  // Defensive: the list call sometimes returns auth configs for *other*
-  // toolkits (the toolkit filter isn't always honored for managed configs),
-  // so trusting items[0] could hand back e.g. Linear's config for a Pylon
-  // connect — opening the wrong provider's OAuth. Only accept a config
-  // whose toolkit slug actually matches; otherwise create a fresh one.
+  // List ALL auth configs for the toolkit (managed + custom). We filter by
+  // slug ourselves: the API's toolkit filter isn't always honored, so
+  // trusting items[0] could hand back e.g. Linear's config for a Pylon
+  // connect — opening the wrong provider's OAuth.
   const wanted = toolkit.toLowerCase();
-  const match = (list.items ?? []).find(
+  const list = await c.authConfigs.list({ toolkit });
+  const matches = (list.items ?? []).filter(
     (i) => i.toolkit?.slug?.toLowerCase() === wanted,
   );
-  if (match) {
-    return match.id;
-  }
+  const managed = matches.find((i) => i.isComposioManaged);
+  if (managed) return managed.id;
+  if (matches.length > 0) return matches[0].id; // custom / BYO config
 
-  const created = await c.authConfigs.create(toolkit, {
-    type: "use_composio_managed_auth",
-    name: `tas-${toolkit}`,
-  });
-  return created.id;
+  try {
+    const created = await c.authConfigs.create(toolkit, {
+      type: "use_composio_managed_auth",
+      name: `tas-${toolkit}`,
+    });
+    return created.id;
+  } catch (err) {
+    const msg = (err as Error).message ?? "";
+    // Composio has no managed credentials for this toolkit (e.g. pylon_mcp).
+    // The admin must create a custom auth config for it once in the Composio
+    // dashboard; then resolution step 1 picks it up.
+    if (/managed credentials|default auth config not found/i.test(msg)) {
+      throw new Error(
+        `Composio has no managed credentials for "${toolkit}". An admin must create a custom auth config for it once at dashboard.composio.dev (add your OAuth app or API key), then reconnect.`,
+      );
+    }
+    throw err;
+  }
 }
 
 export type ComposioLinkResult = {

@@ -448,12 +448,24 @@ connections:
 
 Forms can mix in the same file.
 
-**Common Composio toolkit slugs:** \`slack\`, \`gmail\`,
-\`googlesheets\`, \`googlecalendar\`, \`googledocs\`, \`googledrive\`,
-\`notion\`, \`github\`, \`linear\`, \`hubspot\`, \`salesforce\`,
-\`airtable\`, \`asana\`, \`jira\`. The full catalog (hundreds) lives
-at https://composio.dev/toolkits. TAS doesn't maintain an
-allowlist; declare whatever the agent needs.
+**Toolkit slugs are exact — verify, don't guess.** A service's
+Composio slug is often NOT just its lowercased name: integrations
+can carry suffixes or differ from the brand (e.g. Pylon is
+\`pylon_mcp\`, not \`pylon\`). A wrong slug can't be connected — the
+Connections page flags it "Not a recognized Composio toolkit" and
+the agent never runs. These common slugs are safe to write from
+memory: \`slack\`, \`gmail\`, \`googlesheets\`, \`googlecalendar\`,
+\`googledocs\`, \`googledrive\`, \`notion\`, \`github\`, \`linear\`,
+\`hubspot\`, \`salesforce\`, \`airtable\`, \`asana\`, \`jira\`. For
+**anything else, confirm the exact slug** before writing it into
+\`connections:\` — look it up at https://composio.dev/toolkits (the
+slug is in the toolkit's URL/page) or ask the user. If you can't
+verify it, say so rather than guessing.
+
+Also note: not every Composio toolkit has Composio-managed
+credentials. Some (often \`*_mcp\` ones) are bring-your-own-auth —
+an admin must create a custom auth config for them once at
+dashboard.composio.dev before they can be connected.
 
 **Native MCP providers** (as of v0.4): \`attio\`. The catalog grows
 when TAS adds an entry to \`lib/mcp-providers.ts\` — check the
