@@ -128,6 +128,42 @@ pub async fn list_active_native_connections(
     Ok(out)
 }
 
+/// Decrypted Secrets (the 3rd connection substrate) for a workspace — free-form
+/// `(slug, value)` API keys an admin set under Connections → Secrets. Unlike
+/// native/Composio connections these are per-WORKSPACE (no user filter): a
+/// service API key like Clay is one org-wide value. The runner serializes these
+/// into a flat `{slug: value}` JSON and hands it to the wrapper as TAS_SECRETS,
+/// where sidecar tools read it via `tas_tools.secret("<slug>")`.
+///
+/// Rows whose ciphertext fails to decrypt are dropped with a warning rather
+/// than failing the run — the tool then raises a clear "secret not set" error.
+pub async fn list_workspace_secret_connections(
+    pool: &PgPool,
+    key: &MasterKey,
+    workspace_id: uuid::Uuid,
+) -> anyhow::Result<Vec<(String, String)>> {
+    let rows: Vec<(String, Vec<u8>)> = sqlx::query_as(
+        "SELECT slug, ciphertext \
+           FROM workspace_secret_connection \
+          WHERE workspace_id = $1",
+    )
+    .bind(workspace_id)
+    .fetch_all(pool)
+    .await
+    .context("failed to list workspace_secret_connection")?;
+
+    let mut out = Vec::with_capacity(rows.len());
+    for (slug, ciphertext) in rows {
+        match key.decrypt(&ciphertext) {
+            Ok(value) => out.push((slug, value)),
+            Err(e) => {
+                tracing::warn!(?e, %slug, "skipping secret: decrypt failed")
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// Returns the decrypted plaintext for a workspace secret. Mirrors the
 /// TS-side `getWorkspaceSecretPlaintext` — the web app encrypts on save,
 /// the runtime decrypts on use.

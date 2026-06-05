@@ -17,12 +17,13 @@ automation owner's; an event run uses the trigger owner's. If an agent needs a
 service nobody has connected, the sidebar surfaces an **"Action needed"** prompt
 with a **Connect** button.
 
-## Two substrates
+## Three substrates
 
 | Substrate      | When to pick it                                                                                                |
 | -------------- | -------------------------------------------------------------------------------------------------------------- |
 | **Composio**   | The default. ~1,000 services wrapped as REST tools. Lowercase slugs (`slack`, `googlesheets`).                  |
 | **Native MCP** | The provider has an official MCP server — richer, schema-aware tools, fewer round trips, and TAS-managed OAuth. |
+| **Secrets**    | A plain **API key** for a service with no OAuth (e.g. Clay), read by [sidecar Python tools](/agent-studio/sidecar-python-tools/). |
 
 Prefer **Native MCP** when the provider is in TAS's native catalog: it uses the
 provider's official server and TAS-managed OAuth (just click **Connect** — no
@@ -56,3 +57,24 @@ clear message — reconnect from the same page. See
 
 For doing deterministic I/O over a connection from Python, see
 [Sidecar Python tools](/agent-studio/sidecar-python-tools/).
+
+## Secrets (API keys)
+
+Some services — like Clay — authenticate with a plain **API key**, not OAuth.
+For these, use a **Secret**: a free-form, **workspace-level** key an admin sets
+once under **Connections → Secrets** and the whole workspace shares (unlike the
+per-user OAuth connections above). Secrets are read by an agent's
+[sidecar Python tools](/agent-studio/sidecar-python-tools/) via
+`tas_tools.secret("name")` — they attach no tools and are invisible to the
+model.
+
+- **Add one** (admin): Connections → Secrets → name (e.g. `clay`) + value. It's
+  encrypted at rest and shown masked.
+- **Use it** in a tool: `tas_tools.secret("clay")` returns the value.
+- **Optionally declare it** on the agent so the studio prompts an admin to set a
+  missing one:
+
+  ```yaml
+  connections:
+    - { type: clay, source: secret }
+  ```

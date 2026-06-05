@@ -94,6 +94,11 @@ pub struct PydanticArgs<'a> {
     /// surfaced as `TAS_TOOLS_MODULE_CONTENT`. The wrapper execs it and
     /// exposes its `tools = [...]` export to the agent. None = no module.
     pub tools_module_content: Option<&'a str>,
+    /// Workspace Secrets (the 3rd substrate) as flat `{slug: value}` JSON,
+    /// surfaced as `TAS_SECRETS`. Sidecar tools read a value via
+    /// `tas_tools.secret("<slug>")`. Only set when the run has a tools
+    /// module (secrets feed Python tools, not the model). None = none.
+    pub secrets_json: Option<&'a str>,
     /// Workspace + user the run executes under. Used to flip a
     /// `workspace_composio_connection` row's status to `STALE` if
     /// the Python wrapper detects Composio's
@@ -204,6 +209,11 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
     // `tools = [...]` export. Only set when the agent declared one.
     if let Some(tools_module) = args.tools_module_content {
         cmd.env("TAS_TOOLS_MODULE_CONTENT", tools_module);
+    }
+    // Workspace Secrets — flat {slug: value} the sidecar tools read via
+    // tas_tools.secret(). Only set when the run has a tools module.
+    if let Some(secrets) = args.secrets_json {
+        cmd.env("TAS_SECRETS", secrets);
     }
 
     let mut child = cmd.spawn().context("failed to spawn pydantic-ai wrapper")?;

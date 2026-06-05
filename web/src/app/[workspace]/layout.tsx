@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/toaster";
 import { listConnectionsForUser } from "@/lib/composio-connections";
 import { listNativeConnectionsForUser } from "@/lib/connections";
+import { listSecretConnections } from "@/lib/secret-connections";
 import { listFailingAgents24h } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
@@ -75,6 +76,7 @@ export default async function WorkspaceLayout({
     agentsListing,
     myConnections,
     myNativeConnections,
+    workspaceSecrets,
     failingAgents,
     anthropicKey,
     openaiKey,
@@ -83,6 +85,7 @@ export default async function WorkspaceLayout({
     listAgents(workspace.id).catch(() => null),
     listConnectionsForUser(workspace.id, session.user.id).catch(() => []),
     listNativeConnectionsForUser(workspace.id, session.user.id).catch(() => []),
+    listSecretConnections(workspace.id).catch(() => []),
     listFailingAgents24h(workspace.id).catch(() => []),
     getWorkspaceSecretPreview(workspace.id, "anthropic_api_key").catch(
       () => null,
@@ -110,11 +113,14 @@ export default async function WorkspaceLayout({
       .filter((c) => c.status === "active")
       .map((c) => `${c.type}:${c.name}`),
   );
+  // Secrets are workspace-level (one shared key), not per-user — so the
+  // "missing" check is against the workspace's set, keyed by slug alone.
+  const workspaceSecretSlugs = new Set(workspaceSecrets.map((s) => s.slug));
   const missingConnections: {
     toolkit: string;
     name: string;
     agentName: string;
-    source: "composio" | "native-mcp";
+    source: "composio" | "native-mcp" | "secret";
   }[] = [];
   if (agentsListing && agentsListing.ok) {
     for (const a of agentsListing.agents) {
@@ -124,6 +130,18 @@ export default async function WorkspaceLayout({
         const toolkit = conn.toolkit.trim().toLowerCase();
         const name = conn.name.trim().toLowerCase() || "default";
         if (!toolkit) continue;
+        if (conn.source === "secret") {
+          // Workspace-level: present if any admin set a secret with this slug.
+          if (!workspaceSecretSlugs.has(toolkit)) {
+            missingConnections.push({
+              toolkit,
+              name: "default",
+              agentName: a.spec.name,
+              source: "secret",
+            });
+          }
+          continue;
+        }
         const slots = conn.source === "native-mcp" ? myNativeSlots : mySlots;
         if (!slots.has(`${toolkit}:${name}`)) {
           missingConnections.push({

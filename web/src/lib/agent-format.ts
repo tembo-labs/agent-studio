@@ -39,7 +39,7 @@ function parseLabelsField(raw: unknown): string[] {
   );
 }
 
-export type AgentConnectionSource = "composio" | "native-mcp";
+export type AgentConnectionSource = "composio" | "native-mcp" | "secret";
 
 export type AgentConnection = {
   /** Provider slug. For source="composio" this is a Composio toolkit
@@ -215,7 +215,12 @@ function parseToolsModuleField(raw: unknown): string | undefined {
  * are dropped — the runner does the strict validation.
  */
 function coerceSource(raw: unknown): AgentConnectionSource {
-  return raw === "native-mcp" ? "native-mcp" : "composio";
+  if (raw === "native-mcp") return "native-mcp";
+  // A "secret" connection is a workspace API key (e.g. Clay) read by the
+  // agent's sidecar tools — it attaches no tools and is invisible to the
+  // model. Declaring it only surfaces the missing-secret prompt.
+  if (raw === "secret") return "secret";
+  return "composio";
 }
 
 function parseConnectionsField(raw: unknown): AgentConnection[] {

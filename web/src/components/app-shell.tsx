@@ -26,8 +26,9 @@ type MissingConnection = {
   agentName: string;
   /** Which substrate the agent's entry targets. Drives the authorize
    *  URL and the displayed label — Composio + Native MCP have
-   *  separate connection sets per user. */
-  source: "composio" | "native-mcp";
+   *  separate connection sets per user; "secret" is a workspace-level
+   *  API key set under Connections → Secrets. */
+  source: "composio" | "native-mcp" | "secret";
 };
 
 type FailingAgentAlert = {
@@ -159,7 +160,13 @@ export async function AppShell({
                 // OAuth flow.
                 let authorizeHref: string;
                 let providerLabel: string;
-                if (m.source === "native-mcp") {
+                if (m.source === "secret") {
+                  // Secrets are workspace-level: no per-user authorize
+                  // flow — link straight to the Secrets tab where an
+                  // admin sets the key. Labelled by the secret's name.
+                  authorizeHref = `/${workspace.slug}/connections/secrets`;
+                  providerLabel = m.toolkit;
+                } else if (m.source === "native-mcp") {
                   const params = new URLSearchParams({
                     workspace: workspace.slug,
                   });
@@ -203,7 +210,9 @@ export async function AppShell({
                         <span className="font-semibold">{m.agentName}</span>
                       </span>
                       <Button asChild variant="orange" size="small">
-                        <Link href={authorizeHref}>Connect</Link>
+                        <Link href={authorizeHref}>
+                          {m.source === "secret" ? "Set" : "Connect"}
+                        </Link>
                       </Button>
                     </div>
                   </div>

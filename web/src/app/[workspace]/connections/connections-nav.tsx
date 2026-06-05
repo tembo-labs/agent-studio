@@ -13,6 +13,7 @@ type Item = { slug: string; label: string };
 const ITEMS: Item[] = [
   { slug: "native-mcp", label: "Native MCP" },
   { slug: "composio", label: "Composio" },
+  { slug: "secrets", label: "Secrets" },
 ];
 
 export function ConnectionsNav({ workspaceSlug }: { workspaceSlug: string }) {

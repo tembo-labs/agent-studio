@@ -74,6 +74,31 @@ tools = [list_companies, summarize_arr]
 `.access_token` and `.mcp_url`, or raises a clear error if that connection isn't
 active for the run.
 
+For a service that uses a **plain API key** (no OAuth) — like Clay — read a
+workspace [Secret](/agent-studio/connections/#secrets-api-keys) instead:
+
+```python
+import httpx
+import tas_tools
+
+def enrich(domain: str) -> dict:
+    """Enrich a company domain via Clay."""
+    key = tas_tools.secret("clay")             # set under Connections → Secrets
+    r = httpx.post(
+        "https://api.clay.com/v1/enrich",
+        headers={"Authorization": f"Bearer {key}"},
+        json={"domain": domain},
+    )
+    r.raise_for_status()
+    return r.json()
+
+tools = [enrich]
+```
+
+`tas_tools.secret("name")` returns the value an admin stored under Connections →
+Secrets, or raises a clear error if it isn't set. Secrets are only injected into
+runs that have a tools module.
+
 ## Dependencies
 
 The standard library, `httpx`, and `pydantic` are available out of the box. For

@@ -23,11 +23,31 @@ so the tool can do deterministic I/O (e.g. with httpx) over it.
 
     tools = [list_companies]
 
-Only Native-MCP connections are exposed here: their OAuth access tokens
-are real provider tokens that also work against the provider's REST API.
-Composio brokers auth for LLM tool-calling and does not hand out raw
-downstream tokens, so Composio-only services stay LLM-driven (or wait for
-a future raw-API-key connection type).
+Two kinds of credential flow through here:
+
+- `connection(provider)` — a **Native-MCP** connection's OAuth access token,
+  which is a real provider token that also works against the provider's REST
+  API. (Composio brokers auth for LLM tool-calling and doesn't hand out raw
+  downstream tokens, so Composio-only services stay LLM-driven.)
+- `secret(name)` — a **Secret**: a free-form, workspace-level API key an admin
+  set under Connections → Secrets (e.g. Clay), for services that authenticate
+  with a plain key:
+
+    import httpx
+    import tas_tools
+
+    def enrich(domain: str) -> dict:
+        '''Enrich a company domain via Clay.'''
+        key = tas_tools.secret("clay")
+        r = httpx.post(
+            "https://api.clay.com/v1/enrich",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"domain": domain},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    tools = [enrich]
 """
 
 from __future__ import annotations
@@ -40,6 +60,10 @@ from dataclasses import dataclass
 # decrypted, run-scoped credentials for the acting user's ACTIVE native
 # connections, shaped `{provider: {name: {mcp_url, access_token}}}`.
 _NATIVE_ENV = "TAS_NATIVE_MCP_CONNECTIONS"
+
+# Decrypted workspace Secrets for this run, a flat `{slug: value}` map. Only
+# present when the agent has a tools module (secrets feed Python tools only).
+_SECRETS_ENV = "TAS_SECRETS"
 
 
 @dataclass(frozen=True)
@@ -97,3 +121,33 @@ def connection(provider: str, name: str = "default") -> Connection:
     return Connection(
         provider=provider, name=name, access_token=token, mcp_url=url
     )
+
+
+def _load_secrets() -> dict:
+    raw = os.environ.get(_SECRETS_ENV)
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def secret(name: str) -> str:
+    """Return a workspace Secret's value by name (e.g. "clay").
+
+    Secrets are free-form API keys an admin set under Connections → Secrets.
+    They're shared across the workspace and read only by sidecar tools.
+    Raises a clear ValueError if the named secret isn't set for this run —
+    an admin must add it under Connections → Secrets.
+    """
+    secrets = _load_secrets()
+    value = secrets.get(name)
+    if not isinstance(value, str) or not value:
+        available = ", ".join(sorted(secrets)) or "(none)"
+        raise ValueError(
+            f'no workspace secret named "{name}" for this run — add it under '
+            f"Connections → Secrets (available: {available})"
+        )
+    return value

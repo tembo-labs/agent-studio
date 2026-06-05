@@ -162,10 +162,18 @@ def usage_payload(usage_obj) -> dict:
 
 
 def _coerce_source(value) -> str:
-    """Connection source discriminator: "composio" (default) or
-    "native-mcp". Anything else falls back to "composio" so older
-    specs and typos stay on the well-trodden Composio path."""
-    return "native-mcp" if value == "native-mcp" else "composio"
+    """Connection source discriminator:
+      - "native-mcp" → the provider's official MCP server
+      - "secret"     → a workspace Secret (API key) read by sidecar tools;
+                       attaches NO toolset and is invisible to the model
+      - "composio"   → default; anything else (typos, older specs) falls
+                       back to the well-trodden Composio path
+    """
+    if value == "native-mcp":
+        return "native-mcp"
+    if value == "secret":
+        return "secret"
+    return "composio"
 
 
 def parse_connections(
@@ -689,8 +697,11 @@ async def run(spec: dict, user_message: str) -> None:
     # Native MCP doesn't add meta-tools, so it doesn't change the
     # decision — only Composio's loose mode does.
     direct_mode = (composio_mcp is None or used_direct_tools)
+    # `secret` connections attach no toolset and are invisible to the model
+    # (their value reaches sidecar tools via TAS_SECRETS), so they never
+    # belong in the tool-use preamble's list of available services.
     preamble_labels = (
-        sorted({slug for (slug, _n, _t, _s) in connections})
+        sorted({slug for (slug, _n, _t, src) in connections if src != "secret"})
         if toolsets
         else None
     )

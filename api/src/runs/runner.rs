@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::runs::{cargo_ai, pydantic};
 use crate::workspace::{
     get_workspace_secret_plaintext, list_active_composio_connections,
-    list_active_native_connections, SecretKind,
+    list_active_native_connections, list_workspace_secret_connections, SecretKind,
 };
 use crate::AppState;
 
@@ -396,6 +396,28 @@ async fn run_pydantic(
         }
     };
 
+    // Secrets (the 3rd substrate) — flat `{slug: value}` of the workspace's
+    // free-form API keys. Only injected when the agent has a sidecar tools
+    // module, since secrets are consumed by Python tools (via
+    // tas_tools.secret), never by the model directly — least privilege.
+    let secrets_json: Option<String> = if ctx.tools_module_content.is_some() {
+        let rows =
+            list_workspace_secret_connections(&state.db, &state.encryption_key, ctx.workspace_id)
+                .await
+                .unwrap_or_default();
+        if rows.is_empty() {
+            None
+        } else {
+            let mut map = serde_json::Map::new();
+            for (slug, value) in rows {
+                map.insert(slug, serde_json::Value::String(value));
+            }
+            Some(serde_json::Value::Object(map).to_string())
+        }
+    } else {
+        None
+    };
+
     if openai_key.is_none() && anthropic_key.is_none() {
         // Pydantic-ai would fail inside the subprocess with a less
         // friendly message; intercept here so the run row's error
@@ -421,6 +443,7 @@ async fn run_pydantic(
         composio_connected_accounts_json: composio_connected_accounts_json.as_deref(),
         native_mcp_connections_json: native_mcp_connections_json.as_deref(),
         tools_module_content: ctx.tools_module_content.as_deref(),
+        secrets_json: secrets_json.as_deref(),
         workspace_id: ctx.workspace_id,
         acting_user_id: ctx.acting_user_id.as_str(),
         db: &state.db,

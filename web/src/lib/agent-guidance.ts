@@ -413,6 +413,38 @@ def summarize_arr(records: list[dict]) -> dict:
 tools = [list_companies, summarize_arr]
 \`\`\`
 
+For a service that authenticates with a **plain API key** (e.g. Clay)
+rather than OAuth — i.e. not a Composio or Native-MCP provider — use a
+**Secret**. An admin sets it once under Connections → Secrets
+(workspace-level, shared); the tool reads it by name:
+
+\`\`\`python
+import httpx
+import tas_tools
+
+def enrich(domain: str) -> dict:
+    """Enrich a company domain via Clay."""
+    key = tas_tools.secret("clay")             # a workspace Secret
+    r = httpx.post(
+        "https://api.clay.com/v1/enrich",
+        headers={"Authorization": f"Bearer {key}"},
+        json={"domain": domain},
+    )
+    r.raise_for_status()
+    return r.json()
+
+tools = [enrich]
+\`\`\`
+
+Optionally declare the secret in \`connections:\` so the studio prompts an
+admin to set it if it's missing — it attaches no tools and is invisible to
+the model:
+
+\`\`\`yaml
+connections:
+  - { type: clay, source: secret }
+\`\`\`
+
 Standard library + \`httpx\` + \`pydantic\` are available. For other
 third-party deps (pandas, drivers), add a pinned line to
 \`api/scripts/requirements-tools.txt\` in the TAS deployment and redeploy.
@@ -423,13 +455,14 @@ External services this agent calls at run time. Each entry resolves
 at run time to a connection the **acting user** of the run has
 authorized in the workspace.
 
-TAS has two connection substrates and the agent file picks between
+TAS has three connection substrates and the agent file picks between
 them per-entry with a \`source:\` field:
 
 | \`source:\`    | When to pick it                                     |
 |---------------|-----------------------------------------------------|
 | \`composio\`    | Default. ~250 services wrapped as REST tools by Composio. Slugs are lowercase (\`slack\`, \`googlesheets\`). |
 | \`native-mcp\`  | Provider has an official MCP server — richer tools, schema-aware operations, fewer round trips, TAS-managed OAuth (no per-customer credentials). Slugs from TAS's native catalog (currently: ${NATIVE_MCP_SLUGS}). |
+| \`secret\`      | A plain **API key** (e.g. Clay) for a service with no OAuth — set workspace-wide under Connections → Secrets, read by sidecar Python tools via \`tas_tools.secret("slug")\`. Attaches no tools; declaring it only surfaces the missing-secret prompt. See \`tools_module\` above. |
 
 The default when \`source:\` is omitted is \`composio\` — existing
 agents need no edit.
