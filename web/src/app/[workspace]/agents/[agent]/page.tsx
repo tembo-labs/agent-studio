@@ -24,6 +24,7 @@ import {
   getAgentDailyRunBands30d,
   getAgentStats30d,
   listAgentFailureGroups30d,
+  listAgentToolUsage30d,
   listRecentRunsForAgent,
   type RunSummary,
 } from "@/lib/runs-db";
@@ -80,6 +81,7 @@ export default async function AgentDetailPage({
     stats,
     daily,
     failures,
+    toolUsage,
     triggers,
     myConnections,
     composioApiKeyPreview,
@@ -97,6 +99,7 @@ export default async function AgentDetailPage({
     getAgentStats30d(workspace.id, canonicalName),
     getAgentDailyRunBands30d(workspace.id, canonicalName),
     listAgentFailureGroups30d(workspace.id, canonicalName, 5),
+    listAgentToolUsage30d(workspace.id, canonicalName),
     listTriggersForAgent(workspace.id, canonicalName),
     listConnectionsForUser(workspace.id, session.user.id),
     getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
@@ -262,6 +265,7 @@ export default async function AgentDetailPage({
           stats={stats}
           daily={daily}
           failures={failures}
+          toolUsage={toolUsage}
           workspaceSlug={workspace.slug}
           agentName={canonicalName}
         />

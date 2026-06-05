@@ -6,6 +6,7 @@ import {
   type AgentDailyRunBands,
   type AgentFailureGroup,
   type AgentStats30d,
+  type AgentToolUsage,
 } from "@/lib/runs-db";
 
 import { DailyTrend } from "../../dashboard/workspace-dashboard";
@@ -24,6 +25,7 @@ type Props = {
   stats: AgentStats30d;
   daily: AgentDailyRunBands[];
   failures: AgentFailureGroup[];
+  toolUsage: AgentToolUsage[];
   workspaceSlug: string;
   agentName: string;
 };
@@ -32,6 +34,7 @@ export function AgentDashboard({
   stats,
   daily,
   failures,
+  toolUsage,
   workspaceSlug,
   agentName,
 }: Props) {
@@ -49,6 +52,7 @@ export function AgentDashboard({
     <div className="flex flex-col gap-5">
       <StatTiles stats={stats} successRate={successRate} />
       <DailyTrend daily={daily} />
+      {toolUsage.length > 0 && <ToolUsage toolUsage={toolUsage} />}
       {failures.length > 0 && (
         <FailureGroups
           failures={failures}
@@ -56,6 +60,37 @@ export function AgentDashboard({
           agentName={agentName}
         />
       )}
+    </div>
+  );
+}
+
+function ToolUsage({ toolUsage }: { toolUsage: AgentToolUsage[] }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-foreground-weak text-sm font-medium uppercase tracking-widest">
+        Tool usage (30d)
+      </span>
+      <ul className="divide-border bg-surface border-border flex flex-col divide-y overflow-hidden rounded-lg border">
+        {toolUsage.map((t) => (
+          <li
+            key={t.toolName}
+            className="flex items-baseline justify-between gap-3 px-3 py-2"
+          >
+            <code className="text-foreground truncate text-sm">
+              {t.toolName}
+            </code>
+            <span className="text-foreground-weak shrink-0 text-sm">
+              ×{t.calls.toLocaleString("en-US")}
+              {t.failed > 0 && (
+                <span className="text-sentiment-negative">
+                  {" "}
+                  · {t.failed} failed
+                </span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

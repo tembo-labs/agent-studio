@@ -709,6 +709,47 @@ export async function listToolCallsForRun(
   }));
 }
 
+// Per-tool usage for an agent over the last 30 days — which tools it leans
+// on and how often each fails. Mirrors listAgentFailureGroups30d.
+export type AgentToolUsage = {
+  toolName: string;
+  calls: number;
+  ok: number;
+  failed: number;
+};
+
+export async function listAgentToolUsage30d(
+  workspaceId: string,
+  agentName: string,
+  limit = 50,
+): Promise<AgentToolUsage[]> {
+  const { rows } = await db.query<{
+    tool_name: string;
+    calls: string;
+    ok: string;
+    failed: string;
+  }>(
+    `SELECT tc.tool_name,
+            COUNT(*)::TEXT                              AS calls,
+            COUNT(*) FILTER (WHERE tc.ok IS TRUE)::TEXT  AS ok,
+            COUNT(*) FILTER (WHERE tc.ok IS FALSE)::TEXT AS failed
+       FROM run_tool_call tc
+       JOIN run r ON r.id = tc.run_id
+      WHERE r.workspace_id = $1 AND r.agent_name = $2
+        AND r.created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY tc.tool_name
+      ORDER BY calls DESC, tc.tool_name ASC
+      LIMIT $3`,
+    [workspaceId, agentName, limit],
+  );
+  return rows.map((r) => ({
+    toolName: r.tool_name,
+    calls: Number(r.calls),
+    ok: Number(r.ok),
+    failed: Number(r.failed),
+  }));
+}
+
 export async function listRecentRunsForAgent(
   workspaceId: string,
   agentName: string,
