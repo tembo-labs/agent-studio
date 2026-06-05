@@ -3,6 +3,14 @@ import "server-only";
 import { createHash } from "node:crypto";
 
 import type { Framework } from "@/lib/agent-framework";
+import { listMcpProviders } from "@/lib/mcp-providers";
+
+// Backtick-wrapped slugs of the current Native MCP catalog, interpolated
+// into the guide so it always lists the live providers (and the guidance
+// version hash changes when the catalog does → repos re-bootstrap).
+const NATIVE_MCP_SLUGS: string = listMcpProviders()
+  .map((p) => "`" + p.slug + "`")
+  .join(", ");
 
 // Guidance files dropped into the customer's repo alongside their
 // first agent. The Tembo Coding Agent reads these before editing so
@@ -356,10 +364,20 @@ them per-entry with a \`source:\` field:
 | \`source:\`    | When to pick it                                     |
 |---------------|-----------------------------------------------------|
 | \`composio\`    | Default. ~250 services wrapped as REST tools by Composio. Slugs are lowercase (\`slack\`, \`googlesheets\`). |
-| \`native-mcp\`  | Provider has an official MCP server — richer tools, schema-aware operations, fewer round trips. Use when available. Slugs from TAS's native catalog (today: \`attio\`). |
+| \`native-mcp\`  | Provider has an official MCP server — richer tools, schema-aware operations, fewer round trips, TAS-managed OAuth (no per-customer credentials). Slugs from TAS's native catalog (currently: ${NATIVE_MCP_SLUGS}). |
 
 The default when \`source:\` is omitted is \`composio\` — existing
 agents need no edit.
+
+**Prefer Native MCP over Composio when the provider is in TAS's
+native catalog above.** It uses the provider's official MCP server
+(better, schema-aware tools) and TAS-managed OAuth (the user just
+clicks Connect — no bring-your-own OAuth app). Only use the
+Composio \`source\` for a provider that isn't in the native catalog.
+Note the tool slugs differ between the two substrates for the same
+provider — if you switch a connection from Composio to native (or
+vice-versa), re-copy the tool slugs from the Tools tab; the old
+\`tools:\` list won't match.
 
 **Canonical form** — named slot + narrow tools for Composio, named
 slot for Native MCP. Pin the slot name (so users can hold multiple
@@ -467,10 +485,11 @@ credentials. Some (often \`*_mcp\` ones) are bring-your-own-auth —
 an admin must create a custom auth config for them once at
 dashboard.composio.dev before they can be connected.
 
-**Native MCP providers** (as of v0.4): \`attio\`. The catalog grows
-when TAS adds an entry to \`lib/mcp-providers.ts\` — check the
-Connections page's "Native MCP connections" section for the
-current list. If a provider you want isn't there, fall back to
+**Native MCP providers** (currently: ${NATIVE_MCP_SLUGS}). The
+catalog grows when TAS adds an entry to \`lib/mcp-providers.ts\` —
+check the Connections page's "Native MCP connections" section for
+the current list. If the provider you need IS here, use
+\`source: native-mcp\` (preferred). If it isn't, fall back to
 \`composio\` (assuming the service has a Composio toolkit).
 
 Studio rules:
