@@ -90,6 +90,10 @@ pub struct PydanticArgs<'a> {
     /// (provider, name) slot, with the bearer token in
     /// Authorization headers.
     pub native_mcp_connections_json: Option<&'a str>,
+    /// Sidecar Python module source (the agent's `tools_module:`),
+    /// surfaced as `TAS_TOOLS_MODULE_CONTENT`. The wrapper execs it and
+    /// exposes its `tools = [...]` export to the agent. None = no module.
+    pub tools_module_content: Option<&'a str>,
     /// Workspace + user the run executes under. Used to flip a
     /// `workspace_composio_connection` row's status to `STALE` if
     /// the Python wrapper detects Composio's
@@ -195,6 +199,11 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
     // decode error.
     if let Some(native_json) = args.native_mcp_connections_json {
         cmd.env("TAS_NATIVE_MCP_CONNECTIONS", native_json);
+    }
+    // Sidecar tools module source — wrapper execs it and exposes its
+    // `tools = [...]` export. Only set when the agent declared one.
+    if let Some(tools_module) = args.tools_module_content {
+        cmd.env("TAS_TOOLS_MODULE_CONTENT", tools_module);
     }
 
     let mut child = cmd.spawn().context("failed to spawn pydantic-ai wrapper")?;

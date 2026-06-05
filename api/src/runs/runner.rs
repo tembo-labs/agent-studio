@@ -58,6 +58,10 @@ pub struct RunContext {
     /// Spec content format — YAML or JSON. Drives Python wrapper's
     /// --fmt flag (Pydantic) or selects the JSON parser (Cargo AI).
     pub spec_format: SpecFormat,
+    /// Optional sidecar Python module (the Pydantic agent's
+    /// `tools_module:`) passed to the wrapper as TAS_TOOLS_MODULE_CONTENT.
+    /// Pydantic-only; cargo-ai ignores it.
+    pub tools_module_content: Option<String>,
 }
 
 struct RunOutcome {
@@ -416,6 +420,7 @@ async fn run_pydantic(
         composio_user_id: composio_key.as_ref().map(|_| composio_user_id.as_str()),
         composio_connected_accounts_json: composio_connected_accounts_json.as_deref(),
         native_mcp_connections_json: native_mcp_connections_json.as_deref(),
+        tools_module_content: ctx.tools_module_content.as_deref(),
         workspace_id: ctx.workspace_id,
         acting_user_id: ctx.acting_user_id.as_str(),
         db: &state.db,

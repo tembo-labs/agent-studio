@@ -31,6 +31,10 @@ export type CreateRunInput = {
   framework?: "pydantic-agentspec" | "cargo-ai";
   specContent?: string;
   specFormat?: "yaml" | "json";
+  // Optional sidecar Python module (the agent's `tools_module:`) whose
+  // functions the pydantic wrapper exposes to the model as tools. Read
+  // from the repo at dispatch time; runtime-only (not persisted).
+  toolsModuleContent?: string;
   // Defaults to "manual" on the API side. Slack/webhook dispatch passes
   // "event" so the run is attributed correctly in /runs.
   trigger?: RunTrigger;
@@ -128,6 +132,7 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
       framework: input.framework,
       spec_content: input.specContent,
       spec_format: input.specFormat,
+      tools_module_content: input.toolsModuleContent,
       trigger: input.trigger,
       agent_version_id: input.agentVersionId,
       agent_version_label: input.agentVersionLabel,

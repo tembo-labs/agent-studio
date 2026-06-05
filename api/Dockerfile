@@ -56,9 +56,21 @@ RUN python3 -m venv "${PYDANTIC_AI_VENV}" && \
     "${PYDANTIC_AI_VENV}/bin/pip" install --no-cache-dir \
         'pydantic-ai[mcp]==1.102.0' pyyaml==6.0.2 composio==0.13.1
 
+# Extra deps for agent sidecar tool modules (`tools_module:`). Ships
+# empty; customers add ETL libraries (pandas, drivers, …) here and
+# redeploy. Installed into the same venv so tool functions can import
+# them. Separate layer + file so a deps change doesn't re-pull the
+# pinned core packages above. See scripts/requirements-tools.txt.
+COPY scripts/requirements-tools.txt /opt/requirements-tools.txt
+RUN "${PYDANTIC_AI_VENV}/bin/pip" install --no-cache-dir \
+        -r /opt/requirements-tools.txt
+
 COPY --from=builder /app/tas-api /usr/local/bin/tas-api
 COPY --from=builder /opt/cargo-ai/bin/cargo-ai /usr/local/bin/cargo-ai
 COPY scripts/run_pydantic.py /usr/local/bin/run_pydantic.py
+# Sidecar-tools helper importable by tool modules (`import tas_tools`).
+# Lives next to the wrapper; the wrapper adds this dir to sys.path.
+COPY scripts/tas_tools.py /usr/local/bin/tas_tools.py
 
 # Drop to a non-root user for the runtime. The run path shells out to
 # cargo-ai and the pydantic venv but writes nothing to disk (spec in via

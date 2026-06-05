@@ -178,6 +178,20 @@ export async function sendToAgentAction(args: {
 
   const model = spec.model ?? "";
 
+  // A declared sidecar tools_module that couldn't be read is a hard
+  // error (same as the Run-now dispatch) — running without the agent's
+  // tools would silently change its behavior.
+  if (
+    spec.framework === "pydantic-agentspec" &&
+    spec.toolsModule &&
+    !result.toolsModuleContent
+  ) {
+    return {
+      ok: false,
+      error: `Agent declares tools_module "${spec.toolsModule}" but it couldn't be loaded from the repo.`,
+    };
+  }
+
   try {
     const res = await createRun({
       workspaceId: workspace.id,
@@ -189,6 +203,7 @@ export async function sendToAgentAction(args: {
       framework,
       specContent: result.raw,
       specFormat: agent.format,
+      toolsModuleContent: result.toolsModuleContent,
       // Chat is the iterate-on-draft surface — always runs the live file.
       agentVersionId: null,
       agentVersionLabel: "draft",

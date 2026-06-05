@@ -46,6 +46,12 @@ pub struct CreateRunRequest {
     /// to change.
     #[serde(default)]
     pub spec_format: Option<String>,
+    /// Optional sidecar Python module (the Pydantic agent's
+    /// `tools_module:`) whose functions the wrapper exposes to the
+    /// model as tools. The web layer reads it from the repo at dispatch
+    /// time; transient like spec_content (not persisted on the run row).
+    #[serde(default)]
+    pub tools_module_content: Option<String>,
     /// Where the run came from. Defaults to "manual" so existing
     /// callers (Run-now button, chat) don't need to change. The
     /// scheduler passes "schedule" + automation_id when firing on
@@ -118,6 +124,7 @@ pub async fn create_run(
         .map(parse_framework)
         .unwrap_or(runner::Framework::Pydantic);
     let spec_content = req.spec_content;
+    let tools_module_content = req.tools_module_content;
     let spec_format = match req.spec_format.as_deref() {
         Some("yaml") => runner::SpecFormat::Yaml,
         // JSON is the default so cargo-ai callers (which never
@@ -143,6 +150,7 @@ pub async fn create_run(
                 framework,
                 spec_content,
                 spec_format,
+                tools_module_content,
             },
         )
         .await;

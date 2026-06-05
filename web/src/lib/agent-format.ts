@@ -74,6 +74,14 @@ export type PydanticAgentSpec = AgentSpecBase & {
    * automation.owner_user_id).
    */
   connections: AgentConnection[];
+  /**
+   * Optional sidecar Python module of custom tool functions the model
+   * may call (e.g. deterministic ETL transforms). A bare filename
+   * resolved in the spec's own directory — the runner reads it and
+   * exposes its `tools = [...]` export to pydantic-ai. Undefined = no
+   * module. See context AGENT_FORMAT.md → "Sidecar tools".
+   */
+  toolsModule?: string;
 };
 
 export type CargoAiSpec = AgentSpecBase & {
@@ -159,8 +167,24 @@ function parsePydanticSpec(
       model,
       instructions,
       connections,
+      toolsModule: parseToolsModuleField(obj.tools_module),
     },
   };
+}
+
+/**
+ * Accept `tools_module: foo.py` — a bare `.py` filename resolved in the
+ * spec's own directory. Reject anything with a path separator (no
+ * `../`, no absolute paths): the module must be a sibling of the spec.
+ * Returns undefined for absent / malformed values so the agent runs
+ * with no sidecar tools.
+ */
+function parseToolsModuleField(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim();
+  if (!v || v.includes("/") || v.includes("\\")) return undefined;
+  if (!v.toLowerCase().endsWith(".py")) return undefined;
+  return v;
 }
 
 /**

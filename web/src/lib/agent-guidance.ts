@@ -352,6 +352,71 @@ Common capabilities:
   supported).
 - \`FileSearch\` — provider-native file retrieval.
 
+### tools_module (TAS extension — deterministic Python tools)
+
+Point the agent at a sibling Python file of **deterministic functions
+the model calls as tools**. Use this when work is rote — data
+transforms, scoring, matching, pagination loops, ETL — so the function
+runs in Python at **no token cost** and the LLM just *supervises* which
+function to call. This is the cost + speed lever versus making the model
+do everything through MCP/Composio tool calls.
+
+\`\`\`yaml
+name: revenue-rollup
+model: anthropic:claude-sonnet-4-6
+tools_module: revenue_tools.py        # a sibling file: agents/pydantic-agentspec/revenue_tools.py
+instructions: |
+  Call summarize_arr to compute the monthly ARR waterfall, then post a
+  one-paragraph summary. Don't recompute anything yourself.
+\`\`\`
+
+Rules:
+
+- **\`tools_module\`** is a **bare filename** (no \`/\`, no \`..\`),
+  resolved next to the agent spec. It must end in \`.py\`.
+- The module **must** define a top-level \`tools = [...]\` list of the
+  functions to expose. Helpers not in that list stay private.
+- pydantic-ai builds each tool's schema from the **function signature +
+  docstring** — so type the parameters and write a clear one-line
+  docstring. That text is what the model sees.
+- A declared module that's missing from the repo (or whose \`tools\`
+  list is empty / non-callable) **fails the run** loudly — it never
+  silently runs without the tools.
+- Tool calls show up in the run detail + the **Tool uses** view by
+  function name, same as MCP tools.
+
+**Auth flows through Connections — never hardcode a key.** When a tool
+needs to reach an external system, import the bundled \`tas_tools\`
+helper and ask for a connection the agent already declares under
+\`connections:\` (Native MCP only — its OAuth token also works against
+the provider's REST API):
+
+\`\`\`python
+# agents/pydantic-agentspec/revenue_tools.py
+import httpx
+import tas_tools
+
+def list_companies() -> list[dict]:
+    """Return all Attio companies."""
+    c = tas_tools.connection("attio")          # the agent's attio connection
+    r = httpx.get(
+        "https://api.attio.com/v2/objects/companies/records/query",
+        headers={"Authorization": f"Bearer {c.access_token}"},
+    )
+    r.raise_for_status()
+    return r.json()["data"]
+
+def summarize_arr(records: list[dict]) -> dict:
+    """Compute the monthly ARR waterfall from company records."""
+    ...
+
+tools = [list_companies, summarize_arr]
+\`\`\`
+
+Standard library + \`httpx\` + \`pydantic\` are available. For other
+third-party deps (pandas, drivers), add a pinned line to
+\`api/scripts/requirements-tools.txt\` in the TAS deployment and redeploy.
+
 ### connections
 
 External services this agent calls at run time. Each entry resolves

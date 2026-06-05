@@ -72,8 +72,12 @@ export default async function AgentDetailPage({
 
   const result = await getAgentByName(workspace.id, agentName);
   if (!result) notFound();
-  const { agent, raw } = result;
+  const { agent, raw, toolsModuleContent } = result;
   const canonicalName = agent.ok ? agent.spec.name : agentName;
+  const toolsModule =
+    agent.ok && agent.spec.framework === "pydantic-agentspec"
+      ? agent.spec.toolsModule
+      : undefined;
 
   const [
     recentRuns,
@@ -314,6 +318,26 @@ export default async function AgentDetailPage({
             {raw}
           </pre>
         </Section>
+
+        {toolsModule && (
+          <Section
+            title="Tools module"
+            description={`Deterministic Python functions the model calls as tools, from ${toolsModule}. Runs in the agent's process with no token cost — the LLM supervises which functions to call.`}
+          >
+            {toolsModuleContent ? (
+              <pre className="bg-surface border-border text-foreground overflow-x-auto rounded-lg border p-4 font-mono text-sm leading-5">
+                {toolsModuleContent}
+              </pre>
+            ) : (
+              <p className="text-sentiment-negative text-sm">
+                The spec references{" "}
+                <code className="font-mono">{toolsModule}</code> but it
+                couldn&apos;t be read from the repo. Runs will fail until the
+                file is added next to the agent.
+              </p>
+            )}
+          </Section>
+        )}
       </div>
     </div>
   );

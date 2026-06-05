@@ -1,0 +1,18 @@
+# Extra Python dependencies for agent sidecar tool modules.
+#
+# An agent can declare `tools_module: foo.py` — a sibling Python file of
+# deterministic functions the model calls as tools (ETL transforms,
+# scoring, matching, etc.). If those functions need third-party libraries
+# beyond the standard library + what pydantic-ai already bundles (httpx,
+# pydantic), add them here, pin a version, and redeploy. They get
+# installed into the same wrapper venv (/opt/pydantic-ai) at image build,
+# so a rebuild of a given image tag stays reproducible.
+#
+# This file ships empty: pure-compute tools and simple HTTP (via the
+# already-available httpx) need nothing extra. Add deps via PR so the
+# change is reviewable — same discipline as the pinned core packages in
+# the Dockerfile.
+#
+# Example:
+#   pandas==2.2.3
+#   sqlalchemy==2.0.36

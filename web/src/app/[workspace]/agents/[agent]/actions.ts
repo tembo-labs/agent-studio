@@ -160,6 +160,7 @@ export async function runNowAction(
       framework: r.framework,
       specContent: r.specContent,
       specFormat: r.specFormat,
+      toolsModuleContent: r.toolsModuleContent,
       userMessage,
       agentVersionId: r.versionId,
       agentVersionLabel: r.versionLabel,

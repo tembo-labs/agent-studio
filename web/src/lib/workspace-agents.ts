@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   detectFormat,
+  parseAgentContent,
   parseAgentFile,
   type AgentFileFormat,
   type AgentSpec,
@@ -38,6 +39,79 @@ const FRAMEWORK_DIRS: Record<Framework, string> = {
 };
 
 const FRAMEWORK_DIR_VALUES = Object.values(FRAMEWORK_DIRS);
+
+// ── Sidecar tools module ─────────────────────────────────────────────
+//
+// A Pydantic agent may declare `tools_module: foo.py` — a sibling Python
+// file of deterministic tool functions the model can call. We resolve it
+// next to the spec, read it from the repo, and thread the source through
+// to the runner (which hands it to the pydantic wrapper). Pure-data
+// passthrough: the web layer never executes it.
+
+/** Hard cap so a runaway file can't blow past the subprocess env limit. */
+const TOOLS_MODULE_MAX_BYTES = 256 * 1024;
+
+/** The `tools_module` value, only meaningful for Pydantic specs. */
+function specToolsModule(spec: AgentSpec): string | undefined {
+  return spec.framework === "pydantic-agentspec" ? spec.toolsModule : undefined;
+}
+
+/** Resolve a bare filename in the same directory as the agent file. */
+function siblingPath(agentPath: string, filename: string): string {
+  const slash = agentPath.lastIndexOf("/");
+  const dir = slash >= 0 ? agentPath.slice(0, slash + 1) : "";
+  return `${dir}${filename}`;
+}
+
+async function readToolsModuleContent(
+  token: string,
+  ref: RepoRef,
+  agentPath: string,
+  toolsModule: string,
+): Promise<{ ok: true; content: string } | { ok: false; detail: string }> {
+  const path = siblingPath(agentPath, toolsModule);
+  const read = await readFile(token, ref, path);
+  if (!read.ok) {
+    return {
+      ok: false,
+      detail:
+        read.error === "not-found"
+          ? `referenced tools module "${path}" was not found in the repo`
+          : (read.detail ?? read.error),
+    };
+  }
+  if (read.content.length > TOOLS_MODULE_MAX_BYTES) {
+    return {
+      ok: false,
+      detail: `tools module "${path}" exceeds the ${TOOLS_MODULE_MAX_BYTES}-byte limit`,
+    };
+  }
+  return { ok: true, content: read.content };
+}
+
+/**
+ * Strict load used at dispatch time. No declared module → ok with no
+ * content. Declared but unreadable → error (the spec asked for it, so we
+ * fail the run loudly rather than silently dropping the agent's tools).
+ */
+async function loadDispatchToolsModule(
+  workspaceId: string,
+  agentPath: string,
+  toolsModule: string | undefined,
+): Promise<{ ok: true; content?: string } | { ok: false; detail: string }> {
+  if (!toolsModule) return { ok: true };
+  const repo = await getWorkspaceRepo(workspaceId);
+  if (!repo) return { ok: false, detail: "no connected repo" };
+  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
+  const ref: RepoRef = {
+    owner: repo.owner,
+    name: repo.name,
+    branch: repo.defaultBranch,
+  };
+  const res = await readToolsModuleContent(token, ref, agentPath, toolsModule);
+  if (!res.ok) return res;
+  return { ok: true, content: res.content };
+}
 
 export type ListedAgent =
   | {
@@ -163,6 +237,10 @@ export async function getAgentByName(
 ): Promise<{
   agent: ListedAgent;
   raw: string;
+  /** Source of the declared `tools_module` sibling, if present + readable.
+   *  Best-effort here (undefined on any failure) — dispatch does the
+   *  strict load that surfaces a missing module as a run error. */
+  toolsModuleContent?: string;
 } | null> {
   const list = await listAgents(workspaceId);
   if (!list.ok) return null;
@@ -177,13 +255,22 @@ export async function getAgentByName(
   const repo = await getWorkspaceRepo(workspaceId);
   if (!repo) return null;
   const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
-  const read = await readFile(
-    token,
-    { owner: repo.owner, name: repo.name, branch: repo.defaultBranch },
-    match.path,
-  );
+  const ref: RepoRef = {
+    owner: repo.owner,
+    name: repo.name,
+    branch: repo.defaultBranch,
+  };
+  const read = await readFile(token, ref, match.path);
   if (!read.ok) return null;
-  return { agent: match, raw: read.content };
+
+  let toolsModuleContent: string | undefined;
+  const toolsModule = match.ok ? specToolsModule(match.spec) : undefined;
+  if (toolsModule) {
+    const mod = await readToolsModuleContent(token, ref, match.path, toolsModule);
+    if (mod.ok) toolsModuleContent = mod.content;
+  }
+
+  return { agent: match, raw: read.content, toolsModuleContent };
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -207,6 +294,10 @@ export type ResolvedDispatch = {
   versionId: string | null;
   /** Human label for the run row / UI: "v3" or "draft". */
   versionLabel: string;
+  /** Source of the agent's `tools_module` sibling, if declared. The
+   *  module is read live from the default branch (not snapshotted with
+   *  the version yet); a declared-but-missing module fails resolution. */
+  toolsModuleContent?: string;
 };
 
 export type ResolveDispatchError =
@@ -236,6 +327,29 @@ export async function resolveAgentForDispatch(
           },
         };
       }
+      // The version snapshot froze the spec, but not the sibling `.py`
+      // (v1) — re-read the declared module from the live default branch.
+      const stableParsed = parseAgentContent(
+        stable.specContent,
+        stable.specFormat,
+      );
+      const stableToolsModule = stableParsed.ok
+        ? specToolsModule(stableParsed.spec)
+        : undefined;
+      const stableMod = await loadDispatchToolsModule(
+        workspaceId,
+        stable.agentPath,
+        stableToolsModule,
+      );
+      if (!stableMod.ok) {
+        return {
+          ok: false,
+          error: {
+            kind: "invalid",
+            message: `Agent "${agentName}" declares a tools_module that couldn't be loaded: ${stableMod.detail}`,
+          },
+        };
+      }
       return {
         ok: true,
         resolved: {
@@ -247,6 +361,7 @@ export async function resolveAgentForDispatch(
           specFormat: stable.specFormat,
           versionId: stable.id,
           versionLabel: `v${stable.versionNumber}`,
+          toolsModuleContent: stableMod.content,
         },
       };
     }
@@ -284,6 +399,20 @@ export async function resolveAgentForDispatch(
       },
     };
   }
+  const mod = await loadDispatchToolsModule(
+    workspaceId,
+    found.agent.path,
+    specToolsModule(spec),
+  );
+  if (!mod.ok) {
+    return {
+      ok: false,
+      error: {
+        kind: "invalid",
+        message: `Agent "${agentName}" declares a tools_module that couldn't be loaded: ${mod.detail}`,
+      },
+    };
+  }
   return {
     ok: true,
     resolved: {
@@ -295,6 +424,7 @@ export async function resolveAgentForDispatch(
       specFormat: found.agent.format,
       versionId: null,
       versionLabel: "draft",
+      toolsModuleContent: mod.content,
     },
   };
 }

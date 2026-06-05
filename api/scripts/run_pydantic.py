@@ -39,6 +39,52 @@ from pydantic_ai import Agent, capture_run_messages
 USAGE_SENTINEL = "__TAS_USAGE__:"
 TOOLS_SENTINEL = "__TAS_TOOLS__:"
 
+# Sidecar Python tools: the agent's `tools_module:` sibling source, read
+# from the repo by the web layer and handed to us via env. We exec it and
+# expose its `tools = [...]` export to the agent as callable functions —
+# deterministic work the model supervises instead of paying tokens for.
+TOOLS_MODULE_ENV = "TAS_TOOLS_MODULE_CONTENT"
+
+
+def load_tools_module(source: str) -> list:
+    """Exec a sidecar tools module and return its `tools` export.
+
+    The module must define a top-level `tools = [...]` list of callables;
+    pydantic-ai derives each tool's JSON schema from the function
+    signature + docstring. We expose only that explicit list — private
+    helpers in the module stay private. The source is customer-owned repo
+    code (lands via the same PR review as the spec) and runs single-tenant
+    on the customer's server, so executing it is no more privileged than
+    the agent itself. Raises ValueError with an actionable message so a
+    bad module surfaces as a clear run failure.
+    """
+    # Make `import tas_tools` resolve to the helper shipped next to this
+    # wrapper (the connection-credential bridge for tool I/O).
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+
+    module_globals: dict = {"__name__": "tas_agent_tools"}
+    try:
+        code = compile(source, "<tas_tools_module>", "exec")
+        # Trusted, customer-authored repo code — see docstring.
+        exec(code, module_globals)  # noqa: S102
+    except Exception as e:
+        raise ValueError(f"failed to import tools_module: {e}") from e
+    tools = module_globals.get("tools")
+    if not isinstance(tools, list) or not tools:
+        raise ValueError(
+            "tools_module must define a non-empty top-level `tools = [...]` "
+            "list of functions"
+        )
+    non_callable = [t for t in tools if not callable(t)]
+    if non_callable:
+        raise ValueError(
+            "every entry in the tools_module `tools` list must be callable; "
+            f"found {len(non_callable)} non-callable entry(ies)"
+        )
+    return tools
+
 
 def tool_calls_payload(messages) -> list[dict]:
     """Extract the tool calls (name + outcome) from a run's message history.
@@ -282,6 +328,7 @@ def build_agent(
     toolsets: list | None = None,
     connections: list[str] | None = None,
     direct_tools: bool = False,
+    tools: list | None = None,
 ) -> Agent:
     """Construct a pydantic_ai.Agent from a TAS AgentSpec dict.
 
@@ -345,6 +392,12 @@ def build_agent(
         kwargs["instrument"] = instrument
     if toolsets:
         kwargs["toolsets"] = toolsets
+    # Sidecar Python functions from the agent's `tools_module:`. These
+    # coexist with MCP/Composio toolsets — pydantic-ai exposes both to
+    # the model. Schemas are derived from each function's signature +
+    # docstring, so well-documented functions get good tool schemas.
+    if tools:
+        kwargs["tools"] = tools
 
     return Agent(model, **kwargs)
 
@@ -641,11 +694,26 @@ async def run(spec: dict, user_message: str) -> None:
         if toolsets
         else None
     )
+
+    # Sidecar tools module (the agent's `tools_module:`), if declared.
+    # A parse/validation failure here propagates out of run() and marks
+    # the run failed — the spec asked for these tools, so silently
+    # dropping them would change the agent's behavior.
+    tools_src = os.environ.get(TOOLS_MODULE_ENV)
+    direct_tools_fns = load_tools_module(tools_src) if tools_src else None
+    if direct_tools_fns:
+        sys.stderr.write(
+            f"[tas] loaded {len(direct_tools_fns)} sidecar tool function(s) "
+            f"from tools_module: "
+            f"{[getattr(f, '__name__', '?') for f in direct_tools_fns]}\n"
+        )
+
     agent = build_agent(
         spec,
         toolsets=toolsets or None,
         connections=preamble_labels,
         direct_tools=direct_mode,
+        tools=direct_tools_fns,
     )
 
     # MCP toolsets are async context managers — pydantic-ai keeps the
