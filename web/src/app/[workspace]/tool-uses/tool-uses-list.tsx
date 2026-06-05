@@ -236,7 +236,7 @@ export function ToolUsesList({
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2 align-top">
+                    <td className="px-3 py-2 align-top whitespace-nowrap">
                       <Link
                         href={`/${workspaceSlug}/agents/${encodeURIComponent(t.agentName)}`}
                         onClick={(e) => e.stopPropagation()}
@@ -245,10 +245,10 @@ export function ToolUsesList({
                         {t.agentName}
                       </Link>
                     </td>
-                    <td className="text-foreground-weak px-3 py-2 align-top text-sm">
+                    <td className="text-foreground-weak px-3 py-2 align-top whitespace-nowrap text-sm">
                       <When iso={t.createdAt} />
                     </td>
-                    <td className="px-3 py-2 align-top">
+                    <td className="px-3 py-2 align-top whitespace-nowrap">
                       <Link
                         href={runHref}
                         onClick={(e) => e.stopPropagation()}
