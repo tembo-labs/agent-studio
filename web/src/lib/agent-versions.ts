@@ -154,26 +154,28 @@ export async function promoteToStable(
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    const next = await client.query<{ n: number }>(
-      `SELECT COALESCE(MAX(version_number), 0) + 1 AS n
-         FROM agent_version
-        WHERE workspace_id = $1 AND agent_name = $2
-        FOR UPDATE`,
-      [input.workspaceId, input.agentName],
-    );
-    const versionNumber = next.rows[0].n;
+    // Serialize concurrent promotions of the same agent for this txn so two
+    // can't pick the same version_number. (FOR UPDATE can't be combined with
+    // the MAX() aggregate, so we use a per-(workspace,agent) advisory lock;
+    // the UNIQUE constraint is the backstop.) Released at COMMIT/ROLLBACK.
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+      `${input.workspaceId}/${input.agentName}`,
+    ]);
     const inserted = await client.query<Row>(
       `INSERT INTO agent_version
          (workspace_id, agent_name, agent_path, version_number, framework,
           model, spec_content, spec_format, source_commit_sha, stage,
           change_summary, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'stable', $10, $11)
+       VALUES (
+         $1, $2, $3,
+         (SELECT COALESCE(MAX(version_number), 0) + 1 FROM agent_version
+           WHERE workspace_id = $1 AND agent_name = $2),
+         $4, $5, $6, $7, $8, 'stable', $9, $10)
        RETURNING ${SELECT}`,
       [
         input.workspaceId,
         input.agentName,
         input.agentPath,
-        versionNumber,
         input.framework,
         input.model,
         input.specContent,

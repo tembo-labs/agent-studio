@@ -40,6 +40,19 @@ export function AgentOwnerControl({
   );
   useActionToast(state);
 
+  // Disambiguate the picker: append the email only when two members share a
+  // display name, so identical names are distinguishable.
+  const nameCounts = new Map<string, number>();
+  for (const m of members) {
+    if (m.name) nameCounts.set(m.name, (nameCounts.get(m.name) ?? 0) + 1);
+  }
+  const labelFor = (m: Member): string =>
+    m.name
+      ? (nameCounts.get(m.name) ?? 0) > 1
+        ? `${m.name} (${m.email})`
+        : m.name
+      : m.email;
+
   if (editing && canAssign) {
     return (
       <form
@@ -61,7 +74,7 @@ export function AgentOwnerControl({
           </option>
           {members.map((m) => (
             <option key={m.userId} value={m.userId}>
-              {m.name ?? m.email}
+              {labelFor(m)}
             </option>
           ))}
         </select>

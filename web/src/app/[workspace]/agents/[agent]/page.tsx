@@ -117,10 +117,19 @@ export default async function AgentDetailPage({
     ? allMembers.map((m) => ({ userId: m.userId, name: m.name, email: m.email }))
     : undefined;
 
-  // Lifecycle derived state.
+  // Lifecycle derived state. Disambiguate display names by email when two
+  // members share a name.
+  const nameCounts = new Map<string, number>();
+  for (const m of allMembers) {
+    if (m.name) nameCounts.set(m.name, (nameCounts.get(m.name) ?? 0) + 1);
+  }
   const nameFor = (userId: string): string => {
     const m = allMembers.find((x) => x.userId === userId);
-    return m ? (m.name ?? m.email) : "unknown";
+    if (!m) return "unknown";
+    if (!m.name) return m.email;
+    return (nameCounts.get(m.name) ?? 0) > 1
+      ? `${m.name} (${m.email})`
+      : m.name;
   };
   const ownerLabel = owner ? nameFor(owner.ownerUserId) : null;
   const isOwner = owner?.ownerUserId === session.user.id;

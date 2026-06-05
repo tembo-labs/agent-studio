@@ -86,9 +86,17 @@ async function getOrCreateManagedAuthConfigId(
     toolkit,
     isComposioManaged: true,
   });
-  const items = list.items ?? [];
-  if (items.length > 0) {
-    return items[0].id;
+  // Defensive: the list call sometimes returns auth configs for *other*
+  // toolkits (the toolkit filter isn't always honored for managed configs),
+  // so trusting items[0] could hand back e.g. Linear's config for a Pylon
+  // connect — opening the wrong provider's OAuth. Only accept a config
+  // whose toolkit slug actually matches; otherwise create a fresh one.
+  const wanted = toolkit.toLowerCase();
+  const match = (list.items ?? []).find(
+    (i) => i.toolkit?.slug?.toLowerCase() === wanted,
+  );
+  if (match) {
+    return match.id;
   }
 
   const created = await c.authConfigs.create(toolkit, {
