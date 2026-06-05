@@ -750,6 +750,124 @@ export async function listAgentToolUsage30d(
   }));
 }
 
+// ── Workspace-wide tool-call log (the "Tool uses" page) ──────────────
+
+export type ToolCallOutcome = "ok" | "failed" | "no-result";
+
+export type ToolCallListFilters = {
+  agentName?: string;
+  toolName?: string;
+  outcomes?: ToolCallOutcome[];
+  /** ILIKE across tool_name + error_message. */
+  search?: string;
+};
+
+export type ToolCallListItem = {
+  id: string;
+  runId: string;
+  agentName: string;
+  toolName: string;
+  ok: boolean | null;
+  errorMessage: string | null;
+  createdAt: Date;
+};
+
+const LIST_TOOL_CALLS_MAX_PAGE = 50;
+
+/** Distinct tool names called in the workspace in the last 30 days — the
+ *  "Tool" filter dropdown on the Tool uses page. */
+export async function listToolNamesForWorkspace(
+  workspaceId: string,
+): Promise<string[]> {
+  const { rows } = await db.query<{ tool_name: string }>(
+    `SELECT DISTINCT tc.tool_name
+       FROM run_tool_call tc
+       JOIN run r ON r.id = tc.run_id
+      WHERE r.workspace_id = $1
+        AND r.created_at >= NOW() - INTERVAL '30 days'
+      ORDER BY tc.tool_name ASC`,
+    [workspaceId],
+  );
+  return rows.map((r) => r.tool_name);
+}
+
+export async function listToolCallsForWorkspace(
+  workspaceId: string,
+  filters: ToolCallListFilters,
+  // Keyset cursor: tool calls in one run share a created_at (batch insert),
+  // so we page on (created_at, id) to avoid skipping rows at the boundary.
+  options: { limit?: number; before?: { createdAt: Date; id: string } } = {},
+): Promise<ToolCallListItem[]> {
+  const limit = Math.min(
+    Math.max(1, options.limit ?? LIST_TOOL_CALLS_MAX_PAGE),
+    LIST_TOOL_CALLS_MAX_PAGE,
+  );
+  const params: unknown[] = [workspaceId];
+  const where: string[] = [`r.workspace_id = $1`];
+
+  if (filters.agentName && filters.agentName.trim()) {
+    params.push(filters.agentName.trim());
+    where.push(`r.agent_name = $${params.length}`);
+  }
+  if (filters.toolName && filters.toolName.trim()) {
+    params.push(filters.toolName.trim());
+    where.push(`tc.tool_name = $${params.length}`);
+  }
+  if (filters.outcomes && filters.outcomes.length > 0) {
+    const ors = filters.outcomes.map((o) =>
+      o === "ok" ? "tc.ok IS TRUE" : o === "failed" ? "tc.ok IS FALSE" : "tc.ok IS NULL",
+    );
+    where.push(`(${ors.join(" OR ")})`);
+  }
+  if (filters.search && filters.search.trim()) {
+    params.push(`%${filters.search.trim()}%`);
+    where.push(
+      `(tc.tool_name ILIKE $${params.length} OR tc.error_message ILIKE $${params.length})`,
+    );
+  }
+  if (options.before) {
+    params.push(options.before.createdAt);
+    const tsIdx = params.length;
+    params.push(options.before.id);
+    const idIdx = params.length;
+    where.push(`(tc.created_at, tc.id) < ($${tsIdx}, $${idIdx})`);
+  }
+
+  params.push(limit);
+
+  const { rows } = await db.query<{
+    id: string;
+    run_id: string;
+    agent_name: string;
+    tool_name: string;
+    ok: boolean | null;
+    error_message: string | null;
+    created_at: Date;
+  }>(
+    `SELECT tc.id, tc.run_id, r.agent_name, tc.tool_name, tc.ok,
+            tc.error_message, tc.created_at
+       FROM run_tool_call tc
+       JOIN run r ON r.id = tc.run_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY tc.created_at DESC, tc.id DESC
+      LIMIT $${params.length}`,
+    params,
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    runId: r.run_id,
+    agentName: r.agent_name,
+    toolName: r.tool_name,
+    ok: r.ok,
+    errorMessage:
+      r.error_message && r.error_message.length > 0
+        ? r.error_message.slice(0, 240)
+        : null,
+    createdAt: r.created_at,
+  }));
+}
+
 export async function listRecentRunsForAgent(
   workspaceId: string,
   agentName: string,

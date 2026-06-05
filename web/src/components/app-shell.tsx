@@ -140,6 +140,11 @@ export async function AppShell({
             icon={<IconHammer />}
           />
           <SidebarNavItem
+            href={`${home}/tool-uses`}
+            label="Tool uses"
+            icon={<IconHistory />}
+          />
+          <SidebarNavItem
             href={`${home}/improvements`}
             label="Improvements"
             icon={<IconChatBubbles />}
