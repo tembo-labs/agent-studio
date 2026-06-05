@@ -47,5 +47,5 @@ agent's `tools:` list matches the connection's `source:`. See
 Check the agent and workspace [dashboards](/agent-studio/dashboard-and-runs/) for
 failure groups, and the [Audit](/agent-studio/audit-and-roles/) timeline for what
 changed and when. For instance-level problems, see
-[Deploying & operating](/agent-studio/deploying-and-operating/) and the repo's
-`guides/`.
+[Deploying & operating](/agent-studio/deploying-and-operating/) and the
+self-hosting guides.

@@ -1,19 +1,26 @@
-# Deploying TAS to AWS
+---
+title: Deploy on AWS
+description: Deploy TAS on ECS Fargate with RDS for Postgres — managed containers and managed, automatically-backed-up Postgres.
+---
 
 This guide deploys TAS on **ECS Fargate** with **RDS** for Postgres:
 managed containers and managed, automatically-backed-up Postgres. Both
 services run the published GHCR images (`ghcr.io/tembo/tas-api`,
 `ghcr.io/tembo/tas-web` — public, so no ECR mirroring required).
 
-> We deliberately **don't** document a single-EC2 box running the
-> bundled Postgres container — that pattern invites running a database
-> with no backups. Use RDS. If you genuinely want one box, run
-> `compose.release.yaml` on it but still point `DATABASE_URL` at RDS and
-> terminate TLS in front of `web` (see step 5).
+:::note
+We deliberately **don't** document a single-EC2 box running the bundled
+Postgres container — that pattern invites running a database with no backups.
+Use RDS. If you genuinely want one box, run `compose.release.yaml` on it but
+still point `DATABASE_URL` at RDS and terminate TLS in front of `web` (see
+step 5).
+:::
 
-> **Use `x86_64`.** The images are `linux/amd64` only today — do not pick
-> Graviton/`arm64` Fargate (`ARM64` platform) until arm64 images ship,
-> or containers fail with `exec format error`.
+:::caution[Use `x86_64`]
+The images are `linux/amd64` only today — do not pick Graviton/`arm64` Fargate
+(`ARM64` platform) until arm64 images ship, or containers fail with `exec
+format error`.
+:::
 
 The one AWS-specific wrinkle versus Vercel/Railway is **TLS**: AWS
 doesn't hand you HTTPS for free, and better-auth needs an HTTPS origin
@@ -88,8 +95,10 @@ sit in plaintext task JSON):
 | `INSTANCE_ADMIN_EMAILS` | **Required to bootstrap** — comma-separated instance-admin emails. The instance is invite-only; only these admins can sign in to a fresh deployment and create workspaces / invite others. |
 | `TAS_INSTANCE_NAME` | optional brand label |
 
-> Pulling from GHCR needs no credentials (the images are public). To keep
-> images in-account, mirror them to **ECR** and reference the ECR URI.
+:::note
+Pulling from GHCR needs no credentials (the images are public). To keep images
+in-account, mirror them to **ECR** and reference the ECR URI.
+:::
 
 ## 4. web → api private networking
 
@@ -109,11 +118,13 @@ needs **no** load balancer — it's internal only.
   `https://<domain>`, and the Google OAuth client's authorized redirect
   URI to `https://<domain>/api/auth/callback/google`.
 
-> **Sign-in requires the Google OAuth client.** Email/password is
-> disabled, so the stack deploys but no one can log in until it exists.
-> Order: domain/ALB up → set `BETTER_AUTH_URL` → create the Google
-> **Web application** client with the redirect URI above → set
-> `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` → web redeploys.
+:::caution
+**Sign-in requires the Google OAuth client.** Email/password is disabled, so
+the stack deploys but no one can log in until it exists. Order: domain/ALB up →
+set `BETTER_AUTH_URL` → create the Google **Web application** client with the
+redirect URI above → set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` → web
+redeploys.
+:::
 
 ## 6. Deploy + verify
 

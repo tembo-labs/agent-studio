@@ -4,8 +4,8 @@ description: How to self-host a TAS instance and where the operational guides li
 ---
 
 TAS is **self-hosted first** — identity, data, and runtime stay in your
-environment. This page orients you; the detailed, maintained runbooks live in the
-repository's `guides/` directory.
+environment. This page orients you; the detailed, step-by-step runbooks are the
+other pages in this section.
 
 ## Ways to run it
 
@@ -16,16 +16,16 @@ repository's `guides/` directory.
 - **Managed hosts** — the full stack on **Railway** or **AWS** (ECS Fargate +
   RDS), or the web tier on **Vercel** with the API on a long-lived host.
 
-## The maintained guides
+## The step-by-step guides
 
-These live in the repo and are the source of truth for deployment:
-
-- **`guides/CUSTOMER_SETUP.md`** — start here. A zero-to-running checklist of
-  everything to procure and do, from accounts and keys through first sign-in.
-- **`guides/RAILWAY_DEPLOY.md`** — full stack on Railway from published images.
-- **`guides/AWS_DEPLOY.md`** — ECS Fargate + RDS.
-- **`guides/VERCEL_DEPLOY.md`** — web on Vercel, API on Fly/Render, managed
-  Postgres.
+- **[Customer setup](/agent-studio/customer-setup/)** — start here. A
+  zero-to-running checklist of everything to procure and do, from accounts and
+  keys through first sign-in.
+- **[Deploy on Railway](/agent-studio/deploy-railway/)** — full stack on Railway
+  from published images.
+- **[Deploy on AWS](/agent-studio/deploy-aws/)** — ECS Fargate + RDS.
+- **[Deploy on Vercel](/agent-studio/deploy-vercel/)** — web on Vercel, API on
+  Fly/Render, managed Postgres.
 
 ## Architecture in one breath
 

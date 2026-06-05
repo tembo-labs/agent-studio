@@ -68,8 +68,17 @@ export default defineConfig({
           label: "Administration",
           items: [
             { label: "Settings", slug: "settings" },
-            { label: "Deploying & operating", slug: "deploying-and-operating" },
             { label: "Troubleshooting", slug: "troubleshooting" },
+          ],
+        },
+        {
+          label: "Self-hosting",
+          items: [
+            { label: "Overview", slug: "deploying-and-operating" },
+            { label: "Customer setup", slug: "customer-setup" },
+            { label: "Deploy on Railway", slug: "deploy-railway" },
+            { label: "Deploy on AWS", slug: "deploy-aws" },
+            { label: "Deploy on Vercel", slug: "deploy-vercel" },
           ],
         },
       ],

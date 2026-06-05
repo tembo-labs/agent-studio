@@ -1,20 +1,24 @@
-# TAS Customer Setup — from zero
+---
+title: Customer setup — from zero
+description: Everything a new customer needs to procure and do to stand up a working Tembo Agent Studio instance, starting from nothing.
+---
 
 Everything a new customer needs to **procure** and **do** to stand up a working
 Tembo Agent Studio instance, starting from nothing. Each item is tagged
 **Required** or **Optional**.
 
 For platform-specific deploy mechanics, see the companion guides:
-[`RAILWAY_DEPLOY.md`](./RAILWAY_DEPLOY.md) (easiest),
-[`AWS_DEPLOY.md`](./AWS_DEPLOY.md), [`VERCEL_DEPLOY.md`](./VERCEL_DEPLOY.md). The
-full env reference lives in [`.env.example`](../.env.example).
+[Railway](/agent-studio/deploy-railway/) (easiest),
+[AWS](/agent-studio/deploy-aws/), [Vercel](/agent-studio/deploy-vercel/). The
+full env reference lives in
+[`.env.example`](https://github.com/tembo/agent-studio/blob/main/.env.example).
 
-> **Mental model.** TAS is single-tenant: one instance is one organization on
-> your own server. Agents run on **your** LLM provider keys (Anthropic/OpenAI) —
-> Tembo is only involved in the optional chat-to-PR *authoring* flow. The
-> instance is **invite-only by default**, bootstrapped by `INSTANCE_ADMIN_EMAILS`.
-
----
+:::note[Mental model]
+TAS is single-tenant: one instance is one organization on your own server.
+Agents run on **your** LLM provider keys (Anthropic/OpenAI) — Tembo is only
+involved in the optional chat-to-PR *authoring* flow. The instance is
+**invite-only by default**, bootstrapped by `INSTANCE_ADMIN_EMAILS`.
+:::
 
 ## Phase 1 — Procure (accounts & keys)
 
@@ -51,8 +55,6 @@ There is no password login; users sign in through an identity provider.
 - [ ] **Composio API key** — only if agents need tool connections (Slack, Google
   Sheets, Gmail, …). (<https://app.composio.dev/developers>)
 
----
-
 ## Phase 2 — Generate secrets
 
 Generate each with `openssl rand -base64 32`:
@@ -64,8 +66,6 @@ Generate each with `openssl rand -base64 32`:
   services.
 - [ ] `INTERNAL_API_TOKEN` — gates web→api internal calls. Same value on **both**
   services.
-
----
 
 ## Phase 3 — Deploy & configure env
 
@@ -90,8 +90,6 @@ Generate each with `openssl rand -base64 32`:
 - [ ] **Deploy.** Database migrations apply automatically when the api container
   boots.
 
----
-
 ## Phase 4 — First run (as instance admin)
 
 - [ ] Open the URL — the **first-run setup screen** lets you set the **instance
@@ -100,8 +98,6 @@ Generate each with `openssl rand -base64 32`:
   first user and the instance admin.
 - [ ] **Create your first workspace** (only instance admins can create
   workspaces).
-
----
 
 ## Phase 5 — Per-workspace setup
 
@@ -121,8 +117,6 @@ Generate each with `openssl rand -base64 32`:
 - [ ] **Settings → Members** — invite teammates. TAS gives you a copy-paste invite
   template; invited users drop straight into the workspace on first sign-in.
 
----
-
 ## Phase 6 — Create agents
 
 - [ ] **With a Tembo key** — use "New agent" / "Improve"; Tembo opens a PR against
@@ -130,8 +124,6 @@ Generate each with `openssl rand -base64 32`:
 - [ ] **Without a Tembo key** — commit agent spec files (YAML/JSON) to the repo
   directly.
 - [ ] **Run** an agent ("Run now"), or attach a schedule.
-
----
 
 ## The four things people most often forget
 

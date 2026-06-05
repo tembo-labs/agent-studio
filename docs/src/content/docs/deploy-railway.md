@@ -1,14 +1,17 @@
-# Deploying TAS to Railway
+---
+title: Deploy on Railway
+description: A production deploy where all three tiers run on Railway from the prebuilt GHCR images — no source build.
+---
 
 This guide walks through a production deploy where **all three tiers
 run on Railway** from the prebuilt GHCR images — no source build. Unlike
-the [Vercel split](./VERCEL_DEPLOY.md) (web on Vercel, api elsewhere),
+the [Vercel split](/agent-studio/deploy-vercel/) (web on Vercel, api elsewhere),
 Railway runs the full stack on one vendor: the api is a long-lived
 process that spawns subprocesses and polls schedules, which Railway
 handles natively.
 
 If you'd rather keep everything on your own box, the
-[published-images compose path](../README.md#running-from-published-images-no-source-build)
+[published-images compose path](https://github.com/tembo/agent-studio/blob/main/README.md#running-from-published-images-no-source-build)
 in the main README works on any VPS unchanged.
 
 ## Architecture target
@@ -99,18 +102,20 @@ needed.
 
 ### Sign-in: Google OAuth (required)
 
-> **Without this the instance deploys but no one can log in.** Email/
-> password auth is disabled, so the login screen shows "configuration
-> needed" until a Google OAuth client is set. The redirect URI needs the
-> final public URL, so the order matters:
->
-> 1. Generate the web domain (step 3) and set `BETTER_AUTH_URL` +
->    `NEXT_PUBLIC_BETTER_AUTH_URL` to it.
-> 2. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials),
->    create an OAuth 2.0 **Web application** client with the authorized
->    redirect URI `https://<web-domain>/api/auth/callback/google`.
-> 3. Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` on the web service —
->    it redeploys and sign-in works.
+:::caution
+**Without this the instance deploys but no one can log in.** Email/password
+auth is disabled, so the login screen shows "configuration needed" until a
+Google OAuth client is set. The redirect URI needs the final public URL, so
+the order matters:
+
+1. Generate the web domain (step 3) and set `BETTER_AUTH_URL` +
+   `NEXT_PUBLIC_BETTER_AUTH_URL` to it.
+2. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials),
+   create an OAuth 2.0 **Web application** client with the authorized
+   redirect URI `https://<web-domain>/api/auth/callback/google`.
+3. Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` on the web service —
+   it redeploys and sign-in works.
+:::
 
 If you later attach a custom domain (Railway → Settings → Networking),
 update `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL`, **and** the

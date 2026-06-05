@@ -46,9 +46,9 @@ Today you can:
 
 - Self-host the whole stack via `docker compose up` (build from source)
   or from prebuilt images (`compose.release.yaml`). Deploy to a managed
-  host: the full stack on [Railway](./guides/RAILWAY_DEPLOY.md) or
-  [AWS](./guides/AWS_DEPLOY.md) (ECS Fargate + RDS), or the web tier on
-  [Vercel](./guides/VERCEL_DEPLOY.md) with the api on a long-lived host.
+  host: the full stack on [Railway](https://tembo.github.io/agent-studio/deploy-railway/) or
+  [AWS](https://tembo.github.io/agent-studio/deploy-aws/) (ECS Fargate + RDS), or the web tier on
+  [Vercel](https://tembo.github.io/agent-studio/deploy-vercel/) with the api on a long-lived host.
 - Sign in with Google and connect a GitHub repository as the workspace's
   source of truth.
 - List, create, edit (via chat-to-PR), and run agents in two frameworks —
@@ -78,15 +78,18 @@ and [`ROADMAP.md`](./ROADMAP.md) for where it's headed.
 
 ## Guides
 
-- [`guides/CUSTOMER_SETUP.md`](./guides/CUSTOMER_SETUP.md) — start here.
-  Zero-to-running checklist of everything to procure and do, from accounts
+The user manual + deployment guides live at
+**<https://tembo.github.io/agent-studio/>** (source under [`docs/`](./docs)):
+
+- [Customer setup](https://tembo.github.io/agent-studio/customer-setup/) — start
+  here. Zero-to-running checklist of everything to procure and do, from accounts
   and keys through first sign-in and creating your first agent.
-- [`guides/RAILWAY_DEPLOY.md`](./guides/RAILWAY_DEPLOY.md) — run the full
-  stack on Railway from the published GHCR images.
-- [`guides/AWS_DEPLOY.md`](./guides/AWS_DEPLOY.md) — ECS Fargate + RDS,
-  from the published images.
-- [`guides/VERCEL_DEPLOY.md`](./guides/VERCEL_DEPLOY.md) — deploy the web
-  tier on Vercel with the api on Fly/Render and managed Postgres.
+- [Deploy on Railway](https://tembo.github.io/agent-studio/deploy-railway/) — run
+  the full stack on Railway from the published GHCR images.
+- [Deploy on AWS](https://tembo.github.io/agent-studio/deploy-aws/) — ECS Fargate
+  + RDS, from the published images.
+- [Deploy on Vercel](https://tembo.github.io/agent-studio/deploy-vercel/) — deploy
+  the web tier on Vercel with the api on Fly/Render and managed Postgres.
 
 ## Repository layout
 
@@ -140,7 +143,7 @@ scanned (Trivy), with SBOM + provenance. Upgrading is `bump TAS_VERSION
 → pull → up -d`; the API applies any new migrations on boot.
 
 To run these images on a managed host instead of your own box, see
-[`guides/RAILWAY_DEPLOY.md`](./guides/RAILWAY_DEPLOY.md).
+[Deploy on Railway](https://tembo.github.io/agent-studio/deploy-railway/).
 
 ### Developing without Docker
 

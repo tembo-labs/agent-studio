@@ -1,4 +1,7 @@
-# Deploying TAS to Vercel
+---
+title: Deploy on Vercel
+description: A production deploy where the Next.js web tier runs on Vercel and the Rust api tier runs on a long-lived host.
+---
 
 This guide walks through a production deploy where the Next.js
 **web** tier runs on Vercel and the Rust **api** tier runs on a
@@ -9,8 +12,9 @@ processes webhooks — none of that maps cleanly to Vercel's serverless
 function model.
 
 If you'd rather keep everything on one host, the `docker compose`
-path in the [main README](../README.md#running-locally) works on any
-VPS unchanged.
+path in the
+[main README](https://github.com/tembo/agent-studio/blob/main/README.md#running-locally)
+works on any VPS unchanged.
 
 ## Architecture target
 
@@ -46,7 +50,8 @@ no manual migration step is needed — just hand over the URL.
 Pick a host that supports long-lived Rust processes with outbound
 network access. Either build from `api/Dockerfile` or — simpler — deploy
 the **published image** `ghcr.io/tembo/tas-api:<version>` (signed +
-scanned; see the [main README](../README.md#running-from-published-images-no-source-build)):
+scanned; see the
+[main README](https://github.com/tembo/agent-studio/blob/main/README.md#running-from-published-images-no-source-build)):
 
 - **Fly.io** — `fly launch` against `api/Dockerfile`, or `fly deploy
   --image ghcr.io/tembo/tas-api:<version>`.
@@ -54,9 +59,11 @@ scanned; see the [main README](../README.md#running-from-published-images-no-sou
   deploy the published image directly.
 - **Railway** — same shape; bring the Dockerfile or the image.
 
-> If you want the **whole stack** on Railway (web included) rather than
-> the Vercel split, follow [`RAILWAY_DEPLOY.md`](./RAILWAY_DEPLOY.md)
-> instead — it runs all three tiers from the published images.
+:::note
+If you want the **whole stack** on Railway (web included) rather than the
+Vercel split, follow the [Railway guide](/agent-studio/deploy-railway/) instead
+— it runs all three tiers from the published images.
+:::
 
 ### Required env on the api host
 
@@ -117,11 +124,13 @@ For the Google OAuth client, set the authorized redirect URI to:
 ${BETTER_AUTH_URL}/api/auth/callback/google
 ```
 
-> **Required for sign-in.** Email/password auth is disabled, so without a
-> Google OAuth client the deploy shows a "configuration needed" login
-> screen and no one can log in. Set `BETTER_AUTH_URL` to the final public
-> URL first, register the redirect URI above on a Google **Web
-> application** client, then set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+:::caution[Required for sign-in]
+Email/password auth is disabled, so without a Google OAuth client the deploy
+shows a "configuration needed" login screen and no one can log in. Set
+`BETTER_AUTH_URL` to the final public URL first, register the redirect URI
+above on a Google **Web application** client, then set `GOOGLE_CLIENT_ID` /
+`GOOGLE_CLIENT_SECRET`.
+:::
 
 ### Connect a custom domain
 
