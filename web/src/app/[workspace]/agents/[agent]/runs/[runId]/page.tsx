@@ -8,12 +8,14 @@ import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listImprovementsForRun } from "@/lib/improvements-api";
 import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
 import { getRun, type RunRecord } from "@/lib/runs-api";
+import { listToolCallsForRun } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, isTemboConfigured } from "@/lib/workspace";
 
 import { CopyOutputButton } from "./copy-output-button";
 import { ImproveForm } from "./improve-form";
 import { RunPoller } from "./run-poller";
+import { ToolsUsed } from "./tools-used";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +45,9 @@ export default async function RunDetailPage({
     workspace.id,
     storedImprovements,
   );
+
+  // Tools the agent called during this run (pydantic only; empty otherwise).
+  const toolCalls = await listToolCallsForRun(workspace.id, run.id);
 
   // "Improve the Agent" opens a Tembo CAP task — hide it when no Tembo
   // API key is set (the run + its output still render).
@@ -153,6 +158,15 @@ export default async function RunDetailPage({
       </div>
 
       <hr className="border-[var(--color-border-weak)]" />
+
+      {toolCalls.length > 0 && (
+        <Section
+          title="Tools used"
+          description={`${toolCalls.length} tool call${toolCalls.length === 1 ? "" : "s"}, in order.`}
+        >
+          <ToolsUsed calls={toolCalls} />
+        </Section>
+      )}
 
       <Section title="Output">
         {run.status === "queued" && !run.output && (

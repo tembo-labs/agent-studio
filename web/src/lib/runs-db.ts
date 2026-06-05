@@ -675,6 +675,40 @@ export async function listAgentFailureGroups30d(
   }));
 }
 
+// Tools an agent called during a run, in call order (pydantic runs only).
+// ok: true = returned, false = errored, null = never returned (run ended).
+export type RunToolCall = {
+  ordinal: number;
+  toolName: string;
+  ok: boolean | null;
+  errorMessage: string | null;
+};
+
+export async function listToolCallsForRun(
+  workspaceId: string,
+  runId: string,
+): Promise<RunToolCall[]> {
+  const { rows } = await db.query<{
+    ordinal: number;
+    tool_name: string;
+    ok: boolean | null;
+    error_message: string | null;
+  }>(
+    `SELECT tc.ordinal, tc.tool_name, tc.ok, tc.error_message
+       FROM run_tool_call tc
+       JOIN run r ON r.id = tc.run_id
+      WHERE tc.run_id = $1 AND r.workspace_id = $2
+      ORDER BY tc.ordinal ASC`,
+    [runId, workspaceId],
+  );
+  return rows.map((r) => ({
+    ordinal: r.ordinal,
+    toolName: r.tool_name,
+    ok: r.ok,
+    errorMessage: r.error_message,
+  }));
+}
+
 export async function listRecentRunsForAgent(
   workspaceId: string,
   agentName: string,

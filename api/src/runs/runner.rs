@@ -86,7 +86,12 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
         return;
     }
 
-    match run_inner(state, &ctx).await {
+    let (result, tool_calls) = run_inner(state, &ctx).await;
+    // Persist what the agent called (success or failure) before we mark the
+    // terminal state. Best-effort — a tool-log hiccup must not fail the run.
+    persist_tool_calls(state, ctx.run_id, &tool_calls).await;
+
+    match result {
         Ok(outcome) => {
             if let Err(e) = mark_succeeded(
                 state,
@@ -126,19 +131,31 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
     }
 }
 
-async fn run_inner(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunOutcome> {
+// Returns the run outcome plus the tool calls the agent made (pydantic
+// only; cargo-ai exposes none → empty). Tool calls come back on the
+// failure path too, so a failed run still records what it called.
+async fn run_inner(
+    state: &AppState,
+    ctx: &RunContext,
+) -> (anyhow::Result<RunOutcome>, Vec<pydantic::ToolCall>) {
     match ctx.framework {
         Framework::CargoAi => {
             // Cargo AI still needs the provider:model split to set
             // its --server / --model CLI flags; pydantic-ai parses
             // its own model field out of the spec.
-            let (provider, model) = ctx.model.split_once(':').ok_or_else(|| {
-                anyhow!(
-                    "agent's model field must be `provider:model` (got `{}`)",
-                    ctx.model
-                )
-            })?;
-            run_cargo_ai(state, ctx, provider, model).await
+            let (provider, model) = match ctx.model.split_once(':') {
+                Some(pm) => pm,
+                None => {
+                    return (
+                        Err(anyhow!(
+                            "agent's model field must be `provider:model` (got `{}`)",
+                            ctx.model
+                        )),
+                        Vec::new(),
+                    )
+                }
+            };
+            (run_cargo_ai(state, ctx, provider, model).await, Vec::new())
         }
         Framework::Pydantic => run_pydantic(state, ctx).await,
     }
@@ -224,11 +241,21 @@ async fn run_cargo_ai(
     })
 }
 
-async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunOutcome> {
-    let spec_content = ctx
-        .spec_content
-        .as_deref()
-        .ok_or_else(|| anyhow!("Pydantic run is missing the agent's raw spec content"))?;
+async fn run_pydantic(
+    state: &AppState,
+    ctx: &RunContext,
+) -> (anyhow::Result<RunOutcome>, Vec<pydantic::ToolCall>) {
+    let spec_content = match ctx.spec_content.as_deref() {
+        Some(s) => s,
+        None => {
+            return (
+                Err(anyhow!(
+                    "Pydantic run is missing the agent's raw spec content"
+                )),
+                Vec::new(),
+            )
+        }
+    };
 
     // Load whichever provider keys the workspace has set. Either
     // (or both) may be absent; pydantic-ai inside the subprocess
@@ -369,14 +396,17 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
         // Pydantic-ai would fail inside the subprocess with a less
         // friendly message; intercept here so the run row's error
         // surface tells the customer exactly what to do.
-        return Err(anyhow!(
-            "No provider API keys set for this workspace. \
-             Add either an OpenAI or Anthropic API key under \
-             Settings → API keys before running an agent."
-        ));
+        return (
+            Err(anyhow!(
+                "No provider API keys set for this workspace. \
+                 Add either an OpenAI or Anthropic API key under \
+                 Settings → API keys before running an agent."
+            )),
+            Vec::new(),
+        );
     }
 
-    let result = pydantic::invoke(pydantic::PydanticArgs {
+    let (result, tool_calls) = pydantic::invoke(pydantic::PydanticArgs {
         spec_content,
         spec_format: ctx.spec_format.as_pydantic(),
         user_message: &ctx.user_message,
@@ -390,21 +420,23 @@ async fn run_pydantic(state: &AppState, ctx: &RunContext) -> anyhow::Result<RunO
         acting_user_id: ctx.acting_user_id.as_str(),
         db: &state.db,
     })
-    .await?;
+    .await;
 
-    let usage = result
-        .usage
-        .as_ref()
-        .and_then(pydantic::PydanticUsage::input_output)
-        .map(|(input, output)| Usage {
-            input_tokens: input,
-            output_tokens: output,
-        });
-
-    Ok(RunOutcome {
-        output: render_output(&ctx.user_message, &result.output),
-        usage,
-    })
+    let outcome = result.map(|r| {
+        let usage = r
+            .usage
+            .as_ref()
+            .and_then(pydantic::PydanticUsage::input_output)
+            .map(|(input, output)| Usage {
+                input_tokens: input,
+                output_tokens: output,
+            });
+        RunOutcome {
+            output: render_output(&ctx.user_message, &r.output),
+            usage,
+        }
+    });
+    (outcome, tool_calls)
 }
 
 // Pull the agent's reply out of cargo-ai's mixed stdout. Every line
@@ -562,6 +594,28 @@ async fn mark_failed(state: &AppState, run_id: Uuid, reason: &str) -> anyhow::Re
     .execute(&state.db)
     .await?;
     Ok(())
+}
+
+/// Record the tools an agent called during the run (one row each, in call
+/// order). Best-effort: a failure here is logged and swallowed so it can't
+/// fail an otherwise-good run.
+async fn persist_tool_calls(state: &AppState, run_id: Uuid, calls: &[pydantic::ToolCall]) {
+    if calls.is_empty() {
+        return;
+    }
+    let mut qb = sqlx::QueryBuilder::new(
+        "INSERT INTO run_tool_call (run_id, ordinal, tool_name, ok, error_message) ",
+    );
+    qb.push_values(calls.iter().enumerate(), |mut b, (i, c)| {
+        b.push_bind(run_id)
+            .push_bind(i as i32)
+            .push_bind(c.name.as_str())
+            .push_bind(c.ok)
+            .push_bind(c.error.as_deref());
+    });
+    if let Err(e) = qb.build().execute(&state.db).await {
+        tracing::warn!(run_id = %run_id, ?e, "failed to persist run tool calls");
+    }
 }
 
 // Slack's chat.postMessage caps text at 40k chars; keep replies readable

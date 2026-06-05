@@ -33,10 +33,49 @@ import sys
 import traceback
 
 import yaml
-from pydantic_ai import Agent
+from pydantic_ai import Agent, capture_run_messages
 
 
 USAGE_SENTINEL = "__TAS_USAGE__:"
+TOOLS_SENTINEL = "__TAS_TOOLS__:"
+
+
+def tool_calls_payload(messages) -> list[dict]:
+    """Extract the tool calls (name + outcome) from a run's message history.
+
+    Works on both success and failure — `capture_run_messages` populates the
+    list up to the point the run stopped, so a run that died before calling a
+    tool simply won't list it. We classify by `part_kind`:
+      - *-tool-call  → a call (capture its tool_call_id + name, in order)
+      - retry-prompt → that call errored (the model got a retry)
+      - *-tool-return → that call succeeded
+    A call with no matching return is `ok: None` (the run ended first). We
+    record only name + outcome — never args or results (secrets/PII/bloat).
+    """
+    calls: list[tuple[str, str]] = []  # (tool_call_id, name) in call order
+    outcomes: dict[str, dict] = {}
+    for msg in messages or []:
+        for part in getattr(msg, "parts", None) or []:
+            kind = getattr(part, "part_kind", "") or ""
+            cid = getattr(part, "tool_call_id", None)
+            name = getattr(part, "tool_name", None)
+            if not cid or not name:
+                continue
+            if kind.endswith("tool-call"):
+                calls.append((cid, name))
+            elif kind == "retry-prompt":
+                content = getattr(part, "content", "")
+                outcomes[cid] = {"ok": False, "error": str(content)[:200]}
+            elif kind.endswith("tool-return"):
+                outcomes.setdefault(cid, {"ok": True, "error": None})
+    out: list[dict] = []
+    for cid, name in calls[:200]:
+        o = outcomes.get(cid)
+        if o is None:
+            out.append({"name": name, "ok": None})
+        else:
+            out.append({"name": name, "ok": o["ok"], "error": o.get("error")})
+    return out
 
 
 def parse_spec(content: str, fmt: str) -> dict:
@@ -612,65 +651,68 @@ async def run(spec: dict, user_message: str) -> None:
     # MCP toolsets are async context managers — pydantic-ai keeps the
     # connection to Composio's MCP server alive for the duration of
     # the run, then tears it down on exit.
-    if toolsets:
-        async with agent:
-            # Diagnostic: list the tools pydantic-ai actually exposes
-            # to the model after the MCP context is entered. Lands in
-            # the api container logs so we can tell from the outside
-            # whether the model had tools available at all when it
-            # decided to hedge.
-            try:
-                # Diagnostic counts. We probe each toolset's raw
-                # `list_tools()` (the MCP server's full catalog) and
-                # also walk through wrappers like FilteredToolset to
-                # report the post-filter set the model actually sees.
-                # The two numbers differ when a `tools:` narrowing is
-                # applied — prior probe shape silently skipped
-                # wrappers entirely.
-                tool_names: list[str] = []
-                filtered_notes: list[str] = []
-                for ts in toolsets:
-                    inner = ts
-                    wrapper_chain: list[str] = []
-                    while hasattr(inner, "wrapped"):
-                        wrapper_chain.append(type(inner).__name__)
-                        inner = inner.wrapped  # type: ignore[attr-defined]
-                    if hasattr(inner, "list_tools"):
-                        listed = await inner.list_tools()
-                        names = [
-                            getattr(t, "name", None)
-                            or (t.get("name") if isinstance(t, dict) else None)
-                            for t in listed
-                        ]
-                        names = [n for n in names if n]
-                        tool_names.extend(names)
-                        if wrapper_chain:
-                            filtered_notes.append(
-                                f"{type(ts).__name__}({'/'.join(wrapper_chain)})"
-                                f" over {len(names)} server tools"
+    #
+    # capture_run_messages() collects the run's message history even when
+    # agent.run() raises, so we can emit the tool-call list (TOOLS_SENTINEL)
+    # on both the success and failure paths — the failure case is exactly
+    # where "which tools did it actually call?" is most useful.
+    with capture_run_messages() as _messages:
+        try:
+            if toolsets:
+                async with agent:
+                    # Diagnostic: list the tools pydantic-ai actually
+                    # exposes to the model after the MCP context is entered.
+                    # Lands in the api container logs.
+                    try:
+                        # We probe each toolset's raw `list_tools()` (the
+                        # MCP server's full catalog), unwrapping wrappers
+                        # like FilteredToolset — so this is the RAW catalog,
+                        # NOT the post-`tools:`-narrowing set the model sees.
+                        tool_names: list[str] = []
+                        filtered_notes: list[str] = []
+                        for ts in toolsets:
+                            inner = ts
+                            wrapper_chain: list[str] = []
+                            while hasattr(inner, "wrapped"):
+                                wrapper_chain.append(type(inner).__name__)
+                                inner = inner.wrapped  # type: ignore[attr-defined]
+                            if hasattr(inner, "list_tools"):
+                                listed = await inner.list_tools()
+                                names = [
+                                    getattr(t, "name", None)
+                                    or (t.get("name") if isinstance(t, dict) else None)
+                                    for t in listed
+                                ]
+                                names = [n for n in names if n]
+                                tool_names.extend(names)
+                                if wrapper_chain:
+                                    filtered_notes.append(
+                                        f"{type(ts).__name__}({'/'.join(wrapper_chain)})"
+                                        f" over {len(names)} server tools"
+                                    )
+                        sys.stderr.write(
+                            f"[tas] MCP server catalogs total {len(tool_names)} "
+                            f"tools (before the agent's `tools:` narrowing — the "
+                            f"model only sees the declared subset): "
+                            f"{tool_names[:10]}{'…' if len(tool_names) > 10 else ''}\n"
+                        )
+                        if filtered_notes:
+                            sys.stderr.write(
+                                f"[tas] narrowed toolsets (model sees only the "
+                                f"declared `tools:` from each): {filtered_notes}\n"
                             )
-                # NOTE: this is the RAW server catalog count — we unwrap
-                # FilteredToolset above and list the inner MCPToolset, so
-                # this is everything the provider *could* expose, NOT what
-                # the model sees. A `tools:` narrowing is applied per
-                # toolset at run time (FilteredToolset, see filtered_notes),
-                # so the model's actual tool set is the declared subset.
-                sys.stderr.write(
-                    f"[tas] MCP server catalogs total {len(tool_names)} "
-                    f"tools (before the agent's `tools:` narrowing — the "
-                    f"model only sees the declared subset): "
-                    f"{tool_names[:10]}{'…' if len(tool_names) > 10 else ''}\n"
-                )
-                if filtered_notes:
-                    sys.stderr.write(
-                        f"[tas] narrowed toolsets (model sees only the "
-                        f"declared `tools:` from each): {filtered_notes}\n"
-                    )
-            except Exception as e:
-                sys.stderr.write(f"[tas] list_tools probe failed: {e}\n")
-            result = await agent.run(user_message)
-    else:
-        result = await agent.run(user_message)
+                    except Exception as e:
+                        sys.stderr.write(f"[tas] list_tools probe failed: {e}\n")
+                    result = await agent.run(user_message)
+            else:
+                result = await agent.run(user_message)
+        finally:
+            # Emit the tool-call list on BOTH success and failure (messages
+            # were captured either way), so a failed/truncated run still
+            # records the tools it did call.
+            tool_calls = tool_calls_payload(_messages)
+            if tool_calls:
+                sys.stdout.write(f"{TOOLS_SENTINEL}{json.dumps(tool_calls)}\n")
 
     sys.stdout.write(str(result.output))
     sys.stdout.write("\n")

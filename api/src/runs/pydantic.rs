@@ -19,7 +19,7 @@
 //! counts. `parse_output` peels the sentinel off so the run row's
 //! transcript stays clean and the token columns get populated.
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use serde::Deserialize;
 use std::process::Stdio;
 use tokio::io::AsyncWriteExt;
@@ -29,7 +29,28 @@ use uuid::Uuid;
 const PYDANTIC_PY: &str = "/opt/pydantic-ai/bin/python3";
 const PYDANTIC_SCRIPT: &str = "/usr/local/bin/run_pydantic.py";
 const USAGE_SENTINEL: &str = "__TAS_USAGE__:";
+const TOOLS_SENTINEL: &str = "__TAS_TOOLS__:";
 const STALE_CONNECTION_MARKER: &str = "__TAS_STALE_CONNECTION__:";
+
+/// One tool call the agent made during the run. `ok` is `Some(true)` on a
+/// successful return, `Some(false)` on a tool error, and `None` when the
+/// call never returned (the run ended/failed first). Extracted from the
+/// wrapper's `__TAS_TOOLS__:` sentinel and persisted to `run_tool_call`.
+#[derive(Debug, Clone)]
+pub struct ToolCall {
+    pub name: String,
+    pub ok: Option<bool>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ToolCallJson {
+    name: String,
+    #[serde(default)]
+    ok: Option<bool>,
+    #[serde(default)]
+    error: Option<String>,
+}
 
 pub struct PydanticArgs<'a> {
     /// Raw spec content as it sits in the repo (YAML or JSON).
@@ -131,7 +152,10 @@ impl PydanticUsage {
     }
 }
 
-pub async fn invoke(args: PydanticArgs<'_>) -> anyhow::Result<PydanticResult> {
+/// Spawn the wrapper, pipe the spec in, and collect its output. Separated
+/// from `invoke` so the latter can return parsed tool calls even on a
+/// non-zero exit (an infra error here means no tool data is available).
+async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process::Output> {
     let mut cmd = Command::new(PYDANTIC_PY);
     cmd.arg(PYDANTIC_SCRIPT)
         .arg("--fmt")
@@ -186,13 +210,27 @@ pub async fn invoke(args: PydanticArgs<'_>) -> anyhow::Result<PydanticResult> {
             .context("failed to write spec to pydantic-ai wrapper stdin")?;
     }
 
-    let output = child
+    child
         .wait_with_output()
         .await
-        .context("pydantic-ai wrapper failed to complete")?;
+        .context("pydantic-ai wrapper failed to complete")
+}
+
+/// Run the wrapper and return the parsed result plus the tool calls the
+/// agent made. Tool calls are returned on BOTH the success and failure
+/// path (the wrapper emits them either way) so a failed/truncated run still
+/// records which tools it touched — the most useful case for debugging.
+/// An `Err` here is a *run* failure (non-zero exit or infra error); the
+/// caller marks the run failed, but still persists the returned tool calls.
+pub async fn invoke(args: PydanticArgs<'_>) -> (anyhow::Result<PydanticResult>, Vec<ToolCall>) {
+    let output = match spawn_and_wait(&args).await {
+        Ok(o) => o,
+        Err(e) => return (Err(e), Vec::new()),
+    };
 
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let tool_calls = extract_tool_calls(&stdout);
 
     if !output.status.success() {
         // Pull out any stale-connection markers the wrapper emitted
@@ -228,16 +266,19 @@ pub async fn invoke(args: PydanticArgs<'_>) -> anyhow::Result<PydanticResult> {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            bail!(
-                "Composio rejected the cached connection for: {labels}. \
-                 Open the Connections page, click Disconnect on that \
-                 slot, then Reconnect to re-authorize.\n\n\
-                 ──── raw error ────\n{}",
-                cleaned_stderr
-                    .trim()
-                    .chars()
-                    .take(16_000)
-                    .collect::<String>()
+            return (
+                Err(anyhow!(
+                    "Composio rejected the cached connection for: {labels}. \
+                     Open the Connections page, click Disconnect on that \
+                     slot, then Reconnect to re-authorize.\n\n\
+                     ──── raw error ────\n{}",
+                    cleaned_stderr
+                        .trim()
+                        .chars()
+                        .take(16_000)
+                        .collect::<String>()
+                )),
+                tool_calls,
             );
         }
 
@@ -251,14 +292,17 @@ pub async fn invoke(args: PydanticArgs<'_>) -> anyhow::Result<PydanticResult> {
         // column is TEXT (no length limit on Postgres's side) and
         // the run-detail UI scrolls long messages, so the cap is
         // here only to keep one runaway error from filling a row.
-        bail!(
-            "pydantic-ai wrapper exited with status {}: {}",
-            output.status,
-            snippet.trim().chars().take(16_000).collect::<String>()
+        return (
+            Err(anyhow!(
+                "pydantic-ai wrapper exited with status {}: {}",
+                output.status,
+                snippet.trim().chars().take(16_000).collect::<String>()
+            )),
+            tool_calls,
         );
     }
 
-    Ok(parse_output(&stdout))
+    (Ok(parse_output(&stdout)), tool_calls)
 }
 
 #[derive(Debug, Deserialize)]
@@ -341,6 +385,11 @@ fn parse_output(stdout: &str) -> PydanticResult {
             // into the user-facing transcript.
             continue;
         }
+        // Tool-call sentinel is parsed separately (extract_tool_calls);
+        // here we just keep it out of the user-facing transcript.
+        if line.starts_with(TOOLS_SENTINEL) {
+            continue;
+        }
         output_lines.push(line);
     }
     // Re-join with `\n` and trim trailing blank lines so the run
@@ -350,6 +399,27 @@ fn parse_output(stdout: &str) -> PydanticResult {
         output: joined.trim_end().to_string(),
         usage,
     }
+}
+
+/// Pull the `__TAS_TOOLS__:[...]` sentinel (a JSON array of
+/// `{name, ok, error}`) out of the wrapper's stdout. Absent or malformed
+/// is non-fatal — we just record no tool calls.
+fn extract_tool_calls(stdout: &str) -> Vec<ToolCall> {
+    for line in stdout.lines() {
+        if let Some(json_part) = line.strip_prefix(TOOLS_SENTINEL) {
+            if let Ok(parsed) = serde_json::from_str::<Vec<ToolCallJson>>(json_part) {
+                return parsed
+                    .into_iter()
+                    .map(|t| ToolCall {
+                        name: t.name,
+                        ok: t.ok,
+                        error: t.error,
+                    })
+                    .collect();
+            }
+        }
+    }
+    Vec::new()
 }
 
 #[cfg(test)]
@@ -387,5 +457,28 @@ mod tests {
         let result = parse_output(stdout);
         assert_eq!(result.output, "ok");
         assert!(result.usage.is_none());
+    }
+
+    #[test]
+    fn extracts_tool_calls_and_keeps_output_clean() {
+        let stdout = "Done.\n\
+            __TAS_TOOLS__:[{\"name\":\"LINEAR_LIST\",\"ok\":true,\"error\":null},\
+            {\"name\":\"SLACK_SEND\",\"ok\":false,\"error\":\"channel_not_found\"},\
+            {\"name\":\"get_me\",\"ok\":null}]\n\
+            __TAS_USAGE__:{\"input_tokens\":5,\"output_tokens\":2}\n";
+        let calls = extract_tool_calls(stdout);
+        assert_eq!(calls.len(), 3);
+        assert_eq!(calls[0].name, "LINEAR_LIST");
+        assert_eq!(calls[0].ok, Some(true));
+        assert_eq!(calls[1].ok, Some(false));
+        assert_eq!(calls[1].error.as_deref(), Some("channel_not_found"));
+        assert_eq!(calls[2].ok, None);
+        // Both sentinels stripped from the transcript.
+        assert_eq!(parse_output(stdout).output, "Done.");
+    }
+
+    #[test]
+    fn no_tools_sentinel_yields_empty() {
+        assert!(extract_tool_calls("just output\n").is_empty());
     }
 }
