@@ -1,13 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { detectFormat } from "@/lib/agent-format";
 import { verifyTriggerWebhook } from "@/lib/composio";
 import {
   getTriggerByComposioId,
   recordTriggerFire,
   type WorkspaceTrigger,
 } from "@/lib/triggers-db";
-import { getAgentByName } from "@/lib/workspace-agents";
+import { resolveAgentForDispatch } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceSecretPlaintext,
@@ -109,39 +108,20 @@ export async function POST(
     return NextResponse.json({ status: "disabled" }, { status: 200 });
   }
 
-  // Resolve the agent file fresh — same path the scheduler walks.
-  const resolved = await getAgentByName(workspace.id, trigger.agentName);
-  if (!resolved) {
-    await recordTriggerFire(
-      trigger.id,
-      `Agent "${trigger.agentName}" is no longer in the connected repo.`,
+  // Resolve the agent — event-driven runs use the current stable version
+  // (same default as the scheduler when an automation hasn't opted into draft).
+  const dispatch = await resolveAgentForDispatch(
+    workspace.id,
+    trigger.agentName,
+  );
+  if (!dispatch.ok) {
+    await recordTriggerFire(trigger.id, dispatch.error.message);
+    return NextResponse.json(
+      { status: `agent-${dispatch.error.kind}` },
+      { status: 200 },
     );
-    return NextResponse.json({ status: "agent-missing" }, { status: 200 });
   }
-  if (!resolved.agent.ok) {
-    await recordTriggerFire(
-      trigger.id,
-      `Agent file failed to parse: ${resolved.agent.error}`,
-    );
-    return NextResponse.json({ status: "agent-invalid" }, { status: 200 });
-  }
-  const spec = resolved.agent.spec;
-  const model = spec.model ?? "";
-  if (!model) {
-    await recordTriggerFire(
-      trigger.id,
-      "Agent has no model declared. Add a model and try again.",
-    );
-    return NextResponse.json({ status: "no-model" }, { status: 200 });
-  }
-  const format = detectFormat(resolved.agent.path);
-  if (!format) {
-    await recordTriggerFire(
-      trigger.id,
-      `Agent file has an unrecognized extension: ${resolved.agent.path}`,
-    );
-    return NextResponse.json({ status: "bad-extension" }, { status: 200 });
-  }
+  const r = dispatch.resolved;
 
   // The agent's user_message for an event-driven run is the
   // structured event itself. Tembo writes agents to expect this shape:
@@ -179,14 +159,16 @@ export async function POST(
         // pattern as automation.owner_user_id. The owner's
         // connections are what the Composio runtime resolves.
         user_id: trigger.userId,
-        agent_name: spec.name,
-        agent_path: resolved.agent.path,
-        model,
+        agent_name: r.agentName,
+        agent_path: r.agentPath,
+        model: r.model,
         user_message: userMessage,
-        framework: spec.framework,
-        spec_content: resolved.raw,
-        spec_format: format,
+        framework: r.framework,
+        spec_content: r.specContent,
+        spec_format: r.specFormat,
         trigger: "event",
+        agent_version_id: r.versionId,
+        agent_version_label: r.versionLabel,
       }),
     });
     if (!res.ok) {

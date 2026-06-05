@@ -22,7 +22,6 @@ import "server-only";
 //     last_fired_at floor is advanced anyway so we don't retry-storm
 //     the same broken state on every tick.
 
-import { detectFormat } from "@/lib/agent-format";
 import {
   listEnabledAutomations,
   setAutomationFired,
@@ -30,7 +29,7 @@ import {
   type Automation,
 } from "@/lib/automations-api";
 import { hasFiringInWindow } from "@/lib/cron";
-import { getAgentByName } from "@/lib/workspace-agents";
+import { resolveAgentForDispatch } from "@/lib/workspace-agents";
 
 const TICK_MS = 30_000;
 
@@ -80,45 +79,17 @@ async function maybeFire(a: Automation, now: Date) {
   const floor = a.lastFiredAt ?? a.createdAt;
   if (!hasFiringInWindow(a.cron, floor, now)) return;
 
-  // Resolve the agent. listEnabledAutomations doesn't pre-fetch this
-  // because most automations don't fire on most ticks — only pay the
-  // GitHub round-trip when we're actually about to fire.
-  const resolved = await getAgentByName(a.workspaceId, a.agentName);
-  if (!resolved) {
-    await recordSkipAndAdvance(
-      a,
-      now,
-      `Agent "${a.agentName}" is no longer in the connected repo.`,
-    );
+  // Resolve the agent — the stable snapshot by default, or the live draft
+  // when the automation opts in. listEnabledAutomations doesn't pre-fetch
+  // this because most automations don't fire on most ticks.
+  const dispatch = await resolveAgentForDispatch(a.workspaceId, a.agentName, {
+    preferDraft: a.useDraft,
+  });
+  if (!dispatch.ok) {
+    await recordSkipAndAdvance(a, now, dispatch.error.message);
     return;
   }
-  if (!resolved.agent.ok) {
-    await recordSkipAndAdvance(
-      a,
-      now,
-      `Agent file failed to parse: ${resolved.agent.error}`,
-    );
-    return;
-  }
-  const spec = resolved.agent.spec;
-  const model = spec.model ?? "";
-  if (!model) {
-    await recordSkipAndAdvance(
-      a,
-      now,
-      `Agent has no model declared. Add a model and try again.`,
-    );
-    return;
-  }
-  const format = detectFormat(resolved.agent.path);
-  if (!format) {
-    await recordSkipAndAdvance(
-      a,
-      now,
-      `Agent file has an unrecognized extension: ${resolved.agent.path}`,
-    );
-    return;
-  }
+  const r = dispatch.resolved;
 
   // POST directly to /internal/runs with the new spec_content /
   // spec_format contract + trigger + automation_id. We don't go
@@ -149,15 +120,17 @@ async function maybeFire(a: Automation, now: Date) {
       // looks up; defaults to createdBy when an automation is
       // created and can be reassigned from the form.
       user_id: a.ownerUserId,
-      agent_name: spec.name,
-      agent_path: resolved.agent.path,
-      model,
+      agent_name: r.agentName,
+      agent_path: r.agentPath,
+      model: r.model,
       user_message: a.inputMessage,
-      framework: spec.framework,
-      spec_content: resolved.raw,
-      spec_format: format,
+      framework: r.framework,
+      spec_content: r.specContent,
+      spec_format: r.specFormat,
       trigger: "schedule",
       automation_id: a.id,
+      agent_version_id: r.versionId,
+      agent_version_label: r.versionLabel,
     }),
   });
 

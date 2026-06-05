@@ -34,6 +34,11 @@ export type CreateRunInput = {
   // Defaults to "manual" on the API side. Slack/webhook dispatch passes
   // "event" so the run is attributed correctly in /runs.
   trigger?: RunTrigger;
+  // Which agent version produced specContent. versionId is the
+  // agent_version.id for a stable snapshot (null for draft/live runs);
+  // versionLabel is the human string ("v3" | "draft") for the UI.
+  agentVersionId?: string | null;
+  agentVersionLabel?: string | null;
 };
 
 export type CreateRunResponse = { runId: string };
@@ -57,6 +62,8 @@ export type RunRecord = {
   tokensOutput: number | null;
   trigger: RunTrigger;
   automationId: string | null;
+  agentVersionId: string | null;
+  agentVersionLabel: string | null;
 };
 
 type ApiRunRecord = {
@@ -76,6 +83,8 @@ type ApiRunRecord = {
   tokens_output: number | null;
   trigger: RunTrigger;
   automation_id: string | null;
+  agent_version_id: string | null;
+  agent_version_label: string | null;
 };
 
 function fromApi(r: ApiRunRecord): RunRecord {
@@ -96,6 +105,8 @@ function fromApi(r: ApiRunRecord): RunRecord {
     tokensOutput: r.tokens_output,
     trigger: r.trigger,
     automationId: r.automation_id,
+    agentVersionId: r.agent_version_id,
+    agentVersionLabel: r.agent_version_label,
   };
 }
 
@@ -118,6 +129,8 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
       spec_content: input.specContent,
       spec_format: input.specFormat,
       trigger: input.trigger,
+      agent_version_id: input.agentVersionId,
+      agent_version_label: input.agentVersionLabel,
     }),
   });
   if (!res.ok) {

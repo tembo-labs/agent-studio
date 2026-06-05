@@ -54,6 +54,13 @@ pub struct CreateRunRequest {
     pub trigger: Option<String>,
     #[serde(default)]
     pub automation_id: Option<Uuid>,
+    /// Which agent version produced spec_content. Recorded on the run row
+    /// for provenance. NULL = a draft/live run or a pre-feature caller.
+    #[serde(default)]
+    pub agent_version_id: Option<Uuid>,
+    /// Human label for the version ("v3" | "draft"), shown in the runs UI.
+    #[serde(default)]
+    pub agent_version_label: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -83,8 +90,9 @@ pub async fn create_run(
     sqlx::query(
         r#"INSERT INTO run
             (id, workspace_id, agent_name, agent_path, model, status,
-             created_by, user_message, trigger, automation_id)
-            VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8, $9)"#,
+             created_by, user_message, trigger, automation_id,
+             agent_version_id, agent_version_label)
+            VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8, $9, $10, $11)"#,
     )
     .bind(run_id)
     .bind(req.workspace_id)
@@ -95,6 +103,8 @@ pub async fn create_run(
     .bind(&user_message)
     .bind(trigger)
     .bind(req.automation_id)
+    .bind(req.agent_version_id)
+    .bind(&req.agent_version_label)
     .execute(&state.db)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("db insert: {e}")))?;
@@ -169,6 +179,8 @@ pub struct RunRecord {
     pub tokens_output: Option<i32>,
     pub trigger: String,
     pub automation_id: Option<Uuid>,
+    pub agent_version_id: Option<Uuid>,
+    pub agent_version_label: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -185,7 +197,7 @@ pub async fn get_run(
         r#"SELECT id, workspace_id, agent_name, agent_path, model, status,
                   output, error_message, created_by, created_at,
                   started_at, completed_at, tokens_input, tokens_output,
-                  trigger, automation_id
+                  trigger, automation_id, agent_version_id, agent_version_label
              FROM run
              WHERE id = $1 AND workspace_id = $2"#,
     )

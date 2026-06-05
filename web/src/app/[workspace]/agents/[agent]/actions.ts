@@ -31,6 +31,7 @@ import {
 import {
   deleteAgent,
   getAgentByName,
+  resolveAgentForDispatch,
   type DeleteAgentError,
 } from "@/lib/workspace-agents";
 import {
@@ -111,6 +112,9 @@ export async function runNowAction(
   // input" run that just exercises the agent's instructions).
   const userMessage = String(formData.get("user_message") ?? "");
   const runAsRaw = String(formData.get("run_as") ?? "").trim();
+  // Which version to run. Defaults to the current stable snapshot; "draft"
+  // opts into the live default-branch file.
+  const preferDraft = String(formData.get("run_version") ?? "") === "draft";
 
   const auth = await authorizeWorkspace(slug, "operator");
   if (!auth.ok) {
@@ -134,44 +138,30 @@ export async function runNowAction(
     actingUserId = runAsRaw;
   }
 
-  // Pull the current agent definition off the repo. Both frameworks
-  // are now passthrough — the runner gets the raw file bytes plus
-  // the format so the right subprocess wrapper can parse them.
-  const found = await getAgentByName(workspace.id, agentName);
-  if (!found || !found.agent.ok) {
-    return {
-      error: found
-        ? "This agent's definition file is invalid; fix it before running."
-        : "Agent no longer exists in the connected repo.",
-    };
+  // Resolve the spec to run — the current stable snapshot by default, or
+  // the live draft file when the toggle is set (or no stable exists yet).
+  const dispatch = await resolveAgentForDispatch(workspace.id, agentName, {
+    preferDraft,
+  });
+  if (!dispatch.ok) {
+    return { error: dispatch.error.message };
   }
-  const spec = found.agent.spec;
-  const fileFormat = found.agent.format;
-
-  const framework: "pydantic-agentspec" | "cargo-ai" =
-    spec.framework === "pydantic-agentspec" ? "pydantic-agentspec" : "cargo-ai";
-
-  if (framework === "cargo-ai" && !spec.model) {
-    return {
-      error:
-        "This Cargo AI agent has no model declared. Add `runtime_vars.model` (e.g. `openai:gpt-4o-mini`) and try again.",
-    };
-  }
-
-  const model = spec.model ?? "";
+  const r = dispatch.resolved;
 
   let runId: string;
   try {
     const res = await createRun({
       workspaceId: workspace.id,
       userId: actingUserId,
-      agentName: spec.name,
-      agentPath: found.agent.path,
-      model,
-      framework,
-      specContent: found.raw,
-      specFormat: fileFormat,
+      agentName: r.agentName,
+      agentPath: r.agentPath,
+      model: r.model,
+      framework: r.framework,
+      specContent: r.specContent,
+      specFormat: r.specFormat,
       userMessage,
+      agentVersionId: r.versionId,
+      agentVersionLabel: r.versionLabel,
     });
     runId = res.runId;
   } catch (err) {
@@ -180,9 +170,9 @@ export async function runNowAction(
     };
   }
 
-  revalidatePath(`/${slug}/agents/${encodeURIComponent(spec.name)}`);
+  revalidatePath(`/${slug}/agents/${encodeURIComponent(r.agentName)}`);
   redirect(
-    `/${slug}/agents/${encodeURIComponent(spec.name)}/runs/${encodeURIComponent(runId)}`,
+    `/${slug}/agents/${encodeURIComponent(r.agentName)}/runs/${encodeURIComponent(runId)}`,
   );
 }
 

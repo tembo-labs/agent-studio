@@ -12,6 +12,7 @@ import {
   additionalInstructionsFile,
   guidanceFilesFor,
 } from "@/lib/agent-guidance";
+import { getStableVersion } from "@/lib/agent-versions";
 import { db } from "@/lib/db";
 import {
   createFile,
@@ -183,6 +184,119 @@ export async function getAgentByName(
   );
   if (!read.ok) return null;
   return { agent: match, raw: read.content };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Dispatch resolution: pick the spec a run should execute.
+//
+// Runs default to the agent's current STABLE snapshot (frozen in Postgres
+// at promotion time) and only use the live DRAFT file when explicitly
+// asked, or when the agent has never been promoted (fallback — so nothing
+// breaks before the first promotion). This is the single choke point all
+// five dispatch paths call; it also centralizes the parse/model/format
+// validation those call sites used to duplicate.
+
+export type ResolvedDispatch = {
+  agentName: string;
+  agentPath: string;
+  framework: Framework;
+  model: string;
+  specContent: string;
+  specFormat: AgentFileFormat;
+  /** agent_version.id when running a stable snapshot; null for draft. */
+  versionId: string | null;
+  /** Human label for the run row / UI: "v3" or "draft". */
+  versionLabel: string;
+};
+
+export type ResolveDispatchError =
+  | { kind: "not-found"; message: string }
+  | { kind: "invalid"; message: string }
+  | { kind: "no-model"; message: string };
+
+export type ResolveDispatchResult =
+  | { ok: true; resolved: ResolvedDispatch }
+  | { ok: false; error: ResolveDispatchError };
+
+export async function resolveAgentForDispatch(
+  workspaceId: string,
+  agentName: string,
+  opts: { preferDraft?: boolean } = {},
+): Promise<ResolveDispatchResult> {
+  // Default path: serve the current stable snapshot if one exists.
+  if (!opts.preferDraft) {
+    const stable = await getStableVersion(workspaceId, agentName);
+    if (stable) {
+      if (!stable.model) {
+        return {
+          ok: false,
+          error: {
+            kind: "no-model",
+            message: `Stable v${stable.versionNumber} of "${agentName}" has no model declared.`,
+          },
+        };
+      }
+      return {
+        ok: true,
+        resolved: {
+          agentName: stable.agentName,
+          agentPath: stable.agentPath,
+          framework: stable.framework,
+          model: stable.model,
+          specContent: stable.specContent,
+          specFormat: stable.specFormat,
+          versionId: stable.id,
+          versionLabel: `v${stable.versionNumber}`,
+        },
+      };
+    }
+    // No stable version yet → fall through to the live file.
+  }
+
+  // Draft / fallback path: the live default-branch file.
+  const found = await getAgentByName(workspaceId, agentName);
+  if (!found) {
+    return {
+      ok: false,
+      error: {
+        kind: "not-found",
+        message: `Agent "${agentName}" is no longer in the connected repo.`,
+      },
+    };
+  }
+  if (!found.agent.ok) {
+    return {
+      ok: false,
+      error: {
+        kind: "invalid",
+        message: `Agent file failed to parse: ${found.agent.error}${found.agent.detail ? ` — ${found.agent.detail}` : ""}`,
+      },
+    };
+  }
+  const spec = found.agent.spec;
+  const model = spec.model ?? "";
+  if (!model) {
+    return {
+      ok: false,
+      error: {
+        kind: "no-model",
+        message: `Agent "${agentName}" has no model declared. Add a model and try again.`,
+      },
+    };
+  }
+  return {
+    ok: true,
+    resolved: {
+      agentName: spec.name,
+      agentPath: found.agent.path,
+      framework: spec.framework,
+      model,
+      specContent: found.raw,
+      specFormat: found.agent.format,
+      versionId: null,
+      versionLabel: "draft",
+    },
+  };
 }
 
 // Best-effort guidance-file bootstrap + refresh. For each guidance

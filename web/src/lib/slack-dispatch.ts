@@ -1,6 +1,5 @@
 import "server-only";
 
-import { detectFormat } from "@/lib/agent-format";
 import { writeAuditEvent } from "@/lib/audit-db";
 import { createRun } from "@/lib/runs-api";
 import { getPermalink, getUserEmail } from "@/lib/slack-api";
@@ -10,7 +9,7 @@ import {
   recordSlackDelivery,
   type SlackApp,
 } from "@/lib/slack-apps";
-import { getAgentByName } from "@/lib/workspace-agents";
+import { resolveAgentForDispatch } from "@/lib/workspace-agents";
 import { listWorkspaceMembers } from "@/lib/workspace";
 
 // Per-user guard against runaway loops (a misbehaving integration, or a
@@ -253,24 +252,16 @@ export async function dispatchToAgent(args: {
     };
   }
 
-  const resolved = await getAgentByName(app.workspaceId, agentName);
-  if (!resolved || !resolved.agent.ok) {
+  // Slack runs the agent's current stable version (no draft opt-in here).
+  const dispatch = await resolveAgentForDispatch(app.workspaceId, agentName);
+  if (!dispatch.ok) {
     return {
       ok: false,
       reason: "agent-invalid",
-      message: `"${agentName}" couldn't be loaded from the repo.`,
+      message: `"${agentName}" couldn't be loaded: ${dispatch.error.message}`,
     };
   }
-  const spec = resolved.agent.spec;
-  const model = spec.model ?? "";
-  const format = detectFormat(resolved.agent.path);
-  if (!model || !format) {
-    return {
-      ok: false,
-      reason: "agent-invalid",
-      message: `"${agentName}" is missing a model or has an unrecognized file type.`,
-    };
-  }
+  const r = dispatch.resolved;
 
   const acting = await resolveActingUser(app, botToken, slackUserId);
 
@@ -278,14 +269,16 @@ export async function dispatchToAgent(args: {
     const { runId } = await createRun({
       workspaceId: app.workspaceId,
       userId: acting.userId,
-      agentName: spec.name,
-      agentPath: resolved.agent.path,
-      model,
+      agentName: r.agentName,
+      agentPath: r.agentPath,
+      model: r.model,
       userMessage: input,
-      framework: spec.framework,
-      specContent: resolved.raw,
-      specFormat: format,
+      framework: r.framework,
+      specContent: r.specContent,
+      specFormat: r.specFormat,
       trigger: "event",
+      agentVersionId: r.versionId,
+      agentVersionLabel: r.versionLabel,
     });
     // Deep-link target for the runs UI: the conversation that kicked this
     // off. Best-effort — a missing permalink just means no link in the UI.
@@ -310,7 +303,7 @@ export async function dispatchToAgent(args: {
         kind: "slack.dispatch",
         targetType: "run",
         targetId: runId,
-        agentName: spec.name,
+        agentName: r.agentName,
         payload: {
           slackAppId: app.id,
           slackAppName: app.name,
@@ -321,7 +314,7 @@ export async function dispatchToAgent(args: {
     } catch {
       // swallow — provenance is nice-to-have, not load-bearing
     }
-    return { ok: true, runId, agentName: spec.name, actingAs: acting.label };
+    return { ok: true, runId, agentName: r.agentName, actingAs: acting.label };
   } catch (e) {
     return {
       ok: false,

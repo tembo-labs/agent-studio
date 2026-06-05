@@ -33,6 +33,8 @@ export interface Automation {
   ownerUserId: string;
   ownerUserName: string | null;
   ownerUserEmail: string | null;
+  /** Run the live draft instead of the agent's stable version. */
+  useDraft: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +55,7 @@ type Row = {
   owner_user_id: string;
   owner_user_name: string | null;
   owner_user_email: string | null;
+  use_draft: boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -74,6 +77,7 @@ function rowToAutomation(r: Row): Automation {
     ownerUserId: r.owner_user_id,
     ownerUserName: r.owner_user_name,
     ownerUserEmail: r.owner_user_email,
+    useDraft: r.use_draft,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -85,6 +89,7 @@ const COLUMNS = `
   u.name AS created_by_name, u.email AS created_by_email,
   a.owner_user_id,
   o.name AS owner_user_name, o.email AS owner_user_email,
+  a.use_draft,
   a.created_at, a.updated_at
 `;
 const FROM_JOIN = `FROM automation a
@@ -101,12 +106,14 @@ export async function createAutomation(input: {
   userId: string;
   /** Owner whose credentials each scheduled run uses. Defaults to userId. */
   ownerUserId?: string;
+  /** Run the live draft instead of the stable version. Defaults to false. */
+  useDraft?: boolean;
 }): Promise<Automation> {
   const res = await db.query<Row>(
     `WITH inserted AS (
        INSERT INTO automation
-         (workspace_id, name, agent_name, cron, input_message, enabled, created_by, owner_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (workspace_id, name, agent_name, cron, input_message, enabled, created_by, owner_user_id, use_draft)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *
      )
      SELECT ${COLUMNS}
@@ -122,6 +129,7 @@ export async function createAutomation(input: {
       input.enabled,
       input.userId,
       input.ownerUserId ?? input.userId,
+      input.useDraft ?? false,
     ],
   );
   return rowToAutomation(res.rows[0]);
@@ -135,6 +143,7 @@ export async function updateAutomation(input: {
   inputMessage: string;
   enabled: boolean;
   ownerUserId: string;
+  useDraft?: boolean;
 }): Promise<Automation> {
   // Reset last_fire_error on edit so a fix to a broken cron doesn't
   // leave a stale red badge on the row. last_fired_at is intentionally
@@ -143,7 +152,7 @@ export async function updateAutomation(input: {
     `WITH updated AS (
        UPDATE automation
        SET name = $2, agent_name = $3, cron = $4, input_message = $5,
-           enabled = $6, owner_user_id = $7,
+           enabled = $6, owner_user_id = $7, use_draft = $8,
            last_fire_error = NULL, updated_at = NOW()
        WHERE id = $1
        RETURNING *
@@ -160,6 +169,7 @@ export async function updateAutomation(input: {
       input.inputMessage,
       input.enabled,
       input.ownerUserId,
+      input.useDraft ?? false,
     ],
   );
   return rowToAutomation(res.rows[0]);
