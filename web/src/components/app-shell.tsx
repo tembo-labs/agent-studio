@@ -1,8 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { AgentsIcon } from "@/components/agents-icon";
-import { SidebarNavItem } from "@/components/sidebar-nav-item";
+import { SidebarNav } from "@/components/sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
@@ -11,17 +10,7 @@ import { getMcpProvider } from "@/lib/mcp-providers";
 import { getInstanceName } from "@/lib/instance-settings";
 import { isInstanceAdminEmail } from "@/lib/instance";
 import type { Workspace } from "@/lib/workspace";
-import {
-  IconApiConnection,
-  IconCalendarRepeat,
-  IconChatBubbles,
-  IconDashboardMiddle,
-  IconExclamationTriangle,
-  IconHammer,
-  IconHistory,
-  IconSettingsSliderHor,
-  IconShield,
-} from "central-icons";
+import { IconExclamationTriangle } from "central-icons";
 
 // Layout shell shared by every signed-in workspace route. Modeled on
 // Tembo's apps/web sidebar pattern — fixed-width left rail, top bar
@@ -108,57 +97,7 @@ export async function AppShell({
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-3 pt-6">
-          <SidebarNavItem
-            href={`${home}/dashboard`}
-            label="Dashboard"
-            icon={<IconDashboardMiddle />}
-          />
-          <SidebarNavItem
-            href={`${home}/runs`}
-            label="Runs"
-            icon={<IconHistory />}
-          />
-          <SidebarNavItem
-            href={home}
-            label="Agents"
-            icon={<AgentsIcon />}
-            matchPrefix
-          />
-          <SidebarNavItem
-            href={`${home}/automations`}
-            label="Automations"
-            icon={<IconCalendarRepeat />}
-          />
-          <SidebarNavItem
-            href={`${home}/connections`}
-            label="Connections"
-            icon={<IconApiConnection />}
-          />
-          <SidebarNavItem
-            href={`${home}/tools`}
-            label="Tools"
-            icon={<IconHammer />}
-          />
-          <SidebarNavItem
-            href={`${home}/tool-uses`}
-            label="Tool uses"
-            icon={<IconHistory />}
-          />
-          <SidebarNavItem
-            href={`${home}/improvements`}
-            label="Improvements"
-            icon={<IconChatBubbles />}
-          />
-          <SidebarNavItem
-            href={`${home}/audit`}
-            label="Audit"
-            icon={<IconShield />}
-          />
-          <SidebarNavItem
-            href={`${home}/settings`}
-            label="Settings"
-            icon={<IconSettingsSliderHor />}
-          />
+          <SidebarNav home={home} />
 
           {(!hasLlmProvider ||
             failingAgents.length > 0 ||
