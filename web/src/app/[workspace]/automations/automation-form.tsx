@@ -49,6 +49,7 @@ type CommonProps = {
     inputMessage?: string;
     enabled?: boolean;
     ownerUserId?: string;
+    useDraft?: boolean;
   };
 };
 
@@ -75,6 +76,7 @@ export function AutomationForm({
   const [ownerUserId, setOwnerUserId] = useState(
     defaults?.ownerUserId ?? currentUserId,
   );
+  const [useDraft, setUseDraft] = useState(defaults?.useDraft ?? false);
   const preview = useMemo(() => validateCron(cron), [cron]);
 
   return (
@@ -216,6 +218,21 @@ export function AutomationForm({
         <span className="text-foreground">Enabled</span>
         <span className="text-foreground-weak text-sm">
           (turn off to pause without deleting)
+        </span>
+      </label>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="use_draft"
+          checked={useDraft}
+          onChange={(e) => setUseDraft(e.target.checked)}
+          disabled={pending}
+          className="h-4 w-4"
+        />
+        <span className="text-foreground">Run the draft</span>
+        <span className="text-foreground-weak text-sm">
+          (default: the agent&apos;s current stable version)
         </span>
       </label>
 

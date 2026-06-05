@@ -442,6 +442,11 @@ function SourceCell({ run }: { run: LoadedRun }) {
           {who}
         </span>
       )}
+      {run.agentVersionLabel && (
+        <span className="text-foreground-muted font-mono text-xs">
+          {run.agentVersionLabel}
+        </span>
+      )}
     </div>
   );
 }

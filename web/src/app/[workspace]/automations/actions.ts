@@ -35,6 +35,8 @@ type ParsedForm = {
   enabled: boolean;
   /** Workspace member whose credentials each scheduled run uses. */
   ownerUserId: string;
+  /** Run the live draft instead of the agent's stable version. */
+  useDraft: boolean;
 };
 
 function parseForm(formData: FormData): ParsedForm {
@@ -46,6 +48,7 @@ function parseForm(formData: FormData): ParsedForm {
     inputMessage: String(formData.get("input_message") ?? ""),
     enabled: formData.get("enabled") === "on",
     ownerUserId: String(formData.get("owner_user_id") ?? "").trim(),
+    useDraft: formData.get("use_draft") === "on",
   };
 }
 
@@ -105,6 +108,7 @@ export async function createAutomationAction(
     enabled: parsed.enabled,
     userId,
     ownerUserId,
+    useDraft: parsed.useDraft,
   });
 
   await writeAuditEvent({
@@ -164,6 +168,7 @@ export async function updateAutomationAction(
     // always send the current owner so the edit doesn't accidentally
     // re-assign.
     ownerUserId,
+    useDraft: parsed.useDraft,
   });
 
   await writeAuditEvent({

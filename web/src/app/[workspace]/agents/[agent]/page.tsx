@@ -7,6 +7,11 @@ import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
+import {
+  getAgentOwner,
+  getStableVersion,
+  listAgentVersions,
+} from "@/lib/agent-versions";
 import { listAuditTimeline } from "@/lib/audit-db";
 import {
   listAutomationsForAgent,
@@ -35,10 +40,14 @@ import {
 } from "@/lib/workspace";
 
 import { AgentDashboard } from "./agent-dashboard";
+import { AgentOwnerControl } from "./agent-owner-control";
 import { AgentTimeline } from "./agent-timeline";
 import { DeleteAgentButton } from "./delete-agent-button";
+import { DraftChangesBanner } from "./draft-changes-banner";
+import { PromoteButton } from "./promote-button";
 import { RunNowButton } from "./run-now-button";
 import { TriggersSection } from "./triggers-section";
+import { VersionsSection } from "./versions-section";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +87,10 @@ export default async function AgentDetailPage({
     timeline,
     currentUserRole,
     temboConfigured,
+    versions,
+    stable,
+    owner,
+    allMembers,
   ] = await Promise.all([
     listRecentRunsForAgent(workspace.id, canonicalName, 10),
     listAutomationsForAgent(workspace.id, canonicalName),
@@ -91,18 +104,32 @@ export default async function AgentDetailPage({
     listAuditTimeline(workspace.id, { agentName: canonicalName }, 20),
     getWorkspaceRole(workspace.id, session.user.id),
     isTemboConfigured(workspace.id),
+    listAgentVersions(workspace.id, canonicalName),
+    getStableVersion(workspace.id, canonicalName),
+    getAgentOwner(workspace.id, canonicalName),
+    listWorkspaceMembers(workspace.id),
   ]);
   const canEdit = meetsMinRole(currentUserRole, "operator");
+  const isAdmin = currentUserRole === "workspace_admin";
   // Admins get a "Run as" picker in the Run-now dialog so a manual run
   // can use another member's connections.
-  const runAsMembers =
-    currentUserRole === "workspace_admin"
-      ? (await listWorkspaceMembers(workspace.id)).map((m) => ({
-          userId: m.userId,
-          name: m.name,
-          email: m.email,
-        }))
-      : undefined;
+  const runAsMembers = isAdmin
+    ? allMembers.map((m) => ({ userId: m.userId, name: m.name, email: m.email }))
+    : undefined;
+
+  // Lifecycle derived state.
+  const nameFor = (userId: string): string => {
+    const m = allMembers.find((x) => x.userId === userId);
+    return m ? (m.name ?? m.email) : "unknown";
+  };
+  const ownerLabel = owner ? nameFor(owner.ownerUserId) : null;
+  const isOwner = owner?.ownerUserId === session.user.id;
+  // The owner promotes; admins can too; an unowned agent can be promoted by
+  // any operator (canEdit). Draft must differ from the current stable.
+  const canPromote = canEdit && (!owner || isOwner || isAdmin);
+  const canAssignOwner = canEdit && (isAdmin || !owner || isOwner);
+  const draftChanged = agent.ok && (!stable || stable.specContent !== raw);
+  const nextVersion = (stable?.versionNumber ?? 0) + 1;
 
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
 
@@ -117,6 +144,15 @@ export default async function AgentDetailPage({
             </h1>
             {agent.ok ? (
               <div className="flex flex-wrap items-center gap-1.5">
+                {stable ? (
+                  <Badge variant="green" size="small">
+                    Stable v{stable.versionNumber}
+                  </Badge>
+                ) : (
+                  <Badge variant="gray" size="small">
+                    Draft only
+                  </Badge>
+                )}
                 <Badge variant="blue" size="small">
                   {FRAMEWORK_LABELS[agent.spec.framework]}
                 </Badge>
@@ -126,6 +162,18 @@ export default async function AgentDetailPage({
                 <code className="text-foreground-muted text-sm">
                   {agent.filename}
                 </code>
+                <AgentOwnerControl
+                  workspaceSlug={workspace.slug}
+                  agentName={canonicalName}
+                  ownerUserId={owner?.ownerUserId ?? null}
+                  ownerLabel={ownerLabel}
+                  canAssign={canAssignOwner}
+                  members={allMembers.map((m) => ({
+                    userId: m.userId,
+                    name: m.name,
+                    email: m.email,
+                  }))}
+                />
               </div>
             ) : (
               <p className="text-sentiment-negative text-sm">
@@ -155,12 +203,23 @@ export default async function AgentDetailPage({
                 agentName={canonicalName}
               />
             )}
+            {agent.ok && canPromote && (
+              <PromoteButton
+                workspaceSlug={workspace.slug}
+                agentName={canonicalName}
+                nextVersion={nextVersion}
+                hasChanges={draftChanged}
+                isOwner={isOwner}
+                ownerLabel={ownerLabel}
+              />
+            )}
             {agent.ok && canEdit && (
               <RunNowButton
                 workspaceSlug={workspace.slug}
                 agentName={canonicalName}
                 members={runAsMembers}
                 currentUserId={session.user.id}
+                hasStable={stable !== null}
               />
             )}
           </div>
@@ -172,9 +231,24 @@ export default async function AgentDetailPage({
         )}
       </div>
 
+      {stable && draftChanged && canEdit && (
+        <DraftChangesBanner
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+        />
+      )}
+
       <hr className="border-[var(--color-border-weak)]" />
 
       <div className="flex flex-col gap-8">
+        <VersionsSection
+          versions={versions}
+          stableVersionId={stable?.id ?? null}
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+          nameFor={nameFor}
+        />
+
         <AgentDashboard
           stats={stats}
           daily={daily}

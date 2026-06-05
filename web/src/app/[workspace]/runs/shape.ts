@@ -31,5 +31,6 @@ export function toLoaded(r: RunListItem): LoadedRun {
     createdByName: r.createdByName,
     createdByEmail: r.createdByEmail,
     slack: r.slack,
+    agentVersionLabel: r.agentVersionLabel,
   };
 }

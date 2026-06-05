@@ -33,6 +33,8 @@ type Props = {
    *  themselves and don't get this. */
   members?: { userId: string; name: string | null; email: string }[];
   currentUserId: string;
+  /** When the agent has a stable version, offer a Stable/Draft toggle. */
+  hasStable?: boolean;
 };
 
 export function RunNowButton({
@@ -40,6 +42,7 @@ export function RunNowButton({
   agentName,
   members,
   currentUserId,
+  hasStable,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(runNowAction, INITIAL);
@@ -49,6 +52,7 @@ export function RunNowButton({
   // when the dialog closes so reopening starts fresh.
   const [userMessage, setUserMessage] = useState("");
   const [runAs, setRunAs] = useState(currentUserId);
+  const [runVersion, setRunVersion] = useState<"stable" | "draft">("stable");
   const showRunAs = members !== undefined && members.length > 1;
 
   return (
@@ -60,6 +64,7 @@ export function RunNowButton({
           if (!next) {
             setUserMessage("");
             setRunAs(currentUserId);
+            setRunVersion("stable");
           }
         }}
       >
@@ -80,6 +85,35 @@ export function RunNowButton({
           <form action={formAction} className="flex flex-col gap-3">
             <input type="hidden" name="workspace" value={workspaceSlug} />
             <input type="hidden" name="agent" value={agentName} />
+            <input type="hidden" name="run_version" value={runVersion} />
+            {hasStable && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-foreground-weak text-sm">Version</span>
+                <div className="flex gap-2">
+                  {(["stable", "draft"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setRunVersion(v)}
+                      disabled={pending}
+                      aria-pressed={runVersion === v}
+                      className={
+                        runVersion === v
+                          ? "bg-interactive text-foreground-on-accent border-interactive rounded-md border px-3 py-1 text-sm font-medium capitalize"
+                          : "text-foreground hover:bg-surface-raised border-border rounded-md border px-3 py-1 text-sm font-medium capitalize"
+                      }
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-foreground-muted text-sm">
+                  {runVersion === "stable"
+                    ? "Runs the current stable version."
+                    : "Runs the live draft (unreleased changes)."}
+                </p>
+              </div>
+            )}
             {showRunAs && (
               <div className="flex flex-col gap-1.5">
                 <label

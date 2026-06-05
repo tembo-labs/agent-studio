@@ -63,6 +63,7 @@ export default async function EditAutomationPage({
           inputMessage: automation.inputMessage,
           enabled: automation.enabled,
           ownerUserId: automation.ownerUserId,
+          useDraft: automation.useDraft,
         }}
         mode="edit"
       />

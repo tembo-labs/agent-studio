@@ -203,6 +203,8 @@ export type RunListItem = {
     permalink: string | null;
     channel: string;
   } | null;
+  // Which agent version ran ("v3" | "draft"), or null for pre-feature runs.
+  agentVersionLabel: string | null;
 };
 
 const LIST_RUNS_MAX_PAGE = 50;
@@ -276,10 +278,11 @@ export async function listRunsForWorkspace(
     slack_user_id: string | null;
     slack_permalink: string | null;
     slack_channel: string | null;
+    agent_version_label: string | null;
   }>(
     `SELECT r.id, r.agent_name, r.status, r.trigger, r.automation_id,
             r.created_at, r.started_at, r.completed_at, r.user_message,
-            r.error_message, r.cost_usd,
+            r.error_message, r.cost_usd, r.agent_version_label,
             u.name AS created_by_name, u.email AS created_by_email,
             sa.name AS slack_app_name, sd.slack_user_id,
             sd.permalink AS slack_permalink, sd.channel AS slack_channel
@@ -318,6 +321,7 @@ export async function listRunsForWorkspace(
           channel: r.slack_channel,
         }
       : null,
+    agentVersionLabel: r.agent_version_label,
   }));
 }
 

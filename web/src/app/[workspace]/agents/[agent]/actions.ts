@@ -22,6 +22,7 @@ import {
   setAgentOwner,
 } from "@/lib/agent-versions";
 import { summarizeSpecDiff } from "@/lib/agent-version-summary";
+import { diffLines, type TextDiff } from "@/lib/text-diff";
 import {
   deleteTriggerLocal,
   getTriggerById,
@@ -182,7 +183,7 @@ export async function runNowAction(
 
 export type PromoteFormState = {
   error?: string;
-  promotedVersion?: number;
+  message?: string;
 };
 
 export async function promoteAgentAction(
@@ -268,10 +269,49 @@ export async function promoteAgentAction(
     payload: { versionNumber, promotedByOwner: isOwner },
   });
   revalidatePath(`/${slug}/agents/${encodeURIComponent(agentName)}`);
-  return { promotedVersion: versionNumber };
+  return { message: `Promoted to Stable v${versionNumber}.` };
 }
 
-export type OwnerFormState = { error?: string; ok?: boolean };
+export type DraftChangesResult =
+  | { ok: true; summary: string; diff: TextDiff; invalid: boolean }
+  | { ok: false; error: string };
+
+/**
+ * On-demand: what's changed in the live draft vs the current stable version
+ * (summary + line diff). Called from the "draft has unreleased changes"
+ * banner. Returns invalid=true when the draft no longer parses (the diff is
+ * still shown, but it can't be promoted until fixed).
+ */
+export async function summarizeDraftAction(args: {
+  workspaceSlug: string;
+  agentName: string;
+}): Promise<DraftChangesResult> {
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace } = auth;
+
+  const stable = await getStableVersion(workspace.id, args.agentName);
+  if (!stable) {
+    return { ok: false, error: "This agent has no stable version yet." };
+  }
+  const found = await getAgentByName(workspace.id, args.agentName);
+  if (!found) {
+    return { ok: false, error: "Agent no longer exists in the connected repo." };
+  }
+  const diff = diffLines(stable.specContent, found.raw);
+  const summary = await summarizeSpecDiff({
+    workspaceId: workspace.id,
+    agentName: args.agentName,
+    previous: stable.specContent,
+    next: found.raw,
+  });
+  return { ok: true, summary, diff, invalid: !found.agent.ok };
+}
+
+export type OwnerFormState = { error?: string; message?: string };
 
 export async function setAgentOwnerAction(
   _prev: OwnerFormState,
@@ -317,7 +357,7 @@ export async function setAgentOwnerAction(
     payload: { ownerUserId },
   });
   revalidatePath(`/${slug}/agents/${encodeURIComponent(agentName)}`);
-  return { ok: true };
+  return { message: "Owner updated." };
 }
 
 // ────────────────────────────────────────────────────────────────────
