@@ -47,11 +47,25 @@ export function ImproveForm({
     e.preventDefault();
     setResult(null);
     startTransition(async () => {
-      const r = await improveAgentAction({
-        workspaceSlug,
-        runId,
-        improvement,
-      });
+      let r: ImproveResult;
+      try {
+        r = await improveAgentAction({
+          workspaceSlug,
+          runId,
+          improvement,
+        });
+      } catch {
+        // A thrown server action — most commonly "Failed to find Server
+        // Action" when this page was loaded from an older deployment.
+        // Surface it instead of failing silently so the user knows to
+        // refresh rather than thinking the button is broken.
+        setResult({
+          ok: false,
+          error:
+            "Couldn't submit — this page may be out of date (a new version shipped). Refresh the page and try again.",
+        });
+        return;
+      }
       setResult(r);
       if (r.ok) {
         setImprovement("");
