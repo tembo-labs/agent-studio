@@ -35,8 +35,22 @@ use crate::crypto::MasterKey;
 /// so a token can't die mid-run between the sweep and the agent's
 /// first tool call.
 const REFRESH_SKEW_SECS: i64 = 120;
+
+// Native-MCP providers TAS can refresh tokens for, as
+// (mcp_server_url origin → allowed OAuth authorization-server origins).
+// MUST mirror the web catalog in web/src/lib/mcp-providers.ts
+// (mcpServerUrl + oauthAuthorizationServerOrigins) — keep both in sync
+// when adding a provider, or refreshes for the new provider abort and its
+// short-lived tokens 401 mid-run.
 const ATTIO_MCP_ORIGIN: &str = "https://mcp.attio.com";
 const ATTIO_OAUTH_ORIGINS: &[&str] = &["https://app.attio.com"];
+const PYLON_MCP_ORIGIN: &str = "https://mcp.usepylon.com";
+const PYLON_OAUTH_ORIGINS: &[&str] = &["https://o.auth.usepylon.com"];
+
+const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
+    (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
+    (PYLON_MCP_ORIGIN, PYLON_OAUTH_ORIGINS),
+];
 
 #[derive(Deserialize)]
 struct ProtectedResourceMeta {
@@ -288,10 +302,10 @@ async fn discover_token_endpoint(
 }
 
 fn allowed_oauth_origins_for_mcp_origin(origin: &str) -> Option<&'static [&'static str]> {
-    match origin {
-        ATTIO_MCP_ORIGIN => Some(ATTIO_OAUTH_ORIGINS),
-        _ => None,
-    }
+    NATIVE_MCP_OAUTH_ALLOWLIST
+        .iter()
+        .find(|(mcp_origin, _)| *mcp_origin == origin)
+        .map(|(_, oauth_origins)| *oauth_origins)
 }
 
 fn parse_trusted_oauth_url(

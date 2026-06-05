@@ -649,13 +649,22 @@ async def run(spec: dict, user_message: str) -> None:
                                 f"{type(ts).__name__}({'/'.join(wrapper_chain)})"
                                 f" over {len(names)} server tools"
                             )
+                # NOTE: this is the RAW server catalog count — we unwrap
+                # FilteredToolset above and list the inner MCPToolset, so
+                # this is everything the provider *could* expose, NOT what
+                # the model sees. A `tools:` narrowing is applied per
+                # toolset at run time (FilteredToolset, see filtered_notes),
+                # so the model's actual tool set is the declared subset.
                 sys.stderr.write(
-                    f"[tas] MCP toolset exposes {len(tool_names)} tools: "
+                    f"[tas] MCP server catalogs total {len(tool_names)} "
+                    f"tools (before the agent's `tools:` narrowing — the "
+                    f"model only sees the declared subset): "
                     f"{tool_names[:10]}{'…' if len(tool_names) > 10 else ''}\n"
                 )
                 if filtered_notes:
                     sys.stderr.write(
-                        f"[tas] wrapper chains in play: {filtered_notes}\n"
+                        f"[tas] narrowed toolsets (model sees only the "
+                        f"declared `tools:` from each): {filtered_notes}\n"
                     )
             except Exception as e:
                 sys.stderr.write(f"[tas] list_tools probe failed: {e}\n")

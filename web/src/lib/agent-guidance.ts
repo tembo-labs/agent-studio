@@ -253,7 +253,7 @@ output_schema:
   the filename (\`name: foo\` → \`foo.yaml\`). 2–64 chars, lowercase,
   digits, hyphens.
 - **\`model\`** (required) — format \`provider:model\`. Examples:
-  \`anthropic:claude-opus-4-7\`, \`anthropic:claude-sonnet-4-6\`,
+  \`anthropic:claude-opus-4-8\`, \`anthropic:claude-sonnet-4-6\`,
   \`openai:gpt-5.2\`, \`openai:gpt-4o-mini\`. The provider's API key
   must be set under the workspace's Settings → API keys. See
   *Choosing a model* below for which to pick.
@@ -268,7 +268,7 @@ output_schema:
 
 Model choice is a cost/reliability tradeoff. Default playbook:
 
-- **First-run + iterating: start on \`anthropic:claude-opus-4-7\`
+- **First-run + iterating: start on \`anthropic:claude-opus-4-8\`
   for any agent that calls tools** (i.e. declares \`connections:\`).
   Tool-using agents need to decide when to act without follow-up
   questions, and lower-tier models (Sonnet, GPT-4o-mini) tend to
