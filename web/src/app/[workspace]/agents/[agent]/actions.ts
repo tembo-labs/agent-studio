@@ -16,6 +16,13 @@ import {
 import { getComposioConnectionById } from "@/lib/composio-connections";
 import { createRun } from "@/lib/runs-api";
 import {
+  getAgentOwner,
+  getStableVersion,
+  promoteToStable,
+  setAgentOwner,
+} from "@/lib/agent-versions";
+import { summarizeSpecDiff } from "@/lib/agent-version-summary";
+import {
   deleteTriggerLocal,
   getTriggerById,
   saveTrigger,
@@ -177,6 +184,150 @@ export async function runNowAction(
   redirect(
     `/${slug}/agents/${encodeURIComponent(spec.name)}/runs/${encodeURIComponent(runId)}`,
   );
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Lifecycle: promote the draft to a numbered Stable version, and assign
+// the agent's owner.
+
+export type PromoteFormState = {
+  error?: string;
+  promotedVersion?: number;
+};
+
+export async function promoteAgentAction(
+  _prev: PromoteFormState,
+  formData: FormData,
+): Promise<PromoteFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const agentName = String(formData.get("agent") ?? "");
+
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId, role } = auth;
+
+  // Owner/admin gate: the owner promotes; an admin can too (the UI warns
+  // them when they aren't the owner). An unowned agent can be promoted by
+  // any operator (already gated above).
+  const owner = await getAgentOwner(workspace.id, agentName);
+  const isOwner = owner?.ownerUserId === userId;
+  const isAdmin = role === "workspace_admin";
+  if (owner && !isOwner && !isAdmin) {
+    return {
+      error:
+        "Only this agent's owner or a workspace admin can promote a new stable version.",
+    };
+  }
+
+  // Never promote a broken draft — the current file must parse.
+  const found = await getAgentByName(workspace.id, agentName);
+  if (!found || !found.agent.ok) {
+    return {
+      error: found
+        ? "The draft file is invalid; fix it before promoting."
+        : "Agent no longer exists in the connected repo.",
+    };
+  }
+  const spec = found.agent.spec;
+  const framework: "pydantic-agentspec" | "cargo-ai" =
+    spec.framework === "pydantic-agentspec" ? "pydantic-agentspec" : "cargo-ai";
+
+  const previous = await getStableVersion(workspace.id, agentName);
+  if (previous && previous.specContent === found.raw) {
+    return { error: "No changes since the current stable version." };
+  }
+
+  const changeSummary = await summarizeSpecDiff({
+    workspaceId: workspace.id,
+    agentName,
+    previous: previous?.specContent ?? null,
+    next: found.raw,
+  });
+
+  let versionNumber: number;
+  try {
+    const version = await promoteToStable({
+      workspaceId: workspace.id,
+      agentName,
+      agentPath: found.agent.path,
+      framework,
+      model: spec.model ?? null,
+      specContent: found.raw,
+      specFormat: found.agent.format,
+      changeSummary,
+      createdBy: userId,
+    });
+    versionNumber = version.versionNumber;
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Couldn't promote the agent.",
+    };
+  }
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "agent.version.promoted",
+    targetType: "agent",
+    targetId: agentName,
+    agentName,
+    payload: { versionNumber, promotedByOwner: isOwner },
+  });
+  revalidatePath(`/${slug}/agents/${encodeURIComponent(agentName)}`);
+  return { promotedVersion: versionNumber };
+}
+
+export type OwnerFormState = { error?: string; ok?: boolean };
+
+export async function setAgentOwnerAction(
+  _prev: OwnerFormState,
+  formData: FormData,
+): Promise<OwnerFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const agentName = String(formData.get("agent") ?? "");
+  const ownerUserId = String(formData.get("owner_user_id") ?? "").trim();
+
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId, role } = auth;
+
+  if (!ownerUserId) return { error: "Pick a member to own this agent." };
+  const targetRole = await getWorkspaceRole(workspace.id, ownerUserId);
+  if (!targetRole) {
+    return { error: "That user isn't a member of this workspace." };
+  }
+
+  // An admin can (re)assign; the current owner can hand it off; an unowned
+  // agent can be claimed by any operator (already gated above).
+  const owner = await getAgentOwner(workspace.id, agentName);
+  const canAssign =
+    role === "workspace_admin" || !owner || owner.ownerUserId === userId;
+  if (!canAssign) {
+    return {
+      error: "Only the current owner or a workspace admin can reassign ownership.",
+    };
+  }
+
+  await setAgentOwner(workspace.id, agentName, ownerUserId, userId);
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "agent.owner.changed",
+    targetType: "agent",
+    targetId: agentName,
+    agentName,
+    payload: { ownerUserId },
+  });
+  revalidatePath(`/${slug}/agents/${encodeURIComponent(agentName)}`);
+  return { ok: true };
 }
 
 // ────────────────────────────────────────────────────────────────────
