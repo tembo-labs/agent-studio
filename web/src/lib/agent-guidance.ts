@@ -664,6 +664,14 @@ for production agents.
   allows omitting it, TAS's parser rejects files without
   \`instructions\` to keep the diff-review experience honest
   (an agent without instructions is hard for a reviewer to assess).
+- **Event/webhook runs pass a JSON envelope as the input.** A run
+  fired by an external webhook (e.g. Clay) or a Composio trigger
+  receives its \`user_message\` as a JSON string shaped like
+  \`{ "trigger_type": "webhook", "webhook": "<name>", "payload": <the
+  sender's body> }\` (Composio events use \`trigger_type\` +
+  \`payload\` similarly). Write the agent's instructions to parse this
+  envelope and read \`payload\`; for ETL-style work, a
+  \`tools_module\` function does the field mapping + the write-back.
 
 ## Patterns to recognize
 

@@ -28,8 +28,10 @@ import {
   listRecentRunsForAgent,
   type RunSummary,
 } from "@/lib/runs-db";
+import { getPublicOrigin } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
 import { listTriggersForAgent } from "@/lib/triggers-db";
+import { listWebhooksForAgent } from "@/lib/webhooks-db";
 import { getAgentByName } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
@@ -49,6 +51,7 @@ import { PromoteButton } from "./promote-button";
 import { RunNowButton } from "./run-now-button";
 import { TriggersSection } from "./triggers-section";
 import { VersionsSection } from "./versions-section";
+import { WebhooksSection } from "./webhooks-section";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +100,7 @@ export default async function AgentDetailPage({
     stable,
     owner,
     allMembers,
+    webhooks,
   ] = await Promise.all([
     listRecentRunsForAgent(workspace.id, canonicalName, 10),
     listAutomationsForAgent(workspace.id, canonicalName),
@@ -115,6 +119,7 @@ export default async function AgentDetailPage({
     getStableVersion(workspace.id, canonicalName),
     getAgentOwner(workspace.id, canonicalName),
     listWorkspaceMembers(workspace.id),
+    listWebhooksForAgent(workspace.id, canonicalName),
   ]);
   const canEdit = meetsMinRole(currentUserRole, "operator");
   const isAdmin = currentUserRole === "workspace_admin";
@@ -281,6 +286,29 @@ export default async function AgentDetailPage({
           myConnections={myConnections}
           composioApiKeyConfigured={!!composioApiKeyPreview}
           webhookSecretConfigured={!!composioWebhookSecretPreview}
+        />
+
+        <WebhooksSection
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+          baseUrl={getPublicOrigin()}
+          canManage={canEdit}
+          owners={
+            isAdmin
+              ? allMembers.map((m) => ({
+                  userId: m.userId,
+                  label: m.name ?? m.email,
+                }))
+              : undefined
+          }
+          webhooks={webhooks.map((w) => ({
+            id: w.id,
+            name: w.name,
+            tokenLast4: w.tokenLast4,
+            enabled: w.enabled,
+            lastFiredAtIso: w.lastFiredAt ? w.lastFiredAt.toISOString() : null,
+            lastFireError: w.lastFireError,
+          }))}
         />
 
         <AutomationsSection
