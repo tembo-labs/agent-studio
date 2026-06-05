@@ -16,7 +16,7 @@
 
 import { getPublicOrigin } from "@/lib/config";
 
-export type McpProviderSlug = "attio";
+export type McpProviderSlug = "attio" | "pylon";
 
 export type McpProvider = {
   slug: McpProviderSlug;
@@ -36,6 +36,15 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     displayName: "Attio",
     mcpServerUrl: "https://mcp.attio.com/mcp",
     oauthAuthorizationServerOrigins: ["https://app.attio.com"],
+  },
+  pylon: {
+    slug: "pylon",
+    displayName: "Pylon",
+    // The MCP endpoint is the origin root (verified: POST / returns the
+    // spec's 401 + WWW-Authenticate challenge; /mcp and /sse 404). OAuth is
+    // discovered + dynamically registered (DCR) — no manual client creds.
+    mcpServerUrl: "https://mcp.usepylon.com",
+    oauthAuthorizationServerOrigins: ["https://o.auth.usepylon.com"],
   },
 };
 
