@@ -12,6 +12,46 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.10] — Agent view redesign + run-time connection guard — shipped 2026-06-08
+
+The agent page was a long vertical stack; it's now a focused, Settings-style
+view with a left side-nav. Plus a guard that stops a run before it starts when
+the connections aren't set up. Web-only — no new migrations.
+
+### Added
+- **Agent view side-nav** — the agent page is reorganized into a shared header
+  (name, version, owner, connections, primary actions) + a left tab rail, with
+  one real route per tab: **Overview** (30-day dashboard + recent runs),
+  **Runs**, **Automation** (triggers + webhooks + schedules), **Versions**,
+  **Definition** (spec + tools module), **Activity** (audit timeline), and
+  **Settings**. Each tab fetches only its own data.
+- **Connection icons on the agent view** — a row of the external services the
+  agent uses, each with its **provider name + logo** (logos borrowed from
+  Composio's library; a generic icon when a slug has none).
+
+### Changed
+- **Decluttered the agent header** — Delete moved to **Settings → Danger**;
+  **Promote to Stable** moved to the **Versions** tab (the header keeps the
+  read-only "Stable vN" badge); the ownership picker moved to **Settings** (the
+  header shows a read-only owner). The header's action row is just
+  **View source · Chat to edit · Run now**.
+- **Triggers + External webhooks collapse by default** on the agent view, with a
+  count in the title so configured items stay visible.
+
+### Fixed
+- **Block a run when the acting user's connections aren't set up** — a clear
+  pre-flight message ("You haven't connected: HubSpot. Authorize under
+  Connections, then run again.") instead of a pydantic-ai traceback mid-run.
+  Applies to Run-now and Chat-to-edit.
+- **Lint/CI** — pin `eslint` to 9 (eslint 10 removed an API `eslint-plugin-react`
+  still uses, crashing the lint step), and fix the placeholder Dependabot config
+  (real per-ecosystem groups; Astro + Starlight always bump together).
+
+### Dependencies
+- A wave of Dependabot updates: Next 16.2.7, React 19.2.x, Astro 6.4.4,
+  TypeScript 6, and many GitHub Actions (`checkout`, `setup-node`, the docker/*
+  actions, codeql, pages) — all verified green.
+
 ## [v2026.6.9] — Agent lifecycle, tool observability, and the ETL-agent stack — shipped 2026-06-08
 
 A big release. Agents gain a real **version lifecycle** (draft → stable) and
