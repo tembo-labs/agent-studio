@@ -407,6 +407,21 @@ the job"; the instructions below tell you what the job is.
 --- Agent instructions ---
 """
 
+# Appended to EVERY pydantic agent's instructions (connected or not). Agents
+# were narrating their steps and echoing raw tool output into replies, which
+# burns the output-token budget for no benefit — the reply lands in a run log,
+# not a chat. This targets process-narration, NOT the size of the actual
+# deliverable: an agent whose job is a long report still writes the report.
+OUTPUT_DISCIPLINE = """\
+--- Output discipline (applies to every run) ---
+Work silently. Do your reasoning, planning, and data gathering internally — \
+do NOT narrate your steps, restate the task, think out loud, or echo raw tool \
+output and intermediate results into your reply. Reply with only the final \
+result the task calls for, as briefly as the task allows. Your reply lands in \
+a run log, not a chat, and output tokens are a finite budget — progress \
+commentary and reasoning dumps waste it. If the task produces no user-facing \
+result, reply with a single short line saying so."""
+
 
 def build_agent(
     spec: dict,
@@ -460,9 +475,15 @@ def build_agent(
                 else COMPOSIO_TOOL_USE_PREAMBLE_LOOSE
             )
             preamble = template.format(toolkits=", ".join(connections))
-            kwargs["instructions"] = preamble + instructions
+            base = preamble + instructions
         else:
-            kwargs["instructions"] = instructions
+            base = instructions
+    else:
+        base = ""
+    # Append the global output-discipline rule to whatever the agent declared
+    # (or send it alone when the agent has no instructions). Applies to every
+    # pydantic run so agents stop narrating steps and dumping tool output.
+    kwargs["instructions"] = (base + "\n\n" if base else "") + OUTPUT_DISCIPLINE
     name = spec.get("name")
     if isinstance(name, str) and name.strip():
         kwargs["name"] = name
