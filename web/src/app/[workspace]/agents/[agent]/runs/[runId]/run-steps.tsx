@@ -79,6 +79,12 @@ export function RunSteps({
               <span />
             </div>
 
+            {s.summary && (
+              <p className="text-foreground-weak px-3 pb-1.5 text-xs italic leading-4">
+                {s.summary}
+              </p>
+            )}
+
             {stepCalls.map((c) => {
               const tp = toolProviders[c.toolName];
               return (

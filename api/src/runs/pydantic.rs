@@ -83,6 +83,8 @@ struct ToolCallJson {
 #[derive(Debug, Clone)]
 pub struct RunStep {
     pub ordinal: i32,
+    /// The model's one-line "what I'm doing this step" note, when present.
+    pub summary: Option<String>,
     pub input_tokens: Option<i32>,
     pub output_tokens: Option<i32>,
     pub cache_read_tokens: Option<i32>,
@@ -93,6 +95,8 @@ pub struct RunStep {
 #[derive(Debug, Deserialize)]
 struct StepJson {
     step: i32,
+    #[serde(default)]
+    summary: Option<String>,
     #[serde(default)]
     input_tokens: Option<i32>,
     #[serde(default)]
@@ -615,6 +619,10 @@ fn extract_steps(stdout: &str) -> Vec<RunStep> {
                     .into_iter()
                     .map(|s| RunStep {
                         ordinal: s.step,
+                        summary: s
+                            .summary
+                            .map(|t| t.trim().to_string())
+                            .filter(|t| !t.is_empty()),
                         input_tokens: s.input_tokens,
                         output_tokens: s.output_tokens,
                         cache_read_tokens: s.cache_read_tokens,

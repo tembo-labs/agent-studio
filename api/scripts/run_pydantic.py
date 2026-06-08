@@ -181,8 +181,14 @@ def steps_payload(messages) -> list[dict]:
             continue
         usage_obj = getattr(msg, "usage", None)
         tools: list[dict] = []
+        text_parts: list[str] = []
         for part in getattr(msg, "parts", None) or []:
             kind = getattr(part, "part_kind", "") or ""
+            if kind == "text":
+                content = getattr(part, "content", None)
+                if isinstance(content, str) and content.strip():
+                    text_parts.append(content.strip())
+                continue
             if not kind.endswith("tool-call"):
                 continue
             name = getattr(part, "tool_name", None)
@@ -194,9 +200,15 @@ def steps_payload(messages) -> list[dict]:
                 tools.append({"name": name, "ok": None})
             else:
                 tools.append({"name": name, "ok": o["ok"], "error": o.get("error")})
+        # The model's own one-line "what I'm doing" preamble for this step (see
+        # OUTPUT_DISCIPLINE). Only attach it to TOOL-CALLING steps — a step with
+        # no tool calls is the final answer, which already lives in the run
+        # output and shouldn't be duplicated as a "summary".
+        summary = " ".join(text_parts).strip()
         steps.append(
             {
                 "step": idx,
+                "summary": (summary[:280] if (summary and tools) else None),
                 "input_tokens": _usage_field(usage_obj, "input_tokens", "request_tokens"),
                 "output_tokens": _usage_field(usage_obj, "output_tokens", "response_tokens"),
                 "cache_read_tokens": _usage_field(usage_obj, "cache_read_tokens"),
@@ -464,13 +476,15 @@ the job"; the instructions below tell you what the job is.
 # deliverable: an agent whose job is a long report still writes the report.
 OUTPUT_DISCIPLINE = """\
 --- Output discipline (applies to every run) ---
-Work silently. Do your reasoning, planning, and data gathering internally — \
-do NOT narrate your steps, restate the task, think out loud, or echo raw tool \
-output and intermediate results into your reply. Reply with only the final \
-result the task calls for, as briefly as the task allows. Your reply lands in \
-a run log, not a chat, and output tokens are a finite budget — progress \
-commentary and reasoning dumps waste it. If the task produces no user-facing \
-result, reply with a single short line saying so."""
+Work silently. Do your reasoning and planning internally — do NOT think out \
+loud or echo raw tool output / intermediate results. ONE exception: right \
+before a batch of tool calls you MAY write a single short line (max ~12 words) \
+naming what you're about to do, e.g. "Fetching the pipeline records." — never \
+more than one line, never the tool output. Your FINAL reply must contain only \
+the result the task calls for, as briefly as the task allows; do not restate \
+the task or list your steps there. Output tokens are a finite budget — \
+reasoning dumps and progress commentary waste it. If the task produces no \
+user-facing result, reply with a single short line saying so."""
 
 
 def build_agent(

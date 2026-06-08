@@ -676,11 +676,13 @@ async fn persist_run_steps(state: &AppState, run_id: Uuid, steps: &[pydantic::Ru
     }
     let mut qb = sqlx::QueryBuilder::new(
         "INSERT INTO run_step \
-         (run_id, ordinal, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens) ",
+         (run_id, ordinal, summary, input_tokens, output_tokens, \
+          cache_read_tokens, cache_write_tokens) ",
     );
     qb.push_values(steps.iter(), |mut b, s| {
         b.push_bind(run_id)
             .push_bind(s.ordinal)
+            .push_bind(s.summary.as_deref())
             .push_bind(s.input_tokens)
             .push_bind(s.output_tokens)
             .push_bind(s.cache_read_tokens)

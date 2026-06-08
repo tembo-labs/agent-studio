@@ -719,6 +719,8 @@ export async function listToolCallsForRun(
 // output_tokens are what the model generated that step.
 export type RunStep = {
   ordinal: number;
+  /** The model's one-line "what I'm doing this step" note, if it wrote one. */
+  summary: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
   cacheReadTokens: number | null;
@@ -731,12 +733,13 @@ export async function listStepsForRun(
 ): Promise<RunStep[]> {
   const { rows } = await db.query<{
     ordinal: number;
+    summary: string | null;
     input_tokens: number | null;
     output_tokens: number | null;
     cache_read_tokens: number | null;
     cache_write_tokens: number | null;
   }>(
-    `SELECT s.ordinal, s.input_tokens, s.output_tokens,
+    `SELECT s.ordinal, s.summary, s.input_tokens, s.output_tokens,
             s.cache_read_tokens, s.cache_write_tokens
        FROM run_step s
        JOIN run r ON r.id = s.run_id
@@ -746,6 +749,7 @@ export async function listStepsForRun(
   );
   return rows.map((r) => ({
     ordinal: r.ordinal,
+    summary: r.summary,
     inputTokens: r.input_tokens,
     outputTokens: r.output_tokens,
     cacheReadTokens: r.cache_read_tokens,
