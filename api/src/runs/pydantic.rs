@@ -21,6 +21,7 @@
 
 use anyhow::{anyhow, Context};
 use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -51,6 +52,14 @@ struct ProgressJson {
     kind: String,
     #[serde(default)]
     name: String,
+    #[serde(default)]
+    step: Option<i32>,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    ok: Option<bool>,
+    #[serde(default)]
+    error: Option<String>,
 }
 
 /// One tool call the agent made during the run. `ok` is `Some(true)` on a
@@ -317,6 +326,12 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
     let mut line_buf: Vec<u8> = Vec::new();
     let mut dirty = false;
     let mut last_flush = tokio::time::Instant::now();
+    // Live step-table state: tool-call events insert run_tool_call rows (and the
+    // run_step row they belong to) as they happen so the run page renders the
+    // table building. Reconciled to authoritative rows at run end.
+    let mut tool_ordinal: i32 = 0;
+    let mut id_to_ordinal: HashMap<String, i32> = HashMap::new();
+    let mut steps_seen: HashSet<i32> = HashSet::new();
 
     loop {
         line_buf.clear();
@@ -337,14 +352,33 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
             }
         } else if let Some(json) = trimmed.strip_prefix(PROGRESS_SENTINEL) {
             if let Ok(p) = serde_json::from_str::<ProgressJson>(json) {
-                if p.kind == "tool_call" && !p.name.is_empty() {
-                    if !live.is_empty() && !live.ends_with('\n') {
-                        live.push('\n');
+                match p.kind.as_str() {
+                    "tool_call" if !p.name.is_empty() => {
+                        let step = p.step.unwrap_or(0).max(0);
+                        if steps_seen.insert(step) {
+                            live_ensure_step(args.db, args.run_id, step).await;
+                        }
+                        let ordinal = tool_ordinal;
+                        tool_ordinal += 1;
+                        if let Some(id) = p.id.clone() {
+                            id_to_ordinal.insert(id, ordinal);
+                        }
+                        live_insert_tool_call(args.db, args.run_id, ordinal, &p.name, step).await;
                     }
-                    live.push_str("→ ");
-                    live.push_str(&p.name);
-                    live.push('\n');
-                    dirty = true;
+                    "tool_result" => {
+                        if let Some(ordinal) = p.id.as_deref().and_then(|id| id_to_ordinal.get(id))
+                        {
+                            live_update_tool_result(
+                                args.db,
+                                args.run_id,
+                                *ordinal,
+                                p.ok,
+                                p.error.as_deref(),
+                            )
+                            .await;
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -381,6 +415,58 @@ async fn write_streamed_output(db: &sqlx::PgPool, run_id: Uuid, text: &str) {
         .bind(run_id)
         .execute(db)
         .await;
+}
+
+// Live step-table writes (best-effort; errors swallowed). The end-of-run
+// persist_run_steps / persist_tool_calls DELETE + reinsert the authoritative
+// set, so these only have to be good enough to render the table building.
+async fn live_ensure_step(db: &sqlx::PgPool, run_id: Uuid, step: i32) {
+    let _ = sqlx::query(
+        "INSERT INTO run_step (run_id, ordinal) VALUES ($1, $2) \
+         ON CONFLICT (run_id, ordinal) DO NOTHING",
+    )
+    .bind(run_id)
+    .bind(step)
+    .execute(db)
+    .await;
+}
+
+async fn live_insert_tool_call(
+    db: &sqlx::PgPool,
+    run_id: Uuid,
+    ordinal: i32,
+    name: &str,
+    step: i32,
+) {
+    let _ = sqlx::query(
+        "INSERT INTO run_tool_call (run_id, ordinal, tool_name, step_ordinal) \
+         VALUES ($1, $2, $3, $4)",
+    )
+    .bind(run_id)
+    .bind(ordinal)
+    .bind(name)
+    .bind(step)
+    .execute(db)
+    .await;
+}
+
+async fn live_update_tool_result(
+    db: &sqlx::PgPool,
+    run_id: Uuid,
+    ordinal: i32,
+    ok: Option<bool>,
+    error: Option<&str>,
+) {
+    let _ = sqlx::query(
+        "UPDATE run_tool_call SET ok = $1, error_message = $2 \
+         WHERE run_id = $3 AND ordinal = $4",
+    )
+    .bind(ok)
+    .bind(error)
+    .bind(run_id)
+    .bind(ordinal)
+    .execute(db)
+    .await;
 }
 
 /// Run the wrapper and return the parsed result plus the tool calls the

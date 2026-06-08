@@ -649,6 +649,12 @@ async fn mark_failed(state: &AppState, run_id: Uuid, reason: &str) -> anyhow::Re
 /// order). Best-effort: a failure here is logged and swallowed so it can't
 /// fail an otherwise-good run.
 async fn persist_tool_calls(state: &AppState, run_id: Uuid, calls: &[pydantic::ToolCall]) {
+    // Clear any rows the live stream inserted, then write the authoritative set
+    // (delete first so an empty authoritative list still reconciles live rows).
+    let _ = sqlx::query("DELETE FROM run_tool_call WHERE run_id = $1")
+        .bind(run_id)
+        .execute(&state.db)
+        .await;
     if calls.is_empty() {
         return;
     }
@@ -671,6 +677,12 @@ async fn persist_tool_calls(state: &AppState, run_id: Uuid, calls: &[pydantic::T
 /// Record per-step token usage (one row per model request). Best-effort, like
 /// the tool-call log — a failure here is logged and swallowed.
 async fn persist_run_steps(state: &AppState, run_id: Uuid, steps: &[pydantic::RunStep]) {
+    // Clear any rows the live stream inserted, then write the authoritative set
+    // (delete first so an empty authoritative list still reconciles live rows).
+    let _ = sqlx::query("DELETE FROM run_step WHERE run_id = $1")
+        .bind(run_id)
+        .execute(&state.db)
+        .await;
     if steps.is_empty() {
         return;
     }

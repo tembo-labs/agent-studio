@@ -233,32 +233,71 @@ def _emit_stream_line(sentinel: str, payload: dict) -> None:
 
 
 def make_stream_handler():
-    """Build a pydantic-ai `event_stream_handler`. It's called per node with an
-    async stream of events; we forward incremental model text (DELTA) and
-    tool-call announcements (PROGRESS) to stdout as they happen. We classify by
-    class name to stay robust across pydantic-ai version skew."""
+    """Build a pydantic-ai `event_stream_handler`. It's called once per graph
+    node with an async stream of that node's events; we forward incremental
+    model text (DELTA) + tool-call/result activity (PROGRESS) to stdout as they
+    happen so the runner can build the run's step table live. We classify by
+    class name to stay robust across pydantic-ai version skew, and step indexing
+    matches the end-of-run __TAS_STEPS__ (one step per model request / response):
+    model-request nodes carry the Part* events and bump the step counter; the
+    following tool node's calls belong to that same step. Every event body is
+    guarded — a streaming hiccup must never fail the run."""
+
+    # Mutable across node invocations (each handler call is one node).
+    state = {"step": -1}
 
     async def handler(_ctx, event_stream) -> None:
+        node_counted = False
         async for event in event_stream:
-            name = type(event).__name__
-            if name == "PartDeltaEvent":
-                delta = getattr(event, "delta", None)
-                content = getattr(delta, "content_delta", None)
-                if isinstance(content, str) and content:
-                    _emit_stream_line(DELTA_SENTINEL, {"t": content})
-            elif name == "PartStartEvent":
-                # A starting text part may already carry some content.
-                part = getattr(event, "part", None)
-                content = getattr(part, "content", None)
-                if isinstance(content, str) and content:
-                    _emit_stream_line(DELTA_SENTINEL, {"t": content})
-            elif name == "FunctionToolCallEvent":
-                part = getattr(event, "part", None)
-                tool_name = getattr(part, "tool_name", None)
-                if tool_name:
-                    _emit_stream_line(
-                        PROGRESS_SENTINEL, {"kind": "tool_call", "name": tool_name}
+            try:
+                name = type(event).__name__
+                if name in ("PartStartEvent", "PartDeltaEvent", "FinalResultEvent"):
+                    if not node_counted:
+                        state["step"] += 1
+                        node_counted = True
+                    if name == "PartDeltaEvent":
+                        delta = getattr(event, "delta", None)
+                        content = getattr(delta, "content_delta", None)
+                        if isinstance(content, str) and content:
+                            _emit_stream_line(DELTA_SENTINEL, {"t": content})
+                    elif name == "PartStartEvent":
+                        part = getattr(event, "part", None)
+                        content = getattr(part, "content", None)
+                        if isinstance(content, str) and content:
+                            _emit_stream_line(DELTA_SENTINEL, {"t": content})
+                elif name == "FunctionToolCallEvent":
+                    part = getattr(event, "part", None)
+                    tool_name = getattr(part, "tool_name", None)
+                    cid = getattr(part, "tool_call_id", None)
+                    if tool_name:
+                        _emit_stream_line(
+                            PROGRESS_SENTINEL,
+                            {
+                                "kind": "tool_call",
+                                "step": max(state["step"], 0),
+                                "id": cid,
+                                "name": tool_name,
+                            },
+                        )
+                elif name == "FunctionToolResultEvent":
+                    res = getattr(event, "result", None)
+                    cid = getattr(res, "tool_call_id", None) or getattr(
+                        event, "tool_call_id", None
                     )
+                    rkind = getattr(res, "part_kind", "") or ""
+                    ok = rkind.endswith("tool-return")
+                    err = (
+                        str(getattr(res, "content", ""))[:200]
+                        if (not ok and rkind == "retry-prompt")
+                        else None
+                    )
+                    if cid:
+                        _emit_stream_line(
+                            PROGRESS_SENTINEL,
+                            {"kind": "tool_result", "id": cid, "ok": ok, "error": err},
+                        )
+            except Exception:
+                pass
 
     return handler
 

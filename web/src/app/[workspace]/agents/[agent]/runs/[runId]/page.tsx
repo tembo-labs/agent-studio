@@ -19,7 +19,6 @@ import { CopyOutputButton } from "./copy-output-button";
 import { ImproveForm } from "./improve-form";
 import { RunPoller } from "./run-poller";
 import { RunSteps } from "./run-steps";
-import { StreamingText } from "./streaming-text";
 import { ToolsUsed } from "./tools-used";
 
 export const dynamic = "force-dynamic";
@@ -86,12 +85,6 @@ export default async function RunDetailPage({
       ? estimateRunCost(run.model, run.tokensInput, run.tokensOutput)
       : null;
 
-  // One Output box for both the live (streaming) and final views — same
-  // container, same copy button — so the page doesn't visibly reshape when the
-  // run finishes. While running we show the streamed partial; on completion the
-  // authoritative `output` takes over.
-  const displayedOutput =
-    run.output || (run.status === "running" ? run.streamedOutput : null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -216,27 +209,18 @@ export default async function RunDetailPage({
         {run.status === "queued" && !run.output && (
           <p className="text-foreground-weak text-base">Waiting to start…</p>
         )}
-        {run.status === "running" && !run.output && !run.streamedOutput && (
-          <p className="text-foreground-weak text-base">Running…</p>
+        {run.status === "running" && !run.output && (
+          <p className="text-foreground-weak text-base">
+            Running… the steps build live above.
+          </p>
         )}
-        {/* Same box for live + final — while running this is the streamed
-            partial (the page polls every 1s, so it fills in as the wrapper
-            streams text + tool progress); on completion the authoritative
-            `output` takes over without the layout changing. */}
-        {displayedOutput && (
+        {run.output && (
           <div className="bg-surface-raised border-border group relative overflow-hidden rounded-lg border">
             <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
-              <CopyOutputButton text={stripStopReason(displayedOutput)} />
+              <CopyOutputButton text={stripStopReason(run.output)} />
             </div>
             <pre className="text-foreground overflow-x-auto whitespace-pre-wrap p-4 text-sm leading-6">
-              {/* While the run is live, reveal word-by-word so it reads as
-                  building rather than line-chunks popping in on each poll.
-                  Once `output` lands it renders statically — same box. */}
-              {!run.output && run.status === "running" ? (
-                <StreamingText text={stripStopReason(displayedOutput)} />
-              ) : (
-                stripStopReason(displayedOutput)
-              )}
+              {stripStopReason(run.output)}
             </pre>
           </div>
         )}
