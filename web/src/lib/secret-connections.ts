@@ -73,8 +73,17 @@ export async function upsertSecretConnection(args: {
   const value = args.value;
   if (!value) return { ok: false, error: "empty-value" };
 
+  const { rows: existingRows } = await db.query<{ exists: number }>(
+    `SELECT 1 AS exists
+       FROM workspace_secret_connection
+      WHERE workspace_id = $1 AND slug = $2
+      LIMIT 1`,
+    [args.workspaceId, slug],
+  );
+  const existed = existingRows.length > 0;
+
   const ciphertext = encryptSecret(value);
-  const { rowCount } = await db.query(
+  await db.query(
     `INSERT INTO workspace_secret_connection
        (workspace_id, slug, description, ciphertext, last4, created_by)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -92,10 +101,7 @@ export async function upsertSecretConnection(args: {
       args.userId,
     ],
   );
-  // rowCount is 1 on insert and 1 on update — we can't tell from it alone,
-  // so the caller passes whether a preview already existed for the message.
-  void rowCount;
-  return { ok: true, rotated: false };
+  return { ok: true, rotated: existed };
 }
 
 export async function deleteSecretConnection(
