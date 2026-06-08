@@ -12,6 +12,69 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.9] — Agent lifecycle, tool observability, and the ETL-agent stack — shipped 2026-06-08
+
+A big release. Agents gain a real **version lifecycle** (draft → stable) and
+**tool-call observability**, and a new **ETL-agent stack** lands: agents can run
+deterministic **Python tools**, authenticate them through a new **Secrets**
+substrate, and be **triggered by external webhooks** (Clay first). The full
+**user manual** is now published, and the `guides/` directory moved into it.
+
+### Added
+- **Agent versioning & lifecycle** — agents now have a **draft** (the live repo
+  file) and a promotable **stable** snapshot frozen in Postgres. Promotion
+  records owner + version; runs default to **stable** for predictability (chat
+  iterates on draft). The agent page shows version history, the draft↔stable
+  diff, and a change summary. *(migration 0037)*
+- **Sidecar Python tools** — a Pydantic agent can declare `tools_module: foo.py`,
+  a sibling file of deterministic functions the model calls as tools (transforms,
+  scoring, ETL) at **no token cost**. Schemas derive from each function's
+  signature + docstring; calls are captured like MCP tools. Extra deps go in
+  `api/scripts/requirements-tools.txt`.
+- **Secrets — the 3rd connection substrate** — free-form, per-workspace API keys
+  (e.g. Clay) set under **Connections → Secrets** (admin-managed, AES-256-GCM).
+  Sidecar tools read a value via `tas_tools.secret("<name>")`; injected only
+  into runs that have a tools module. *(migration 0039)*
+- **External webhook triggers** — a per-agent inbound endpoint
+  (`/api/hooks/webhook/<id>`) fires a run from any outside system. Built for
+  Clay's model: `POST` JSON + an `Authorization: Bearer <token>` header
+  (constant-time verified, shown once, rotatable); fire-and-forget 202. The
+  request body reaches the agent as a `{trigger_type, webhook, payload}`
+  envelope. *(migration 0040)*
+- **Tool-usage tracking** — every tool an agent calls is captured per run
+  (success + failure), rolled up per agent over 30 days, and surfaced in a
+  workspace-wide, filterable **Tool uses** view. *(migration 0038)*
+- **Pylon** as a Native MCP provider.
+- **Two-level collapsible sidebar** navigation (Build / Activity / Integrations /
+  Workspace).
+- **Published user manual** — an Astro Starlight site at
+  <https://tembo.github.io/agent-studio/>, deployed from `docs/` on every change.
+
+### Changed
+- **Prefer Native MCP over Composio** in the agent-authoring guidance, with a
+  dynamic provider list; default model guidance moved to `claude-opus-4-8`, and
+  the `labels:` extension field is documented.
+- **`guides/` merged into the docs site** and deleted; the README and deploy
+  guides now point at the published manual.
+
+### Fixed
+- **Native MCP token refresh** for short-lived tokens (Pylon ~5-min tokens) via a
+  per-provider refresh allowlist.
+- **Composio**: surface connect errors instead of swallowing them; support
+  bring-your-own-auth toolkits; flag unknown toolkit slugs; fix a Pylon→Linear
+  OAuth misroute and a "no active connection" false negative.
+- **Agent versioning**: fix a promote crash (`FOR UPDATE` with an aggregate) and
+  owner-picker name disambiguation.
+- **"Improve the Agent"** now surfaces a thrown/stale server action ("refresh —
+  a new version shipped") instead of failing silently.
+- **Docs build**: upgrade Starlight to 0.39 for Astro 6 compatibility, and
+  replace the placeholder Dependabot config with real per-ecosystem groups
+  (Astro + Starlight always bump together).
+
+### Migrations
+- `0037_agent_version`, `0038_run_tool_call`, `0039_workspace_secret_connection`,
+  `0040_workspace_webhook`. The api applies them on boot.
+
 ## [v2026.6.8] — Slack apps: launch agents from Slack — shipped 2026-06-04
 
 TAS can now host per-team Slack bots that launch a **label-scoped subset** of

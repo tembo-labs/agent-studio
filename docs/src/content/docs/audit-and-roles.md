@@ -37,4 +37,4 @@ Above workspace roles, **instance admins** are bootstrapped from
 Everyone else joins via workspace invitation. On a fresh instance, the first
 person to sign in with an email listed in `INSTANCE_ADMIN_EMAILS` becomes an
 instance admin and can create the first workspace. See
-[Customer setup](/agent-studio/customer-setup/) for the bootstrap checklist.
+[Setup checklist](/agent-studio/customer-setup/) for the bootstrap checklist.

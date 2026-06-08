@@ -34,7 +34,7 @@ and [improvements](/agent-studio/improvements/). Agents run fine without it —
 you'd commit spec files by hand instead.
 
 For Tembo to open PRs, the agents repo must also be authorized in Tembo under
-**Source Control** (see [Customer setup](/agent-studio/customer-setup/)).
+**Source Control** (see [Setup checklist](/agent-studio/customer-setup/)).
 
 ## Repository
 

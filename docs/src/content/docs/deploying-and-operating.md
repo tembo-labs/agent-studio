@@ -18,7 +18,7 @@ other pages in this section.
 
 ## The step-by-step guides
 
-- **[Customer setup](/agent-studio/customer-setup/)** — start here. A
+- **[Setup checklist](/agent-studio/customer-setup/)** — start here. A
   zero-to-running checklist of everything to procure and do, from accounts and
   keys through first sign-in.
 - **[Deploy on Railway](/agent-studio/deploy-railway/)** — full stack on Railway
