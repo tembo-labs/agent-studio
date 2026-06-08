@@ -20,11 +20,8 @@ import {
   type ConnectionIconItem,
 } from "./agent-connection-icons";
 import { AgentNav } from "./agent-nav";
-import { AgentOwnerControl } from "./agent-owner-control";
 import { loadAgentContext } from "./agent-page-context";
-import { DeleteAgentButton } from "./delete-agent-button";
 import { DraftChangesBanner } from "./draft-changes-banner";
-import { PromoteButton } from "./promote-button";
 import { RunNowButton } from "./run-now-button";
 
 export const dynamic = "force-dynamic";
@@ -72,11 +69,7 @@ export default async function AgentLayout({
     return (nameCounts.get(m.name) ?? 0) > 1 ? `${m.name} (${m.email})` : m.name;
   };
   const ownerLabel = owner ? nameFor(owner.ownerUserId) : null;
-  const isOwner = owner?.ownerUserId === session.user.id;
-  const canPromote = canEdit && (!owner || isOwner || isAdmin);
-  const canAssignOwner = canEdit && (isAdmin || !owner || isOwner);
   const draftChanged = agent.ok && (!stable || stable.specContent !== raw);
-  const nextVersion = (stable?.versionNumber ?? 0) + 1;
   const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
 
   // External services the agent declares, deduped by slug, for the icon row.
@@ -128,18 +121,16 @@ export default async function AgentLayout({
                 <code className="text-foreground-muted text-sm">
                   {agent.filename}
                 </code>
-                <AgentOwnerControl
-                  workspaceSlug={workspace.slug}
-                  agentName={canonicalName}
-                  ownerUserId={owner?.ownerUserId ?? null}
-                  ownerLabel={ownerLabel}
-                  canAssign={canAssignOwner}
-                  members={allMembers.map((m) => ({
-                    userId: m.userId,
-                    name: m.name,
-                    email: m.email,
-                  }))}
-                />
+                <span className="text-foreground-muted text-sm">
+                  {ownerLabel ? (
+                    <>
+                      Owner:{" "}
+                      <span className="text-foreground-weak">{ownerLabel}</span>
+                    </>
+                  ) : (
+                    "Unassigned"
+                  )}
+                </span>
               </div>
             ) : (
               <p className="text-sentiment-negative text-sm">
@@ -165,22 +156,6 @@ export default async function AgentLayout({
                   Chat to edit
                 </Link>
               </Button>
-            )}
-            {canEdit && (
-              <DeleteAgentButton
-                workspaceSlug={workspace.slug}
-                agentName={canonicalName}
-              />
-            )}
-            {agent.ok && canPromote && (
-              <PromoteButton
-                workspaceSlug={workspace.slug}
-                agentName={canonicalName}
-                nextVersion={nextVersion}
-                hasChanges={draftChanged}
-                isOwner={isOwner}
-                ownerLabel={ownerLabel}
-              />
             )}
             {agent.ok && canEdit && (
               <RunNowButton

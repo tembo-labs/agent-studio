@@ -1,12 +1,20 @@
-import { getStableVersion, listAgentVersions } from "@/lib/agent-versions";
-import { listWorkspaceMembers } from "@/lib/workspace";
+import { Section } from "@/components/section";
+import {
+  getAgentOwner,
+  getStableVersion,
+  listAgentVersions,
+} from "@/lib/agent-versions";
+import { meetsMinRole } from "@/lib/rbac";
+import { getWorkspaceRole, listWorkspaceMembers } from "@/lib/workspace";
 
 import { loadAgentContext } from "../agent-page-context";
+import { PromoteButton } from "../promote-button";
 import { VersionsSection } from "../versions-section";
 
 export const dynamic = "force-dynamic";
 
-// Versions tab — released stable snapshots, with the current one marked.
+// Versions tab — released stable snapshots (current one marked) plus the
+// promote-the-draft action (moved here from the header).
 
 export default async function AgentVersionsPage({
   params,
@@ -14,13 +22,24 @@ export default async function AgentVersionsPage({
   params: Promise<{ workspace: string; agent: string }>;
 }) {
   const { workspace: slug, agent: agentName } = await params;
-  const { workspace, canonicalName } = await loadAgentContext(slug, agentName);
+  const { session, workspace, agent, raw, canonicalName } =
+    await loadAgentContext(slug, agentName);
 
-  const [versions, stable, allMembers] = await Promise.all([
-    listAgentVersions(workspace.id, canonicalName),
-    getStableVersion(workspace.id, canonicalName),
-    listWorkspaceMembers(workspace.id),
-  ]);
+  const [versions, stable, owner, allMembers, currentUserRole] =
+    await Promise.all([
+      listAgentVersions(workspace.id, canonicalName),
+      getStableVersion(workspace.id, canonicalName),
+      getAgentOwner(workspace.id, canonicalName),
+      listWorkspaceMembers(workspace.id),
+      getWorkspaceRole(workspace.id, session.user.id),
+    ]);
+
+  const canEdit = meetsMinRole(currentUserRole, "operator");
+  const isAdmin = currentUserRole === "workspace_admin";
+  const isOwner = owner?.ownerUserId === session.user.id;
+  const canPromote = canEdit && (!owner || isOwner || isAdmin);
+  const draftChanged = agent.ok && (!stable || stable.specContent !== raw);
+  const nextVersion = (stable?.versionNumber ?? 0) + 1;
 
   const nameCounts = new Map<string, number>();
   for (const m of allMembers) {
@@ -32,14 +51,37 @@ export default async function AgentVersionsPage({
     if (!m.name) return m.email;
     return (nameCounts.get(m.name) ?? 0) > 1 ? `${m.name} (${m.email})` : m.name;
   };
+  const ownerLabel = owner ? nameFor(owner.ownerUserId) : null;
 
   return (
-    <VersionsSection
-      versions={versions}
-      stableVersionId={stable?.id ?? null}
-      workspaceSlug={workspace.slug}
-      agentName={canonicalName}
-      nameFor={nameFor}
-    />
+    <>
+      {agent.ok && canPromote && (
+        <Section
+          title="Promote the draft"
+          description={
+            draftChanged
+              ? `The draft differs from the current stable. Promote it to v${nextVersion} so scheduled, Slack, and webhook runs pick it up.`
+              : "The draft matches the current stable — nothing to promote."
+          }
+        >
+          <PromoteButton
+            workspaceSlug={workspace.slug}
+            agentName={canonicalName}
+            nextVersion={nextVersion}
+            hasChanges={draftChanged}
+            isOwner={isOwner}
+            ownerLabel={ownerLabel}
+          />
+        </Section>
+      )}
+
+      <VersionsSection
+        versions={versions}
+        stableVersionId={stable?.id ?? null}
+        workspaceSlug={workspace.slug}
+        agentName={canonicalName}
+        nameFor={nameFor}
+      />
+    </>
   );
 }

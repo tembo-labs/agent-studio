@@ -40,29 +40,31 @@ export function AgentConnectionIcons({
 
 function ConnectionIcon({ item }: { item: ConnectionIconItem }) {
   const [failed, setFailed] = useState(false);
-  const label =
-    item.name && item.name !== "default"
-      ? `${item.label} (${item.name})`
-      : item.label;
+  const slotSuffix =
+    item.name && item.name !== "default" ? ` (${item.name})` : "";
 
   return (
-    <span
-      title={label}
-      className="bg-surface-raised border-border inline-flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md border"
-    >
-      {failed ? (
-        <IconApiConnection size={14} className="text-foreground-muted" />
-      ) : (
-        // Plain <img> (skip next/image host config) — small icon from
-        // Composio's logo CDN; broken/unknown slugs swap to the fallback.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`https://logos.composio.dev/api/${encodeURIComponent(item.slug.toLowerCase())}`}
-          alt={label}
-          className="h-4 w-4 object-contain"
-          onError={() => setFailed(true)}
-        />
-      )}
+    <span className="bg-surface-raised border-border inline-flex shrink-0 items-center gap-1.5 rounded-md border py-0.5 pl-1 pr-2">
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden">
+        {failed ? (
+          <IconApiConnection size={13} className="text-foreground-muted" />
+        ) : (
+          // Plain <img> (skip next/image host config) — small icon from
+          // Composio's logo CDN; broken/unknown slugs swap to the fallback.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`https://logos.composio.dev/api/${encodeURIComponent(item.slug.toLowerCase())}`}
+            alt=""
+            aria-hidden
+            className="h-4 w-4 object-contain"
+            onError={() => setFailed(true)}
+          />
+        )}
+      </span>
+      <span className="text-foreground-weak text-xs">
+        {item.label}
+        {slotSuffix}
+      </span>
     </span>
   );
 }
