@@ -90,9 +90,16 @@ async function readToolsModuleContent(
 }
 
 /**
- * Strict load used at dispatch time. No declared module → ok with no
- * content. Declared but unreadable → error (the spec asked for it, so we
- * fail the run loudly rather than silently dropping the agent's tools).
+ * Strictly loads a declared tools module at dispatch time.
+ * If no module is declared, returns success with no content.
+ * If a module is declared but cannot be read, returns an error instead of
+ * silently dropping tools.
+ *
+ * @param workspaceId Workspace identifier used to resolve repo and token.
+ * @param agentPath Path to the agent spec file in the repository.
+ * @param toolsModule Optional tools module filename declared by the spec.
+ * @returns `{ ok: true, content?: string }` when loading is not required or succeeds;
+ * otherwise `{ ok: false, detail: string }` with a user-facing failure reason.
  */
 async function loadDispatchToolsModule(
   workspaceId: string,
