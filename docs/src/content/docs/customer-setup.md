@@ -22,7 +22,8 @@ involved in the optional chat-to-PR *authoring* flow. The instance is
 
 ## Phase 1 — Procure (accounts & keys)
 
-### Infrastructure
+**Infrastructure**
+
 - [ ] **A host that runs Docker** — Railway (easiest), AWS/ECS, or any VM with
   Docker Compose. **Required.**
 - [ ] **Postgres 18** — a managed instance with backups (recommended for
@@ -31,24 +32,28 @@ involved in the optional chat-to-PR *authoring* flow. The instance is
   platform usually terminates TLS. **Recommended** — you can start on the
   platform-provided URL.
 
-### Authentication — pick at least one **(Required)**
-There is no password login; users sign in through an identity provider.
+**Authentication** — pick at least one *(Required)*. There is no password login;
+users sign in through an identity provider.
+
 - [ ] **Google OAuth** *(easiest)* — create an OAuth 2.0 client at
   <https://console.cloud.google.com/apis/credentials>; or
 - [ ] **Microsoft Entra ID** — register an app; note client ID, secret, tenant; or
 - [ ] **Generic OIDC** (Okta, Auth0, Keycloak, …) — get the
   `.well-known/openid-configuration` URL + client ID/secret.
 
-### To run agents **(Required)**
+**To run agents** *(Required)*
+
 - [ ] **Anthropic API key** and/or **OpenAI API key** — at least one. Agents
   execute on these keys, not Tembo's.
   (<https://console.anthropic.com> / <https://platform.openai.com>)
 
-### Agent storage **(Required)**
+**Agent storage** *(Required)*
+
 - [ ] **A GitHub repository** to hold agent spec files, plus a **GitHub PAT** for
   TAS to read/write it.
 
-### Optional add-ons
+**Optional add-ons**
+
 - [ ] **Tembo API key** — only for the chat-to-PR authoring flow (the "New agent",
   "chat to edit", and "Improve" buttons). Agents run fine without it; you'd
   hand-write specs instead. (<https://tembo.io>)

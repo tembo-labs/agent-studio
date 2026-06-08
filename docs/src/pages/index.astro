@@ -1,0 +1,7 @@
+---
+// The docs site has no splash page — send the root straight to the
+// Introduction. Using BASE_URL keeps the redirect correct under the
+// /agent-studio project-site base (and a future custom-domain base of "/").
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+return Astro.redirect(`${base}/introduction/`);
+---

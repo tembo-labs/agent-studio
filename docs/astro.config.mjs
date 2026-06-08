@@ -10,15 +10,16 @@ import starlight from "@astrojs/starlight";
 export default defineConfig({
   site: "https://tembo.github.io",
   base: "/agent-studio",
+  // No splash landing page — the site root sends visitors straight to the
+  // Introduction. The redirect lives in src/pages/index.astro so it can use
+  // the base-aware BASE_URL (an astro.config `redirects` destination is
+  // literal and wouldn't include the /agent-studio base on the project site).
   integrations: [
     starlight({
       title: "Tembo Agent Studio",
       tagline: "Self-hosted control room for AI agents",
-      logo: {
-        src: "./src/assets/logo.svg",
-        alt: "Tembo Agent Studio",
-      },
       favicon: "/favicon.svg",
+      customCss: ["./src/styles/custom.css"],
       social: [
         {
           icon: "github",
