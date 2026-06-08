@@ -1,569 +1,73 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
 
-import { BackLink } from "@/components/back-link";
-import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
-import {
-  getAgentOwner,
-  getStableVersion,
-  listAgentVersions,
-} from "@/lib/agent-versions";
-import { listAuditTimeline } from "@/lib/audit-db";
-import {
-  listAutomationsForAgent,
-  type Automation,
-} from "@/lib/automations-api";
-import { listConnectionsForUser } from "@/lib/composio-connections";
-import { nextFireAfter, validateCron } from "@/lib/cron";
-import { meetsMinRole } from "@/lib/rbac";
 import {
   getAgentDailyRunBands30d,
   getAgentStats30d,
   listAgentFailureGroups30d,
   listAgentToolUsage30d,
   listRecentRunsForAgent,
-  type RunSummary,
 } from "@/lib/runs-db";
-import { toolkitLabel } from "@/lib/composio-label";
-import { getPublicOrigin } from "@/lib/config";
-import { getMcpProvider } from "@/lib/mcp-providers";
-import { getServerSession } from "@/lib/session";
-import { listTriggersForAgent } from "@/lib/triggers-db";
-import { listWebhooksForAgent } from "@/lib/webhooks-db";
-import { getAgentByName } from "@/lib/workspace-agents";
-import {
-  getWorkspaceBySlug,
-  getWorkspaceRepo,
-  getWorkspaceRole,
-  getWorkspaceSecretPreview,
-  isTemboConfigured,
-  listWorkspaceMembers,
-} from "@/lib/workspace";
 
 import { AgentDashboard } from "./agent-dashboard";
-import { AgentOwnerControl } from "./agent-owner-control";
-import { AgentTimeline } from "./agent-timeline";
-import { DeleteAgentButton } from "./delete-agent-button";
-import { DraftChangesBanner } from "./draft-changes-banner";
-import { PromoteButton } from "./promote-button";
-import { RunNowButton } from "./run-now-button";
-import {
-  AgentConnectionIcons,
-  type ConnectionIconItem,
-} from "./agent-connection-icons";
-import { TriggersSection } from "./triggers-section";
-import { VersionsSection } from "./versions-section";
-import { WebhooksSection } from "./webhooks-section";
+import { loadAgentContext } from "./agent-page-context";
+import { RecentRuns } from "./recent-runs";
 
 export const dynamic = "force-dynamic";
 
-export default async function AgentDetailPage({
+// Overview tab — the agent's at-a-glance landing: 30-day dashboard plus a peek
+// at the most recent runs. The header + nav come from the layout.
+
+const RECENT_PEEK = 5;
+
+export default async function AgentOverviewPage({
   params,
 }: {
   params: Promise<{ workspace: string; agent: string }>;
 }) {
   const { workspace: slug, agent: agentName } = await params;
+  const { workspace, canonicalName } = await loadAgentContext(slug, agentName);
 
-  const session = await getServerSession();
-  if (!session) notFound();
-
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
-
-  const repo = await getWorkspaceRepo(workspace.id);
-  if (!repo) {
-    redirect(`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`);
-  }
-
-  const result = await getAgentByName(workspace.id, agentName);
-  if (!result) notFound();
-  const { agent, raw, toolsModuleContent } = result;
-  const canonicalName = agent.ok ? agent.spec.name : agentName;
-  const toolsModule =
-    agent.ok && agent.spec.framework === "pydantic-agentspec"
-      ? agent.spec.toolsModule
-      : undefined;
-
-  // External services the agent declares, deduped by slug, for the icon row
-  // near the title. Labels resolve per substrate; the icons themselves all
-  // borrow from Composio's logo library (see agent-connection-icons.tsx).
-  const connectionIcons: ConnectionIconItem[] = [];
-  if (agent.ok && agent.spec.framework === "pydantic-agentspec") {
-    const seen = new Set<string>();
-    for (const c of agent.spec.connections) {
-      const slug = c.toolkit.trim().toLowerCase();
-      if (!slug || seen.has(slug)) continue;
-      seen.add(slug);
-      connectionIcons.push({
-        slug,
-        name: c.name,
-        label:
-          c.source === "native-mcp"
-            ? (getMcpProvider(slug)?.displayName ?? toolkitLabel(slug))
-            : toolkitLabel(slug),
-        source: c.source,
-      });
-    }
-  }
-
-  const [
-    recentRuns,
-    automations,
-    stats,
-    daily,
-    failures,
-    toolUsage,
-    triggers,
-    myConnections,
-    composioApiKeyPreview,
-    composioWebhookSecretPreview,
-    timeline,
-    currentUserRole,
-    temboConfigured,
-    versions,
-    stable,
-    owner,
-    allMembers,
-    webhooks,
-  ] = await Promise.all([
-    listRecentRunsForAgent(workspace.id, canonicalName, 10),
-    listAutomationsForAgent(workspace.id, canonicalName),
+  const [stats, daily, failures, toolUsage, recentRuns] = await Promise.all([
     getAgentStats30d(workspace.id, canonicalName),
     getAgentDailyRunBands30d(workspace.id, canonicalName),
     listAgentFailureGroups30d(workspace.id, canonicalName, 5),
     listAgentToolUsage30d(workspace.id, canonicalName),
-    listTriggersForAgent(workspace.id, canonicalName),
-    listConnectionsForUser(workspace.id, session.user.id),
-    getWorkspaceSecretPreview(workspace.id, "composio_api_key"),
-    getWorkspaceSecretPreview(workspace.id, "composio_webhook_secret"),
-    listAuditTimeline(workspace.id, { agentName: canonicalName }, 20),
-    getWorkspaceRole(workspace.id, session.user.id),
-    isTemboConfigured(workspace.id),
-    listAgentVersions(workspace.id, canonicalName),
-    getStableVersion(workspace.id, canonicalName),
-    getAgentOwner(workspace.id, canonicalName),
-    listWorkspaceMembers(workspace.id),
-    listWebhooksForAgent(workspace.id, canonicalName),
+    listRecentRunsForAgent(workspace.id, canonicalName, RECENT_PEEK),
   ]);
-  const canEdit = meetsMinRole(currentUserRole, "operator");
-  const isAdmin = currentUserRole === "workspace_admin";
-  // Admins get a "Run as" picker in the Run-now dialog so a manual run
-  // can use another member's connections.
-  const runAsMembers = isAdmin
-    ? allMembers.map((m) => ({ userId: m.userId, name: m.name, email: m.email }))
-    : undefined;
 
-  // Lifecycle derived state. Disambiguate display names by email when two
-  // members share a name.
-  const nameCounts = new Map<string, number>();
-  for (const m of allMembers) {
-    if (m.name) nameCounts.set(m.name, (nameCounts.get(m.name) ?? 0) + 1);
-  }
-  const nameFor = (userId: string): string => {
-    const m = allMembers.find((x) => x.userId === userId);
-    if (!m) return "unknown";
-    if (!m.name) return m.email;
-    return (nameCounts.get(m.name) ?? 0) > 1
-      ? `${m.name} (${m.email})`
-      : m.name;
-  };
-  const ownerLabel = owner ? nameFor(owner.ownerUserId) : null;
-  const isOwner = owner?.ownerUserId === session.user.id;
-  // The owner promotes; admins can too; an unowned agent can be promoted by
-  // any operator (canEdit). Draft must differ from the current stable.
-  const canPromote = canEdit && (!owner || isOwner || isAdmin);
-  const canAssignOwner = canEdit && (isAdmin || !owner || isOwner);
-  const draftChanged = agent.ok && (!stable || stable.specContent !== raw);
-  const nextVersion = (stable?.versionNumber ?? 0) + 1;
-
-  const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
+  const runsHref = `/${workspace.slug}/agents/${encodeURIComponent(canonicalName)}/runs`;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
-      <div className="flex flex-col gap-2">
-        <BackLink href={`/${workspace.slug}`} label="Agents" />
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 flex-col gap-2">
-            <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
-              {canonicalName}
-            </h1>
-            {agent.ok ? (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {stable ? (
-                  <Badge variant="green" size="small">
-                    Stable v{stable.versionNumber}
-                  </Badge>
-                ) : (
-                  <Badge variant="gray" size="small">
-                    Draft only
-                  </Badge>
-                )}
-                <Badge variant="blue" size="small">
-                  {FRAMEWORK_LABELS[agent.spec.framework]}
-                </Badge>
-                <Badge variant="purple" size="small">
-                  {agent.spec.model ?? "—"}
-                </Badge>
-                <code className="text-foreground-muted text-sm">
-                  {agent.filename}
-                </code>
-                <AgentOwnerControl
-                  workspaceSlug={workspace.slug}
-                  agentName={canonicalName}
-                  ownerUserId={owner?.ownerUserId ?? null}
-                  ownerLabel={ownerLabel}
-                  canAssign={canAssignOwner}
-                  members={allMembers.map((m) => ({
-                    userId: m.userId,
-                    name: m.name,
-                    email: m.email,
-                  }))}
-                />
-              </div>
-            ) : (
-              <p className="text-sentiment-negative text-sm">
-                Invalid agent: {agent.error}
-                {agent.detail ? ` — ${agent.detail}` : ""}
-              </p>
-            )}
-            {connectionIcons.length > 0 && (
-              <AgentConnectionIcons connections={connectionIcons} />
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button asChild variant="ghost">
-              <a href={sourceHref} target="_blank" rel="noreferrer noopener">
-                View source
-              </a>
-            </Button>
-            {agent.ok && canEdit && temboConfigured && (
-              <Button asChild variant="secondary">
-                <Link
-                  href={`/${workspace.slug}/agents/${encodeURIComponent(canonicalName)}/chat`}
-                >
-                  Chat to edit
-                </Link>
-              </Button>
-            )}
-            {canEdit && (
-              <DeleteAgentButton
-                workspaceSlug={workspace.slug}
-                agentName={canonicalName}
-              />
-            )}
-            {agent.ok && canPromote && (
-              <PromoteButton
-                workspaceSlug={workspace.slug}
-                agentName={canonicalName}
-                nextVersion={nextVersion}
-                hasChanges={draftChanged}
-                isOwner={isOwner}
-                ownerLabel={ownerLabel}
-              />
-            )}
-            {agent.ok && canEdit && (
-              <RunNowButton
-                workspaceSlug={workspace.slug}
-                agentName={canonicalName}
-                members={runAsMembers}
-                currentUserId={session.user.id}
-                hasStable={stable !== null}
-              />
-            )}
-          </div>
-        </div>
-        {agent.ok && agent.spec.description && (
-          <p className="text-foreground-weak max-w-prose text-sm leading-6">
-            {agent.spec.description}
-          </p>
-        )}
-      </div>
+    <>
+      <AgentDashboard
+        stats={stats}
+        daily={daily}
+        failures={failures}
+        toolUsage={toolUsage}
+        workspaceSlug={workspace.slug}
+        agentName={canonicalName}
+      />
 
-      {stable && draftChanged && canEdit && (
-        <DraftChangesBanner
-          workspaceSlug={workspace.slug}
-          agentName={canonicalName}
-        />
-      )}
-
-      <hr className="border-[var(--color-border-weak)]" />
-
-      <div className="flex flex-col gap-8">
-        <VersionsSection
-          versions={versions}
-          stableVersionId={stable?.id ?? null}
-          workspaceSlug={workspace.slug}
-          agentName={canonicalName}
-          nameFor={nameFor}
-        />
-
-        <AgentDashboard
-          stats={stats}
-          daily={daily}
-          failures={failures}
-          toolUsage={toolUsage}
-          workspaceSlug={workspace.slug}
-          agentName={canonicalName}
-        />
-
-        <TriggersSection
-          workspaceSlug={workspace.slug}
-          agentName={canonicalName}
-          triggers={triggers}
-          myConnections={myConnections}
-          composioApiKeyConfigured={!!composioApiKeyPreview}
-          webhookSecretConfigured={!!composioWebhookSecretPreview}
-        />
-
-        <WebhooksSection
-          workspaceSlug={workspace.slug}
-          agentName={canonicalName}
-          baseUrl={getPublicOrigin()}
-          canManage={canEdit}
-          owners={
-            isAdmin
-              ? allMembers.map((m) => ({
-                  userId: m.userId,
-                  label: m.name ?? m.email,
-                }))
-              : undefined
-          }
-          webhooks={webhooks.map((w) => ({
-            id: w.id,
-            name: w.name,
-            tokenLast4: w.tokenLast4,
-            enabled: w.enabled,
-            lastFiredAtIso: w.lastFiredAt ? w.lastFiredAt.toISOString() : null,
-            lastFireError: w.lastFireError,
-          }))}
-        />
-
-        <AutomationsSection
-          automations={automations}
-          workspaceSlug={workspace.slug}
-          agentName={canonicalName}
-        />
-
-        <Section
-          title="Recent runs"
-          description={
-            recentRuns.length === 0
-              ? undefined
-              : `Last ${recentRuns.length} run${recentRuns.length === 1 ? "" : "s"}.`
-          }
-        >
-          <RecentRuns
-            runs={recentRuns}
-            workspaceSlug={workspace.slug}
-            agentName={canonicalName}
-          />
-        </Section>
-
-        <AgentTimeline
-          workspaceSlug={workspace.slug}
-          agentName={canonicalName}
-          entries={timeline}
-        />
-
-        <Section
-          title="Definition"
-          description="Edits go through Git. Framework and model changes go through the same review path as any other change — never edited in a live console."
-        >
-          <pre className="bg-surface border-border text-foreground overflow-x-auto rounded-lg border p-4 font-mono text-sm leading-5">
-            {raw}
-          </pre>
-        </Section>
-
-        {toolsModule && (
-          <Section
-            title="Tools module"
-            description={`Deterministic Python functions the model calls as tools, from ${toolsModule}. Runs in the agent's process with no token cost — the LLM supervises which functions to call.`}
-          >
-            {toolsModuleContent ? (
-              <pre className="bg-surface border-border text-foreground overflow-x-auto rounded-lg border p-4 font-mono text-sm leading-5">
-                {toolsModuleContent}
-              </pre>
-            ) : (
-              <p className="text-sentiment-negative text-sm">
-                The spec references{" "}
-                <code className="font-mono">{toolsModule}</code> but it
-                couldn&apos;t be read from the repo. Runs will fail until the
-                file is added next to the agent.
-              </p>
-            )}
-          </Section>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function RecentRuns({
-  runs,
-  workspaceSlug,
-  agentName,
-}: {
-  runs: RunSummary[];
-  workspaceSlug: string;
-  agentName: string;
-}) {
-  if (runs.length === 0) {
-    return (
-      <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
-        No runs yet. Click <strong className="text-foreground">Run now</strong>{" "}
-        above.
-      </p>
-    );
-  }
-  return (
-    <ul className="divide-border flex flex-col divide-y border-y border-[var(--color-border)]">
-      {runs.map((run) => {
-        const tone = STATUS_TONE[run.status];
-        return (
-          <li
-            key={run.id}
-            className="flex items-center justify-between gap-3 py-2"
-          >
+      <Section
+        title="Recent runs"
+        actions={
+          recentRuns.length > 0 ? (
             <Link
-              href={`/${workspaceSlug}/agents/${encodeURIComponent(agentName)}/runs/${run.id}`}
-              className="flex flex-1 items-center gap-3"
-            >
-              <Badge variant={tone.variant} size="small">
-                {STATUS_LABELS[run.status]}
-              </Badge>
-              {run.trigger === "schedule" && (
-                <Badge variant="blue" size="small">
-                  Scheduled
-                </Badge>
-              )}
-              {run.trigger === "event" && (
-                <Badge variant="purple" size="small">
-                  Event
-                </Badge>
-              )}
-              <LocalTime
-                iso={run.createdAt.toISOString()}
-                className="text-foreground-muted text-sm"
-              />
-            </Link>
-            <Link
-              href={`/${workspaceSlug}/agents/${encodeURIComponent(agentName)}/runs/${run.id}`}
+              href={runsHref}
               className="text-foreground-weak hover:text-foreground text-sm"
             >
-              Open →
+              View all →
             </Link>
-          </li>
-        );
-      })}
-    </ul>
+          ) : undefined
+        }
+      >
+        <RecentRuns
+          runs={recentRuns}
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+        />
+      </Section>
+    </>
   );
 }
-
-function AutomationsSection({
-  automations,
-  workspaceSlug,
-  agentName,
-}: {
-  automations: Automation[];
-  workspaceSlug: string;
-  agentName: string;
-}) {
-  // The "New automation" link is in the Section header (right side)
-  // so the affordance is visible even when the list is empty.
-  const newHref = `/${workspaceSlug}/automations/new?agent=${encodeURIComponent(agentName)}`;
-  return (
-    <Section
-      title="Automations"
-      description="Schedules that fire this agent on their own. Cron is UTC; times shown are local."
-      actions={
-        <Button asChild variant="secondary">
-          <Link href={newHref}>New automation</Link>
-        </Button>
-      }
-    >
-      {automations.length === 0 ? (
-        <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
-          No automations yet. Click <strong className="text-foreground">New
-          automation</strong> to schedule this agent.
-        </p>
-      ) : (
-        <ul className="divide-border flex flex-col divide-y border-y border-[var(--color-border)]">
-          {automations.map((a) => {
-            const preview = validateCron(a.cron);
-            const next = a.enabled ? nextFireAfter(a.cron, new Date()) : null;
-            return (
-              <li
-                key={a.id}
-                className="flex items-center justify-between gap-3 py-2"
-              >
-                <Link
-                  href={`/${workspaceSlug}/automations/${a.id}`}
-                  className="flex flex-1 min-w-0 items-center gap-3"
-                >
-                  {a.enabled ? (
-                    a.lastFireError ? (
-                      <Badge variant="red" size="small">
-                        Error
-                      </Badge>
-                    ) : (
-                      <Badge variant="green" size="small">
-                        On
-                      </Badge>
-                    )
-                  ) : (
-                    <Badge variant="gray" size="small">
-                      Off
-                    </Badge>
-                  )}
-                  <span className="text-foreground truncate text-sm font-medium">
-                    {a.name}
-                  </span>
-                  <span className="text-foreground-weak truncate text-sm">
-                    {preview.ok ? preview.humanReadable : a.cron}{" "}
-                    <span className="text-foreground-muted">(UTC)</span>
-                  </span>
-                </Link>
-                <span className="text-foreground-muted shrink-0 text-sm">
-                  {next ? (
-                    <>
-                      Next{" "}
-                      <LocalTime
-                        iso={next.toISOString()}
-                        className="text-foreground-weak"
-                      />
-                    </>
-                  ) : a.enabled ? (
-                    "—"
-                  ) : (
-                    "Paused"
-                  )}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Section>
-  );
-}
-
-const STATUS_LABELS: Record<RunSummary["status"], string> = {
-  queued: "Queued",
-  running: "Running",
-  succeeded: "Succeeded",
-  failed: "Failed",
-};
-
-const STATUS_TONE: Record<
-  RunSummary["status"],
-  { variant: "blue" | "yellow" | "green" | "red" }
-> = {
-  queued: { variant: "yellow" },
-  running: { variant: "blue" },
-  succeeded: { variant: "green" },
-  failed: { variant: "red" },
-};

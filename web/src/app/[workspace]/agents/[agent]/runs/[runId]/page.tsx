@@ -64,7 +64,7 @@ export default async function RunDetailPage({
       : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
+    <div className="flex flex-col gap-6">
       <RunPoller status={run.status} />
       <div className="flex flex-col gap-3">
         <BackLink href={agentHref} label={run.agentName} />
