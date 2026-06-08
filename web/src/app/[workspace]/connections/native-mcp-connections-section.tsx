@@ -9,9 +9,20 @@ import type { WorkspaceConnection } from "@/lib/connections";
 import type { McpTool } from "@/lib/mcp-tools";
 
 import { AddNativeMcpConnectionForm } from "./add-native-mcp-connection-form";
+import { ConfigureNativeOAuthApp } from "./configure-native-oauth-app";
 import { DisconnectNativeMcpConnectionForm } from "./disconnect-native-mcp-connection-form";
 import { RefreshNativeMcpToolsForm } from "./refresh-native-mcp-tools-form";
 import { RenameNativeMcpConnectionForm } from "./rename-native-mcp-connection-form";
+
+// Manual (BYO OAuth app) provider config, keyed by provider slug. Only manual
+// providers (e.g. HubSpot) appear here.
+export type ManualAppConfig = {
+  configured: boolean;
+  clientId?: string;
+  secretLast4?: string;
+  redirectUri: string;
+  setupUrl?: string;
+};
 
 // Per-provider Native-MCP card. Each provider is in one of two
 // states:
@@ -54,6 +65,10 @@ type Props = {
    *  Connect/Reconnect, Disconnect, placeholder "Connect" rows, and the
    *  "Add another" form. */
   viewingOther?: boolean;
+  /** BYO-OAuth-app config for manual providers (e.g. HubSpot), keyed by slug. */
+  manualConfig?: Record<string, ManualAppConfig>;
+  /** Whether the current user can configure OAuth apps (workspace admin). */
+  isAdmin?: boolean;
 };
 
 export function NativeMcpConnectionsSection({
@@ -62,7 +77,12 @@ export function NativeMcpConnectionsSection({
   catalog,
   banner,
   viewingOther = false,
+  manualConfig = {},
+  isAdmin = false,
 }: Props) {
+  // Manual providers (HubSpot) need a one-time admin OAuth-app config before
+  // anyone can Connect. Show the config cards above the rows for admins.
+  const manualProviders = catalog.filter((p) => p.authMode === "manual");
   return (
     <Section
       title="Native MCP connections"
@@ -85,6 +105,25 @@ export function NativeMcpConnectionsSection({
           </div>
         )}
 
+        {!viewingOther &&
+          isAdmin &&
+          manualProviders.map((provider) => {
+            const cfg = manualConfig[provider.slug];
+            if (!cfg) return null;
+            return (
+              <ConfigureNativeOAuthApp
+                key={`cfg:${provider.slug}`}
+                workspaceSlug={workspaceSlug}
+                providerSlug={provider.slug}
+                providerDisplayName={provider.displayName}
+                redirectUri={cfg.redirectUri}
+                clientId={cfg.clientId}
+                secretLast4={cfg.secretLast4}
+                setupUrl={cfg.setupUrl}
+              />
+            );
+          })}
+
         <ul className="divide-border bg-surface border-border flex flex-col divide-y overflow-hidden rounded-lg border">
           {providers.map(({ provider, connection, tools }) => (
             <ProviderRow
@@ -98,6 +137,10 @@ export function NativeMcpConnectionsSection({
               connection={connection}
               tools={tools}
               viewingOther={viewingOther}
+              needsOAuthApp={
+                provider.authMode === "manual" &&
+                !manualConfig[provider.slug]?.configured
+              }
             />
           ))}
         </ul>
@@ -119,12 +162,15 @@ function ProviderRow({
   connection,
   tools,
   viewingOther = false,
+  needsOAuthApp = false,
 }: {
   workspaceSlug: string;
   provider: McpProvider;
   connection: WorkspaceConnection | null;
   tools: McpTool[];
   viewingOther?: boolean;
+  /** Manual provider whose workspace OAuth app isn't configured yet. */
+  needsOAuthApp?: boolean;
 }) {
   if (!connection) {
     // Placeholder "Connect" rows aren't actionable for an admin viewing
@@ -145,12 +191,20 @@ function ProviderRow({
             </Badge>
           </div>
           <p className="text-foreground-weak text-sm">
-            Click Connect to log in with your {provider.displayName} account.
+            {needsOAuthApp
+              ? `An admin must configure the ${provider.displayName} OAuth app before you can connect.`
+              : `Click Connect to log in with your ${provider.displayName} account.`}
           </p>
         </div>
-        <Button asChild variant="primary" size="small">
-          <Link href={authorizeHref}>Connect</Link>
-        </Button>
+        {needsOAuthApp ? (
+          <Button variant="primary" size="small" disabled>
+            Connect
+          </Button>
+        ) : (
+          <Button asChild variant="primary" size="small">
+            <Link href={authorizeHref}>Connect</Link>
+          </Button>
+        )}
       </li>
     );
   }

@@ -53,6 +53,10 @@ export type NativeMcpStatePayload = {
   /** Authorization server token endpoint, captured during
    *  discovery so the callback doesn't need to re-discover. */
   tokenEndpoint: string;
+  /** OAuth client mode. "manual" (confidential, BYO app) tells the
+   *  callback to add the stored client_secret at token exchange.
+   *  Absent/"dcr" = public client (no secret). */
+  authMode?: "dcr" | "manual";
   /** Short random nonce — defends against state replay across users. */
   nonce: string;
 };

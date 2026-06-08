@@ -46,10 +46,17 @@ const ATTIO_MCP_ORIGIN: &str = "https://mcp.attio.com";
 const ATTIO_OAUTH_ORIGINS: &[&str] = &["https://app.attio.com"];
 const PYLON_MCP_ORIGIN: &str = "https://mcp.usepylon.com";
 const PYLON_OAUTH_ORIGINS: &[&str] = &["https://o.auth.usepylon.com"];
+// HubSpot advertises its auth server as the MCP origin itself and uses a
+// CONFIDENTIAL client (no DCR) — the refresh below presents client_id +
+// client_secret from workspace_native_oauth_client when the connection's
+// metadata says auth_mode=manual.
+const HUBSPOT_MCP_ORIGIN: &str = "https://mcp.hubspot.com";
+const HUBSPOT_OAUTH_ORIGINS: &[&str] = &["https://mcp.hubspot.com"];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
     (PYLON_MCP_ORIGIN, PYLON_OAUTH_ORIGINS),
+    (HUBSPOT_MCP_ORIGIN, HUBSPOT_OAUTH_ORIGINS),
 ];
 
 #[derive(Deserialize)]
@@ -107,7 +114,19 @@ pub async fn refresh_expiring_native_connections(
     .context("failed to list native connections for refresh")?;
 
     for (id, provider, name, mcp_url, ciphertext, metadata) in rows {
-        match refresh_one(pool, key, http, id, &mcp_url, &ciphertext, &metadata).await {
+        match refresh_one(
+            pool,
+            key,
+            http,
+            workspace_id,
+            id,
+            &provider,
+            &mcp_url,
+            &ciphertext,
+            &metadata,
+        )
+        .await
+        {
             Ok(()) => {
                 tracing::info!(%provider, %name, "refreshed native MCP token before run")
             }
@@ -119,11 +138,14 @@ pub async fn refresh_expiring_native_connections(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)] // one row's worth of refresh inputs
 async fn refresh_one(
     pool: &PgPool,
     key: &MasterKey,
     http: &reqwest::Client,
+    workspace_id: uuid::Uuid,
     id: uuid::Uuid,
+    provider: &str,
     mcp_url: &Option<String>,
     ciphertext: &[u8],
     metadata: &serde_json::Value,
@@ -141,25 +163,39 @@ async fn refresh_one(
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .ok_or_else(|| anyhow!("no refresh_token stored — reconnect required"))?;
-    // The DCR-issued public client_id we registered at authorize time;
-    // the refresh exchange must present the same client identity.
-    let client_id = metadata
-        .get("dcr_client_id")
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| anyhow!("no dcr_client_id in connection metadata"))?;
+    // The client identity the refresh exchange presents. DCR (public) providers
+    // stored a `dcr_client_id` and send no secret; manual (confidential)
+    // providers (HubSpot) present the BYO client_id + client_secret an admin
+    // stored in workspace_native_oauth_client.
+    let (client_id, client_secret): (String, Option<String>) =
+        if metadata.get("auth_mode").and_then(|v| v.as_str()) == Some("manual") {
+            let (cid, secret) =
+                native_oauth_client_secret(pool, key, workspace_id, provider).await?;
+            (cid, Some(secret))
+        } else {
+            let cid = metadata
+                .get("dcr_client_id")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| anyhow!("no dcr_client_id in connection metadata"))?
+                .to_string();
+            (cid, None)
+        };
 
     let token_endpoint = discover_token_endpoint(http, mcp_url).await?;
 
-    // Public client (token_endpoint_auth_method=none) → no secret.
+    let mut form: Vec<(&str, &str)> = vec![
+        ("grant_type", "refresh_token"),
+        ("refresh_token", refresh_token),
+        ("client_id", client_id.as_str()),
+    ];
+    if let Some(ref secret) = client_secret {
+        form.push(("client_secret", secret.as_str()));
+    }
     let res = http
         .post(token_endpoint)
         .header("Accept", "application/json")
-        .form(&[
-            ("grant_type", "refresh_token"),
-            ("refresh_token", refresh_token),
-            ("client_id", client_id),
-        ])
+        .form(&form)
         .send()
         .await
         .context("refresh request failed")?;
@@ -230,6 +266,30 @@ async fn refresh_one(
     .context("failed to persist refreshed credentials")?;
 
     Ok(())
+}
+
+/// Read + decrypt the bring-your-own OAuth client (client_id + client_secret)
+/// an admin stored for a confidential native-MCP provider (HubSpot). Errors if
+/// the app isn't configured (the connection can't be refreshed without it).
+async fn native_oauth_client_secret(
+    pool: &PgPool,
+    key: &MasterKey,
+    workspace_id: uuid::Uuid,
+    provider: &str,
+) -> anyhow::Result<(String, String)> {
+    let row: Option<(String, Vec<u8>)> = sqlx::query_as(
+        "SELECT client_id, client_secret_ciphertext FROM workspace_native_oauth_client \
+           WHERE workspace_id = $1 AND provider = $2",
+    )
+    .bind(workspace_id)
+    .bind(provider)
+    .fetch_optional(pool)
+    .await
+    .context("failed to read workspace_native_oauth_client")?;
+    let (client_id, ciphertext) =
+        row.ok_or_else(|| anyhow!("no OAuth app configured for native provider {provider}"))?;
+    let secret = key.decrypt(&ciphertext).context("decrypt client_secret")?;
+    Ok((client_id, secret))
 }
 
 /// Resolve a provider's token endpoint from its MCP URL via the same

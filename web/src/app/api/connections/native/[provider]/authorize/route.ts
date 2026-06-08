@@ -13,6 +13,7 @@ import {
   trustedOAuthUrl,
   trustedProviderMcpOrigin,
 } from "@/lib/native-oauth-security";
+import { getNativeOAuthClientPreview } from "@/lib/native-oauth-clients";
 import { signNativeMcpState } from "@/lib/oauth-state";
 
 // Native-MCP OAuth authorize handler. URL shape:
@@ -194,10 +195,14 @@ export async function GET(
       `Authorization server metadata fetch failed: ${(e as Error).message}`,
     );
   }
+  // "manual" providers (HubSpot) use a confidential BYO OAuth app and have no
+  // registration_endpoint; "dcr" providers (Attio, Pylon) self-register a
+  // public client.
+  const isManual = provider.authMode === "manual";
   if (
     !asMeta.authorization_endpoint ||
     !asMeta.token_endpoint ||
-    !asMeta.registration_endpoint
+    (!isManual && !asMeta.registration_endpoint)
   ) {
     return back(
       workspace.slug,
@@ -207,7 +212,6 @@ export async function GET(
   }
   let authorizationEndpoint: URL;
   let tokenEndpoint: URL;
-  let registrationEndpoint: URL;
   try {
     authorizationEndpoint = await trustedOAuthUrl(
       asMeta.authorization_endpoint,
@@ -218,11 +222,6 @@ export async function GET(
       asMeta.token_endpoint,
       provider,
       "Token endpoint",
-    );
-    registrationEndpoint = await trustedOAuthUrl(
-      asMeta.registration_endpoint,
-      provider,
-      "Registration endpoint",
     );
   } catch (e) {
     return back(
@@ -240,58 +239,96 @@ export async function GET(
       `${provider.displayName} auth server doesn't support PKCE/S256 — auth flow won't complete safely.`,
     );
   }
-  const useNoneAuth = (asMeta.token_endpoint_auth_methods_supported ?? []).some(
-    (m) => m === "none",
-  );
-  if (!useNoneAuth) {
-    return back(
-      workspace.slug,
-      provider.slug,
-      `${provider.displayName} auth server requires a confidential client; TAS only supports public clients today.`,
-    );
-  }
 
-  // ── Step 3: Dynamic Client Registration ─────────────────────────
   const redirectUri = redirectUriFor(provider.slug as McpProviderSlug);
+  const authMethods = asMeta.token_endpoint_auth_methods_supported ?? [];
+
+  // ── Step 3: obtain a client_id ──────────────────────────────────
   let clientId: string;
-  try {
-    const dcrRes = await fetch(registrationEndpoint, noRedirectFetchInit({
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        client_name: "Tembo Agent Studio",
-        redirect_uris: [redirectUri],
-        token_endpoint_auth_method: "none",
-        grant_types: ["authorization_code", "refresh_token"],
-        response_types: ["code"],
-      }),
-    }));
-    if (!dcrRes.ok) {
-      const body = await dcrRes.text().catch(() => "");
+  if (isManual) {
+    // Confidential client: require client_secret_post and use the admin-stored
+    // OAuth app. The secret is added at the callback's token exchange.
+    if (!authMethods.some((m) => m === "client_secret_post")) {
       return back(
         workspace.slug,
         provider.slug,
-        `Dynamic client registration failed (${dcrRes.status}): ${body.slice(0, 150)}`,
+        `${provider.displayName} auth server doesn't support client_secret_post.`,
       );
     }
-    const dcrJson = (await dcrRes.json()) as DcrResponse;
-    if (!dcrJson.client_id) {
+    const byo = await getNativeOAuthClientPreview(workspace.id, provider.slug);
+    if (!byo) {
       return back(
         workspace.slug,
         provider.slug,
-        `DCR succeeded but no client_id in the response.`,
+        `Configure the ${provider.displayName} OAuth app first (Connections → ${provider.displayName} → Configure OAuth app).`,
       );
     }
-    clientId = dcrJson.client_id;
-  } catch (e) {
-    return back(
-      workspace.slug,
-      provider.slug,
-      `DCR fetch failed: ${(e as Error).message}`,
-    );
+    clientId = byo.clientId;
+  } else {
+    // Public client → Dynamic Client Registration.
+    if (!authMethods.some((m) => m === "none")) {
+      return back(
+        workspace.slug,
+        provider.slug,
+        `${provider.displayName} auth server requires a confidential client; configure an OAuth app instead.`,
+      );
+    }
+    let registrationEndpoint: URL;
+    try {
+      registrationEndpoint = await trustedOAuthUrl(
+        asMeta.registration_endpoint as string,
+        provider,
+        "Registration endpoint",
+      );
+    } catch (e) {
+      return back(
+        workspace.slug,
+        provider.slug,
+        `Registration endpoint is not trusted: ${(e as Error).message}`,
+      );
+    }
+    try {
+      const dcrRes = await fetch(
+        registrationEndpoint,
+        noRedirectFetchInit({
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            client_name: "Tembo Agent Studio",
+            redirect_uris: [redirectUri],
+            token_endpoint_auth_method: "none",
+            grant_types: ["authorization_code", "refresh_token"],
+            response_types: ["code"],
+          }),
+        }),
+      );
+      if (!dcrRes.ok) {
+        const body = await dcrRes.text().catch(() => "");
+        return back(
+          workspace.slug,
+          provider.slug,
+          `Dynamic client registration failed (${dcrRes.status}): ${body.slice(0, 150)}`,
+        );
+      }
+      const dcrJson = (await dcrRes.json()) as DcrResponse;
+      if (!dcrJson.client_id) {
+        return back(
+          workspace.slug,
+          provider.slug,
+          `DCR succeeded but no client_id in the response.`,
+        );
+      }
+      clientId = dcrJson.client_id;
+    } catch (e) {
+      return back(
+        workspace.slug,
+        provider.slug,
+        `DCR fetch failed: ${(e as Error).message}`,
+      );
+    }
   }
 
   // ── Step 4: PKCE verifier + S256 challenge ──────────────────────
@@ -311,6 +348,7 @@ export async function GET(
     pkceVerifier,
     clientId,
     tokenEndpoint: tokenEndpoint.toString(),
+    authMode: isManual ? "manual" : "dcr",
   });
 
   const authorizeUrl = new URL(authorizationEndpoint);

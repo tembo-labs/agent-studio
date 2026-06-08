@@ -12,6 +12,7 @@ import {
   noRedirectFetchInit,
   trustedOAuthUrl,
 } from "@/lib/native-oauth-security";
+import { getNativeOAuthClientSecret } from "@/lib/native-oauth-clients";
 import { fetchNativeMcpTools } from "@/lib/native-mcp-tools";
 import { replaceToolsForConnection } from "@/lib/mcp-tools";
 import { verifyNativeMcpState } from "@/lib/oauth-state";
@@ -133,6 +134,30 @@ export async function GET(
       `Token endpoint is not trusted: ${(e as Error).message}`,
     );
   }
+  // Confidential (manual / BYO-app) providers add the stored client_secret at
+  // the token exchange (client_secret_post). Public DCR providers send none.
+  const tokenParams: Record<string, string> = {
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: redirectUriFor(provider.slug as McpProviderSlug),
+    client_id: state.clientId,
+    code_verifier: state.pkceVerifier,
+  };
+  if (state.authMode === "manual") {
+    const byo = await getNativeOAuthClientSecret(
+      state.workspaceId,
+      provider.slug,
+    );
+    if (!byo) {
+      return back(
+        state.workspaceSlug,
+        provider.slug,
+        "error",
+        `The ${provider.displayName} OAuth app is no longer configured. Re-add it under Connections.`,
+      );
+    }
+    tokenParams.client_secret = byo.clientSecret;
+  }
   try {
     const tokenRes = await fetch(tokenEndpoint, noRedirectFetchInit({
       method: "POST",
@@ -140,13 +165,7 @@ export async function GET(
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
       },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirectUriFor(provider.slug as McpProviderSlug),
-        client_id: state.clientId,
-        code_verifier: state.pkceVerifier,
-      }).toString(),
+      body: new URLSearchParams(tokenParams).toString(),
     }));
     if (!tokenRes.ok) {
       const body = await tokenRes.text().catch(() => "");
@@ -193,10 +212,14 @@ export async function GET(
       scope: tokenJson.scope,
       token_type: tokenJson.token_type,
     },
-    // DCR client_id stays in metadata so a future "refresh token"
-    // exchange can present the same client identity. (We can also
-    // re-DCR on reconnect; this is a minor optimization.)
-    metadata: { dcr_client_id: state.clientId },
+    // The client identity the refresh exchange must present. For DCR
+    // (public) providers that's the registered client_id; for manual
+    // (confidential) providers it's the BYO client_id, plus auth_mode so the
+    // Rust refresh knows to add the stored client_secret.
+    metadata:
+      state.authMode === "manual"
+        ? { auth_mode: "manual", client_id: state.clientId }
+        : { dcr_client_id: state.clientId },
   });
 
   await writeAuditEvent({

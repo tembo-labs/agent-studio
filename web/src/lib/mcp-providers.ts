@@ -16,7 +16,7 @@
 
 import { getPublicOrigin } from "@/lib/config";
 
-export type McpProviderSlug = "attio" | "pylon";
+export type McpProviderSlug = "attio" | "pylon" | "hubspot";
 
 export type McpProvider = {
   slug: McpProviderSlug;
@@ -28,6 +28,17 @@ export type McpProvider = {
   /** Exact OAuth authorization-server origins this provider is allowed
    *  to advertise through protected-resource discovery. */
   oauthAuthorizationServerOrigins: string[];
+  /**
+   * How TAS obtains an OAuth client for this provider:
+   *  - "dcr" (default): Dynamic Client Registration — TAS self-registers
+   *    a public client at Connect time; zero per-customer setup.
+   *  - "manual": the provider doesn't support DCR (or requires a
+   *    confidential client). An admin creates an OAuth app at the
+   *    provider and stores its client_id/secret in TAS
+   *    (workspace_native_oauth_client); the flow uses that confidential
+   *    client. HubSpot is the first of these.
+   */
+  authMode?: "dcr" | "manual";
 };
 
 export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
@@ -45,6 +56,19 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // discovered + dynamically registered (DCR) — no manual client creds.
     mcpServerUrl: "https://mcp.usepylon.com",
     oauthAuthorizationServerOrigins: ["https://o.auth.usepylon.com"],
+  },
+  hubspot: {
+    slug: "hubspot",
+    displayName: "HubSpot",
+    // Verified: protected-resource + auth-server metadata advertise the auth
+    // server as the MCP origin itself (authorize /oauth/authorize/user, token
+    // /oauth/v3/token). No registration_endpoint (no DCR) and
+    // token_endpoint_auth_methods_supported = ["client_secret_post"], so this
+    // is a CONFIDENTIAL client — an admin must create a HubSpot "MCP auth app"
+    // and store its client_id/secret (authMode: "manual").
+    mcpServerUrl: "https://mcp.hubspot.com",
+    oauthAuthorizationServerOrigins: ["https://mcp.hubspot.com"],
+    authMode: "manual",
   },
 };
 

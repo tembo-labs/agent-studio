@@ -5,12 +5,22 @@ import {
   type WorkspaceConnection,
 } from "@/lib/connections";
 import { resolveConnectionsView } from "@/lib/connections-view";
-import { listMcpProviders } from "@/lib/mcp-providers";
+import { listMcpProviders, redirectUriFor } from "@/lib/mcp-providers";
 import { listToolsForUser, type McpTool } from "@/lib/mcp-tools";
+import { listNativeOAuthClients } from "@/lib/native-oauth-clients";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug } from "@/lib/workspace";
+import { getWorkspaceBySlug, getWorkspaceRole } from "@/lib/workspace";
 
-import { NativeMcpConnectionsSection } from "../native-mcp-connections-section";
+import {
+  NativeMcpConnectionsSection,
+  type ManualAppConfig,
+} from "../native-mcp-connections-section";
+
+// Where to create the OAuth app, per manual provider.
+const SETUP_URLS: Record<string, string> = {
+  hubspot:
+    "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/integrate-with-the-remote-hubspot-mcp-server",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -42,10 +52,13 @@ export default async function NativeMcpConnectionsPage({
     requestedUser,
   );
 
-  const [nativeConnections, allTools] = await Promise.all([
-    listNativeConnectionsForUser(workspace.id, view.userId),
-    listToolsForUser(workspace.id, view.userId),
-  ]);
+  const [nativeConnections, allTools, oauthClients, currentUserRole] =
+    await Promise.all([
+      listNativeConnectionsForUser(workspace.id, view.userId),
+      listToolsForUser(workspace.id, view.userId),
+      listNativeOAuthClients(workspace.id),
+      getWorkspaceRole(workspace.id, session.user.id),
+    ]);
 
   // Same bucketing as the composio sub-page — the tools query
   // returns everything for the user; we slice by source +
@@ -114,6 +127,23 @@ export default async function NativeMcpConnectionsPage({
         }
       : undefined;
 
+  // BYO-OAuth-app config for manual providers (HubSpot). One entry per manual
+  // catalog provider; `configured` gates the per-user Connect button.
+  const oauthByProvider = new Map(oauthClients.map((c) => [c.provider, c]));
+  const manualConfig: Record<string, ManualAppConfig> = {};
+  for (const provider of nativeCatalog) {
+    if (provider.authMode !== "manual") continue;
+    const cfg = oauthByProvider.get(provider.slug);
+    manualConfig[provider.slug] = {
+      configured: Boolean(cfg),
+      clientId: cfg?.clientId,
+      secretLast4: cfg?.secretLast4,
+      redirectUri: redirectUriFor(provider.slug),
+      setupUrl: SETUP_URLS[provider.slug],
+    };
+  }
+  const isAdmin = currentUserRole === "workspace_admin";
+
   return (
     <>
       {view.viewingOther && view.viewedMember && (
@@ -134,6 +164,8 @@ export default async function NativeMcpConnectionsPage({
         catalog={nativeCatalog}
         banner={banner}
         viewingOther={view.viewingOther}
+        manualConfig={manualConfig}
+        isAdmin={isAdmin}
       />
     </>
   );
