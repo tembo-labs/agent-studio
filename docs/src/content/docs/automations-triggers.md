@@ -8,17 +8,56 @@ own — on a clock or in response to something happening.
 
 ## Automations (schedules)
 
-An **automation** runs an agent on a cron schedule. You pick the agent, the
-schedule, an optional input message, and an **owner** — the automation runs as
-that owner, so it uses the owner's [connection](/agent-studio/connections/)
-credentials. You can also choose whether a schedule runs the agent's stable
-version or its live draft.
+An **automation** runs an agent on a cron schedule. Create and manage them from
+the **Automations** page. You pick the agent, the schedule, an optional input
+message, and an **owner** — the automation runs as that owner, so it uses the
+owner's [connection](/agent-studio/connections/) credentials. You can also choose
+whether a schedule runs the agent's **stable** version or its live **draft**.
 
-## Triggers (events)
+The automations list shows an **Run as** column so you can see whose credentials
+each schedule uses.
+
+## Composio event triggers
 
 A **trigger** fires an agent from an external event — a new Gmail message, a
-Slack mention, a GitHub PR event, and so on — via Composio. Like automations, an
-event run executes as the trigger's owner.
+GitHub PR event, and so on — via Composio. Triggers are configured **per agent**
+on the agent detail page, in the **Triggers** section (above Automations).
+
+### Prerequisites
+
+1. **Composio API key** — set under **Settings → Composio**.
+2. **Composio webhook secret** — also under **Settings → Composio**. Copy the
+   webhook URL shown there (`/api/hooks/composio/{workspace}`) into your Composio
+   app's webhook configuration, then paste the matching secret into TAS.
+3. **A connection** — the acting user must have authorized the toolkit the
+   trigger listens on (e.g. Gmail). Authorize it under
+   [Connections](/agent-studio/connections/) first.
+
+:::caution[Web tier must stay up]
+Composio trigger webhooks terminate on the **web** service at
+`/api/hooks/composio/{workspace}`. If the web tier sleeps (some serverless
+plans) or scales to zero, event triggers pause until it's reachable again. See
+your [deploy guide](/agent-studio/deploying-and-operating/) for platform-specific
+notes.
+:::
+
+### Creating a trigger
+
+On the agent detail page, under **Triggers → Add trigger**:
+
+1. **Connection** — pick which authorized connection's credentials the trigger
+   runs under (this sets the acting user).
+2. **Composio trigger slug** — SCREAMING_SNAKE_CASE, e.g.
+   `GMAIL_NEW_GMAIL_MESSAGE`. Find slugs in
+   [Composio's trigger catalog](https://docs.composio.dev/triggers).
+3. **Config (JSON)** — per-trigger configuration. Use `{}` when the trigger has
+   no required fields.
+
+TAS registers the subscription with Composio. When an event arrives, TAS verifies
+the HMAC signature, looks up the trigger, and queues a run. Enable or disable
+individual triggers from the same section without deleting them.
+
+Like automations, an event run executes as the trigger's connection owner.
 
 :::note
 The owner/acting-user model is the same across manual runs, automations, and
@@ -26,9 +65,8 @@ triggers — it determines which credentials a run uses. See
 [Core concepts → acting user](/agent-studio/core-concepts/).
 :::
 
-Each fired run shows up in [Runs](/agent-studio/dashboard-and-runs/) attributed
-to its trigger (manual / schedule / event) so you can tell automated activity
-from hand runs.
+Each fired run shows up in [Runs](/agent-studio/dashboard-and-runs/) with
+**Source = Event** so you can tell automated activity from hand runs.
 
 ## External webhooks
 
@@ -68,6 +106,6 @@ or [connection](/agent-studio/connections/) to write results back (to Clay,
 Attio, etc.) from its [Python tools](/agent-studio/sidecar-python-tools/) — the
 webhook only starts the run.
 
-Runs fired this way appear in [Runs](/agent-studio/dashboard-and-runs/) as
+Runs fired this way also appear in [Runs](/agent-studio/dashboard-and-runs/) as
 **Event**. Bad/missing token → 401, a disabled webhook → 403, too many in a
 short window → 429.

@@ -14,9 +14,10 @@ Monorepo, three runtime pieces, all started by `docker-compose.yml`:
   See [`api/AGENTS.md`](./api/AGENTS.md).
 - `postgres` — single database shared by web and api.
 
-`agents/` holds seed agent fixtures. `context/` holds phase docs.
-`docs/` is empty; the long-form docs live in `context/` and the
-PRFAQ-style READMEs there.
+`agents/` holds seed agent fixtures. `context/` holds phase docs (PRFAQ,
+user stories, demo scripts per phase). The product user manual lives in
+`docs/` (Astro Starlight, published to GitHub Pages) — see
+[`docs/README.md`](./docs/README.md).
 
 ## Commands
 

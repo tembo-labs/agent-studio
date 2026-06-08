@@ -21,5 +21,20 @@ Workspace membership has three roles, enforced at the API layer:
 | **Operator**  | Author, run, and improve agents; authorize their own connections. |
 | **Viewer**    | Read agents, runs, and dashboards.                              |
 
-Manage members and their roles under **Settings**. Instance admins can also
-create workspaces.
+Manage members and their roles under **Settings → Members**. Workspace admins
+can open a [member detail view](/agent-studio/dashboard-and-runs/#member-detail-admins)
+to inspect connections, automations, and runs before offboarding someone.
+
+## Instance admins
+
+Above workspace roles, **instance admins** are bootstrapped from
+`INSTANCE_ADMIN_EMAILS` at deploy time. An instance admin can:
+
+- Set the instance name and branding (top-level **Settings**)
+- **Create workspaces** (only instance admins see "Create workspace")
+- Access any workspace they're a member of with their assigned workspace role
+
+Everyone else joins via workspace invitation. On a fresh instance, the first
+person to sign in with an email listed in `INSTANCE_ADMIN_EMAILS` becomes an
+instance admin and can create the first workspace. See
+[Customer setup](/agent-studio/customer-setup/) for the bootstrap checklist.

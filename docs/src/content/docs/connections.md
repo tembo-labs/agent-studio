@@ -55,6 +55,18 @@ or is revoked, the connection is marked stale and runs that need it fail with a
 clear message — reconnect from the same page. See
 [Troubleshooting](/agent-studio/troubleshooting/).
 
+### Viewing another member's connections (admins)
+
+Workspace admins see a **Viewing** dropdown at the top of the Connections page.
+Switch it to inspect another member's authorized accounts. When viewing someone
+else you can **Rename** and **Refresh** their connections; **Connect**,
+**Reconnect**, and **Disconnect** are hidden because OAuth must be performed by
+that member themselves.
+
+Use this together with the [member detail view](/agent-studio/dashboard-and-runs/#member-detail-admins)
+when troubleshooting "no active connection" failures for automations or triggers
+that run as a specific owner.
+
 For doing deterministic I/O over a connection from Python, see
 [Sidecar Python tools](/agent-studio/sidecar-python-tools/).
 

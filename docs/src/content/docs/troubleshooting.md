@@ -12,7 +12,7 @@ failed runs).
 
 **"LLM provider needed" / runs won't start.**
 The workspace has no Anthropic or OpenAI key. Add one under
-**Settings → API keys** ([Settings](/agent-studio/settings/)).
+**Settings → LLM Providers** ([Settings](/agent-studio/settings/)).
 
 **A connection-using agent fails with "no active connection".**
 The [acting user](/agent-studio/core-concepts/) hasn't authorized that service,

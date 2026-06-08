@@ -32,7 +32,7 @@ other pages in this section.
 A Next.js web control plane, a Rust (axum + sqlx) API that owns the runtime and
 Postgres migrations, and a Postgres database. Agent definitions live in your
 connected GitHub repo; the API runs agents as subprocess calls into the bundled
-`pydantic-ai` wrapper or `cargo-ai` CLI.
+`pydantic-ai` wrapper.
 
 ## Versioning
 

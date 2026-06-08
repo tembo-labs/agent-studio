@@ -38,6 +38,7 @@ export default defineConfig({
           label: "Building agents",
           items: [
             { label: "Authoring agents", slug: "authoring-agents" },
+            { label: "Agent lifecycle", slug: "agent-lifecycle" },
             { label: "Sidecar Python tools", slug: "sidecar-python-tools" },
           ],
         },

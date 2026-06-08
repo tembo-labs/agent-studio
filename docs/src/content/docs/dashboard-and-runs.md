@@ -1,6 +1,6 @@
 ---
 title: Dashboard & Runs
-description: Read workspace and per-agent health, and browse the full run history.
+description: Read workspace and per-agent health, browse run history, and inspect team activity.
 ---
 
 ## Dashboard
@@ -11,10 +11,53 @@ trend, the top-failing agents, and recent improvements. Each agent also has its
 own dashboard with the same shape scoped to that agent — useful for deciding
 whether a model downgrade held up or an agent started failing.
 
+### Team (workspace admins)
+
+Below the headline tiles, the **Team** section lists every workspace member with
+counts for:
+
+| Column | What it shows |
+| ------ | ------------- |
+| **Connections** | How many tool connections the member has authorized. Hover for the toolkit list. |
+| **Automations** | How many scheduled automations **Run as** this member. Hover for the agent names. |
+| **Slack (30d)** | How many runs this member instigated from [Slack apps](/agent-studio/slack-apps/) in the last 30 days. Hover for a per-bot breakdown. |
+| **Runs (30d)** | Total runs they triggered in the last 30 days. |
+
+The table is sorted by run activity. **Click a member's name** (admins only) to
+open their [member detail](#member-detail-admins) — useful before offboarding
+someone who owns connections or automations.
+
 ## Runs
 
 The **Runs** page is the full, filterable history of every run in the workspace.
 Filter by agent, status, and trigger to find what you're looking for, then open
 any run for its [detail page](/agent-studio/running-agents/) — output, tokens,
-cost, and tools used. The "Action needed" alerts in the sidebar (failing agents,
-missing connections, missing LLM key) link straight to the relevant surface.
+cost, and tools used.
+
+### Source column
+
+Each row shows **how the run was instigated** and **who it acted as**:
+
+| Source | Meaning |
+| ------ | ------- |
+| **Manual** | Someone clicked Run (or ran from chat). Shows the acting member. Admins see a **Run as** picker in the Run-now dialog to execute under another member's connections. |
+| **Scheduled** | Fired by an [automation](/agent-studio/automations-triggers/). Shows the automation's **Run as** owner. |
+| **Event** | Fired by a Composio trigger or [external webhook](/agent-studio/automations-triggers/#external-webhooks). Shows the trigger/webhook owner. |
+| **Slack** | Launched from a [Slack app](/agent-studio/slack-apps/). Shows who the run acted as and a **View in Slack** link to the originating message. |
+
+The "Action needed" alerts in the sidebar (failing agents, missing connections,
+missing LLM key) link straight to the relevant surface.
+
+## Member detail (admins)
+
+From **Settings → Members** or the Dashboard **Team** table, workspace admins
+can open a read-only view of any member's footprint:
+
+- **Connections** — every Composio and Native MCP connection they've authorized.
+- **Automations** — schedules that **Run as** them (with links to each automation).
+- **Recent runs** — the last 20 runs they triggered.
+
+Use this before removing a member to see what still depends on their credentials.
+To change connections on their behalf, use the **Viewing** dropdown on the
+[Connections](/agent-studio/connections/) page (rename and refresh only — OAuth
+must still be performed by the member).

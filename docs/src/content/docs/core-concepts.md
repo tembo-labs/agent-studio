@@ -1,6 +1,6 @@
 ---
 title: Core concepts
-description: Agents-as-code, the chat-to-PR loop, the two agent frameworks, and draft → stable versioning.
+description: Agents-as-code, the chat-to-PR loop, Pydantic AgentSpec, and draft → stable versioning.
 ---
 
 A few ideas explain how everything in TAS fits together.
@@ -27,27 +27,23 @@ A **workspace** maps to one GitHub repository and owns its members, connections,
 agents, automations, and runs. Switching workspaces switches all of that. Access
 is governed by [roles](/agent-studio/audit-and-roles/).
 
-## Two agent frameworks
+## Agent format (Pydantic AgentSpec)
 
-TAS runs two agent file formats, each as a passthrough into the upstream tool so
-you get its full power:
-
-- **Pydantic AgentSpec** — the canonical authoring format. A YAML (or JSON) file
-  with `model`, `instructions`, optional `connections:`, and TAS extensions like
-  `labels:` and [`tools_module:`](/agent-studio/sidecar-python-tools/). Runs
-  through a bundled `pydantic-ai` wrapper.
-- **Cargo AI** — a single-file JSON agent format, importable and run through the
-  bundled `cargo-ai` CLI.
-
-The Agents list and run pipeline detect the framework from the file's shape.
+Agents are **Pydantic AgentSpec** files — YAML (or JSON) with `model`,
+`instructions`, optional `connections:`, and TAS extensions like `labels:` and
+[`tools_module:`](/agent-studio/sidecar-python-tools/). They live under
+`agents/pydantic-agentspec/` and run through a bundled `pydantic-ai` wrapper so
+you get the upstream tool's full power.
 
 ## Draft → stable versioning
 
 An agent has a **draft** (the live file on your default branch) and, once you
-promote it, a **stable** snapshot frozen in the database. Runs default to the
-stable snapshot for predictability; the chat/iterate surface always runs the
-draft. Promotion records who promoted what and when, and you can compare versions
-— so "what changed and when did behavior shift?" is always answerable.
+promote it, a **stable** snapshot frozen in the database. Automated runs default
+to stable for predictability; the chat/iterate surface always runs the draft.
+Promotion records who promoted what and when, and you can compare versions — so
+"what changed and when did behavior shift?" is always answerable. See
+[Agent lifecycle](/agent-studio/agent-lifecycle/) for promotion, ownership, and
+pending agents.
 
 ## Connections and tools
 

@@ -34,7 +34,7 @@ Key fields:
   lowercase letters, digits, hyphens.
 - **`model`** (required) — `provider:model`, e.g. `anthropic:claude-opus-4-8`,
   `anthropic:claude-sonnet-4-6`, `openai:gpt-5.2`, `openai:gpt-4o-mini`. The
-  provider's key must be set in **Settings → API keys**.
+  provider's key must be set in **Settings → LLM Providers**.
 - **`instructions`** (required) — the system prompt, usually a `|` block scalar.
 - **`connections:`** (optional) — external services the agent calls; see
   [Connections](/agent-studio/connections/).
@@ -64,10 +64,11 @@ Model choice is a cost/reliability tradeoff:
 
 ## Iterating
 
-- **Chat** with an agent to probe its behavior against the live draft, then
-  submit a change request that opens a PR.
+- **Chat-to-edit** — probe the live draft in the agent chat surface, then submit
+  a change request that opens a PR. See
+  [Agent lifecycle](/agent-studio/agent-lifecycle/).
 - **Improve the Agent** from any run turns feedback into a PR — see
   [Improvements](/agent-studio/improvements/).
-- **Promote** a draft to a stable version when you're happy with it; runs serve
-  the stable snapshot by default. See
-  [Core concepts → versioning](/agent-studio/core-concepts/).
+- **Promote** a draft to a stable version when you're happy with it; automated
+  runs serve stable by default. See
+  [Agent lifecycle → promoting](/agent-studio/agent-lifecycle/#promoting-to-stable).

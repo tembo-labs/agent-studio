@@ -9,16 +9,23 @@ your first agent. If you're standing up the instance itself, see
 
 ## 1. Sign in
 
-Open the instance URL and sign in with Google. The first time you sign in, an
-instance admin may need to add you to a workspace (see
-[Audit & roles](/agent-studio/audit-and-roles/) for the role model).
+Open the instance URL and sign in through your organization's identity provider.
+Most instances use **Google**; others may offer **Microsoft Entra ID** or a
+generic **OIDC** provider (Okta, Auth0, Keycloak, …) — whichever buttons appear
+on the login screen.
+
+The first time you sign in, an instance admin may need to add you to a workspace
+(see [Audit & roles](/agent-studio/audit-and-roles/) for the role model). Fresh
+instances bootstrap the first admins from `INSTANCE_ADMIN_EMAILS` and are
+invite-only by default.
 
 ## 2. Pick a workspace
 
 A **workspace** is the unit of isolation in TAS: it pins to exactly one GitHub
 repository and has its own members, connections, agents, and runs. Use the
 workspace switcher at the top of the left sidebar to move between workspaces you
-belong to. Instance admins can create new workspaces.
+belong to. [Instance admins](/agent-studio/audit-and-roles/#instance-admins) can
+create new workspaces.
 
 ## 3. Connect a GitHub repository
 
@@ -27,11 +34,25 @@ connect one — TAS stores agent definitions under `agents/` in that repo and
 reads/writes them through the GitHub API. Once connected, the **Agents** list
 reflects what's in the repo's default branch.
 
+You'll need a **GitHub personal access token** with read + write access to that
+repo. TAS validates the token on save and stores it encrypted.
+
+**Fine-grained token** (recommended):
+
+1. Go to [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new).
+2. **Repository access** → *Only select repositories* → pick this repo.
+3. **Repository permissions** → **Contents: Read and write**.
+4. Set an expiration that fits your org's policy, then generate.
+
+**Classic token** also works — create one at
+[github.com/settings/tokens/new](https://github.com/settings/tokens/new) with the
+`repo` scope.
+
 ## 4. Add an LLM provider key
 
 Agents call a model, so the workspace needs at least one provider key. Go to
-**Settings → API keys** and add an **Anthropic** or **OpenAI** key. Until one is
-set, the sidebar shows an **"LLM provider needed"** prompt and runs can't
+**Settings → LLM Providers** and add an **Anthropic** or **OpenAI** key. Until one
+is set, the sidebar shows an **"LLM provider needed"** prompt and runs can't
 execute.
 
 :::tip[Which model?]
@@ -52,11 +73,15 @@ authorizes the accounts their runs act as. See
 ## 6. Create and run your first agent
 
 - **From chat:** describe the agent you want; TAS opens a pull request via Tembo.
-  Merge it and the agent appears in the **Agents** list.
+  Merge it and the agent appears in the **Agents** list (or as **Pending** until
+  the PR merges — see [Agent lifecycle](/agent-studio/agent-lifecycle/)).
+- **By hand:** commit a spec file under `agents/pydantic-agentspec/` in the
+  connected repo. See [Authoring agents](/agent-studio/authoring-agents/).
 - **Run it:** open the agent and use **Run** to execute it once. The
   [run detail page](/agent-studio/running-agents/) shows the output, token usage,
   cost, and every tool the agent called.
 
 From here, automate it on a schedule or an event
-([Automations & triggers](/agent-studio/automations-triggers/)), or refine it
-with [Improvements](/agent-studio/improvements/).
+([Automations & triggers](/agent-studio/automations-triggers/)), launch it from
+[Slack](/agent-studio/slack-apps/), or refine it with
+[Improvements](/agent-studio/improvements/).
