@@ -22,7 +22,8 @@
 use anyhow::{anyhow, Context};
 use serde::Deserialize;
 use std::process::Stdio;
-use tokio::io::AsyncWriteExt;
+use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use uuid::Uuid;
 
@@ -31,7 +32,26 @@ const PYDANTIC_SCRIPT: &str = "/usr/local/bin/run_pydantic.py";
 const USAGE_SENTINEL: &str = "__TAS_USAGE__:";
 const TOOLS_SENTINEL: &str = "__TAS_TOOLS__:";
 const STEPS_SENTINEL: &str = "__TAS_STEPS__:";
+// Streaming sentinels the wrapper flushes DURING the run (see run_pydantic.py).
+const DELTA_SENTINEL: &str = "__TAS_DELTA__:";
+const PROGRESS_SENTINEL: &str = "__TAS_PROGRESS__:";
 const STALE_CONNECTION_MARKER: &str = "__TAS_STALE_CONNECTION__:";
+// How often (at most) to flush reconstructed live output to the run row.
+const STREAM_FLUSH_INTERVAL: Duration = Duration::from_millis(400);
+
+#[derive(Debug, Deserialize)]
+struct DeltaJson {
+    #[serde(default)]
+    t: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProgressJson {
+    #[serde(default)]
+    kind: String,
+    #[serde(default)]
+    name: String,
+}
 
 /// One tool call the agent made during the run. `ok` is `Some(true)` on a
 /// successful return, `Some(false)` on a tool error, and `None` when the
@@ -139,6 +159,8 @@ pub struct PydanticArgs<'a> {
     /// id no longer matches a connection that user owns.
     pub workspace_id: Uuid,
     pub acting_user_id: &'a str,
+    /// The run row to stream partial output into while it's still running.
+    pub run_id: Uuid,
     pub db: &'a sqlx::PgPool,
 }
 
@@ -251,10 +273,12 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
 
     let mut child = cmd.spawn().context("failed to spawn pydantic-ai wrapper")?;
 
+    // Write the spec to stdin, then drop it so the pipe closes (EOF) and the
+    // wrapper's stdin read returns.
     {
-        let stdin = child
+        let mut stdin = child
             .stdin
-            .as_mut()
+            .take()
             .ok_or_else(|| anyhow!("pydantic-ai wrapper stdin not captured"))?;
         stdin
             .write_all(args.spec_content.as_bytes())
@@ -262,10 +286,97 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
             .context("failed to write spec to pydantic-ai wrapper stdin")?;
     }
 
-    child
-        .wait_with_output()
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow!("pydantic-ai wrapper stdout not captured"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| anyhow!("pydantic-ai wrapper stderr not captured"))?;
+
+    // Drain stderr concurrently — a chatty wrapper would otherwise deadlock on
+    // a full stderr pipe while we're blocked reading stdout.
+    let stderr_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        let mut rd = BufReader::new(stderr);
+        let _ = rd.read_to_end(&mut buf).await;
+        buf
+    });
+
+    // Read stdout line by line: `full` reconstructs the whole stream for the
+    // final parse; `live` accumulates streamed text + tool-call progress, which
+    // we flush (debounced) to the run row so the page shows partial output.
+    let mut full = String::new();
+    let mut live = String::new();
+    let mut reader = BufReader::new(stdout);
+    let mut line_buf: Vec<u8> = Vec::new();
+    let mut dirty = false;
+    let mut last_flush = tokio::time::Instant::now();
+
+    loop {
+        line_buf.clear();
+        let n = reader
+            .read_until(b'\n', &mut line_buf)
+            .await
+            .context("reading pydantic-ai wrapper stdout")?;
+        if n == 0 {
+            break;
+        }
+        let line = String::from_utf8_lossy(&line_buf);
+        full.push_str(&line);
+        let trimmed = line.trim_end_matches(['\n', '\r']);
+        if let Some(json) = trimmed.strip_prefix(DELTA_SENTINEL) {
+            if let Ok(d) = serde_json::from_str::<DeltaJson>(json) {
+                live.push_str(&d.t);
+                dirty = true;
+            }
+        } else if let Some(json) = trimmed.strip_prefix(PROGRESS_SENTINEL) {
+            if let Ok(p) = serde_json::from_str::<ProgressJson>(json) {
+                if p.kind == "tool_call" && !p.name.is_empty() {
+                    if !live.is_empty() && !live.ends_with('\n') {
+                        live.push('\n');
+                    }
+                    live.push_str("→ ");
+                    live.push_str(&p.name);
+                    live.push('\n');
+                    dirty = true;
+                }
+            }
+        }
+        if dirty && last_flush.elapsed() >= STREAM_FLUSH_INTERVAL {
+            write_streamed_output(args.db, args.run_id, &live).await;
+            dirty = false;
+            last_flush = tokio::time::Instant::now();
+        }
+    }
+    // Final flush so the last partial is visible until the terminal write.
+    if dirty {
+        write_streamed_output(args.db, args.run_id, &live).await;
+    }
+
+    let status = child
+        .wait()
         .await
-        .context("pydantic-ai wrapper failed to complete")
+        .context("pydantic-ai wrapper failed to complete")?;
+    let stderr_buf = stderr_task.await.unwrap_or_default();
+
+    Ok(std::process::Output {
+        status,
+        stdout: full.into_bytes(),
+        stderr: stderr_buf,
+    })
+}
+
+/// Best-effort write of the reconstructed live output to the run row. Guarded
+/// on `status = 'running'` so a late flush can never clobber a terminal row,
+/// and errors are swallowed — streaming is a nicety, not load-bearing.
+async fn write_streamed_output(db: &sqlx::PgPool, run_id: Uuid, text: &str) {
+    let _ = sqlx::query("UPDATE run SET streamed_output = $1 WHERE id = $2 AND status = 'running'")
+        .bind(text)
+        .bind(run_id)
+        .execute(db)
+        .await;
 }
 
 /// Run the wrapper and return the parsed result plus the tool calls the
@@ -449,9 +560,15 @@ fn parse_output(stdout: &str) -> PydanticResult {
             continue;
         }
         // Tool-call + step sentinels are parsed separately
-        // (extract_tool_calls / extract_steps); here we just keep them out of
-        // the user-facing transcript.
-        if line.starts_with(TOOLS_SENTINEL) || line.starts_with(STEPS_SENTINEL) {
+        // (extract_tool_calls / extract_steps); the streaming delta/progress
+        // sentinels were already consumed live. Keep all of them out of the
+        // user-facing transcript (the authoritative output is the plain text
+        // the wrapper printed at the end).
+        if line.starts_with(TOOLS_SENTINEL)
+            || line.starts_with(STEPS_SENTINEL)
+            || line.starts_with(DELTA_SENTINEL)
+            || line.starts_with(PROGRESS_SENTINEL)
+        {
             continue;
         }
         output_lines.push(line);
@@ -615,5 +732,18 @@ mod tests {
     #[test]
     fn no_steps_sentinel_yields_empty() {
         assert!(extract_steps("just output\n").is_empty());
+    }
+
+    #[test]
+    fn strips_streaming_sentinels_from_transcript() {
+        // Delta/progress lines stream live and must never leak into the final
+        // output — only the plain end-of-run text survives.
+        let stdout = "__TAS_PROGRESS__:{\"kind\":\"tool_call\",\"name\":\"list-records\"}\n\
+            __TAS_DELTA__:{\"t\":\"Hel\"}\n\
+            __TAS_DELTA__:{\"t\":\"lo.\"}\n\
+            Hello.\n\
+            __TAS_USAGE__:{\"input_tokens\":5,\"output_tokens\":2}\n";
+        let result = parse_output(stdout);
+        assert_eq!(result.output, "Hello.");
     }
 }

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import inspect
 import json
 import os
 import sys
@@ -39,6 +40,12 @@ from pydantic_ai import Agent, capture_run_messages
 USAGE_SENTINEL = "__TAS_USAGE__:"
 TOOLS_SENTINEL = "__TAS_TOOLS__:"
 STEPS_SENTINEL = "__TAS_STEPS__:"
+# Live-streaming sentinels: emitted DURING the run (flushed immediately) so the
+# runner can show partial output on the run page. DELTA carries incremental
+# final-answer text; PROGRESS carries tool-call activity. Both are stripped
+# from the final transcript (the authoritative output is printed at the end).
+DELTA_SENTINEL = "__TAS_DELTA__:"
+PROGRESS_SENTINEL = "__TAS_PROGRESS__:"
 
 # Sidecar Python tools: the agent's `tools_module:` sibling source, read
 # from the repo by the web layer and handed to us via env. We exec it and
@@ -199,6 +206,49 @@ def steps_payload(messages) -> list[dict]:
         )
         idx += 1
     return steps[:500]
+
+
+def _emit_stream_line(sentinel: str, payload: dict) -> None:
+    """Write a streaming sentinel line and flush immediately. Stdout is
+    block-buffered when piped, so without the flush the runner wouldn't see
+    deltas until the buffer fills (or the process exits) — defeating streaming.
+    Best-effort: a broken pipe / serialization error must not fail the run."""
+    try:
+        sys.stdout.write(f"{sentinel}{json.dumps(payload)}\n")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+
+def make_stream_handler():
+    """Build a pydantic-ai `event_stream_handler`. It's called per node with an
+    async stream of events; we forward incremental model text (DELTA) and
+    tool-call announcements (PROGRESS) to stdout as they happen. We classify by
+    class name to stay robust across pydantic-ai version skew."""
+
+    async def handler(_ctx, event_stream) -> None:
+        async for event in event_stream:
+            name = type(event).__name__
+            if name == "PartDeltaEvent":
+                delta = getattr(event, "delta", None)
+                content = getattr(delta, "content_delta", None)
+                if isinstance(content, str) and content:
+                    _emit_stream_line(DELTA_SENTINEL, {"t": content})
+            elif name == "PartStartEvent":
+                # A starting text part may already carry some content.
+                part = getattr(event, "part", None)
+                content = getattr(part, "content", None)
+                if isinstance(content, str) and content:
+                    _emit_stream_line(DELTA_SENTINEL, {"t": content})
+            elif name == "FunctionToolCallEvent":
+                part = getattr(event, "part", None)
+                tool_name = getattr(part, "tool_name", None)
+                if tool_name:
+                    _emit_stream_line(
+                        PROGRESS_SENTINEL, {"kind": "tool_call", "name": tool_name}
+                    )
+
+    return handler
 
 
 def parse_spec(content: str, fmt: str) -> dict:
@@ -833,6 +883,17 @@ async def run(spec: dict, user_message: str) -> None:
     # agent.run() raises, so we can emit the tool-call list (TOOLS_SENTINEL)
     # on both the success and failure paths — the failure case is exactly
     # where "which tools did it actually call?" is most useful.
+    # Live streaming: pass an event_stream_handler so the model's text + tool
+    # calls flow to stdout as they happen. Guard on the kwarg actually being
+    # supported (version skew) so an older pydantic-ai still runs — just
+    # without streaming, falling back to the end-of-run capture.
+    run_kwargs: dict = {}
+    try:
+        if "event_stream_handler" in inspect.signature(agent.run).parameters:
+            run_kwargs["event_stream_handler"] = make_stream_handler()
+    except (ValueError, TypeError):
+        pass
+
     with capture_run_messages() as _messages:
         try:
             if toolsets:
@@ -880,9 +941,9 @@ async def run(spec: dict, user_message: str) -> None:
                             )
                     except Exception as e:
                         sys.stderr.write(f"[tas] list_tools probe failed: {e}\n")
-                    result = await agent.run(user_message)
+                    result = await agent.run(user_message, **run_kwargs)
             else:
-                result = await agent.run(user_message)
+                result = await agent.run(user_message, **run_kwargs)
         finally:
             # Emit the tool-call list on BOTH success and failure (messages
             # were captured either way), so a failed/truncated run still

@@ -464,6 +464,7 @@ async fn run_pydantic(
         secrets_json: secrets_json.as_deref(),
         workspace_id: ctx.workspace_id,
         acting_user_id: ctx.acting_user_id.as_str(),
+        run_id: ctx.run_id,
         db: &state.db,
     })
     .await;
@@ -567,7 +568,8 @@ async fn mark_succeeded(
     };
     sqlx::query(
         "UPDATE run SET status = 'succeeded', output = $1, completed_at = $2, \
-                        tokens_input = $3, tokens_output = $4, cost_usd = $5 \
+                        tokens_input = $3, tokens_output = $4, cost_usd = $5, \
+                        streamed_output = NULL \
                   WHERE id = $6",
     )
     .bind(output)
@@ -632,7 +634,8 @@ Run complete · 3.7s total
 
 async fn mark_failed(state: &AppState, run_id: Uuid, reason: &str) -> anyhow::Result<()> {
     sqlx::query(
-        "UPDATE run SET status = 'failed', error_message = $1, completed_at = $2 WHERE id = $3",
+        "UPDATE run SET status = 'failed', error_message = $1, completed_at = $2, \
+                        streamed_output = NULL WHERE id = $3",
     )
     .bind(reason)
     .bind(Utc::now())

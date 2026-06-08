@@ -178,6 +178,8 @@ pub struct RunRecord {
     pub model: String,
     pub status: String,
     pub output: String,
+    /// Live partial output while status='running' (NULL once terminal).
+    pub streamed_output: Option<String>,
     pub error_message: Option<String>,
     pub created_by: String,
     pub created_at: DateTime<Utc>,
@@ -203,7 +205,7 @@ pub async fn get_run(
 ) -> Result<Json<RunRecord>, StatusCode> {
     let row: Option<RunRecord> = sqlx::query_as(
         r#"SELECT id, workspace_id, agent_name, agent_path, model, status,
-                  output, error_message, created_by, created_at,
+                  output, streamed_output, error_message, created_by, created_at,
                   started_at, completed_at, tokens_input, tokens_output,
                   trigger, automation_id, agent_version_id, agent_version_label
              FROM run

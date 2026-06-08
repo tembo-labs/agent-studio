@@ -57,6 +57,8 @@ export type RunRecord = {
   model: string;
   status: "queued" | "running" | "succeeded" | "failed";
   output: string;
+  /** Live partial output while running (null once terminal). */
+  streamedOutput: string | null;
   errorMessage: string | null;
   createdBy: string;
   createdAt: string;
@@ -78,6 +80,7 @@ type ApiRunRecord = {
   model: string;
   status: RunRecord["status"];
   output: string;
+  streamed_output: string | null;
   error_message: string | null;
   created_by: string;
   created_at: string;
@@ -100,6 +103,7 @@ function fromApi(r: ApiRunRecord): RunRecord {
     model: r.model,
     status: r.status,
     output: r.output,
+    streamedOutput: r.streamed_output,
     errorMessage: r.error_message,
     createdBy: r.created_by,
     createdAt: r.created_at,

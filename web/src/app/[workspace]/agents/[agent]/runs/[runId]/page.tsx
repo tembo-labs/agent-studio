@@ -208,8 +208,19 @@ export default async function RunDetailPage({
         {run.status === "queued" && !run.output && (
           <p className="text-foreground-weak text-base">Waiting to start…</p>
         )}
-        {run.status === "running" && !run.output && (
+        {run.status === "running" && !run.output && !run.streamedOutput && (
           <p className="text-foreground-weak text-base">Running…</p>
+        )}
+        {/* Live partial output while the run is in flight — the page polls
+            every 1s, so this fills in as the wrapper streams text + tool
+            progress. Replaced by the authoritative `output` on completion. */}
+        {run.status === "running" && !run.output && run.streamedOutput && (
+          <div className="bg-surface-raised border-border overflow-hidden rounded-lg border">
+            <pre className="text-foreground overflow-x-auto whitespace-pre-wrap p-4 text-sm leading-6">
+              {run.streamedOutput}
+              <span className="text-foreground-muted ml-0.5 animate-pulse">▋</span>
+            </pre>
+          </div>
         )}
         {run.output && (
           <div className="bg-surface-raised border-border group relative overflow-hidden rounded-lg border">
