@@ -477,6 +477,14 @@ async function ensureGuidanceFiles(
   await ensureAdditionalInstructionsFile(token, ref);
 }
 
+/**
+ * Ensures the customer-managed additional-instructions file exists.
+ *
+ * Unlike TAS-managed guidance files, this file is created only if missing
+ * and is never updated afterward so customer customizations are preserved.
+ * Any read/create failures are treated as best-effort and are retried by
+ * future sync/commit flows.
+ */
 async function ensureAdditionalInstructionsFile(
   token: string,
   ref: RepoRef,
