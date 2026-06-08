@@ -38,6 +38,7 @@ from pydantic_ai import Agent, capture_run_messages
 
 USAGE_SENTINEL = "__TAS_USAGE__:"
 TOOLS_SENTINEL = "__TAS_TOOLS__:"
+STEPS_SENTINEL = "__TAS_STEPS__:"
 
 # Sidecar Python tools: the agent's `tools_module:` sibling source, read
 # from the repo by the web layer and handed to us via env. We exec it and
@@ -122,6 +123,82 @@ def tool_calls_payload(messages) -> list[dict]:
         else:
             out.append({"name": name, "ok": o["ok"], "error": o.get("error")})
     return out
+
+
+def _usage_field(usage_obj, *names):
+    """First non-None of `names` off a usage object, across version skew.
+
+    pydantic-ai 1.x exposes input_tokens/output_tokens/cache_*; older releases
+    used request_tokens/response_tokens. We read whatever is present.
+    """
+    if usage_obj is None:
+        return None
+    for n in names:
+        val = getattr(usage_obj, n, None)
+        if val is not None:
+            return val
+    return None
+
+
+def steps_payload(messages) -> list[dict]:
+    """Per model-request usage + the tool calls that request emitted.
+
+    One ModelResponse == one LLM request (a "step"). Each carries its own usage
+    and the ToolCallParts the model produced that turn; the call OUTCOMES
+    (ok/error) arrive in the following request's tool-return / retry-prompt
+    parts, keyed by tool_call_id — same classification as tool_calls_payload.
+    Token attribution is per step, not per individual tool_use: a step can emit
+    several tool calls that share the request's tokens. input_tokens are
+    cumulative-by-nature (each request resends the history); output_tokens are
+    what the model generated that step.
+    """
+    outcomes: dict[str, dict] = {}
+    for msg in messages or []:
+        for part in getattr(msg, "parts", None) or []:
+            kind = getattr(part, "part_kind", "") or ""
+            cid = getattr(part, "tool_call_id", None)
+            if not cid:
+                continue
+            if kind == "retry-prompt":
+                content = getattr(part, "content", "")
+                outcomes[cid] = {"ok": False, "error": str(content)[:200]}
+            elif kind.endswith("tool-return"):
+                outcomes.setdefault(cid, {"ok": True, "error": None})
+
+    steps: list[dict] = []
+    idx = 0
+    for msg in messages or []:
+        # ModelResponse.kind == "response"; ModelRequest is "request". Only
+        # responses are LLM steps with usage.
+        if getattr(msg, "kind", "") != "response":
+            continue
+        usage_obj = getattr(msg, "usage", None)
+        tools: list[dict] = []
+        for part in getattr(msg, "parts", None) or []:
+            kind = getattr(part, "part_kind", "") or ""
+            if not kind.endswith("tool-call"):
+                continue
+            name = getattr(part, "tool_name", None)
+            if not name:
+                continue
+            cid = getattr(part, "tool_call_id", None)
+            o = outcomes.get(cid) if cid else None
+            if o is None:
+                tools.append({"name": name, "ok": None})
+            else:
+                tools.append({"name": name, "ok": o["ok"], "error": o.get("error")})
+        steps.append(
+            {
+                "step": idx,
+                "input_tokens": _usage_field(usage_obj, "input_tokens", "request_tokens"),
+                "output_tokens": _usage_field(usage_obj, "output_tokens", "response_tokens"),
+                "cache_read_tokens": _usage_field(usage_obj, "cache_read_tokens"),
+                "cache_write_tokens": _usage_field(usage_obj, "cache_write_tokens"),
+                "tool_calls": tools[:200],
+            }
+        )
+        idx += 1
+    return steps[:500]
 
 
 def parse_spec(content: str, fmt: str) -> dict:
@@ -792,6 +869,11 @@ async def run(spec: dict, user_message: str) -> None:
             tool_calls = tool_calls_payload(_messages)
             if tool_calls:
                 sys.stdout.write(f"{TOOLS_SENTINEL}{json.dumps(tool_calls)}\n")
+            # Per-step usage (one row per model request) — emitted on both
+            # paths so a failed run still shows the tokens it burned.
+            steps = steps_payload(_messages)
+            if steps:
+                sys.stdout.write(f"{STEPS_SENTINEL}{json.dumps(steps)}\n")
 
     sys.stdout.write(str(result.output))
     sys.stdout.write("\n")

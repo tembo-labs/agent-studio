@@ -30,17 +30,22 @@ const PYDANTIC_PY: &str = "/opt/pydantic-ai/bin/python3";
 const PYDANTIC_SCRIPT: &str = "/usr/local/bin/run_pydantic.py";
 const USAGE_SENTINEL: &str = "__TAS_USAGE__:";
 const TOOLS_SENTINEL: &str = "__TAS_TOOLS__:";
+const STEPS_SENTINEL: &str = "__TAS_STEPS__:";
 const STALE_CONNECTION_MARKER: &str = "__TAS_STALE_CONNECTION__:";
 
 /// One tool call the agent made during the run. `ok` is `Some(true)` on a
 /// successful return, `Some(false)` on a tool error, and `None` when the
 /// call never returned (the run ended/failed first). Extracted from the
-/// wrapper's `__TAS_TOOLS__:` sentinel and persisted to `run_tool_call`.
+/// wrapper's `__TAS_TOOLS__:`/`__TAS_STEPS__:` sentinel and persisted to
+/// `run_tool_call`.
 #[derive(Debug, Clone)]
 pub struct ToolCall {
     pub name: String,
     pub ok: Option<bool>,
     pub error: Option<String>,
+    /// Which model step (0-based) emitted this call, when known. `None` for
+    /// runs from an older wrapper that only sent the flat `__TAS_TOOLS__` list.
+    pub step_ordinal: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,6 +55,34 @@ struct ToolCallJson {
     ok: Option<bool>,
     #[serde(default)]
     error: Option<String>,
+}
+
+/// One model request ("step") in a run: its token usage plus the tool calls
+/// the model emitted that turn. Extracted from the wrapper's `__TAS_STEPS__:`
+/// sentinel and persisted to `run_step`.
+#[derive(Debug, Clone)]
+pub struct RunStep {
+    pub ordinal: i32,
+    pub input_tokens: Option<i32>,
+    pub output_tokens: Option<i32>,
+    pub cache_read_tokens: Option<i32>,
+    pub cache_write_tokens: Option<i32>,
+    pub tool_calls: Vec<ToolCall>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StepJson {
+    step: i32,
+    #[serde(default)]
+    input_tokens: Option<i32>,
+    #[serde(default)]
+    output_tokens: Option<i32>,
+    #[serde(default)]
+    cache_read_tokens: Option<i32>,
+    #[serde(default)]
+    cache_write_tokens: Option<i32>,
+    #[serde(default)]
+    tool_calls: Vec<ToolCallJson>,
 }
 
 pub struct PydanticArgs<'a> {
@@ -241,15 +274,24 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
 /// records which tools it touched — the most useful case for debugging.
 /// An `Err` here is a *run* failure (non-zero exit or infra error); the
 /// caller marks the run failed, but still persists the returned tool calls.
-pub async fn invoke(args: PydanticArgs<'_>) -> (anyhow::Result<PydanticResult>, Vec<ToolCall>) {
+pub async fn invoke(
+    args: PydanticArgs<'_>,
+) -> (anyhow::Result<PydanticResult>, Vec<ToolCall>, Vec<RunStep>) {
     let output = match spawn_and_wait(&args).await {
         Ok(o) => o,
-        Err(e) => return (Err(e), Vec::new()),
+        Err(e) => return (Err(e), Vec::new(), Vec::new()),
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    let tool_calls = extract_tool_calls(&stdout);
+    // Prefer the per-step breakdown (carries token usage + step_ordinal per
+    // call); fall back to the flat tool list for output from an older wrapper.
+    let steps = extract_steps(&stdout);
+    let tool_calls = if steps.is_empty() {
+        extract_tool_calls(&stdout)
+    } else {
+        flatten_step_tool_calls(&steps)
+    };
 
     if !output.status.success() {
         // Pull out any stale-connection markers the wrapper emitted
@@ -298,6 +340,7 @@ pub async fn invoke(args: PydanticArgs<'_>) -> (anyhow::Result<PydanticResult>, 
                         .collect::<String>()
                 )),
                 tool_calls,
+                steps,
             );
         }
 
@@ -318,10 +361,11 @@ pub async fn invoke(args: PydanticArgs<'_>) -> (anyhow::Result<PydanticResult>, 
                 snippet.trim().chars().take(16_000).collect::<String>()
             )),
             tool_calls,
+            steps,
         );
     }
 
-    (Ok(parse_output(&stdout)), tool_calls)
+    (Ok(parse_output(&stdout)), tool_calls, steps)
 }
 
 #[derive(Debug, Deserialize)]
@@ -404,9 +448,10 @@ fn parse_output(stdout: &str) -> PydanticResult {
             // into the user-facing transcript.
             continue;
         }
-        // Tool-call sentinel is parsed separately (extract_tool_calls);
-        // here we just keep it out of the user-facing transcript.
-        if line.starts_with(TOOLS_SENTINEL) {
+        // Tool-call + step sentinels are parsed separately
+        // (extract_tool_calls / extract_steps); here we just keep them out of
+        // the user-facing transcript.
+        if line.starts_with(TOOLS_SENTINEL) || line.starts_with(STEPS_SENTINEL) {
             continue;
         }
         output_lines.push(line);
@@ -433,12 +478,53 @@ fn extract_tool_calls(stdout: &str) -> Vec<ToolCall> {
                         name: t.name,
                         ok: t.ok,
                         error: t.error,
+                        step_ordinal: None,
                     })
                     .collect();
             }
         }
     }
     Vec::new()
+}
+
+/// Pull the `__TAS_STEPS__:[...]` sentinel (a JSON array of per-model-request
+/// usage + the tool calls each request emitted) out of the wrapper's stdout.
+/// Absent or malformed is non-fatal — we just record no steps.
+fn extract_steps(stdout: &str) -> Vec<RunStep> {
+    for line in stdout.lines() {
+        if let Some(json_part) = line.strip_prefix(STEPS_SENTINEL) {
+            if let Ok(parsed) = serde_json::from_str::<Vec<StepJson>>(json_part) {
+                return parsed
+                    .into_iter()
+                    .map(|s| RunStep {
+                        ordinal: s.step,
+                        input_tokens: s.input_tokens,
+                        output_tokens: s.output_tokens,
+                        cache_read_tokens: s.cache_read_tokens,
+                        cache_write_tokens: s.cache_write_tokens,
+                        tool_calls: s
+                            .tool_calls
+                            .into_iter()
+                            .map(|t| ToolCall {
+                                name: t.name,
+                                ok: t.ok,
+                                error: t.error,
+                                step_ordinal: Some(s.step),
+                            })
+                            .collect(),
+                    })
+                    .collect();
+            }
+        }
+    }
+    Vec::new()
+}
+
+/// Flatten the tool calls across steps into a single call-ordered list,
+/// preserving each call's originating step_ordinal. Steps arrive in request
+/// order and their calls in emission order, so this is the run's call order.
+fn flatten_step_tool_calls(steps: &[RunStep]) -> Vec<ToolCall> {
+    steps.iter().flat_map(|s| s.tool_calls.clone()).collect()
 }
 
 #[cfg(test)]
@@ -499,5 +585,35 @@ mod tests {
     #[test]
     fn no_tools_sentinel_yields_empty() {
         assert!(extract_tool_calls("just output\n").is_empty());
+    }
+
+    #[test]
+    fn extracts_steps_with_usage_and_tool_calls() {
+        let stdout = "Done.\n\
+            __TAS_STEPS__:[\
+            {\"step\":0,\"input_tokens\":1200,\"output_tokens\":40,\
+             \"tool_calls\":[{\"name\":\"LINEAR_LIST\",\"ok\":true,\"error\":null}]},\
+            {\"step\":1,\"input_tokens\":1800,\"output_tokens\":12,\
+             \"cache_read_tokens\":900,\"tool_calls\":[]}]\n";
+        let steps = extract_steps(stdout);
+        assert_eq!(steps.len(), 2);
+        assert_eq!(steps[0].ordinal, 0);
+        assert_eq!(steps[0].input_tokens, Some(1200));
+        assert_eq!(steps[0].output_tokens, Some(40));
+        assert_eq!(steps[0].tool_calls.len(), 1);
+        assert_eq!(steps[0].tool_calls[0].name, "LINEAR_LIST");
+        assert_eq!(steps[0].tool_calls[0].step_ordinal, Some(0));
+        assert_eq!(steps[1].cache_read_tokens, Some(900));
+        // Flatten keeps call order + step linkage; step 1 had no calls.
+        let flat = flatten_step_tool_calls(&steps);
+        assert_eq!(flat.len(), 1);
+        assert_eq!(flat[0].step_ordinal, Some(0));
+        // The steps sentinel is stripped from the user-facing transcript.
+        assert_eq!(parse_output(stdout).output, "Done.");
+    }
+
+    #[test]
+    fn no_steps_sentinel_yields_empty() {
+        assert!(extract_steps("just output\n").is_empty());
     }
 }

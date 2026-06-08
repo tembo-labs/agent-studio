@@ -90,9 +90,11 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
         return;
     }
 
-    let (result, tool_calls) = run_inner(state, &ctx).await;
-    // Persist what the agent called (success or failure) before we mark the
-    // terminal state. Best-effort — a tool-log hiccup must not fail the run.
+    let (result, tool_calls, steps) = run_inner(state, &ctx).await;
+    // Persist per-step usage + what the agent called (success or failure)
+    // before we mark the terminal state. Best-effort — a logging hiccup must
+    // not fail the run.
+    persist_run_steps(state, ctx.run_id, &steps).await;
     persist_tool_calls(state, ctx.run_id, &tool_calls).await;
 
     match result {
@@ -141,7 +143,11 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
 async fn run_inner(
     state: &AppState,
     ctx: &RunContext,
-) -> (anyhow::Result<RunOutcome>, Vec<pydantic::ToolCall>) {
+) -> (
+    anyhow::Result<RunOutcome>,
+    Vec<pydantic::ToolCall>,
+    Vec<pydantic::RunStep>,
+) {
     match ctx.framework {
         Framework::CargoAi => {
             // Cargo AI still needs the provider:model split to set
@@ -156,10 +162,16 @@ async fn run_inner(
                             ctx.model
                         )),
                         Vec::new(),
+                        Vec::new(),
                     )
                 }
             };
-            (run_cargo_ai(state, ctx, provider, model).await, Vec::new())
+            // cargo-ai exposes neither per-step usage nor tool calls.
+            (
+                run_cargo_ai(state, ctx, provider, model).await,
+                Vec::new(),
+                Vec::new(),
+            )
         }
         Framework::Pydantic => run_pydantic(state, ctx).await,
     }
@@ -248,7 +260,11 @@ async fn run_cargo_ai(
 async fn run_pydantic(
     state: &AppState,
     ctx: &RunContext,
-) -> (anyhow::Result<RunOutcome>, Vec<pydantic::ToolCall>) {
+) -> (
+    anyhow::Result<RunOutcome>,
+    Vec<pydantic::ToolCall>,
+    Vec<pydantic::RunStep>,
+) {
     let spec_content = match ctx.spec_content.as_deref() {
         Some(s) => s,
         None => {
@@ -256,6 +272,7 @@ async fn run_pydantic(
                 Err(anyhow!(
                     "Pydantic run is missing the agent's raw spec content"
                 )),
+                Vec::new(),
                 Vec::new(),
             )
         }
@@ -429,10 +446,11 @@ async fn run_pydantic(
                  Settings → API keys before running an agent."
             )),
             Vec::new(),
+            Vec::new(),
         );
     }
 
-    let (result, tool_calls) = pydantic::invoke(pydantic::PydanticArgs {
+    let (result, tool_calls, steps) = pydantic::invoke(pydantic::PydanticArgs {
         spec_content,
         spec_format: ctx.spec_format.as_pydantic(),
         user_message: &ctx.user_message,
@@ -464,7 +482,7 @@ async fn run_pydantic(
             usage,
         }
     });
-    (outcome, tool_calls)
+    (outcome, tool_calls, steps)
 }
 
 // Pull the agent's reply out of cargo-ai's mixed stdout. Every line
@@ -632,17 +650,41 @@ async fn persist_tool_calls(state: &AppState, run_id: Uuid, calls: &[pydantic::T
         return;
     }
     let mut qb = sqlx::QueryBuilder::new(
-        "INSERT INTO run_tool_call (run_id, ordinal, tool_name, ok, error_message) ",
+        "INSERT INTO run_tool_call (run_id, ordinal, tool_name, ok, error_message, step_ordinal) ",
     );
     qb.push_values(calls.iter().enumerate(), |mut b, (i, c)| {
         b.push_bind(run_id)
             .push_bind(i as i32)
             .push_bind(c.name.as_str())
             .push_bind(c.ok)
-            .push_bind(c.error.as_deref());
+            .push_bind(c.error.as_deref())
+            .push_bind(c.step_ordinal);
     });
     if let Err(e) = qb.build().execute(&state.db).await {
         tracing::warn!(run_id = %run_id, ?e, "failed to persist run tool calls");
+    }
+}
+
+/// Record per-step token usage (one row per model request). Best-effort, like
+/// the tool-call log — a failure here is logged and swallowed.
+async fn persist_run_steps(state: &AppState, run_id: Uuid, steps: &[pydantic::RunStep]) {
+    if steps.is_empty() {
+        return;
+    }
+    let mut qb = sqlx::QueryBuilder::new(
+        "INSERT INTO run_step \
+         (run_id, ordinal, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens) ",
+    );
+    qb.push_values(steps.iter(), |mut b, s| {
+        b.push_bind(run_id)
+            .push_bind(s.ordinal)
+            .push_bind(s.input_tokens)
+            .push_bind(s.output_tokens)
+            .push_bind(s.cache_read_tokens)
+            .push_bind(s.cache_write_tokens);
+    });
+    if let Err(e) = qb.build().execute(&state.db).await {
+        tracing::warn!(run_id = %run_id, ?e, "failed to persist run steps");
     }
 }
 

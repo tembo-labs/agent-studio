@@ -8,13 +8,14 @@ import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listImprovementsForRun } from "@/lib/improvements-api";
 import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
 import { getRun, type RunRecord } from "@/lib/runs-api";
-import { listToolCallsForRun } from "@/lib/runs-db";
+import { listStepsForRun, listToolCallsForRun } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, isTemboConfigured } from "@/lib/workspace";
 
 import { CopyOutputButton } from "./copy-output-button";
 import { ImproveForm } from "./improve-form";
 import { RunPoller } from "./run-poller";
+import { RunSteps } from "./run-steps";
 import { ToolsUsed } from "./tools-used";
 
 export const dynamic = "force-dynamic";
@@ -46,8 +47,13 @@ export default async function RunDetailPage({
     storedImprovements,
   );
 
-  // Tools the agent called during this run (pydantic only; empty otherwise).
-  const toolCalls = await listToolCallsForRun(workspace.id, run.id);
+  // Tools the agent called during this run (pydantic only; empty otherwise),
+  // plus the per-step token usage so we can attribute tokens to the model step
+  // that fired each call.
+  const [toolCalls, steps] = await Promise.all([
+    listToolCallsForRun(workspace.id, run.id),
+    listStepsForRun(workspace.id, run.id),
+  ]);
 
   // "Improve the Agent" opens a Tembo CAP task — hide it when no Tembo
   // API key is set (the run + its output still render).
@@ -159,13 +165,22 @@ export default async function RunDetailPage({
 
       <hr className="border-[var(--color-border-weak)]" />
 
-      {toolCalls.length > 0 && (
+      {steps.length > 0 ? (
         <Section
-          title="Tools used"
-          description={`${toolCalls.length} tool call${toolCalls.length === 1 ? "" : "s"}, in order.`}
+          title="Steps"
+          description="One row per model request. Tokens are per step (a step can fire several tool calls that share its tokens) — output is what the model generated, input includes the resent history."
         >
-          <ToolsUsed calls={toolCalls} />
+          <RunSteps model={run.model} steps={steps} calls={toolCalls} />
         </Section>
+      ) : (
+        toolCalls.length > 0 && (
+          <Section
+            title="Tools used"
+            description={`${toolCalls.length} tool call${toolCalls.length === 1 ? "" : "s"}, in order.`}
+          >
+            <ToolsUsed calls={toolCalls} />
+          </Section>
+        )
       )}
 
       <Section title="Output">

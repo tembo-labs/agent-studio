@@ -677,11 +677,14 @@ export async function listAgentFailureGroups30d(
 
 // Tools an agent called during a run, in call order (pydantic runs only).
 // ok: true = returned, false = errored, null = never returned (run ended).
+// stepOrdinal links the call to the model step that emitted it (null for runs
+// recorded before per-step tracking).
 export type RunToolCall = {
   ordinal: number;
   toolName: string;
   ok: boolean | null;
   errorMessage: string | null;
+  stepOrdinal: number | null;
 };
 
 export async function listToolCallsForRun(
@@ -693,8 +696,9 @@ export async function listToolCallsForRun(
     tool_name: string;
     ok: boolean | null;
     error_message: string | null;
+    step_ordinal: number | null;
   }>(
-    `SELECT tc.ordinal, tc.tool_name, tc.ok, tc.error_message
+    `SELECT tc.ordinal, tc.tool_name, tc.ok, tc.error_message, tc.step_ordinal
        FROM run_tool_call tc
        JOIN run r ON r.id = tc.run_id
       WHERE tc.run_id = $1 AND r.workspace_id = $2
@@ -706,6 +710,46 @@ export async function listToolCallsForRun(
     toolName: r.tool_name,
     ok: r.ok,
     errorMessage: r.error_message,
+    stepOrdinal: r.step_ordinal,
+  }));
+}
+
+// Per model-request token usage for a run, in step order (pydantic runs only).
+// input_tokens are cumulative-by-nature (each request resends the history);
+// output_tokens are what the model generated that step.
+export type RunStep = {
+  ordinal: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+};
+
+export async function listStepsForRun(
+  workspaceId: string,
+  runId: string,
+): Promise<RunStep[]> {
+  const { rows } = await db.query<{
+    ordinal: number;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    cache_read_tokens: number | null;
+    cache_write_tokens: number | null;
+  }>(
+    `SELECT s.ordinal, s.input_tokens, s.output_tokens,
+            s.cache_read_tokens, s.cache_write_tokens
+       FROM run_step s
+       JOIN run r ON r.id = s.run_id
+      WHERE s.run_id = $1 AND r.workspace_id = $2
+      ORDER BY s.ordinal ASC`,
+    [runId, workspaceId],
+  );
+  return rows.map((r) => ({
+    ordinal: r.ordinal,
+    inputTokens: r.input_tokens,
+    outputTokens: r.output_tokens,
+    cacheReadTokens: r.cache_read_tokens,
+    cacheWriteTokens: r.cache_write_tokens,
   }));
 }
 
