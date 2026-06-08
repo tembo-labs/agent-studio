@@ -19,9 +19,13 @@ export default defineConfig({
         alt: "Tembo Agent Studio",
       },
       favicon: "/favicon.svg",
-      social: {
-        github: "https://github.com/tembo/agent-studio",
-      },
+      social: [
+        {
+          icon: "github",
+          label: "GitHub",
+          href: "https://github.com/tembo/agent-studio",
+        },
+      ],
       editLink: {
         baseUrl: "https://github.com/tembo/agent-studio/edit/main/docs/",
       },
