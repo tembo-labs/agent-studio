@@ -45,7 +45,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@cucumber/cucumber": "^12.9.0",
+    "@cucumber/cucumber": "^13.0.0",
     "@playwright/test": "^1.60.0",
     "@pollyjs/adapter-fetch": "^6.0.7",
     "@pollyjs/core": "^6.0.6",
