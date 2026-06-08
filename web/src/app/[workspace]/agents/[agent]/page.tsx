@@ -28,7 +28,9 @@ import {
   listRecentRunsForAgent,
   type RunSummary,
 } from "@/lib/runs-db";
+import { toolkitLabel } from "@/lib/composio-label";
 import { getPublicOrigin } from "@/lib/config";
+import { getMcpProvider } from "@/lib/mcp-providers";
 import { getServerSession } from "@/lib/session";
 import { listTriggersForAgent } from "@/lib/triggers-db";
 import { listWebhooksForAgent } from "@/lib/webhooks-db";
@@ -49,6 +51,10 @@ import { DeleteAgentButton } from "./delete-agent-button";
 import { DraftChangesBanner } from "./draft-changes-banner";
 import { PromoteButton } from "./promote-button";
 import { RunNowButton } from "./run-now-button";
+import {
+  AgentConnectionIcons,
+  type ConnectionIconItem,
+} from "./agent-connection-icons";
 import { TriggersSection } from "./triggers-section";
 import { VersionsSection } from "./versions-section";
 import { WebhooksSection } from "./webhooks-section";
@@ -81,6 +87,28 @@ export default async function AgentDetailPage({
     agent.ok && agent.spec.framework === "pydantic-agentspec"
       ? agent.spec.toolsModule
       : undefined;
+
+  // External services the agent declares, deduped by slug, for the icon row
+  // near the title. Labels resolve per substrate; the icons themselves all
+  // borrow from Composio's logo library (see agent-connection-icons.tsx).
+  const connectionIcons: ConnectionIconItem[] = [];
+  if (agent.ok && agent.spec.framework === "pydantic-agentspec") {
+    const seen = new Set<string>();
+    for (const c of agent.spec.connections) {
+      const slug = c.toolkit.trim().toLowerCase();
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      connectionIcons.push({
+        slug,
+        name: c.name,
+        label:
+          c.source === "native-mcp"
+            ? (getMcpProvider(slug)?.displayName ?? toolkitLabel(slug))
+            : toolkitLabel(slug),
+        source: c.source,
+      });
+    }
+  }
 
   const [
     recentRuns,
@@ -201,6 +229,9 @@ export default async function AgentDetailPage({
                 Invalid agent: {agent.error}
                 {agent.detail ? ` — ${agent.detail}` : ""}
               </p>
+            )}
+            {connectionIcons.length > 0 && (
+              <AgentConnectionIcons connections={connectionIcons} />
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
