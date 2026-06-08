@@ -429,15 +429,24 @@ export async function resolveAgentForDispatch(
   };
 }
 
-// Best-effort guidance-file bootstrap + refresh. For each guidance
-// file:
-//   - missing → create it
-//   - present + content matches what TAS ships  → leave it alone
-//   - present + content differs (older TAS version, hand-edit drift)
-//     → update in place with a stamped commit message
-// Network/auth failures are swallowed so a hiccup never blocks the
-// agent commit; the refresh-first protocol in cap-api will catch
-// anything we miss here.
+/**
+ * Best-effort guidance-file bootstrap and refresh.
+ *
+ * For each TAS-managed guidance file:
+ * - missing: create it
+ * - present with matching content: leave it unchanged
+ * - present with differing content (older TAS version or hand-edit drift):
+ *   update it in place with a stamped commit message
+ *
+ * Network/auth failures are intentionally swallowed so transient issues
+ * never block an agent commit; the refresh-first protocol in cap-api
+ * will catch anything missed here.
+ *
+ * @param token GitHub auth token used for repository file operations.
+ * @param ref Repository owner/name/ref context.
+ * @param framework Framework used to determine required guidance files.
+ * @returns Resolves when best-effort guidance synchronization completes.
+ */
 async function ensureGuidanceFiles(
   token: string,
   ref: RepoRef,
