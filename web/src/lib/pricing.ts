@@ -39,11 +39,7 @@ const OPENAI_RATES: Array<{ pattern: RegExp; rate: Rate }> = [
  * `provider:model-name` (e.g. `anthropic:claude-sonnet-4-6`,
  * `openai:gpt-4o-mini`).
  */
-export function estimateRunCost(
-  model: string,
-  tokensInput: number,
-  tokensOutput: number,
-): number | null {
+function lookupRate(model: string): Rate | null {
   const tables: Array<{ prefix: string; rates: typeof ANTHROPIC_RATES }> = [
     { prefix: "anthropic:", rates: ANTHROPIC_RATES },
     { prefix: "openai:", rates: OPENAI_RATES },
@@ -51,18 +47,57 @@ export function estimateRunCost(
   for (const { prefix, rates } of tables) {
     if (!model.startsWith(prefix)) continue;
     const modelName = model.slice(prefix.length);
-    const match = rates.find((r) => r.pattern.test(modelName));
-    if (!match) return null;
-    return (
-      (tokensInput * match.rate.input + tokensOutput * match.rate.output) /
-      1_000_000
-    );
+    return rates.find((r) => r.pattern.test(modelName))?.rate ?? null;
   }
   return null;
 }
 
+export function estimateRunCost(
+  model: string,
+  tokensInput: number,
+  tokensOutput: number,
+): number | null {
+  const rate = lookupRate(model);
+  if (!rate) return null;
+  return (tokensInput * rate.input + tokensOutput * rate.output) / 1_000_000;
+}
+
+/** Cost of just the input or just the output tokens, for per-direction display. */
+export function estimateTokenCost(
+  model: string,
+  tokens: number,
+  direction: "input" | "output",
+): number | null {
+  const rate = lookupRate(model);
+  if (!rate) return null;
+  return (tokens * rate[direction]) / 1_000_000;
+}
+
 export function formatTokens(n: number): string {
   return new Intl.NumberFormat("en-US").format(n);
+}
+
+/** 3-significant-figure abbreviation: 9_502 → "9.50k", 15_100 → "15.1k",
+ *  152_000 → "152k", 1_520_000 → "1.52M". Sub-1000 shows the plain number. */
+export function abbreviateTokens(n: number): string {
+  if (n < 1000) return String(n);
+  for (const [div, unit] of [
+    [1_000_000_000, "B"],
+    [1_000_000, "M"],
+    [1_000, "k"],
+  ] as const) {
+    if (n >= div) {
+      const v = n / div;
+      const s = v >= 100 ? Math.round(v).toString() : v >= 10 ? v.toFixed(1) : v.toFixed(2);
+      return `${s}${unit}`;
+    }
+  }
+  return String(n);
+}
+
+/** Cost rounded to the nearest penny, leading zero dropped: 0.048 → "$.05". */
+export function formatPenny(usd: number): string {
+  return `$${usd.toFixed(2).replace(/^0(?=\.)/, "")}`;
 }
 
 export function formatCurrency(usd: number): string {

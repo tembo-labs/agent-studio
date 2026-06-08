@@ -486,6 +486,19 @@ the task or list your steps there. Output tokens are a finite budget — \
 reasoning dumps and progress commentary waste it. If the task produces no \
 user-facing result, reply with a single short line saying so."""
 
+# Appended alongside OUTPUT_DISCIPLINE. Agents that fan out many calls to one
+# provider (e.g. running an Attio report repeatedly in parallel) get rate-limited
+# every time. The model controls parallelism by how many tool calls it emits per
+# turn, so the actionable instruction is "go sequential, and back off on 429s".
+TOOL_USE_DISCIPLINE = """\
+--- Tool use ---
+Call tools SEQUENTIALLY, not in parallel — most providers (Attio, HubSpot, etc.) \
+rate-limit, and parallel bursts get rejected. Never issue the same tool many \
+times at once: make one call, wait for its result, then the next. If a tool \
+returns a rate-limit or "retry after" error, do NOT immediately re-issue it — \
+do other useful work first, then retry that one call later, once, on its own. \
+Never retry the same failing call repeatedly in a tight loop."""
+
 
 def build_agent(
     spec: dict,
@@ -544,10 +557,16 @@ def build_agent(
             base = instructions
     else:
         base = ""
-    # Append the global output-discipline rule to whatever the agent declared
-    # (or send it alone when the agent has no instructions). Applies to every
-    # pydantic run so agents stop narrating steps and dumping tool output.
-    kwargs["instructions"] = (base + "\n\n" if base else "") + OUTPUT_DISCIPLINE
+    # Append the global output- + tool-use discipline to whatever the agent
+    # declared (or send them alone when the agent has no instructions). Applies
+    # to every pydantic run so agents stop narrating/dumping output and stop
+    # hammering rate-limited providers with parallel calls.
+    kwargs["instructions"] = (
+        (base + "\n\n" if base else "")
+        + OUTPUT_DISCIPLINE
+        + "\n\n"
+        + TOOL_USE_DISCIPLINE
+    )
     name = spec.get("name")
     if isinstance(name, str) and name.strip():
         kwargs["name"] = name

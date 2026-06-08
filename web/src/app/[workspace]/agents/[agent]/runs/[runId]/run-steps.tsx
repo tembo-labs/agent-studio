@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
+import { abbreviateTokens, estimateTokenCost, formatPenny } from "@/lib/pricing";
 import type { RunStep, RunToolCall } from "@/lib/runs-db";
 
 import { ToolProviderLogo } from "./tool-provider-logo";
@@ -12,16 +12,16 @@ import { ToolProviderLogo } from "./tool-provider-logo";
 export type ToolProviderMap = Record<string, { slug: string; label: string }>;
 
 // Shared column template so the header, step rows, and tool rows all line up.
-// Fixed widths (not auto) keep columns aligned even though each row is its own
-// grid. Columns: label · In · Out · Cost · Status.
+// Fixed widths keep columns aligned even though each row is its own grid.
+// Columns: label · In · Out · Status. In/Out each carry their own cost.
 const ROW =
-  "grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem_5rem_5.5rem] items-center gap-x-3";
+  "grid grid-cols-[minmax(0,1fr)_6rem_6rem_5.5rem] items-center gap-x-3";
 
 // Per model-step view of a run, as an aligned table. Tokens are per step (one
 // LLM request) — a step can fire several tool calls that share its tokens.
 // Input tokens include the resent conversation history (so they climb step over
-// step); output is what the model generated that step. Tool-call outcomes show
-// in the Status column under each step.
+// step); output is what the model generated that step. Each direction shows its
+// own cost; tool-call outcomes show in the Status column under each step.
 export function RunSteps({
   model,
   steps,
@@ -49,16 +49,11 @@ export function RunSteps({
         <span>Step</span>
         <span className="text-right">In</span>
         <span className="text-right">Out</span>
-        <span className="text-right">Cost</span>
         <span className="text-right">Status</span>
       </div>
 
       {steps.map((s, i) => {
         const stepCalls = callsByStep.get(s.ordinal) ?? [];
-        const cost =
-          s.inputTokens !== null && s.outputTokens !== null
-            ? estimateRunCost(model, s.inputTokens, s.outputTokens)
-            : null;
         return (
           <Fragment key={s.ordinal}>
             <div
@@ -67,20 +62,18 @@ export function RunSteps({
               <span className="text-foreground truncate text-sm font-medium">
                 Step {s.ordinal + 1}
               </span>
-              <span className="text-foreground-weak text-right text-xs tabular-nums">
-                {s.inputTokens !== null ? formatTokens(s.inputTokens) : "—"}
-              </span>
-              <span className="text-foreground text-right text-xs font-medium tabular-nums">
-                {s.outputTokens !== null ? formatTokens(s.outputTokens) : "—"}
-              </span>
-              <span className="text-foreground-weak text-right text-xs tabular-nums">
-                {cost !== null ? `~${formatCurrency(cost)}` : "—"}
-              </span>
+              <TokenCell model={model} tokens={s.inputTokens} direction="input" />
+              <TokenCell
+                model={model}
+                tokens={s.outputTokens}
+                direction="output"
+                emphasize
+              />
               <span />
             </div>
 
             {s.summary && (
-              <p className="text-foreground-weak px-3 pb-1.5 text-xs italic leading-4">
+              <p className="text-foreground-weak px-3 pb-1.5 text-sm italic leading-5">
                 {s.summary}
               </p>
             )}
@@ -98,7 +91,6 @@ export function RunSteps({
                         {c.toolName}
                       </code>
                     </span>
-                    <span />
                     <span />
                     <span />
                     <span className="flex justify-end">
@@ -129,5 +121,33 @@ export function RunSteps({
         );
       })}
     </div>
+  );
+}
+
+// One In/Out cell: abbreviated token count + its own cost, right-aligned.
+function TokenCell({
+  model,
+  tokens,
+  direction,
+  emphasize,
+}: {
+  model: string;
+  tokens: number | null;
+  direction: "input" | "output";
+  emphasize?: boolean;
+}) {
+  if (tokens === null) {
+    return <span className="text-foreground-muted text-right text-xs">—</span>;
+  }
+  const cost = estimateTokenCost(model, tokens, direction);
+  return (
+    <span className="text-right text-xs tabular-nums">
+      <span className={emphasize ? "text-foreground font-medium" : "text-foreground-weak"}>
+        {abbreviateTokens(tokens)}
+      </span>
+      {cost !== null && (
+        <span className="text-foreground-muted"> ~{formatPenny(cost)}</span>
+      )}
+    </span>
   );
 }
