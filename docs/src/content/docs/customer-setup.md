@@ -1,5 +1,5 @@
 ---
-title: Customer setup — from zero
+title: Setup checklist
 description: Everything a new customer needs to procure and do to stand up a working Tembo Agent Studio instance, starting from nothing.
 ---
 

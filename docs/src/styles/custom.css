@@ -1,7 +1,12 @@
 /* Checklists (markdown task lists, `- [ ] …`).
    Default rendering shows a bullet *and* a checkbox; this turns them into a
-   clean checklist — one tidy checkbox per row, no redundant bullet, with light
-   dividers so a long list (e.g. Customer setup) reads as steps. */
+   clean checklist — one tidy checkbox in the gutter per row, no redundant
+   bullet, light dividers so a long list (e.g. Setup checklist) reads as steps.
+
+   IMPORTANT: the row stays in normal block flow. Do NOT use `display:flex` on
+   the <li> — its content is mixed inline nodes (bold, code, links, text), and
+   flex would lay each one out as its own column. Instead the checkbox is
+   absolutely positioned in a left gutter and the text wraps as a paragraph. */
 
 .sl-markdown-content ul.contains-task-list {
   list-style: none;
@@ -9,17 +14,17 @@
   margin-block: 1rem;
 }
 
-/* Nested checklists (a sub-step under an item) keep an indent but no divider. */
+/* Nested checklist (a sub-step under an item): indent, no divider above. */
 .sl-markdown-content ul.contains-task-list ul.contains-task-list {
-  margin-block: 0.4rem 0;
-  padding-inline-start: 1.6rem;
+  margin-block: 0.45rem 0;
+  padding-inline-start: 1.9rem;
 }
 
 .sl-markdown-content li.task-list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  padding-block: 0.4rem;
+  position: relative;
+  list-style: none;
+  padding-inline-start: 1.9rem;
+  padding-block: 0.45rem;
   margin-block: 0;
 }
 
@@ -28,10 +33,11 @@
 }
 
 .sl-markdown-content li.task-list-item > input[type="checkbox"] {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0.6em;
   margin: 0;
-  margin-block-start: 0.3em;
   inline-size: 1.05em;
   block-size: 1.05em;
-  flex-shrink: 0;
   accent-color: var(--sl-color-accent);
 }
