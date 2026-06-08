@@ -21,7 +21,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # Pin explicitly: action-setup looks for `packageManager` in the
       # repo-root package.json, but ours lives in web/. Keep in sync with
       # web/package.json's packageManager field.
@@ -48,7 +48,7 @@ jobs:
       run:
         working-directory: api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt

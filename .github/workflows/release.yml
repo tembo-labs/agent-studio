@@ -48,7 +48,7 @@ jobs:
             context: ./web
     steps:
       - name: Check out the tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
@@ -151,7 +151,7 @@ jobs:
       pull-requests: write # open the PR
     steps:
       - name: Check out main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: main
 
