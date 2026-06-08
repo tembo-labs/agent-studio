@@ -23,14 +23,19 @@ export function AutomationsSection({
   const newHref = `/${workspaceSlug}/automations/new?agent=${encodeURIComponent(agentName)}`;
   return (
     <Section
-      title="Automations"
+      collapsible
+      title={
+        automations.length > 0
+          ? `Automations (${automations.length})`
+          : "Automations"
+      }
       description="Schedules that fire this agent on their own. Cron is UTC; times shown are local."
-      actions={
+    >
+      <div className="mb-3">
         <Button asChild variant="secondary">
           <Link href={newHref}>New automation</Link>
         </Button>
-      }
-    >
+      </div>
       {automations.length === 0 ? (
         <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
           No automations yet. Click{" "}
