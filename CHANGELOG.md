@@ -12,6 +12,35 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.11] — HubSpot via Native MCP (bring-your-own OAuth app) — shipped 2026-06-08
+
+### Added
+- **HubSpot as a Native MCP provider** (`https://mcp.hubspot.com`). HubSpot
+  doesn't support auto-registration (DCR) and uses a confidential OAuth client,
+  so this adds a **"bring-your-own OAuth app"** mode to Native MCP — generic for
+  any future non-DCR provider:
+  - `McpProvider.authMode` (`dcr` | `manual`); manual providers run a
+    confidential PKCE flow with an admin-stored client_id/secret instead of
+    self-registering a public client.
+  - An admin **Configure OAuth app** card on **Connections → Native MCP** shows
+    the redirect URI to register and stores the client_id/secret (encrypted);
+    the per-user **Connect** button is gated until it's configured.
+  - Token refresh presents the confidential client_secret for these
+    connections. *(migration 0041 `workspace_native_oauth_client`)*
+
+  To use it: create a HubSpot MCP auth app with redirect URI
+  `<origin>/api/connections/native/hubspot/callback`, paste its client_id/secret
+  under Connections → Native MCP, then Connect and reference
+  `{ type: hubspot, source: native-mcp }` in an agent.
+
+### Changed
+- **Automations** collapses by default on the agent Automation tab (matching
+  Triggers + External webhooks), with a count in the title.
+
+### Migrations
+- `0041_workspace_native_oauth_client` (per-workspace BYO OAuth client for manual
+  Native MCP providers). Applied on api boot.
+
 ## [v2026.6.10] — Agent view redesign + run-time connection guard — shipped 2026-06-08
 
 The agent page was a long vertical stack; it's now a focused, Settings-style
