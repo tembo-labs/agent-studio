@@ -14,6 +14,10 @@ import {
   setTriggerEnabledRemote,
 } from "@/lib/composio";
 import { getComposioConnectionById } from "@/lib/composio-connections";
+import {
+  findMissingConnections,
+  missingConnectionsMessage,
+} from "@/lib/connection-checks";
 import { createRun } from "@/lib/runs-api";
 import {
   getAgentOwner,
@@ -148,6 +152,20 @@ export async function runNowAction(
     return { error: dispatch.error.message };
   }
   const r = dispatch.resolved;
+
+  // Pre-flight: don't start a run the acting user can't complete. Without an
+  // active connection for each declared service the wrapper fails mid-run with
+  // a traceback — block it here with an actionable message instead.
+  const missing = await findMissingConnections(
+    workspace.id,
+    actingUserId,
+    r.connections,
+  );
+  if (missing.length > 0) {
+    return {
+      error: missingConnectionsMessage(missing, actingUserId === userId),
+    };
+  }
 
   let runId: string;
   try {

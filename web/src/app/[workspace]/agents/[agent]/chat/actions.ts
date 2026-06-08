@@ -16,6 +16,10 @@ import {
   improvementMarker,
   setImprovementTask,
 } from "@/lib/improvements-api";
+import {
+  findMissingConnections,
+  missingConnectionsMessage,
+} from "@/lib/connection-checks";
 import { createRun } from "@/lib/runs-api";
 import {
   getWorkspaceRepo,
@@ -190,6 +194,19 @@ export async function sendToAgentAction(args: {
       ok: false,
       error: `Agent declares tools_module "${spec.toolsModule}" but it couldn't be loaded from the repo.`,
     };
+  }
+
+  // Pre-flight the connections, same as Run-now — block instead of failing
+  // mid-run when the user hasn't set up a declared service.
+  if (spec.framework === "pydantic-agentspec") {
+    const missing = await findMissingConnections(
+      workspace.id,
+      userId,
+      spec.connections,
+    );
+    if (missing.length > 0) {
+      return { ok: false, error: missingConnectionsMessage(missing, true) };
+    }
   }
 
   try {

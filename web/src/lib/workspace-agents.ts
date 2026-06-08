@@ -4,6 +4,7 @@ import {
   detectFormat,
   parseAgentContent,
   parseAgentFile,
+  type AgentConnection,
   type AgentFileFormat,
   type AgentSpec,
   type Framework,
@@ -305,6 +306,9 @@ export type ResolvedDispatch = {
    *  module is read live from the default branch (not snapshotted with
    *  the version yet); a declared-but-missing module fails resolution. */
   toolsModuleContent?: string;
+  /** External services the agent declares (Pydantic only; [] otherwise).
+   *  Used to pre-flight the acting user's connections before a run. */
+  connections: AgentConnection[];
 };
 
 export type ResolveDispatchError =
@@ -369,6 +373,11 @@ export async function resolveAgentForDispatch(
           versionId: stable.id,
           versionLabel: `v${stable.versionNumber}`,
           toolsModuleContent: stableMod.content,
+          connections:
+            stableParsed.ok &&
+            stableParsed.spec.framework === "pydantic-agentspec"
+              ? stableParsed.spec.connections
+              : [],
         },
       };
     }
@@ -432,6 +441,8 @@ export async function resolveAgentForDispatch(
       versionId: null,
       versionLabel: "draft",
       toolsModuleContent: mod.content,
+      connections:
+        spec.framework === "pydantic-agentspec" ? spec.connections : [],
     },
   };
 }
