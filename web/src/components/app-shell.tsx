@@ -75,6 +75,26 @@ export async function AppShell({
   const isInstanceAdmin = isInstanceAdminEmail(user.email);
   const home = `/${workspace.slug}`;
 
+  // Collapse missing-connection alerts by the connection itself (substrate +
+  // toolkit + slot). One HubSpot app needed by three agents is a single card
+  // ("HubSpot for 3 agents"), not three identical ones stacked in the rail.
+  const groupedMissing = (() => {
+    const groups = new Map<
+      string,
+      { rep: MissingConnection; agentNames: string[] }
+    >();
+    for (const m of missingConnections) {
+      const key = `${m.source}:${m.toolkit}:${m.name}`;
+      const g = groups.get(key);
+      if (g) {
+        if (!g.agentNames.includes(m.agentName)) g.agentNames.push(m.agentName);
+      } else {
+        groups.set(key, { rep: m, agentNames: [m.agentName] });
+      }
+    }
+    return [...groups.values()];
+  })();
+
   return (
     <div className="bg-surface flex min-h-screen">
       {/* sticky h-screen so the sidebar stays put while the main
@@ -151,7 +171,7 @@ export async function AppShell({
                   </div>
                 );
               })}
-              {missingConnections.map((m, i) => {
+              {groupedMissing.map(({ rep: m, agentNames }) => {
                 // Authorize endpoint differs per substrate: Composio
                 // is one route per workspace (toolkit in query
                 // string), Native MCP is one route per provider
@@ -196,7 +216,7 @@ export async function AppShell({
                     : providerLabel;
                 return (
                   <div
-                    key={`${m.toolkit}:${m.name}:${m.agentName}:${i}`}
+                    key={`${m.source}:${m.toolkit}:${m.name}`}
                     className="flex items-start gap-2 rounded-md px-2 py-2 bg-[var(--color-sentiment-caution-subtle)]"
                   >
                     <IconExclamationTriangle
@@ -207,7 +227,13 @@ export async function AppShell({
                       <span className="text-sm leading-tight text-[var(--color-foreground-sentiment-caution)]">
                         <span className="font-semibold">{labelWithSlot}</span>{" "}
                         for{" "}
-                        <span className="font-semibold">{m.agentName}</span>
+                        {agentNames.length === 1 ? (
+                          <span className="font-semibold">{agentNames[0]}</span>
+                        ) : (
+                          <span className="font-semibold">
+                            {agentNames.length} agents
+                          </span>
+                        )}
                       </span>
                       <Button asChild variant="orange" size="small">
                         <Link href={authorizeHref}>
