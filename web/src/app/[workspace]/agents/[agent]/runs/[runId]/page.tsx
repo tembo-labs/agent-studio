@@ -7,6 +7,9 @@ import { Section } from "@/components/section";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listImprovementsForRun } from "@/lib/improvements-api";
 import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
+import { toolkitLabel } from "@/lib/composio-label";
+import { getMcpProvider } from "@/lib/mcp-providers";
+import { listWorkspaceToolProviders } from "@/lib/mcp-tools";
 import { getRun, type RunRecord } from "@/lib/runs-api";
 import { listStepsForRun, listToolCallsForRun } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
@@ -50,10 +53,23 @@ export default async function RunDetailPage({
   // Tools the agent called during this run (pydantic only; empty otherwise),
   // plus the per-step token usage so we can attribute tokens to the model step
   // that fired each call.
-  const [toolCalls, steps] = await Promise.all([
+  const [toolCalls, steps, toolProviderRows] = await Promise.all([
     listToolCallsForRun(workspace.id, run.id),
     listStepsForRun(workspace.id, run.id),
+    listWorkspaceToolProviders(workspace.id),
   ]);
+
+  // tool_name → provider (slug for the logo + label for the tooltip). First
+  // row wins on the rare slug collision across providers.
+  const toolProviders: Record<string, { slug: string; label: string }> = {};
+  for (const t of toolProviderRows) {
+    if (toolProviders[t.slug]) continue;
+    const label =
+      t.source === "native-mcp"
+        ? (getMcpProvider(t.provider)?.displayName ?? toolkitLabel(t.provider))
+        : toolkitLabel(t.provider);
+    toolProviders[t.slug] = { slug: t.provider, label };
+  }
 
   // "Improve the Agent" opens a Tembo CAP task — hide it when no Tembo
   // API key is set (the run + its output still render).
@@ -170,7 +186,12 @@ export default async function RunDetailPage({
           title="Steps"
           description="One row per model request. Tokens are per step (a step can fire several tool calls that share its tokens) — output is what the model generated, input includes the resent history."
         >
-          <RunSteps model={run.model} steps={steps} calls={toolCalls} />
+          <RunSteps
+            model={run.model}
+            steps={steps}
+            calls={toolCalls}
+            toolProviders={toolProviders}
+          />
         </Section>
       ) : (
         toolCalls.length > 0 && (

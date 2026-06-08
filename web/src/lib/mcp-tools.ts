@@ -86,6 +86,34 @@ export async function listToolsForUser(
 }
 
 /**
+ * Distinct tool-slug → (source, provider) across the whole workspace's tool
+ * cache, for resolving a run's recorded tool_name to the provider whose logo
+ * to show. Workspace-wide (not per-user) because a tool slug maps to the same
+ * provider regardless of who connected it; this also covers runs whose acting
+ * user differs from the viewer. Slug collisions across providers are rare; the
+ * caller takes the first.
+ */
+export async function listWorkspaceToolProviders(
+  workspaceId: string,
+): Promise<{ slug: string; source: McpToolSource; provider: string }[]> {
+  const { rows } = await db.query<{
+    slug: string;
+    source: string;
+    provider: string;
+  }>(
+    `SELECT DISTINCT slug, source, provider
+       FROM workspace_mcp_tool
+      WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  return rows.map((r) => ({
+    slug: r.slug,
+    source: r.source as McpToolSource,
+    provider: r.provider,
+  }));
+}
+
+/**
  * Tools for one specific connection slot. Used by the per-row
  * expand affordance on Connections so each row can render its own
  * count + list without scanning the full per-user set in JS.

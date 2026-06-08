@@ -2,6 +2,13 @@ import { Badge } from "@/components/ui/badge";
 import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
 import type { RunStep, RunToolCall } from "@/lib/runs-db";
 
+import { ToolProviderLogo } from "./tool-provider-logo";
+
+// Resolved provider for a tool name, keyed by run_tool_call.tool_name. `slug`
+// is the provider slug used for the logo (e.g. "attio"); `label` is its
+// display name for the tooltip.
+export type ToolProviderMap = Record<string, { slug: string; label: string }>;
+
 // Per model-step view of a run: one row per LLM request, showing the tokens it
 // used and the tool calls it emitted. Token usage is per step (one API
 // request), not per individual tool_use — a step can fire several tool calls
@@ -12,10 +19,12 @@ export function RunSteps({
   model,
   steps,
   calls,
+  toolProviders = {},
 }: {
   model: string;
   steps: RunStep[];
   calls: RunToolCall[];
+  toolProviders?: ToolProviderMap;
 }) {
   const callsByStep = new Map<number, RunToolCall[]>();
   for (const c of calls) {
@@ -59,12 +68,22 @@ export function RunSteps({
             </div>
             {stepCalls.length > 0 && (
               <ul className="flex flex-col gap-1 border-l border-[var(--color-border)] pl-3">
-                {stepCalls.map((c) => (
+                {stepCalls.map((c) => {
+                  const tp = toolProviders[c.toolName];
+                  return (
                   <li key={c.ordinal} className="flex flex-col gap-0.5">
                     <div className="flex items-center justify-between gap-2">
-                      <code className="text-foreground-weak truncate text-xs">
-                        {c.toolName}
-                      </code>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        {tp && (
+                          <ToolProviderLogo
+                            providerSlug={tp.slug}
+                            title={tp.label}
+                          />
+                        )}
+                        <code className="text-foreground-weak truncate text-xs">
+                          {c.toolName}
+                        </code>
+                      </span>
                       {c.ok === true ? (
                         <Badge variant="green" size="small">
                           ok
@@ -85,7 +104,8 @@ export function RunSteps({
                       </p>
                     )}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </li>
