@@ -13,7 +13,7 @@ import {
 } from "@/lib/native-mcp-providers-admin";
 import { listNativeOAuthClients } from "@/lib/native-oauth-clients";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug, getWorkspaceRole } from "@/lib/workspace";
+import { getWorkspaceBySlug } from "@/lib/workspace";
 
 import {
   NativeMcpConnectionsSection,
@@ -51,13 +51,12 @@ export default async function NativeMcpConnectionsPage({
     requestedUser,
   );
 
-  const [nativeConnections, allTools, oauthClients, enableMap, currentUserRole] =
+  const [nativeConnections, allTools, oauthClients, enableMap] =
     await Promise.all([
       listNativeConnectionsForUser(workspace.id, view.userId),
       listToolsForUser(workspace.id, view.userId),
       listNativeOAuthClients(workspace.id),
       getProviderEnableMap(workspace.id),
-      getWorkspaceRole(workspace.id, session.user.id),
     ]);
 
   // Slice the user's tools by source + provider + connection_name into rows.
@@ -159,8 +158,6 @@ export default async function NativeMcpConnectionsPage({
         }
       : undefined;
 
-  const isAdmin = currentUserRole === "workspace_admin";
-
   return (
     <>
       {view.viewingOther && view.viewedMember && (
@@ -182,7 +179,6 @@ export default async function NativeMcpConnectionsPage({
         manualConnect={view.viewingOther ? [] : manualConnect}
         banner={banner}
         viewingOther={view.viewingOther}
-        isAdmin={isAdmin}
       />
     </>
   );

@@ -76,7 +76,7 @@ export default async function ConnectionsLayout({
       <hr className="border-[var(--color-border-weak)]" />
 
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-10">
-        <ConnectionsNav workspaceSlug={workspace.slug} />
+        <ConnectionsNav workspaceSlug={workspace.slug} isAdmin={isAdmin} />
         <div className="flex min-w-0 flex-1 flex-col gap-6">{children}</div>
       </div>
     </div>

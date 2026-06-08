@@ -8,15 +8,31 @@ import { usePathname } from "next/navigation";
 // the second slot since the catalog is small today but will grow as
 // more providers ship official MCP servers.
 
-type Item = { slug: string; label: string };
+type SubItem = { slug: string; label: string };
+type Item = {
+  slug: string;
+  label: string;
+  /** Indented child links shown only to workspace admins. */
+  adminSub?: SubItem[];
+};
 
 const ITEMS: Item[] = [
-  { slug: "native-mcp", label: "Native MCP" },
+  {
+    slug: "native-mcp",
+    label: "Native MCP",
+    adminSub: [{ slug: "native-mcp/admin", label: "Manage providers" }],
+  },
   { slug: "composio", label: "Composio" },
   { slug: "secrets", label: "Secrets" },
 ];
 
-export function ConnectionsNav({ workspaceSlug }: { workspaceSlug: string }) {
+export function ConnectionsNav({
+  workspaceSlug,
+  isAdmin = false,
+}: {
+  workspaceSlug: string;
+  isAdmin?: boolean;
+}) {
   const pathname = usePathname();
   const base = `/${workspaceSlug}/connections`;
 
@@ -25,13 +41,20 @@ export function ConnectionsNav({ workspaceSlug }: { workspaceSlug: string }) {
       aria-label="Connection substrates"
       className="flex w-full shrink-0 flex-row gap-1 overflow-x-auto sm:w-52 sm:flex-col"
     >
-      {ITEMS.map((item) => {
+      {ITEMS.flatMap((item) => {
         const href = `${base}/${item.slug}`;
+        const subs = isAdmin && item.adminSub ? item.adminSub : [];
+        // A child route is active → keep the parent un-bolded so only one
+        // row reads as current.
+        const onSub = subs.some((s) =>
+          pathname.startsWith(`${base}/${s.slug}`),
+        );
         const isActive =
-          pathname === href ||
-          pathname.startsWith(`${href}/`) ||
-          (pathname === base && item.slug === "native-mcp");
-        return (
+          !onSub &&
+          (pathname === href ||
+            pathname.startsWith(`${href}/`) ||
+            (pathname === base && item.slug === "native-mcp"));
+        return [
           <Link
             key={item.slug}
             href={href}
@@ -42,8 +65,26 @@ export function ConnectionsNav({ workspaceSlug }: { workspaceSlug: string }) {
             }
           >
             {item.label}
-          </Link>
-        );
+          </Link>,
+          ...subs.map((s) => {
+            const subHref = `${base}/${s.slug}`;
+            const subActive =
+              pathname === subHref || pathname.startsWith(`${subHref}/`);
+            return (
+              <Link
+                key={s.slug}
+                href={subHref}
+                className={
+                  subActive
+                    ? "bg-surface-secondary text-foreground rounded-md px-3 py-1.5 text-sm font-medium sm:ml-3"
+                    : "text-foreground-weak hover:bg-surface hover:text-foreground rounded-md px-3 py-1.5 text-sm sm:ml-3"
+                }
+              >
+                {s.label}
+              </Link>
+            );
+          }),
+        ];
       })}
     </nav>
   );

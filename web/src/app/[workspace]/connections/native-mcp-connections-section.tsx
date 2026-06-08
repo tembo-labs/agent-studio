@@ -51,8 +51,6 @@ type Props = {
   };
   /** Admin viewing another member: rename + refresh only. */
   viewingOther?: boolean;
-  /** Whether to show the admin "Manage providers" link (workspace admin). */
-  isAdmin?: boolean;
 };
 
 export function NativeMcpConnectionsSection({
@@ -62,22 +60,11 @@ export function NativeMcpConnectionsSection({
   manualConnect,
   banner,
   viewingOther = false,
-  isAdmin = false,
 }: Props) {
   return (
     <Section
       title="Native MCP connections"
       description="TAS-managed OAuth + direct connection to each provider's official MCP server. Richer than the wrapped REST surface — providers expose aggregations, schema-aware operations, and the tools they actually optimized for LLMs."
-      actions={
-        isAdmin ? (
-          <Link
-            href={`/${workspaceSlug}/connections/native-mcp/admin`}
-            className="text-foreground hover:text-foreground-title text-sm font-medium hover:underline"
-          >
-            Manage providers
-          </Link>
-        ) : undefined
-      }
     >
       <div className="flex flex-col gap-4">
         {banner && (
