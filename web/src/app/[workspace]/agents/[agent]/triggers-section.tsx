@@ -35,7 +35,8 @@ export function TriggersSection({
 }: Props) {
   return (
     <Section
-      title="Triggers"
+      collapsible
+      title={triggers.length > 0 ? `Triggers (${triggers.length})` : "Triggers"}
       description="Events from connected services that fire this agent. Composio handles the per-provider subscription; TAS receives a signed webhook and queues a run."
     >
       {!composioApiKeyConfigured && (

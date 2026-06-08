@@ -54,7 +54,12 @@ export function WebhooksSection({
 }: Props) {
   return (
     <Section
-      title="External webhooks"
+      collapsible
+      title={
+        webhooks.length > 0
+          ? `External webhooks (${webhooks.length})`
+          : "External webhooks"
+      }
       description="Inbound HTTP endpoints that fire this agent from an outside system (e.g. Clay). The caller POSTs JSON with an Authorization: Bearer token; TAS queues a run and passes the body to the agent."
     >
       <div className="flex flex-col gap-4">
