@@ -90,9 +90,16 @@ async function readToolsModuleContent(
 }
 
 /**
- * Strict load used at dispatch time. No declared module → ok with no
- * content. Declared but unreadable → error (the spec asked for it, so we
- * fail the run loudly rather than silently dropping the agent's tools).
+ * Strictly loads a declared tools module at dispatch time.
+ * If no module is declared, returns success with no content.
+ * If a module is declared but cannot be read, returns an error instead of
+ * silently dropping tools.
+ *
+ * @param workspaceId Workspace identifier used to resolve repo and token.
+ * @param agentPath Path to the agent spec file in the repository.
+ * @param toolsModule Optional tools module filename declared by the spec.
+ * @returns `{ ok: true, content?: string }` when loading is not required or succeeds;
+ * otherwise `{ ok: false, detail: string }` with a user-facing failure reason.
  */
 async function loadDispatchToolsModule(
   workspaceId: string,
@@ -429,15 +436,24 @@ export async function resolveAgentForDispatch(
   };
 }
 
-// Best-effort guidance-file bootstrap + refresh. For each guidance
-// file:
-//   - missing → create it
-//   - present + content matches what TAS ships  → leave it alone
-//   - present + content differs (older TAS version, hand-edit drift)
-//     → update in place with a stamped commit message
-// Network/auth failures are swallowed so a hiccup never blocks the
-// agent commit; the refresh-first protocol in cap-api will catch
-// anything we miss here.
+/**
+ * Best-effort guidance-file bootstrap and refresh.
+ *
+ * For each TAS-managed guidance file:
+ * - missing: create it
+ * - present with matching content: leave it unchanged
+ * - present with differing content (older TAS version or hand-edit drift):
+ *   update it in place with a stamped commit message
+ *
+ * Network/auth failures are intentionally swallowed so transient issues
+ * never block an agent commit; the refresh-first protocol in cap-api
+ * will catch anything missed here.
+ *
+ * @param token GitHub auth token used for repository file operations.
+ * @param ref Repository owner/name/ref context.
+ * @param framework Framework used to determine required guidance files.
+ * @returns Resolves when best-effort guidance synchronization completes.
+ */
 async function ensureGuidanceFiles(
   token: string,
   ref: RepoRef,
@@ -477,6 +493,14 @@ async function ensureGuidanceFiles(
   await ensureAdditionalInstructionsFile(token, ref);
 }
 
+/**
+ * Ensures the customer-managed additional-instructions file exists.
+ *
+ * Unlike TAS-managed guidance files, this file is created only if missing
+ * and is never updated afterward so customer customizations are preserved.
+ * Any read/create failures are treated as best-effort and are retried by
+ * future sync/commit flows.
+ */
 async function ensureAdditionalInstructionsFile(
   token: string,
   ref: RepoRef,
