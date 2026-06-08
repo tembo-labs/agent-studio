@@ -1,14 +1,15 @@
 import { Section } from "@/components/section";
-import { listRecentRunsForAgent } from "@/lib/runs-db";
+import { listRunsForWorkspace } from "@/lib/runs-db";
 
+import { RunsList } from "../../../runs/runs-list";
+import { toLoaded } from "../../../runs/shape";
 import { loadAgentContext } from "../agent-page-context";
-import { RecentRuns } from "../recent-runs";
 
 export const dynamic = "force-dynamic";
 
-// Runs tab — the agent's recent run history. Each row links to the run detail.
-
-const RUNS_LIMIT = 25;
+// Runs tab — the agent's run history, using the same table as the workspace
+// Runs page (minus the Agent + Input columns and the Agent filter), scoped to
+// this agent. Keeps the status/trigger/search filters + pagination.
 
 export default async function AgentRunsPage({
   params,
@@ -18,25 +19,18 @@ export default async function AgentRunsPage({
   const { workspace: slug, agent: agentName } = await params;
   const { workspace, canonicalName } = await loadAgentContext(slug, agentName);
 
-  const runs = await listRecentRunsForAgent(
-    workspace.id,
-    canonicalName,
-    RUNS_LIMIT,
-  );
+  const runs = await listRunsForWorkspace(workspace.id, {
+    agentName: canonicalName,
+  });
 
   return (
-    <Section
-      title="Runs"
-      description={
-        runs.length === 0
-          ? undefined
-          : `The ${runs.length} most recent run${runs.length === 1 ? "" : "s"}.`
-      }
-    >
-      <RecentRuns
-        runs={runs}
+    <Section title="Runs" description="This agent's run history.">
+      <RunsList
         workspaceSlug={workspace.slug}
-        agentName={canonicalName}
+        agentNames={[]}
+        initial={runs.map(toLoaded)}
+        initialFilters={{ agentName: canonicalName }}
+        lockedAgent={canonicalName}
       />
     </Section>
   );

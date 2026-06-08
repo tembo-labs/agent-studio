@@ -56,6 +56,12 @@ type Props = {
     agentName?: string;
     search?: string;
   };
+  /**
+   * When set, the list is scoped to a single agent: the Agent filter and the
+   * Agent + Input columns are hidden (the per-agent Runs tab). Loads always
+   * filter to this agent.
+   */
+  lockedAgent?: string;
 };
 
 export function RunsList({
@@ -63,8 +69,10 @@ export function RunsList({
   agentNames,
   initial,
   initialFilters,
+  lockedAgent,
 }: Props) {
   const router = useRouter();
+  const agentScoped = Boolean(lockedAgent);
 
   const [statuses, setStatuses] = useState<RunStatus[]>(
     initialFilters?.statuses ?? [],
@@ -73,7 +81,7 @@ export function RunsList({
     initialFilters?.triggers ?? [],
   );
   const [agentName, setAgentName] = useState<string>(
-    initialFilters?.agentName ?? "",
+    lockedAgent ?? initialFilters?.agentName ?? "",
   );
   const [search, setSearch] = useState<string>(initialFilters?.search ?? "");
 
@@ -210,18 +218,20 @@ export function RunsList({
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide">
-            Agent
-          </span>
-          <Select
-            value={agentName}
-            onValueChange={setAgentName}
-            options={agentOptions}
-            ariaLabel="Filter by agent"
-            className="min-w-[200px]"
-          />
-        </div>
+        {!agentScoped && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-foreground-weak w-20 shrink-0 text-sm uppercase tracking-wide">
+              Agent
+            </span>
+            <Select
+              value={agentName}
+              onValueChange={setAgentName}
+              options={agentOptions}
+              ariaLabel="Filter by agent"
+              className="min-w-[200px]"
+            />
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <label
@@ -259,9 +269,13 @@ export function RunsList({
             <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Status</th>
-                <th className="px-3 py-2 text-left font-medium">Agent</th>
+                {!agentScoped && (
+                  <th className="px-3 py-2 text-left font-medium">Agent</th>
+                )}
                 <th className="px-3 py-2 text-left font-medium">Source</th>
-                <th className="px-3 py-2 text-left font-medium">Input</th>
+                {!agentScoped && (
+                  <th className="px-3 py-2 text-left font-medium">Input</th>
+                )}
                 <th className="px-3 py-2 text-left font-medium">Queued</th>
                 <th className="px-3 py-2 text-left font-medium">Duration</th>
                 <th className="px-3 py-2 text-left font-medium">Cost</th>
@@ -273,6 +287,7 @@ export function RunsList({
                   key={r.id}
                   run={r}
                   workspaceSlug={workspaceSlug}
+                  agentScoped={agentScoped}
                   maxDurationMs={maxDurationMs}
                   maxCostUsd={maxCostUsd}
                   onNavigate={(href) => router.push(href)}
@@ -302,12 +317,14 @@ export function RunsList({
 function RunRow({
   run,
   workspaceSlug,
+  agentScoped,
   maxDurationMs,
   maxCostUsd,
   onNavigate,
 }: {
   run: LoadedRun;
   workspaceSlug: string;
+  agentScoped: boolean;
   maxDurationMs: number;
   maxCostUsd: number;
   onNavigate: (href: string) => void;
@@ -328,33 +345,37 @@ function RunRow({
           {STATUS_LABELS[run.status]}
         </Badge>
       </td>
-      <td className="px-3 py-2 align-top">
-        <Link
-          href={agentHref}
-          onClick={(e) => e.stopPropagation()}
-          className="text-foreground hover:underline"
-        >
-          {run.agentName}
-        </Link>
-      </td>
+      {!agentScoped && (
+        <td className="px-3 py-2 align-top">
+          <Link
+            href={agentHref}
+            onClick={(e) => e.stopPropagation()}
+            className="text-foreground hover:underline"
+          >
+            {run.agentName}
+          </Link>
+        </td>
+      )}
       <td className="px-3 py-2 align-top">
         <SourceCell run={run} />
       </td>
-      <td className="text-foreground max-w-md px-3 py-2 align-top text-sm">
-        {run.userMessagePreview ? (
-          <div className="truncate">{run.userMessagePreview}</div>
-        ) : !run.errorMessagePreview ? (
-          <span className="text-foreground-muted">—</span>
-        ) : null}
-        {run.errorMessagePreview && (
-          // Failed runs surface their error inline so a triager can
-          // scan failures without clicking into each row. Two-line
-          // clamp keeps the column from ballooning on verbose stacks.
-          <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-sm leading-4">
-            {run.errorMessagePreview}
-          </div>
-        )}
-      </td>
+      {!agentScoped && (
+        <td className="text-foreground max-w-md px-3 py-2 align-top text-sm">
+          {run.userMessagePreview ? (
+            <div className="truncate">{run.userMessagePreview}</div>
+          ) : !run.errorMessagePreview ? (
+            <span className="text-foreground-muted">—</span>
+          ) : null}
+          {run.errorMessagePreview && (
+            // Failed runs surface their error inline so a triager can
+            // scan failures without clicking into each row. Two-line
+            // clamp keeps the column from ballooning on verbose stacks.
+            <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-sm leading-4">
+              {run.errorMessagePreview}
+            </div>
+          )}
+        </td>
+      )}
       <td className="text-foreground-weak px-3 py-2 align-top text-sm">
         <QueuedAt iso={run.createdAt} />
       </td>
