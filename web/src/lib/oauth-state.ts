@@ -57,6 +57,11 @@ export type NativeMcpStatePayload = {
    *  callback to add the stored client_secret at token exchange.
    *  Absent/"dcr" = public client (no secret). */
   authMode?: "dcr" | "manual";
+  /** For manual providers: which BYO OAuth-app instance this flow used
+   *  (slug in workspace_native_oauth_client). The callback re-reads the
+   *  secret by this instance, and it's stored on the connection so refresh
+   *  presents the right client_secret. Absent for DCR. */
+  instance?: string;
   /** Short random nonce — defends against state replay across users. */
   nonce: string;
 };

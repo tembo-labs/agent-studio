@@ -169,8 +169,16 @@ async fn refresh_one(
     // stored in workspace_native_oauth_client.
     let (client_id, client_secret): (String, Option<String>) =
         if metadata.get("auth_mode").and_then(|v| v.as_str()) == Some("manual") {
+            // Which BYO app instance this connection authorized against. Older
+            // rows (pre multi-instance) have no `instance` → fall back to
+            // "default", which is where their single app was migrated.
+            let instance = metadata
+                .get("instance")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .unwrap_or("default");
             let (cid, secret) =
-                native_oauth_client_secret(pool, key, workspace_id, provider).await?;
+                native_oauth_client_secret(pool, key, workspace_id, provider, instance).await?;
             (cid, Some(secret))
         } else {
             let cid = metadata
@@ -276,18 +284,21 @@ async fn native_oauth_client_secret(
     key: &MasterKey,
     workspace_id: uuid::Uuid,
     provider: &str,
+    instance: &str,
 ) -> anyhow::Result<(String, String)> {
     let row: Option<(String, Vec<u8>)> = sqlx::query_as(
         "SELECT client_id, client_secret_ciphertext FROM workspace_native_oauth_client \
-           WHERE workspace_id = $1 AND provider = $2",
+           WHERE workspace_id = $1 AND provider = $2 AND instance = $3",
     )
     .bind(workspace_id)
     .bind(provider)
+    .bind(instance)
     .fetch_optional(pool)
     .await
     .context("failed to read workspace_native_oauth_client")?;
-    let (client_id, ciphertext) =
-        row.ok_or_else(|| anyhow!("no OAuth app configured for native provider {provider}"))?;
+    let (client_id, ciphertext) = row.ok_or_else(|| {
+        anyhow!("no OAuth app \"{instance}\" configured for native provider {provider}")
+    })?;
     let secret = key.decrypt(&ciphertext).context("decrypt client_secret")?;
     Ok((client_id, secret))
 }

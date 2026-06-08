@@ -1,0 +1,202 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { Section } from "@/components/section";
+import { Badge } from "@/components/ui/badge";
+import { listMcpProviders, redirectUriFor } from "@/lib/mcp-providers";
+import {
+  getProviderEnableMap,
+  isProviderAdminEnabled,
+} from "@/lib/native-mcp-providers-admin";
+import {
+  listNativeOAuthClients,
+  type NativeOAuthClientPreview,
+} from "@/lib/native-oauth-clients";
+import { getServerSession } from "@/lib/session";
+import { getWorkspaceBySlug, getWorkspaceRole } from "@/lib/workspace";
+
+import {
+  AddNativeOAuthAppInstanceForm,
+  CopyableField,
+  NativeOAuthAppInstanceCard,
+  ProviderEnableToggle,
+} from "../../native-mcp-admin-forms";
+
+// Where to create the OAuth app, per manual provider.
+const SETUP_URLS: Record<string, string> = {
+  hubspot:
+    "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/integrate-with-the-remote-hubspot-mcp-server",
+};
+
+export const dynamic = "force-dynamic";
+
+// Admin-only: decide which native-MCP providers members can connect, and
+// register the bring-your-own OAuth apps that confidential providers (HubSpot)
+// need. Lives under the Native MCP connections area; gated to workspace admins.
+
+export default async function NativeMcpAdminPage({
+  params,
+}: {
+  params: Promise<{ workspace: string }>;
+}) {
+  const { workspace: slug } = await params;
+
+  const session = await getServerSession();
+  if (!session) notFound();
+  const workspace = await getWorkspaceBySlug(slug);
+  if (!workspace) notFound();
+  const role = await getWorkspaceRole(workspace.id, session.user.id);
+  if (role !== "workspace_admin") notFound();
+
+  const [enableMap, oauthClients] = await Promise.all([
+    getProviderEnableMap(workspace.id),
+    listNativeOAuthClients(workspace.id),
+  ]);
+
+  const catalog = listMcpProviders();
+  const dcrProviders = catalog.filter((p) => p.authMode !== "manual");
+  const manualProviders = catalog.filter((p) => p.authMode === "manual");
+
+  const instancesByProvider = new Map<string, NativeOAuthClientPreview[]>();
+  for (const c of oauthClients) {
+    const arr = instancesByProvider.get(c.provider) ?? [];
+    arr.push(c);
+    instancesByProvider.set(c.provider, arr);
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Link
+          href={`/${workspace.slug}/connections/native-mcp`}
+          className="text-foreground-weak hover:text-foreground text-sm"
+        >
+          ← Back to Native MCP
+        </Link>
+        <h2 className="text-foreground-title mt-1 text-lg font-semibold">
+          Manage providers
+        </h2>
+        <p className="text-foreground-weak text-sm">
+          Choose which native-MCP providers members can connect, and configure
+          the OAuth apps that confidential providers require.
+        </p>
+      </div>
+
+      <Section
+        title="Simple MCPs"
+        description="Zero-config providers — TAS registers itself automatically. Toggle which ones members can connect."
+      >
+        <ul className="divide-border bg-surface border-border flex flex-col divide-y overflow-hidden rounded-lg border">
+          {dcrProviders.map((p) => (
+            <li
+              key={p.slug}
+              className="flex flex-wrap items-center justify-between gap-3 px-3 py-3"
+            >
+              <span className="text-foreground text-sm font-medium">
+                {p.displayName}
+              </span>
+              <ProviderEnableToggle
+                workspaceSlug={workspace.slug}
+                providerSlug={p.slug}
+                enabled={isProviderAdminEnabled(p, enableMap)}
+              />
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <Section
+        title="Custom-OAuth MCPs"
+        description="Providers that need your own OAuth app. Register one or more app instances; members pick which to connect."
+      >
+        <div className="flex flex-col gap-4">
+          {manualProviders.map((p) => {
+            const instances = instancesByProvider.get(p.slug) ?? [];
+            const enabled = isProviderAdminEnabled(p, enableMap);
+            const setupUrl = SETUP_URLS[p.slug];
+            return (
+              <div
+                key={p.slug}
+                className="border-border bg-surface flex flex-col gap-3 rounded-lg border p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-foreground text-sm font-medium">
+                      {p.displayName}
+                    </span>
+                    {instances.length === 0 && (
+                      <Badge variant="gray" size="small">
+                        No apps yet
+                      </Badge>
+                    )}
+                  </div>
+                  <ProviderEnableToggle
+                    workspaceSlug={workspace.slug}
+                    providerSlug={p.slug}
+                    enabled={enabled}
+                    note={
+                      enabled && instances.length === 0
+                        ? "add an app below to make it usable"
+                        : undefined
+                    }
+                  />
+                </div>
+
+                <p className="text-foreground-weak text-sm leading-5">
+                  {p.displayName} doesn&apos;t support auto-registration. Create
+                  an OAuth app at {p.displayName}
+                  {setupUrl ? (
+                    <>
+                      {" ("}
+                      <a
+                        href={setupUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-foreground hover:underline"
+                      >
+                        guide →
+                      </a>
+                      {")"}
+                    </>
+                  ) : null}
+                  , register this redirect URI on it, then add its credentials
+                  below. Add more than one app to give members separate accounts.
+                </p>
+
+                <CopyableField
+                  label="Redirect URI to register"
+                  value={redirectUriFor(p.slug)}
+                />
+
+                {instances.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {instances.map((inst) => (
+                      <NativeOAuthAppInstanceCard
+                        key={inst.instance}
+                        workspaceSlug={workspace.slug}
+                        providerSlug={p.slug}
+                        providerDisplayName={p.displayName}
+                        instance={inst.instance}
+                        label={inst.label}
+                        clientId={inst.clientId}
+                        secretLast4={inst.secretLast4}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <div>
+                  <AddNativeOAuthAppInstanceForm
+                    workspaceSlug={workspace.slug}
+                    providerSlug={p.slug}
+                    providerDisplayName={p.displayName}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+    </div>
+  );
+}

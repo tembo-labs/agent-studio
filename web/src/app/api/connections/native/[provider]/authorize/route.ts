@@ -13,12 +13,20 @@ import {
   trustedOAuthUrl,
   trustedProviderMcpOrigin,
 } from "@/lib/native-oauth-security";
-import { getNativeOAuthClientPreview } from "@/lib/native-oauth-clients";
+import {
+  DEFAULT_INSTANCE,
+  getNativeOAuthClientPreview,
+} from "@/lib/native-oauth-clients";
 import { signNativeMcpState } from "@/lib/oauth-state";
 
 // Native-MCP OAuth authorize handler. URL shape:
 //
-//   GET /api/connections/native/<provider>/authorize?workspace=<slug>&name=<slot>
+//   DCR:    GET /api/connections/native/<provider>/authorize?workspace=<slug>&name=<slot>
+//   manual: GET /api/connections/native/<provider>/authorize?workspace=<slug>&app=<instance>
+//
+// For manual (BYO-app) providers the connection's slot name IS the OAuth-app
+// instance, so `?app=` picks which app to use AND names the connection; `?name=`
+// is ignored. DCR providers use the free-typed `?name=` slot.
 //
 // MCP-spec auth flow — no per-provider OAuth-app setup needed:
 //
@@ -85,11 +93,18 @@ export async function GET(
       { status: 400 },
     );
   }
-  const nameRaw = request.nextUrl.searchParams.get("name") ?? "default";
-  const connectionName = nameRaw.trim().toLowerCase();
+  // manual (BYO-app) providers use a confidential client per app instance; DCR
+  // providers self-register a public client per named slot.
+  const isManual = provider.authMode === "manual";
+  const slotRaw = isManual
+    ? (request.nextUrl.searchParams.get("app") ?? DEFAULT_INSTANCE)
+    : (request.nextUrl.searchParams.get("name") ?? DEFAULT_INSTANCE);
+  // For manual providers the instance slug doubles as the connection name.
+  const connectionName = slotRaw.trim().toLowerCase();
+  const instance = connectionName;
   if (!/^[a-z0-9_-]+$/.test(connectionName)) {
     return NextResponse.json(
-      { error: `bad connection name shape: ${nameRaw}` },
+      { error: `bad ${isManual ? "app instance" : "connection name"} shape: ${slotRaw}` },
       { status: 400 },
     );
   }
@@ -197,8 +212,7 @@ export async function GET(
   }
   // "manual" providers (HubSpot) use a confidential BYO OAuth app and have no
   // registration_endpoint; "dcr" providers (Attio, Pylon) self-register a
-  // public client.
-  const isManual = provider.authMode === "manual";
+  // public client. (isManual computed above with the slot parsing.)
   if (
     !asMeta.authorization_endpoint ||
     !asMeta.token_endpoint ||
@@ -255,12 +269,16 @@ export async function GET(
         `${provider.displayName} auth server doesn't support client_secret_post.`,
       );
     }
-    const byo = await getNativeOAuthClientPreview(workspace.id, provider.slug);
+    const byo = await getNativeOAuthClientPreview(
+      workspace.id,
+      provider.slug,
+      instance,
+    );
     if (!byo) {
       return back(
         workspace.slug,
         provider.slug,
-        `Configure the ${provider.displayName} OAuth app first (Connections → ${provider.displayName} → Configure OAuth app).`,
+        `The ${provider.displayName} app "${instance}" isn't configured. An admin can add it under Connections → Native MCP → Manage providers.`,
       );
     }
     clientId = byo.clientId;
@@ -349,6 +367,7 @@ export async function GET(
     clientId,
     tokenEndpoint: tokenEndpoint.toString(),
     authMode: isManual ? "manual" : "dcr",
+    ...(isManual ? { instance } : {}),
   });
 
   const authorizeUrl = new URL(authorizationEndpoint);

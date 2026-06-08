@@ -147,6 +147,7 @@ export async function GET(
     const byo = await getNativeOAuthClientSecret(
       state.workspaceId,
       provider.slug,
+      state.instance ?? "default",
     );
     if (!byo) {
       return back(
@@ -218,7 +219,11 @@ export async function GET(
     // Rust refresh knows to add the stored client_secret.
     metadata:
       state.authMode === "manual"
-        ? { auth_mode: "manual", client_id: state.clientId }
+        ? {
+            auth_mode: "manual",
+            client_id: state.clientId,
+            instance: state.instance ?? "default",
+          }
         : { dcr_client_id: state.clientId },
   });
 

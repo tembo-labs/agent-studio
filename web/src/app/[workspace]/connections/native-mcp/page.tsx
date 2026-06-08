@@ -5,29 +5,28 @@ import {
   type WorkspaceConnection,
 } from "@/lib/connections";
 import { resolveConnectionsView } from "@/lib/connections-view";
-import { listMcpProviders, redirectUriFor } from "@/lib/mcp-providers";
+import { listMcpProviders } from "@/lib/mcp-providers";
 import { listToolsForUser, type McpTool } from "@/lib/mcp-tools";
+import {
+  getProviderEnableMap,
+  isProviderAdminEnabled,
+} from "@/lib/native-mcp-providers-admin";
 import { listNativeOAuthClients } from "@/lib/native-oauth-clients";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, getWorkspaceRole } from "@/lib/workspace";
 
 import {
   NativeMcpConnectionsSection,
-  type ManualAppConfig,
+  type ManualConnectTarget,
 } from "../native-mcp-connections-section";
-
-// Where to create the OAuth app, per manual provider.
-const SETUP_URLS: Record<string, string> = {
-  hubspot:
-    "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/integrate-with-the-remote-hubspot-mcp-server",
-};
 
 export const dynamic = "force-dynamic";
 
-// Native MCP half of the Connections page. TAS-managed OAuth +
-// direct connection to each provider's official MCP server. Agent
-// `connections:` entries with `source: native-mcp` resolve through
-// whatever the user has authorized here.
+// Native MCP half of the Connections page. TAS-managed OAuth + direct
+// connection to each provider's official MCP server. Agent `connections:`
+// entries with `source: native-mcp` resolve through whatever the user has
+// authorized here. Admin setup (enable providers + register OAuth apps) lives
+// on the separate /native-mcp/admin screen.
 
 export default async function NativeMcpConnectionsPage({
   params,
@@ -52,17 +51,16 @@ export default async function NativeMcpConnectionsPage({
     requestedUser,
   );
 
-  const [nativeConnections, allTools, oauthClients, currentUserRole] =
+  const [nativeConnections, allTools, oauthClients, enableMap, currentUserRole] =
     await Promise.all([
       listNativeConnectionsForUser(workspace.id, view.userId),
       listToolsForUser(workspace.id, view.userId),
       listNativeOAuthClients(workspace.id),
+      getProviderEnableMap(workspace.id),
       getWorkspaceRole(workspace.id, session.user.id),
     ]);
 
-  // Same bucketing as the composio sub-page — the tools query
-  // returns everything for the user; we slice by source +
-  // provider + connection_name into the rows we'll render.
+  // Slice the user's tools by source + provider + connection_name into rows.
   const toolsBySlot = new Map<string, McpTool[]>();
   for (const t of allTools) {
     if (t.source !== "native-mcp") continue;
@@ -72,17 +70,36 @@ export default async function NativeMcpConnectionsPage({
     else toolsBySlot.set(key, [t]);
   }
 
-  // One row per (provider, name) slot the user has authorized.
-  // Catalog providers with zero connections still get a single
-  // "first-time Connect" placeholder row so the user can discover
-  // them without going through the Add Another form.
   const nativeCatalog = listMcpProviders();
+
+  // Which OAuth app instances exist per manual provider.
+  const instancesByProvider = new Map<
+    string,
+    { instance: string; label: string | null }[]
+  >();
+  for (const c of oauthClients) {
+    const arr = instancesByProvider.get(c.provider) ?? [];
+    arr.push({ instance: c.instance, label: c.label });
+    instancesByProvider.set(c.provider, arr);
+  }
+
+  // A provider is visible to members when the admin enabled it; manual
+  // providers additionally need at least one configured OAuth app instance.
+  const isVisible = (provider: (typeof nativeCatalog)[number]): boolean => {
+    if (!isProviderAdminEnabled(provider, enableMap)) return false;
+    if (provider.authMode === "manual") {
+      return (instancesByProvider.get(provider.slug)?.length ?? 0) > 0;
+    }
+    return true;
+  };
+
   const activeByProvider = new Map<string, WorkspaceConnection[]>();
   for (const c of nativeConnections.filter((c) => c.status === "active")) {
     const arr = activeByProvider.get(c.type) ?? [];
     arr.push(c);
     activeByProvider.set(c.type, arr);
   }
+
   type NativeRow = {
     provider: (typeof nativeCatalog)[number];
     connection: WorkspaceConnection | null;
@@ -90,16 +107,15 @@ export default async function NativeMcpConnectionsPage({
   };
   const nativeProviderRows: NativeRow[] = [];
   for (const provider of nativeCatalog) {
+    const isManual = provider.authMode === "manual";
     const conns = activeByProvider.get(provider.slug) ?? [];
-    if (conns.length === 0) {
-      nativeProviderRows.push({ provider, connection: null, tools: [] });
-      continue;
-    }
     conns.sort((a, b) => {
       if (a.name === "default") return -1;
       if (b.name === "default") return 1;
       return a.name.localeCompare(b.name);
     });
+    // Always show connected rows (even if the provider was later disabled, so
+    // the user can still see/disconnect them).
     for (const c of conns) {
       nativeProviderRows.push({
         provider,
@@ -107,11 +123,27 @@ export default async function NativeMcpConnectionsPage({
         tools: toolsBySlot.get(`${provider.slug}:${c.name}`) ?? [],
       });
     }
+    // DCR providers get a first-time Connect placeholder; manual providers
+    // connect via the instance form (manualConnect) instead.
+    if (!isManual && conns.length === 0 && isVisible(provider)) {
+      nativeProviderRows.push({ provider, connection: null, tools: [] });
+    }
   }
 
+  // Visible DCR providers feed the "Add another" named-slot picker.
+  const addableProviders = nativeCatalog.filter(
+    (p) => p.authMode !== "manual" && isVisible(p),
+  );
+  // Visible manual providers + their connectable instances.
+  const manualConnect: ManualConnectTarget[] = nativeCatalog
+    .filter((p) => p.authMode === "manual" && isVisible(p))
+    .map((p) => ({
+      provider: p,
+      instances: instancesByProvider.get(p.slug) ?? [],
+    }));
+
   // Native MCP OAuth callback bounces back here with
-  // ?native_mcp=…&result=…&detail=… — render the banner inside
-  // the section so it lands next to the row that just connected.
+  // ?native_mcp=…&result=…&detail=… — render the banner inside the section.
   const resultParam = typeof sp.result === "string" ? sp.result : undefined;
   const detailParam = typeof sp.detail === "string" ? sp.detail : undefined;
   const nativeMcpParam =
@@ -127,21 +159,6 @@ export default async function NativeMcpConnectionsPage({
         }
       : undefined;
 
-  // BYO-OAuth-app config for manual providers (HubSpot). One entry per manual
-  // catalog provider; `configured` gates the per-user Connect button.
-  const oauthByProvider = new Map(oauthClients.map((c) => [c.provider, c]));
-  const manualConfig: Record<string, ManualAppConfig> = {};
-  for (const provider of nativeCatalog) {
-    if (provider.authMode !== "manual") continue;
-    const cfg = oauthByProvider.get(provider.slug);
-    manualConfig[provider.slug] = {
-      configured: Boolean(cfg),
-      clientId: cfg?.clientId,
-      secretLast4: cfg?.secretLast4,
-      redirectUri: redirectUriFor(provider.slug),
-      setupUrl: SETUP_URLS[provider.slug],
-    };
-  }
   const isAdmin = currentUserRole === "workspace_admin";
 
   return (
@@ -161,10 +178,10 @@ export default async function NativeMcpConnectionsPage({
       <NativeMcpConnectionsSection
         workspaceSlug={workspace.slug}
         providers={nativeProviderRows}
-        catalog={nativeCatalog}
+        addableProviders={addableProviders}
+        manualConnect={view.viewingOther ? [] : manualConnect}
         banner={banner}
         viewingOther={view.viewingOther}
-        manualConfig={manualConfig}
         isAdmin={isAdmin}
       />
     </>
