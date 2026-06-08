@@ -61,7 +61,7 @@
     "eslint-config-next": "16.2.7",
     "playwright": "^1.60.0",
     "tailwindcss": "^4",
-    "tsx": "^4.22.3",
+    "tsx": "^4.22.4",
     "typescript": "^6",
     "vitest": "^4.1.7"
   },
