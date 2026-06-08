@@ -24,6 +24,12 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      # eslint 10 dropped context.getFilename(), which eslint-plugin-react
+      # (pulled in by eslint-config-next) still calls — it crashes the lint
+      # step. Stay on eslint 9 until the plugin supports eslint 10.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     groups:
       types:
         patterns:

@@ -57,7 +57,7 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^4.1.7",
     "dotenv": "^17.4.2",
-    "eslint": "^10",
+    "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "playwright": "^1.60.0",
     "tailwindcss": "^4",
