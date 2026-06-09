@@ -95,9 +95,9 @@ export function AgentsInventory({
   // null = "all" (no facet selected). Selecting a pill switches the
   // visible rows to that bucket only.
   const [bucket, setBucket] = useState<StatusBucket | null>(null);
-  // Default sort: erroring rows surface first, then most-recently-
-  // active. The user can re-sort by clicking column headers.
-  const [sortKey, setSortKey] = useState<SortKey>("status");
+  // Default sort: alphabetical by name. The user can re-sort by clicking
+  // column headers.
+  const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const enriched = useMemo(
@@ -201,19 +201,19 @@ export function AgentsInventory({
             <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
               <tr>
                 <SortableTh
-                  label="Status"
-                  active={sortKey === "status"}
-                  dir={sortDir}
-                  onClick={() => onHeaderClick("status")}
-                  className="w-[140px]"
-                />
-                <SortableTh
                   label="Name"
                   active={sortKey === "name"}
                   dir={sortDir}
                   onClick={() => onHeaderClick("name")}
                 />
-                <th className="px-3 py-2 text-left font-medium">Framework</th>
+                <SortableTh
+                  label="Status"
+                  active={sortKey === "status"}
+                  dir={sortDir}
+                  onClick={() => onHeaderClick("status")}
+                  className="w-[120px]"
+                />
+                <th className="px-3 py-2 text-left font-medium">Labels</th>
                 <th className="px-3 py-2 text-left font-medium">Model</th>
                 <SortableTh
                   label="Runs 30d"
@@ -356,12 +356,12 @@ function InventoryRow({
     return (
       <tr className="bg-[var(--color-input-error)]/30">
         <td className="px-3 py-2 align-middle">
-          <StatusCell bucket="invalid" />
-        </td>
-        <td className="px-3 py-2 align-middle">
           <span className="text-foreground font-mono text-sm">
             {agent.filename}
           </span>
+        </td>
+        <td className="px-3 py-2 align-middle">
+          <StatusCell bucket="invalid" />
         </td>
         <td
           className="text-sentiment-negative px-3 py-2 align-middle text-sm"
@@ -377,17 +377,15 @@ function InventoryRow({
     return (
       <tr>
         <td className="px-3 py-2 align-middle">
-          <StatusCell bucket="pending" />
-        </td>
-        <td className="px-3 py-2 align-middle">
           <span className="text-foreground text-sm font-medium">
             {agent.name}
           </span>
         </td>
         <td className="px-3 py-2 align-middle">
-          <Badge variant="gray" size="small">
-            {agent.frameworkLabel}
-          </Badge>
+          <StatusCell bucket="pending" />
+        </td>
+        <td className="text-foreground-muted px-3 py-2 align-middle text-sm">
+          —
         </td>
         <td className="text-foreground-muted px-3 py-2 align-middle text-sm">
           —
@@ -419,34 +417,31 @@ function InventoryRow({
   return (
     <tr className="hover:bg-surface-secondary transition-colors">
       <td className="px-3 py-2 align-middle">
+        <Link
+          href={agent.detailHref}
+          className="text-foreground font-medium hover:underline"
+        >
+          {agent.name}
+        </Link>
+      </td>
+      <td className="px-3 py-2 align-middle">
         <StatusCell bucket={bucket} />
       </td>
       <td className="px-3 py-2 align-middle">
-        <div className="flex flex-col gap-1">
-          <Link
-            href={agent.detailHref}
-            className="text-foreground hover:underline font-medium"
-          >
-            {agent.name}
-          </Link>
-          {agent.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {agent.labels.map((l) => (
-                <Badge key={l} variant="gray" size="small">
-                  {l}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-      </td>
-      <td className="px-3 py-2 align-middle">
-        <Badge variant="gray" size="small">
-          {agent.frameworkLabel}
-        </Badge>
+        {agent.labels.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {agent.labels.map((l) => (
+              <Badge key={l} variant="gray" size="small">
+                {l}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <span className="text-foreground-muted">—</span>
+        )}
       </td>
       <td className="text-foreground-weak px-3 py-2 align-middle font-mono text-sm">
-        {agent.model ?? "—"}
+        {shortModel(agent.model)}
       </td>
       <td className="text-foreground px-3 py-2 text-right align-middle font-mono text-sm">
         {agent.runs30d.toLocaleString("en-US")}
@@ -702,6 +697,13 @@ function rowLastRunMs(a: InventoryAgent): number | null {
     return new Date(a.createdAtIso).getTime();
   }
   return null;
+}
+
+// Trim the noisy provider/family prefix off the model id for the table:
+// "anthropic:claude-sonnet-4-6" → "sonnet-4-6", "openai:gpt-4o-mini" → "gpt-4o-mini".
+function shortModel(model: string | null): string {
+  if (!model) return "—";
+  return model.replace(/^anthropic:claude-/, "").replace(/^openai:/, "");
 }
 
 function compareNames(a: InventoryAgent, b: InventoryAgent): number {

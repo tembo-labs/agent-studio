@@ -96,11 +96,6 @@ export default async function DashboardPage({
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Dashboard
         </h1>
-        <p className="text-foreground-weak text-base">
-          Workspace-wide activity for{" "}
-          <span className="text-foreground font-medium">{workspace.name}</span>
-          .
-        </p>
       </div>
 
       <hr className="border-[var(--color-border-weak)]" />
@@ -234,10 +229,15 @@ export default async function DashboardPage({
                       </p>
                     )}
                   </div>
-                  <div className="text-foreground-weak relative flex shrink-0 flex-col items-end gap-1 text-sm">
+                  <div className="text-foreground-weak relative flex shrink-0 flex-col items-end gap-0.5 text-sm">
                     <span>
                       <LocalTime iso={r.createdAt.toISOString()} style="relative" />
                     </span>
+                    {(r.createdByName ?? r.createdByEmail) && (
+                      <span className="text-foreground-muted max-w-[12rem] truncate text-xs">
+                        {r.createdByName ?? r.createdByEmail}
+                      </span>
+                    )}
                   </div>
                 </li>
               );
