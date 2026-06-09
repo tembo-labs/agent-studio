@@ -11,6 +11,7 @@ import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
+  getWorkspaceRole,
   getWorkspaceSecretPreview,
   listWorkspacesForUser,
   touchWorkspaceLastVisited,
@@ -80,6 +81,7 @@ export default async function WorkspaceLayout({
     failingAgents,
     anthropicKey,
     openaiKey,
+    role,
   ] = await Promise.all([
     listWorkspacesForUser(session.user.id),
     listAgents(workspace.id).catch(() => null),
@@ -91,6 +93,7 @@ export default async function WorkspaceLayout({
       () => null,
     ),
     getWorkspaceSecretPreview(workspace.id, "openai_api_key").catch(() => null),
+    getWorkspaceRole(workspace.id, session.user.id).catch(() => null),
   ]);
   // Agents run on the workspace's own provider keys; with neither set,
   // every run fails immediately. Surface a sidebar CTA so a new
@@ -170,6 +173,7 @@ export default async function WorkspaceLayout({
       workspace={workspace}
       workspaces={switcherList}
       user={session.user}
+      role={role}
       missingConnections={missingConnections}
       failingAgents={failingAlerts}
       hasLlmProvider={hasLlmProvider}

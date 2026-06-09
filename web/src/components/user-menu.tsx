@@ -5,20 +5,30 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
+import type { WorkspaceRole } from "@/lib/rbac";
 
 // Sidebar-footer user menu. Clicking the name/email opens a small popup
 // with Sign out. Outside-click and Escape both close it; the popup sits
 // above the trigger because the trigger lives at the bottom of the
-// sidebar.
+// sidebar. The user's role in the current workspace shows as a badge
+// under their name.
+
+const ROLE_LABELS: Record<WorkspaceRole, string> = {
+  workspace_admin: "Workspace Admin",
+  operator: "Operator",
+  viewer: "Viewer",
+};
 
 type Props = {
   name: string | null;
   email: string;
+  /** Role in the current workspace, for the badge. Null = not a member. */
+  role?: WorkspaceRole | null;
   /** Show the instance-settings link (INSTANCE_ADMIN_EMAILS allowlist). */
   isInstanceAdmin?: boolean;
 };
 
-export function UserMenu({ name, email, isInstanceAdmin }: Props) {
+export function UserMenu({ name, email, role, isInstanceAdmin }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +80,11 @@ export function UserMenu({ name, email, isInstanceAdmin }: Props) {
         {name && (
           <span className="text-foreground-muted text-sm leading-tight">
             {email}
+          </span>
+        )}
+        {role && (
+          <span className="bg-surface-secondary text-foreground-weak mt-1 rounded px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide">
+            {ROLE_LABELS[role]}
           </span>
         )}
       </button>

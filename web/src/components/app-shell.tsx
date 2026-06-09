@@ -9,6 +9,7 @@ import { toolkitLabel } from "@/lib/composio";
 import { getMcpProvider } from "@/lib/mcp-providers";
 import { getInstanceName } from "@/lib/instance-settings";
 import { isInstanceAdminEmail } from "@/lib/instance";
+import type { WorkspaceRole } from "@/lib/rbac";
 import type { Workspace } from "@/lib/workspace";
 import { IconExclamationTriangle } from "central-icons";
 
@@ -42,6 +43,8 @@ type Props = {
   workspace: Workspace;
   workspaces: { slug: string; name: string }[];
   user: { name?: string | null; email: string };
+  /** The user's role in this workspace, shown as a badge by their name. */
+  role?: WorkspaceRole | null;
   /**
    * (toolkit, agent) pairs where an agent in this workspace declared
    * a Composio toolkit the workspace hasn't authorized. Rendered as
@@ -66,6 +69,7 @@ export async function AppShell({
   workspace,
   workspaces,
   user,
+  role,
   missingConnections,
   failingAgents,
   hasLlmProvider,
@@ -252,6 +256,7 @@ export async function AppShell({
           <UserMenu
             name={user.name ?? null}
             email={user.email}
+            role={role}
             isInstanceAdmin={isInstanceAdmin}
           />
         </div>
