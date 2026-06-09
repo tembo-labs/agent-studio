@@ -12,7 +12,9 @@ const ANTHROPIC_RATES: Array<{ pattern: RegExp; rate: Rate }> = [
   // Fable 5 (Mythos-class) is the premium tier — list it first; it doesn't
   // overlap the opus/sonnet/haiku patterns. $10/$50 per MTok (GA 2026-06-09).
   { pattern: /claude-fable/i, rate: { input: 10, output: 50 } },
-  { pattern: /claude-opus/i, rate: { input: 15, output: 75 } },
+  // Current Opus (4.5–4.8) is $5/$25. The only $15/$75 Opus models were 4.1
+  // and 4.0, both deprecated and retiring mid-2026 — not worth special-casing.
+  { pattern: /claude-opus/i, rate: { input: 5, output: 25 } },
   { pattern: /claude-sonnet/i, rate: { input: 3, output: 15 } },
   { pattern: /claude-haiku/i, rate: { input: 1, output: 5 } },
 ];

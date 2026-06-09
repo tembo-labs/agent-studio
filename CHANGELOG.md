@@ -20,6 +20,12 @@ they are no longer release versions. Phase scope now lives in
   GA on the Claude API as of 2026-06-09. Priced in the run-cost estimates at
   $10/$50 per MTok (web + API tables), and added to the authoring guidance as
   the top-capability step-up above Opus 4.8.
+
+### Fixed
+- **Opus run-cost estimates.** Corrected the `claude-opus` rate from the stale
+  $15/$75 to the current $5/$25 per MTok (current Opus 4.5–4.8), so cost
+  estimates and the stored `cost_usd` are accurate. (The $15/$75 rate only ever
+  applied to the deprecated Opus 4.1/4.0.)
 - **Agent Skills.** A workspace **Skills** area to install reusable Agent Skills
   (Anthropic's `SKILL.md` folders) into your repo under `skills/`, from three
   sources: the [skills.sh](https://www.skills.sh/) directory (by slug / GitHub

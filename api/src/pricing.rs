@@ -19,7 +19,9 @@ static ANTHROPIC_RATES: Lazy<Vec<ModelRate>> = Lazy::new(|| {
     vec![
         // Fable 5 (Mythos-class) — premium tier, $10/$50 per MTok (GA 2026-06-09).
         rate("claude-fable", 10.0, 50.0),
-        rate("claude-opus", 15.0, 75.0),
+        // Current Opus (4.5–4.8) is $5/$25; only the deprecated 4.1/4.0 were
+        // $15/$75 and they retire mid-2026 — not worth special-casing.
+        rate("claude-opus", 5.0, 25.0),
         rate("claude-sonnet", 3.0, 15.0),
         rate("claude-haiku", 1.0, 5.0),
     ]
@@ -93,6 +95,14 @@ mod tests {
             estimate_run_cost("anthropic:claude-sonnet-4-6", 1_000_000, 1_000_000).expect("priced");
         // 3 + 15 = 18 USD for 1M in + 1M out
         assert!((c - 18.0).abs() < 1e-9, "expected ~18.0, got {c}");
+    }
+
+    #[test]
+    fn anthropic_opus() {
+        let c =
+            estimate_run_cost("anthropic:claude-opus-4-8", 1_000_000, 1_000_000).expect("priced");
+        // 5 + 25 = 30 USD for 1M in + 1M out
+        assert!((c - 30.0).abs() < 1e-9, "expected ~30.0, got {c}");
     }
 
     #[test]
