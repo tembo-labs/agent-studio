@@ -12,49 +12,26 @@ export const DOC_SECTIONS: DocSection[] = [
     audience: "For Operators",
     groups: [
       {
-        label: "Start here",
+        label: "The Basics",
         items: [
           { slug: "introduction", label: "Introduction" },
           { slug: "getting-started", label: "Getting started" },
           { slug: "core-concepts", label: "Core concepts" },
-        ],
-      },
-      {
-        label: "Building agents",
-        items: [
-          { slug: "authoring-agents", label: "Authoring agents" },
-          { slug: "agent-lifecycle", label: "Agent lifecycle" },
-          { slug: "sidecar-python-tools", label: "Sidecar Python tools" },
-        ],
-      },
-      {
-        label: "Running & automating",
-        items: [
           { slug: "running-agents", label: "Running agents" },
+          { slug: "connections", label: "Connections" },
+          { slug: "dashboard-and-runs", label: "Dashboard & Runs" },
           { slug: "automations-triggers", label: "Automations & triggers" },
         ],
       },
       {
-        label: "Connections & tools",
+        label: "Advanced",
         items: [
-          { slug: "connections", label: "Connections" },
+          { slug: "authoring-agents", label: "Authoring agents" },
+          { slug: "agent-lifecycle", label: "Agent lifecycle" },
+          { slug: "sidecar-python-tools", label: "Sidecar Python tools" },
           { slug: "tools-and-tool-uses", label: "Tools & Tool uses" },
-        ],
-      },
-      {
-        label: "Observability",
-        items: [
-          { slug: "dashboard-and-runs", label: "Dashboard & Runs" },
           { slug: "improvements", label: "Improvements" },
-        ],
-      },
-      {
-        label: "Help",
-        items: [{ slug: "troubleshooting", label: "Troubleshooting" }],
-      },
-      {
-        label: "Project",
-        items: [
+          { slug: "troubleshooting", label: "Troubleshooting" },
           { slug: "changelog", label: "Changelog" },
           { slug: "roadmap", label: "Roadmap" },
         ],
