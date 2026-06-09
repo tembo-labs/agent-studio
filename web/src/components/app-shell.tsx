@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { DocsSidebarLink } from "@/components/docs-sidebar-link";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -252,7 +253,10 @@ export async function AppShell({
           )}
         </nav>
 
-        <div className="px-2 py-2">
+        <div className="border-border border-t px-2 pb-1 pt-2">
+          <DocsSidebarLink href={`/${workspace.slug}/docs`} />
+        </div>
+        <div className="px-2 pb-2">
           <UserMenu
             name={user.name ?? null}
             email={user.email}

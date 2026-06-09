@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "gen:docs": "node scripts/gen-docs.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
