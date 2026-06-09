@@ -124,13 +124,21 @@ function CatalogCard({
       <input type="hidden" name="source" value={skill.source} />
       <input type="hidden" name="skillId" value={skill.skillId} />
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <code className="text-foreground truncate text-sm font-medium">
             {skill.name}
           </code>
           <span className="text-foreground-muted truncate text-xs">
             {skill.source} · {formatInstalls(skill.installs)} installs
           </span>
+          <a
+            href={`https://skills.sh/${skill.source}/${skill.skillId}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-foreground-muted hover:text-foreground w-fit text-xs underline underline-offset-2"
+          >
+            Read more on skills.sh ↗
+          </a>
         </div>
         <Button
           type="submit"
