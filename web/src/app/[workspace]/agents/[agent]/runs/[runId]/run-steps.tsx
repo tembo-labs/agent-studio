@@ -5,7 +5,6 @@ import {
   abbreviateTokens,
   estimateRunCost,
   estimateTokenCost,
-  formatCurrency,
   formatPenny,
 } from "@/lib/pricing";
 import type { RunStep, RunToolCall } from "@/lib/runs-db";
@@ -70,52 +69,54 @@ export function RunSteps({
         return (
           <div
             key={s.ordinal}
-            className={`flex flex-col gap-1.5 px-3 py-2.5 ${i > 0 ? "border-border border-t" : ""}`}
+            className={`flex items-start justify-between gap-4 px-3 py-2 ${i > 0 ? "border-border border-t" : ""}`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-foreground min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6">
-                {s.summary && <RevealText text={s.summary} live={live} />}
-              </div>
-              <TokenBox
-                model={model}
-                inputTokens={s.inputTokens}
-                outputTokens={s.outputTokens}
-              />
+            {/* Col 1: narration + the tool calls. Col 2: In/Out. */}
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              {s.summary && (
+                <div className="text-foreground whitespace-pre-wrap text-base leading-6">
+                  <RevealText text={s.summary} live={live} />
+                </div>
+              )}
+              {stepCalls.map((c) => {
+                const tp = toolProviders[c.toolName];
+                return (
+                  <Fragment key={c.ordinal}>
+                    <div className="flex items-center gap-1.5">
+                      {tp && (
+                        <ToolProviderLogo providerSlug={tp.slug} title={tp.label} />
+                      )}
+                      <code className="text-foreground-weak min-w-0 truncate text-sm">
+                        {c.toolName}
+                      </code>
+                      {c.ok === true ? (
+                        <Badge variant="green" size="small">
+                          ok
+                        </Badge>
+                      ) : c.ok === false ? (
+                        <Badge variant="red" size="small">
+                          failed
+                        </Badge>
+                      ) : (
+                        <Badge variant="gray" size="small">
+                          running
+                        </Badge>
+                      )}
+                    </div>
+                    {c.ok === false && c.errorMessage && (
+                      <p className="text-sentiment-negative line-clamp-2 pl-[1.375rem] font-mono text-xs leading-4">
+                        {c.errorMessage}
+                      </p>
+                    )}
+                  </Fragment>
+                );
+              })}
             </div>
-
-            {stepCalls.map((c) => {
-              const tp = toolProviders[c.toolName];
-              return (
-                <Fragment key={c.ordinal}>
-                  <div className="flex items-center gap-1.5">
-                    {tp && (
-                      <ToolProviderLogo providerSlug={tp.slug} title={tp.label} />
-                    )}
-                    <code className="text-foreground-weak min-w-0 truncate text-xs">
-                      {c.toolName}
-                    </code>
-                    {c.ok === true ? (
-                      <Badge variant="green" size="small">
-                        ok
-                      </Badge>
-                    ) : c.ok === false ? (
-                      <Badge variant="red" size="small">
-                        failed
-                      </Badge>
-                    ) : (
-                      <Badge variant="gray" size="small">
-                        running
-                      </Badge>
-                    )}
-                  </div>
-                  {c.ok === false && c.errorMessage && (
-                    <p className="text-sentiment-negative line-clamp-2 pl-[1.375rem] font-mono text-xs leading-4">
-                      {c.errorMessage}
-                    </p>
-                  )}
-                </Fragment>
-              );
-            })}
+            <TokenBox
+              model={model}
+              inputTokens={s.inputTokens}
+              outputTokens={s.outputTokens}
+            />
           </div>
         );
       })}
@@ -128,20 +129,19 @@ export function RunSteps({
             {abbreviateTokens(totalOut)} out
             {totalOutCost !== null && ` ~${formatPenny(totalOutCost)}`}
           </div>
-          {combinedCost !== null && (
-            <div className="text-foreground-weak text-xs tabular-nums">
-              total ~{formatCurrency(combinedCost)}
-            </div>
-          )}
+          <div className="text-foreground-weak text-xs tabular-nums">
+            total {abbreviateTokens(totalIn + totalOut)}
+            {combinedCost !== null && ` ~${formatPenny(combinedCost)}`}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// A small top-right box with this step's In/Out tokens + each direction's cost.
-// While a step is still in flight its tokens aren't known yet, so each line
-// shows a placeholder until the step completes.
+// This step's In/Out tokens + each direction's cost, on one line, pinned tight
+// to the step's top-right (no box chrome). Shows a placeholder per direction
+// until the step's tokens land.
 function TokenBox({
   model,
   inputTokens,
@@ -157,30 +157,18 @@ function TokenBox({
     outputTokens !== null
       ? estimateTokenCost(model, outputTokens, "output")
       : null;
+  const inStr =
+    inputTokens !== null
+      ? `${abbreviateTokens(inputTokens)}${inCost !== null ? ` ~${formatPenny(inCost)}` : ""}`
+      : "··";
+  const outStr =
+    outputTokens !== null
+      ? `${abbreviateTokens(outputTokens)}${outCost !== null ? ` ~${formatPenny(outCost)}` : ""}`
+      : "··";
   return (
-    <div className="border-border bg-surface-secondary text-foreground-muted shrink-0 rounded-md border px-2 py-1 text-right text-[11px] leading-4 tabular-nums">
-      <div>
-        {inputTokens !== null ? (
-          <>
-            {abbreviateTokens(inputTokens)}
-            {inCost !== null && ` ~${formatPenny(inCost)}`}{" "}
-            <span className="text-foreground-weak">in</span>
-          </>
-        ) : (
-          <span>·· in</span>
-        )}
-      </div>
-      <div>
-        {outputTokens !== null ? (
-          <>
-            {abbreviateTokens(outputTokens)}
-            {outCost !== null && ` ~${formatPenny(outCost)}`}{" "}
-            <span className="text-foreground-weak">out</span>
-          </>
-        ) : (
-          <span>·· out</span>
-        )}
-      </div>
+    <div className="text-foreground-muted shrink-0 whitespace-nowrap text-right text-xs leading-6 tabular-nums">
+      {inStr} <span className="text-foreground-weak">in</span> ·{" "}
+      {outStr} <span className="text-foreground-weak">out</span>
     </div>
   );
 }

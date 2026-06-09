@@ -70,11 +70,29 @@ export default async function RunDetailPage({
     toolProviders[t.slug] = { slug: t.provider, label };
   }
 
-  // The text parts across all steps (narration + the final answer), for the
-  // copy button. `isLive` drives the word-by-word reveal in RunSteps.
+  // Plain-text transcript for the copy button: each step's narration (and the
+  // final answer) plus the tool calls it made, in order. `isLive` drives the
+  // word-by-word reveal in RunSteps.
+  const callsByStepForCopy = new Map<number, typeof toolCalls>();
+  for (const c of toolCalls) {
+    if (c.stepOrdinal === null) continue;
+    const arr = callsByStepForCopy.get(c.stepOrdinal) ?? [];
+    arr.push(c);
+    callsByStepForCopy.set(c.stepOrdinal, arr);
+  }
   const stepText = steps
-    .map((s) => s.summary)
-    .filter((x): x is string => Boolean(x))
+    .map((s) => {
+      const lines: string[] = [];
+      if (s.summary) lines.push(s.summary);
+      for (const c of callsByStepForCopy.get(s.ordinal) ?? []) {
+        const status =
+          c.ok === true ? "ok" : c.ok === false ? "failed" : "running";
+        const err = c.ok === false && c.errorMessage ? `: ${c.errorMessage}` : "";
+        lines.push(`  → ${c.toolName} (${status})${err}`);
+      }
+      return lines.join("\n");
+    })
+    .filter((s) => s.length > 0)
     .join("\n\n");
   const isLive = run.status === "running" || run.status === "queued";
 
