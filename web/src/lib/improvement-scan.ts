@@ -1,11 +1,17 @@
 import "server-only";
 
-// On-demand scan that asks GitHub for PRs containing our
-// improvement markers, then updates each matching improvement row's
-// pr_url / pr_state / status. Called when the user visits
-// /<workspace>/improvements. No webhook infra required — trades
-// freshness for simplicity. A real webhook can replace this without
-// changing the improvement table.
+// On-demand scan that reconciles each open improvement row's PR state with
+// GitHub. Called when the user visits /<workspace>/improvements (and the
+// dashboard / inventory). No webhook infra — trades freshness for simplicity.
+//
+// Two paths:
+//   1. Improvements that already have a PR number → fetch that PR DIRECTLY
+//      (`GET /repos/:o/:r/pulls/:n`). The direct endpoint reports `merged` /
+//      `merged_at` reliably; the search API does NOT (its `pull_request.
+//      merged_at` is frequently null even for merged PRs, which left merged
+//      improvements stuck showing "PR opened").
+//   2. Improvements with no PR yet → search the repo body for the marker to
+//      discover the PR that Tembo opened.
 
 import {
   setImprovementPr,
@@ -30,6 +36,20 @@ interface GhSearchResult {
   }>;
 }
 
+interface GhPull {
+  number: number;
+  html_url: string;
+  state: string;
+  merged_at: string | null;
+  merged: boolean;
+}
+
+const GH_HEADERS = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+});
+
 export async function scanImprovementsForPRs(
   workspaceId: string,
   improvements: Improvement[],
@@ -46,75 +66,108 @@ export async function scanImprovementsForPRs(
   const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
   if (!token) return improvements;
 
-  // GitHub's search API caps `in:body` queries by length. Ask for
-  // ALL PRs in the repo that mention the marker prefix; we'll match
-  // by id client-side. Capped at 100 results which is fine for a
-  // dev-stage app.
-  const q = `repo:${repo.owner}/${repo.name} is:pr "${IMPROVEMENT_MARKER_PREFIX}" in:body`;
-  const url = `https://api.github.com/search/issues?q=${encodeURIComponent(q)}&per_page=100`;
-
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.log(
-      "[improvement-scan] github search failed",
-      res.status,
-      body.slice(0, 300),
-    );
-    return improvements;
-  }
-
-  const search = (await res.json()) as GhSearchResult;
-
-  // Build a quick lookup of improvement rows by id so we can match
-  // each PR back to its source improvement.
-  const byId = new Map(open.map((i) => [i.id, i]));
   const updates = new Map<string, Improvement>();
 
-  for (const pr of search.items) {
-    const body = pr.body ?? "";
-    for (const id of byId.keys()) {
-      if (!body.includes(improvementMarker(id))) continue;
-      const status = derivePrStatus(pr.state, pr.pull_request?.merged_at ?? null);
-      const newState = derivePrState(pr.state, pr.pull_request?.merged_at ?? null);
-      const existing = byId.get(id);
-      if (!existing) continue;
-      // Skip if nothing actually changed — avoids a pointless write.
+  // ── Path 1: improvements with a known PR number — fetch each PR directly
+  // so merged/closed is detected reliably. ───────────────────────────────
+  const withPr = open.filter((i) => i.prNumber !== null);
+  await Promise.all(
+    withPr.map(async (imp) => {
+      const pr = await fetchPull(repo.owner, repo.name, imp.prNumber!, token);
+      if (!pr) return;
+      const mergedAt = pr.merged_at ?? (pr.merged ? new Date(0).toISOString() : null);
+      const status = derivePrStatus(pr.state, mergedAt);
+      const newState = derivePrState(pr.state, mergedAt);
       if (
-        existing.prUrl === pr.html_url &&
-        existing.prNumber === pr.number &&
-        existing.prState === newState &&
-        existing.status === status
+        imp.prUrl === pr.html_url &&
+        imp.prState === newState &&
+        imp.status === status
       ) {
-        updates.set(id, existing);
-        continue;
+        updates.set(imp.id, imp);
+        return;
       }
       await setImprovementPr({
-        id,
+        id: imp.id,
         prUrl: pr.html_url,
         prNumber: pr.number,
         prState: newState,
         status,
       });
-      updates.set(id, {
-        ...existing,
+      updates.set(imp.id, {
+        ...imp,
         prUrl: pr.html_url,
         prNumber: pr.number,
         prState: newState,
         status,
       });
+    }),
+  );
+
+  // ── Path 2: improvements with no PR yet — discover via body search. ─────
+  const withoutPr = open.filter((i) => i.prNumber === null);
+  if (withoutPr.length > 0) {
+    // GitHub's search API caps `in:body` queries by length. Ask for ALL PRs
+    // mentioning the marker prefix; match by id client-side. Capped at 100.
+    const q = `repo:${repo.owner}/${repo.name} is:pr "${IMPROVEMENT_MARKER_PREFIX}" in:body`;
+    const url = `https://api.github.com/search/issues?q=${encodeURIComponent(q)}&per_page=100`;
+    const res = await fetch(url, { headers: GH_HEADERS(token), cache: "no-store" });
+    if (res.ok) {
+      const search = (await res.json()) as GhSearchResult;
+      const byId = new Map(withoutPr.map((i) => [i.id, i]));
+      for (const pr of search.items) {
+        const body = pr.body ?? "";
+        for (const id of byId.keys()) {
+          if (!body.includes(improvementMarker(id))) continue;
+          const mergedAt = pr.pull_request?.merged_at ?? null;
+          const status = derivePrStatus(pr.state, mergedAt);
+          const newState = derivePrState(pr.state, mergedAt);
+          const existing = byId.get(id);
+          if (!existing) continue;
+          await setImprovementPr({
+            id,
+            prUrl: pr.html_url,
+            prNumber: pr.number,
+            prState: newState,
+            status,
+          });
+          updates.set(id, {
+            ...existing,
+            prUrl: pr.html_url,
+            prNumber: pr.number,
+            prState: newState,
+            status,
+          });
+        }
+      }
+    } else {
+      const body = await res.text().catch(() => "");
+      console.log(
+        "[improvement-scan] github search failed",
+        res.status,
+        body.slice(0, 300),
+      );
     }
   }
 
   // Return improvements with updated rows folded in.
   return improvements.map((i) => updates.get(i.id) ?? i);
+}
+
+async function fetchPull(
+  owner: string,
+  name: string,
+  number: number,
+  token: string,
+): Promise<GhPull | null> {
+  const url = `https://api.github.com/repos/${owner}/${name}/pulls/${number}`;
+  const res = await fetch(url, { headers: GH_HEADERS(token), cache: "no-store" });
+  if (!res.ok) {
+    if (res.status !== 404) {
+      console.log("[improvement-scan] pr fetch failed", number, res.status);
+    }
+    return null;
+  }
+  return (await res.json()) as GhPull;
 }
 
 function derivePrStatus(
