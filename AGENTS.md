@@ -51,6 +51,32 @@ files. The Rust API runs them at boot via `sqlx::migrate!()`.
 - **Renames need both a column and the readers.** When renaming, ship
   the migration + the TS/Rust callers in the same PR.
 
+## Keep the docs in sync
+
+When you add or change product behavior, update the docs **in the same
+change** — they're the product's source of truth for users and drift fast if
+treated as a follow-up. Don't ship a feature without touching the docs it
+affects.
+
+- **User-facing behavior** (a page, flow, setting, agent-spec field, connection
+  type, automation surface) → update the matching page in the Astro Starlight
+  user manual under `docs/src/content/docs/`. Rough map: `running-agents.md`
+  (the run view), `authoring-agents.md` (agent spec + model settings),
+  `connections.md` (Composio / Native MCP / Secrets), `automations-triggers.md`
+  (schedules / triggers / webhooks), `settings.md` + `audit-and-roles.md`
+  (admin), `dashboard-and-runs.md`.
+- **Behavior the runner injects into every agent** (output discipline,
+  `parallel_tool_calls`, etc.) is user-visible — document it in
+  `authoring-agents.md` / `troubleshooting.md`.
+- **Code structure / conventions** → update the nearest `AGENTS.md` (this file,
+  `web/AGENTS.md`, `api/AGENTS.md`).
+- The in-app docs viewer reads the same `docs/` content, so one update covers
+  both the published manual and the in-app version.
+
+CI runs a non-blocking `docs-sync` reminder that flags changes touching
+`web/src/app/**` or `api/src/**` without any `docs/` change. It's a nudge, not
+a gate — if a change genuinely needs no doc update, ignore it.
+
 ## Commit style
 
 Conventional commits with the current phase tag — match the existing

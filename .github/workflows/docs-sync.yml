@@ -1,0 +1,44 @@
+name: docs-sync
+
+# Non-blocking reminder: if a change touches product code (web/src/app or
+# api/src) without touching docs/, nudge the author to update the user manual.
+# It's a warning annotation, never a gate — see AGENTS.md → "Keep the docs in
+# sync". Runs on PRs and on direct pushes to main (the repo's normal flow).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Flag product changes without doc updates
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+          # First push of a new branch has an all-zero `before`; nothing to diff.
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "No base to diff against — skipping."
+            exit 0
+          fi
+          changed=$(git diff --name-only "$base" "$head" || true)
+          code=$(printf '%s\n' "$changed" | grep -E '^(web/src/app/|api/src/)' || true)
+          docs=$(printf '%s\n' "$changed" | grep -E '^docs/' || true)
+          if [ -n "$code" ] && [ -z "$docs" ]; then
+            echo "::warning::Product code changed (web/src/app or api/src) but no docs/ files were updated. If this changes user-facing behavior, update the matching page under docs/src/content/docs/ (see AGENTS.md → 'Keep the docs in sync')."
+          else
+            echo "docs-sync ok"
+          fi
