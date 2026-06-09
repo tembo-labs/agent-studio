@@ -48,11 +48,16 @@ export function RunSteps({
             key={s.ordinal}
             className={`flex flex-col gap-1.5 px-3 py-2.5 ${i > 0 ? "border-border border-t" : ""}`}
           >
-            {s.summary && (
-              <div className="text-foreground whitespace-pre-wrap text-sm leading-6">
-                <RevealText text={s.summary} live={live} />
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-foreground min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6">
+                {s.summary && <RevealText text={s.summary} live={live} />}
               </div>
-            )}
+              <TokenBox
+                model={model}
+                inputTokens={s.inputTokens}
+                outputTokens={s.outputTokens}
+              />
+            </div>
 
             {stepCalls.map((c) => {
               const tp = toolProviders[c.toolName];
@@ -87,12 +92,6 @@ export function RunSteps({
                 </Fragment>
               );
             })}
-
-            <TokenMeta
-              model={model}
-              inputTokens={s.inputTokens}
-              outputTokens={s.outputTokens}
-            />
           </div>
         );
       })}
@@ -100,9 +99,10 @@ export function RunSteps({
   );
 }
 
-// Faint per-step "9.50k in ~$.04 · 1.30k out ~$.05" line. While a step is still
-// in flight its tokens aren't known yet, so it shows a placeholder.
-function TokenMeta({
+// A small top-right box with this step's In/Out tokens + each direction's cost.
+// While a step is still in flight its tokens aren't known yet, so each line
+// shows a placeholder until the step completes.
+function TokenBox({
   model,
   inputTokens,
   outputTokens,
@@ -111,25 +111,36 @@ function TokenMeta({
   inputTokens: number | null;
   outputTokens: number | null;
 }) {
-  if (inputTokens === null && outputTokens === null) {
-    return <span className="text-foreground-muted text-xs">·····</span>;
-  }
-  const parts: string[] = [];
-  if (inputTokens !== null) {
-    const c = estimateTokenCost(model, inputTokens, "input");
-    parts.push(
-      `${abbreviateTokens(inputTokens)} in${c !== null ? ` ~${formatPenny(c)}` : ""}`,
-    );
-  }
-  if (outputTokens !== null) {
-    const c = estimateTokenCost(model, outputTokens, "output");
-    parts.push(
-      `${abbreviateTokens(outputTokens)} out${c !== null ? ` ~${formatPenny(c)}` : ""}`,
-    );
-  }
+  const inCost =
+    inputTokens !== null ? estimateTokenCost(model, inputTokens, "input") : null;
+  const outCost =
+    outputTokens !== null
+      ? estimateTokenCost(model, outputTokens, "output")
+      : null;
   return (
-    <span className="text-foreground-muted text-xs tabular-nums">
-      {parts.join(" · ")}
-    </span>
+    <div className="border-border bg-surface-secondary text-foreground-muted shrink-0 rounded-md border px-2 py-1 text-right text-[11px] leading-4 tabular-nums">
+      <div>
+        {inputTokens !== null ? (
+          <>
+            {abbreviateTokens(inputTokens)}
+            {inCost !== null && ` ~${formatPenny(inCost)}`}{" "}
+            <span className="text-foreground-weak">in</span>
+          </>
+        ) : (
+          <span>·· in</span>
+        )}
+      </div>
+      <div>
+        {outputTokens !== null ? (
+          <>
+            {abbreviateTokens(outputTokens)}
+            {outCost !== null && ` ~${formatPenny(outCost)}`}{" "}
+            <span className="text-foreground-weak">out</span>
+          </>
+        ) : (
+          <span>·· out</span>
+        )}
+      </div>
+    </div>
   );
 }
