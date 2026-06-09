@@ -21,7 +21,7 @@ export default async function DocPage({
   return (
     <article className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-foreground-title text-xl font-bold tracking-tight">
+        <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           {doc.title}
         </h1>
         {doc.description && (

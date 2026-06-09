@@ -42,12 +42,9 @@ export const DOC_SECTIONS: DocSection[] = [
     audience: "For Admins",
     groups: [
       {
-        label: "Start here",
-        items: [{ slug: "admin-introduction", label: "Introduction" }],
-      },
-      {
         label: "Workspace admin",
         items: [
+          { slug: "admin-introduction", label: "Introduction" },
           { slug: "settings", label: "Settings" },
           { slug: "audit-and-roles", label: "Audit & roles" },
           { slug: "slack-apps", label: "Slack apps" },

@@ -20,7 +20,7 @@ export function DocBody({
 }) {
   const base = `/${workspaceSlug}/docs`;
   return (
-    <div className="prose dark:prose-invert max-w-none prose-pre:bg-surface prose-pre:border prose-pre:border-[var(--color-border)] prose-pre:text-foreground prose-code:bg-surface prose-code:text-foreground prose-code:font-mono prose-code:rounded prose-code:px-1 prose-code:py-0.5 prose-headings:text-foreground-title prose-strong:text-foreground prose-p:text-foreground prose-li:text-foreground prose-a:text-foreground prose-a:underline hover:prose-a:no-underline">
+    <div className="prose dark:prose-invert max-w-none prose-headings:text-foreground-title prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-pre:bg-surface prose-pre:border prose-pre:border-[var(--color-border)] prose-pre:text-foreground prose-code:bg-surface prose-code:text-foreground prose-code:font-mono prose-code:rounded prose-code:px-1 prose-code:py-0.5 prose-strong:text-foreground prose-p:text-foreground prose-li:text-foreground prose-a:text-foreground prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-foreground-title">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
