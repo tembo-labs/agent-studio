@@ -14,6 +14,13 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+### Added
+- **Free-text agent names.** Name an agent in normal text (e.g. "Inbox Triage")
+  — the create form slugifies it for the filename and saves the text as a new
+  optional `title:` field on the spec. The agents list, agent page, and chat
+  header show the `title` (falling back to the slug); the slug `name` stays the
+  stable identifier for URLs, runs, and automations, so nothing else changes.
+
 ### Fixed
 - **Historical run-cost backfill.** Recomputed the stored `cost_usd` on existing
   runs against the corrected model rates (Opus $5/$25; gpt-5.x priced per

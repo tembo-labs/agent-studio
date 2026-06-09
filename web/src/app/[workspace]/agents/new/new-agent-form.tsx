@@ -12,6 +12,7 @@ import {
   type Framework,
 } from "@/lib/agent-framework";
 import type { CommitMode } from "@/lib/commit-mode-constants";
+import { suggestSlug } from "@/lib/slugify";
 
 import {
   createFromChatAction,
@@ -47,6 +48,8 @@ export function NewAgentForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [framework, setFramework] = useState<Framework>(DEFAULT_FRAMEWORK);
+  // The name is free text; the filename + spec `name:` slug are derived from it.
+  const nameSlug = suggestSlug(name.trim());
 
   if (state.success) {
     const s = state.success;
@@ -117,19 +120,30 @@ export function NewAgentForm({
           name="name"
           type="text"
           autoComplete="off"
-          spellCheck={false}
           required
-          minLength={2}
-          maxLength={64}
-          pattern="[a-z0-9]+(-[a-z0-9]+)*"
+          maxLength={120}
           disabled={pending}
-          placeholder="inbox-triage"
+          placeholder="Inbox Triage"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
         <p className="text-foreground-muted text-sm">
-          Lowercase letters, digits, and hyphens. Becomes the filename and
-          the canonical agent name.
+          Use any name you like.{" "}
+          {name.trim() && nameSlug ? (
+            <>
+              Saved as{" "}
+              <code className="bg-surface rounded px-1 py-0.5">
+                {nameSlug}.{name.trim() && framework === "cargo-ai" ? "json" : "yaml"}
+              </code>
+              .
+            </>
+          ) : name.trim() ? (
+            <span className="text-sentiment-negative">
+              Add some letters or numbers for the filename.
+            </span>
+          ) : (
+            "It's slugified for the filename."
+          )}
         </p>
       </div>
 

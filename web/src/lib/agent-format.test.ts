@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAgentContent } from "@/lib/agent-format";
+import { agentDisplayName, parseAgentContent } from "@/lib/agent-format";
 
 // Minimal valid Pydantic spec + an extra line under test.
 function pyd(extra: string): string {
@@ -31,5 +31,22 @@ describe("agentspec `skills:` parsing", () => {
 
   it("defaults to [] when absent", () => {
     expect(skillsOf(pyd(""))).toEqual([]);
+  });
+});
+
+describe("agentspec `title:` + agentDisplayName", () => {
+  it("parses a free-text title", () => {
+    const r = parseAgentContent(pyd('title: "Inbox Triage"'), "yaml");
+    expect(r.ok && r.spec.title).toBe("Inbox Triage");
+  });
+
+  it("agentDisplayName prefers title, falls back to name", () => {
+    expect(agentDisplayName({ name: "inbox-triage", title: "Inbox Triage" })).toBe(
+      "Inbox Triage",
+    );
+    expect(agentDisplayName({ name: "inbox-triage" })).toBe("inbox-triage");
+    expect(agentDisplayName({ name: "inbox-triage", title: "  " })).toBe(
+      "inbox-triage",
+    );
   });
 });

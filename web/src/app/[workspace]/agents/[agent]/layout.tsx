@@ -5,6 +5,7 @@ import { BackLink } from "@/components/back-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
+import { agentDisplayName } from "@/lib/agent-format";
 import { getAgentOwner, getStableVersion } from "@/lib/agent-versions";
 import { toolkitLabel } from "@/lib/composio-label";
 import { getMcpProvider } from "@/lib/mcp-providers";
@@ -99,7 +100,7 @@ export default async function AgentLayout({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2">
             <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
-              {canonicalName}
+              {agent.ok ? agentDisplayName(agent.spec) : canonicalName}
             </h1>
             {agent.ok ? (
               <div className="flex flex-wrap items-center gap-1.5">

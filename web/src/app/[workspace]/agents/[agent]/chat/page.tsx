@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
+import { agentDisplayName } from "@/lib/agent-format";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listImprovementsForAgent } from "@/lib/improvements-api";
 import { listChatRunsForAgent } from "@/lib/runs-db";
@@ -30,6 +31,7 @@ export default async function AgentChatPage({
   if (!result) notFound();
   const { agent } = result;
   const canonicalName = agent.ok ? agent.spec.name : agentName;
+  const displayName = agent.ok ? agentDisplayName(agent.spec) : agentName;
 
   const [stored, chatRuns] = await Promise.all([
     listImprovementsForAgent(workspace.id, canonicalName),
@@ -58,14 +60,14 @@ export default async function AgentChatPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <BackLink href={agentHref} label={canonicalName} />
+        <BackLink href={agentHref} label={displayName} />
         <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
           Chat to edit
         </h1>
         <p className="text-foreground-weak text-base">
           Describe a change you&apos;d like to make to{" "}
           <span className="text-foreground font-medium">
-            {canonicalName}
+            {displayName}
           </span>
           .{" "}
           {workspace.commitMode === "direct"

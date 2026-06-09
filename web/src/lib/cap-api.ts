@@ -196,6 +196,8 @@ export type AvailableConnectionSlots = Record<string, string[]>;
 export function buildCreateAgentPrompt(args: {
   framework: Framework;
   agentName: string;
+  /** Free-text display name to write as the spec's `title:`. */
+  title: string;
   agentPath: string;
   description: string;
   improvementMarker: string;
@@ -219,7 +221,7 @@ export function buildCreateAgentPrompt(args: {
     `- \`${frameworkGuide}\` — framework-specific shape and patterns`,
     `- \`${GUIDANCE_ADDITIONAL_PATH}\` — any customer-specific overrides (read if present)`,
     "",
-    `The agent's \`name:\` field must be exactly \`${args.agentName}\` (matching the filename). Don't put the file anywhere other than \`${args.agentPath}\`.`,
+    `The agent's \`name:\` field must be exactly \`${args.agentName}\` (it matches the filename). Also set a \`title:\` field to the human display name "${args.title}" (free text — this is what the UI shows). Don't put the file anywhere other than \`${args.agentPath}\`.`,
     "",
     ...renderAvailableSlots(args.availableSlots),
     "If the agent needs to call external services (Slack, Gmail, Google",

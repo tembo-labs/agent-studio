@@ -14,7 +14,18 @@ export { FRAMEWORKS, FRAMEWORK_LABELS } from "@/lib/agent-framework";
 export type { Framework } from "@/lib/agent-framework";
 
 type AgentSpecBase = {
+  /**
+   * The slug identifier — must match the filename (`name: foo` → `foo.yaml`).
+   * Used as the stable key everywhere (URLs, run records, dispatch, versions,
+   * automations). Lowercase letters, digits, hyphens.
+   */
   name: string;
+  /**
+   * Optional free-text display name shown in the UI (e.g. "Revenue Rollup").
+   * Falls back to `name` when absent — see `agentDisplayName`. Doesn't affect
+   * identity: the slug `name` stays the key.
+   */
+  title?: string;
   description?: string;
   /**
    * Optional labels for grouping + scoping. Normalized lowercase. Used
@@ -25,6 +36,21 @@ type AgentSpecBase = {
   /** Raw parsed object preserved for round-tripping. */
   raw: Record<string, unknown>;
 };
+
+/** Human label for an agent: the free-text `title` if set, else the slug. */
+export function agentDisplayName(spec: {
+  title?: string;
+  name: string;
+}): string {
+  return spec.title && spec.title.trim() ? spec.title.trim() : spec.name;
+}
+
+/** Accept a non-empty `title:` string; trim + cap length. */
+function parseTitleField(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim();
+  return v ? v.slice(0, 200) : undefined;
+}
 
 /** Accept `labels: [sales, crm]` or `labels: "sales, crm"`; normalize. */
 function parseLabelsField(raw: unknown): string[] {
@@ -362,6 +388,7 @@ export function parseAgentContent(
     typeof obj.description === "string" ? obj.description : undefined;
   const base: AgentSpecBase = {
     name,
+    title: parseTitleField(obj.title),
     description,
     labels: parseLabelsField(obj.labels),
     raw: obj,

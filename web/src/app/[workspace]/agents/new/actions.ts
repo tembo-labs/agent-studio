@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { validateAgentName } from "@/lib/agent-format";
 import { FRAMEWORKS, type Framework } from "@/lib/agent-framework";
+import { suggestSlug } from "@/lib/slugify";
 import {
   authorizeWorkspace,
   DENIED_MESSAGE,
@@ -60,14 +61,19 @@ export async function createFromChatAction(
   formData: FormData,
 ): Promise<ChatCreateFormState> {
   const slug = String(formData.get("workspace") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
+  // The name is free text (e.g. "Inbox Triage"). The filename + spec `name:`
+  // identifier are a slug derived from it; the free text rides along as `title`.
+  const displayName = String(formData.get("name") ?? "").trim();
+  const agentSlug = suggestSlug(displayName);
   const framework = parseFrameworkField(formData.get("framework"));
   const description = String(formData.get("description") ?? "").trim();
 
-  if (!validateAgentName(name)) {
+  if (!displayName) {
+    return { error: "Enter a name for the agent." };
+  }
+  if (!validateAgentName(agentSlug)) {
     return {
-      error:
-        "Agent name must be 2–64 chars, lowercase letters, digits, and hyphens.",
+      error: "Use a name with at least two letters or numbers (for the filename).",
     };
   }
   if (!framework) {
@@ -102,7 +108,7 @@ export async function createFromChatAction(
   // Name-collision check against the repo's current agents. Treat
   // both parsed-OK matches (by canonical name) and parse-error
   // matches (by filename base) as taken.
-  const collision = await getAgentByName(workspace.id, name);
+  const collision = await getAgentByName(workspace.id, agentSlug);
   if (collision) {
     return {
       error:
@@ -111,7 +117,7 @@ export async function createFromChatAction(
   }
 
   const { dir, ext } = FRAMEWORK_PATH[framework];
-  const agentPath = `agents/${dir}/${name}.${ext}`;
+  const agentPath = `agents/${dir}/${agentSlug}.${ext}`;
 
   // Persist the request as an improvement row before talking to
   // Tembo so we own the id we embed in the prompt. agent_name +
@@ -121,7 +127,7 @@ export async function createFromChatAction(
   const row = await createImprovement({
     workspaceId: workspace.id,
     runId: null,
-    agentName: name,
+    agentName: agentSlug,
     agentPath,
     improvementText: description,
     kind: "create",
@@ -145,7 +151,8 @@ export async function createFromChatAction(
 
   const prompt = buildCreateAgentPrompt({
     framework,
-    agentName: name,
+    agentName: agentSlug,
+    title: displayName,
     agentPath,
     description,
     improvementMarker: improvementMarker(row.id),
@@ -188,7 +195,7 @@ export async function createFromChatAction(
       taskId: res.result.taskId,
       htmlUrl: res.result.htmlUrl,
       status: res.result.status,
-      agentName: name,
+      agentName: displayName,
       agentPath,
     },
   };

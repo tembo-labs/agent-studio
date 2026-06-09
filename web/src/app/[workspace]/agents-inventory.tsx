@@ -24,7 +24,10 @@ export type InventoryAgent =
       // Used as the React key. Stable across renders.
       path: string;
       filename: string;
+      /** The slug identifier (matches the filename); used for links + lookup. */
       name: string;
+      /** Free-text display name (spec `title:`), falls back to the slug. */
+      displayName: string;
       detailHref: string;
       frameworkLabel: string;
       /** Spec labels (for grouping + Slack-app scoping). */
@@ -474,8 +477,13 @@ function InventoryRow({
           href={agent.detailHref}
           className="text-foreground font-medium hover:underline"
         >
-          {agent.name}
+          {agent.displayName}
         </Link>
+        {agent.displayName !== agent.name && (
+          <div className="text-foreground-muted font-mono text-xs">
+            {agent.filename}
+          </div>
+        )}
       </td>
       <td className="px-3 py-2 align-middle">
         <StatusCell bucket={bucket} />
@@ -679,6 +687,7 @@ function statusBucket(a: InventoryAgent): StatusBucket {
 
 function searchHaystack(a: InventoryAgent): string {
   if (a.kind === "invalid") return a.filename;
+  if (a.kind === "live") return `${a.displayName} ${a.name} ${a.filename}`;
   return a.name;
 }
 

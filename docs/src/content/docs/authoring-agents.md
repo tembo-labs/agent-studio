@@ -30,8 +30,13 @@ instructions: |
 
 Key fields:
 
-- **`name`** (required) — must match the filename (`name: foo` → `foo.yaml`);
-  lowercase letters, digits, hyphens.
+- **`name`** (required) — the slug identifier; must match the filename
+  (`name: foo` → `foo.yaml`); lowercase letters, digits, hyphens. It's the
+  stable key for URLs, runs, and automations, so don't change it after creation.
+- **`title`** (optional) — a free-text display name shown in the UI (e.g.
+  `title: "Inbox Triage"`). When you create an agent you can type any name; the
+  filename slug is derived from it and the text is saved as `title`. The UI falls
+  back to `name` when there's no title.
 - **`model`** (required) — `provider:model`, e.g. `anthropic:claude-fable-5`,
   `anthropic:claude-opus-4-8`, `anthropic:claude-sonnet-4-6`, `openai:gpt-5.5`,
   `openai:gpt-4o-mini`. The provider's key must be set in

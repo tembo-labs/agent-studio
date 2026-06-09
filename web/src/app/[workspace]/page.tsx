@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
+import { agentDisplayName } from "@/lib/agent-format";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listPendingCreatesForWorkspace } from "@/lib/improvements-api";
 import { meetsMinRole } from "@/lib/rbac";
@@ -101,6 +102,7 @@ export default async function WorkspacePage({
             path: a.path,
             filename: a.filename,
             name: a.spec.name,
+            displayName: agentDisplayName(a.spec),
             detailHref: `/${workspace.slug}/agents/${encodeURIComponent(a.spec.name)}`,
             frameworkLabel: FRAMEWORK_LABELS[a.spec.framework],
             labels: a.spec.labels,

@@ -249,9 +249,14 @@ output_schema:
 
 ### Top-level fields
 
-- **\`name\`** (required by TAS) — agent identifier. Must match
-  the filename (\`name: foo\` → \`foo.yaml\`). 2–64 chars, lowercase,
-  digits, hyphens.
+- **\`name\`** (required by TAS) — the **slug identifier**. Must match
+  the filename (\`name: foo\` → \`foo.yaml\`) and is the stable key used
+  in URLs, runs, and automations. 2–64 chars, lowercase, digits,
+  hyphens. Don't change it after creation (it would orphan history).
+- **\`title\`** (optional) — a **free-text display name** shown in the
+  UI (e.g. \`title: "Inbox Triage"\`). Use it whenever a human-friendly
+  name reads better than the slug. The UI falls back to \`name\` when
+  it's absent. Unlike \`name\`, you can change \`title\` freely.
 - **\`model\`** (required) — format \`provider:model\`. Examples:
   \`anthropic:claude-fable-5\`, \`anthropic:claude-opus-4-8\`,
   \`anthropic:claude-sonnet-4-6\`, \`openai:gpt-5.5\`,
