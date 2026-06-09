@@ -85,6 +85,19 @@ export async function listTriggersForAgent(
   return rows.map(rowToTrigger);
 }
 
+export async function listTriggersForWorkspace(
+  workspaceId: string,
+): Promise<WorkspaceTrigger[]> {
+  const { rows } = await db.query<Row>(
+    `SELECT ${COLUMNS}
+       FROM workspace_trigger
+      WHERE workspace_id = $1
+      ORDER BY agent_name ASC, created_at ASC`,
+    [workspaceId],
+  );
+  return rows.map(rowToTrigger);
+}
+
 export async function getTriggerById(
   workspaceId: string,
   id: string,

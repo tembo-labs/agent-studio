@@ -82,6 +82,19 @@ export async function listWebhooksForAgent(
   return rows.map(toPreview);
 }
 
+export async function listWebhooksForWorkspace(
+  workspaceId: string,
+): Promise<WebhookPreview[]> {
+  const { rows } = await db.query<PreviewDbRow>(
+    `SELECT ${PREVIEW_COLS}
+       FROM workspace_webhook
+      WHERE workspace_id = $1
+      ORDER BY agent_name ASC, created_at ASC`,
+    [workspaceId],
+  );
+  return rows.map(toPreview);
+}
+
 export async function getWebhookPreview(
   workspaceId: string,
   id: string,
