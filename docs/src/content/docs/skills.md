@@ -18,9 +18,10 @@ code-execution sandbox) and work with **any model**.
 Open **Skills** in the sidebar. Three sources, each commits the skill folder to
 your repo:
 
-- **skills.sh** — paste a slug or GitHub URL from the open
-  [Agent Skills directory](https://www.skills.sh/) (e.g.
-  `vercel-labs/skills/find-skills`). TAS fetches the folder and commits it.
+- **skills.sh** — browse and search the open
+  [Agent Skills directory](https://www.skills.sh/) right in the app and install
+  with one click. (You can also paste a slug or GitHub URL for a skill that
+  isn't in the directory.)
 - **Upload** — a custom skill bundled as a `.zip` (a folder containing
   `SKILL.md`).
 - **Import from the Claude API** — copy a skill your team created via the Claude

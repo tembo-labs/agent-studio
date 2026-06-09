@@ -8,6 +8,11 @@ import { writeAuditEvent } from "@/lib/audit-db";
 import { authorizeWorkspace, DENIED_MESSAGE } from "@/lib/auth-server";
 import { unzipSkillBundle } from "@/lib/skill-bundle";
 import { fetchSkillFromGitHub, parseSkillRef } from "@/lib/skillssh";
+import {
+  downloadSkillSh,
+  searchSkillsSh,
+  type SkillsShEntry,
+} from "@/lib/skillssh-api";
 import { suggestSlug } from "@/lib/slugify";
 import { getWorkspaceSecretPlaintext } from "@/lib/workspace";
 import {
@@ -79,6 +84,47 @@ export async function installFromGitHubAction(
     deriveSkillName(fetched.files, parsed.path.split("/").pop() || parsed.repo);
   if (!name) return { error: "Couldn't determine a skill name from SKILL.md." };
   return commitSkill(auth.workspace.id, auth.userId, slug, name, fetched.files, `github:${parsed.owner}/${parsed.repo}`);
+}
+
+// Live search of the skills.sh directory (membership-gated proxy, read-only).
+export type SearchSkillsResult =
+  | { ok: true; skills: SkillsShEntry[] }
+  | { ok: false; error: string };
+
+export async function searchSkillsShAction(
+  workspaceSlug: string,
+  query: string,
+): Promise<SearchSkillsResult> {
+  const auth = await authorizeWorkspace(workspaceSlug, "viewer");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  return searchSkillsSh(query);
+}
+
+// Install a skill from the skills.sh directory (downloads its files + commits).
+export async function installFromSkillsShAction(
+  _prev: SkillActionState,
+  formData: FormData,
+): Promise<SkillActionState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const source = String(formData.get("source") ?? "").trim();
+  const skillId = String(formData.get("skillId") ?? "").trim();
+
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  if (!source || !skillId) return { error: "Missing skill reference." };
+
+  const dl = await downloadSkillSh(source, skillId);
+  if (!dl.ok) return { error: dl.error };
+
+  const name = deriveSkillName(dl.files, skillId);
+  if (!name) return { error: "Couldn't determine a skill name from SKILL.md." };
+  return commitSkill(auth.workspace.id, auth.userId, slug, name, dl.files, `skills.sh:${source}`);
 }
 
 // Import a skill the org created via the Claude Skills API (downloads its zip).

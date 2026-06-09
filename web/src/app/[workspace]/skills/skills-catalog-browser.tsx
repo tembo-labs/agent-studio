@@ -1,48 +1,55 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { CatalogSkill } from "@/lib/skills-catalog";
+import type { SkillsShEntry } from "@/lib/skillssh-api";
 
-import { installFromGitHubAction, type SkillActionState } from "./actions";
+import {
+  installFromSkillsShAction,
+  searchSkillsShAction,
+  type SkillActionState,
+} from "./actions";
 
 const INITIAL: SkillActionState = {};
 
-// Browse + filter the curated skill catalog and install with one click. Each
-// card posts the skill's owner/repo/path ref to the existing GitHub installer.
+// Browse the live skills.sh directory: popular skills by default, live search as
+// you type, one-click install (downloads the skill's files + commits them).
 export function SkillsCatalogBrowser({
   workspaceSlug,
-  catalog,
+  popular,
   installed,
 }: {
   workspaceSlug: string;
-  catalog: CatalogSkill[];
+  popular: SkillsShEntry[];
   installed: string[];
 }) {
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SkillsShEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [searching, startSearch] = useTransition();
   const installedSet = useMemo(() => new Set(installed), [installed]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return catalog;
-    return catalog.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.description ?? "").toLowerCase().includes(q),
-    );
-  }, [catalog, query]);
+  const isSearching = query.trim().length >= 2;
+  const shown = isSearching ? results : popular;
 
-  if (catalog.length === 0) {
-    return (
-      <p className="text-foreground-weak text-sm">
-        Couldn&apos;t load the catalog right now. You can still install by slug
-        below.
-      </p>
-    );
-  }
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const t = setTimeout(() => {
+      startSearch(async () => {
+        const r = await searchSkillsShAction(workspaceSlug, q);
+        if (r.ok) {
+          setResults(r.skills);
+          setError(null);
+        } else {
+          setError(r.error);
+        }
+      });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query, workspaceSlug]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -50,24 +57,47 @@ export function SkillsCatalogBrowser({
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search skills…"
+        placeholder="Search the skills.sh directory…"
         className="max-w-sm"
       />
+      {error && (
+        <p className="text-sentiment-negative text-sm">
+          Couldn&apos;t reach skills.sh: {error}
+        </p>
+      )}
+      {!error && popular.length === 0 && !isSearching && (
+        <p className="text-foreground-weak text-sm">
+          Couldn&apos;t load the directory right now. You can still install by
+          slug below.
+        </p>
+      )}
+      <p className="text-foreground-muted text-xs uppercase tracking-wide">
+        {isSearching
+          ? searching
+            ? "Searching…"
+            : `${shown.length} result${shown.length === 1 ? "" : "s"}`
+          : "Popular"}
+      </p>
       <div className="grid gap-2 sm:grid-cols-2">
-        {filtered.map((skill) => (
+        {shown.map((skill) => (
           <CatalogCard
-            key={skill.ref}
+            key={`${skill.source}/${skill.skillId}`}
             workspaceSlug={workspaceSlug}
             skill={skill}
             installed={installedSet.has(skill.name)}
           />
         ))}
       </div>
-      {filtered.length === 0 && (
+      {isSearching && !searching && shown.length === 0 && !error && (
         <p className="text-foreground-weak text-sm">No skills match “{query}”.</p>
       )}
     </div>
   );
+}
+
+function formatInstalls(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
+  return String(n);
 }
 
 function CatalogCard({
@@ -76,11 +106,11 @@ function CatalogCard({
   installed,
 }: {
   workspaceSlug: string;
-  skill: CatalogSkill;
+  skill: SkillsShEntry;
   installed: boolean;
 }) {
   const [state, action, pending] = useActionState(
-    installFromGitHubAction,
+    installFromSkillsShAction,
     INITIAL,
   );
   const done = installed || !!state.message;
@@ -91,14 +121,15 @@ function CatalogCard({
       className="border-border bg-surface-raised flex flex-col gap-2 rounded-lg border p-3"
     >
       <input type="hidden" name="workspace" value={workspaceSlug} />
-      <input type="hidden" name="ref" value={skill.ref} />
+      <input type="hidden" name="source" value={skill.source} />
+      <input type="hidden" name="skillId" value={skill.skillId} />
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col">
-          <code className="text-foreground text-sm font-medium">
+          <code className="text-foreground truncate text-sm font-medium">
             {skill.name}
           </code>
-          <span className="text-foreground-muted text-xs uppercase tracking-wide">
-            {skill.collection}
+          <span className="text-foreground-muted truncate text-xs">
+            {skill.source} · {formatInstalls(skill.installs)} installs
           </span>
         </div>
         <Button
@@ -110,20 +141,10 @@ function CatalogCard({
           {pending ? "Installing…" : done ? "Installed ✓" : "Install"}
         </Button>
       </div>
-      {skill.description && (
-        <p className="text-foreground-weak line-clamp-3 text-sm">
-          {skill.description}
-        </p>
-      )}
       {state.error && (
         <p className="text-sentiment-negative text-sm" role="alert">
           {state.error}
         </p>
-      )}
-      {!installed && state.message && (
-        <Badge variant="green" size="small">
-          Installed
-        </Badge>
       )}
     </form>
   );

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Section } from "@/components/section";
 import { listAnthropicSkills } from "@/lib/anthropic-skills";
-import { listCatalogSkills } from "@/lib/skills-catalog";
+import { popularSkillsSh } from "@/lib/skillssh-api";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
@@ -40,12 +40,9 @@ export default async function SkillsPage({
   const installed = repo ? await listInstalledSkills(workspace.id) : [];
   const installedNames = installed.map((s) => s.name);
 
-  // Browsable catalog (curated GitHub collections). The workspace token lifts
-  // GitHub's rate limit; best-effort.
-  const githubToken = repo
-    ? await getWorkspaceSecretPlaintext(workspace.id, "github_pat")
-    : null;
-  const catalog = repo ? await listCatalogSkills(githubToken ?? undefined) : [];
+  // Popular skills from the live skills.sh directory (search is client-side).
+  const popular = repo ? await popularSkillsSh() : { ok: false as const, error: "" };
+  const popularSkills = popular.ok ? popular.skills : [];
 
   // Best-effort list of the org's Claude API skills for the import dropdown.
   const anthropicKey = await getWorkspaceSecretPlaintext(
@@ -135,12 +132,12 @@ export default async function SkillsPage({
           <div className="divide-y divide-[var(--color-border-weak)]">
             <div className="pb-6">
               <Section
-                title="Browse the catalog"
-                description="Curated Agent Skills from public collections. Search and install with one click."
+                title="Browse skills.sh"
+                description="Search the open Agent Skills directory and install with one click."
               >
                 <SkillsCatalogBrowser
                   workspaceSlug={slug}
-                  catalog={catalog}
+                  popular={popularSkills}
                   installed={installedNames}
                 />
                 <details className="mt-4">
