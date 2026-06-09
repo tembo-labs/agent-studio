@@ -123,23 +123,23 @@ export function RunSteps({
       })}
 
       {hasTokens && (
-        <div className="border-border bg-surface-secondary flex items-start gap-x-4 border-t px-3 py-2.5">
-          <span className="min-w-0 flex-1" />
-          <span className="text-foreground w-28 shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums">
-            {dirStr(model, totalIn, "input")}{" "}
-            <span className="text-foreground-weak font-normal">in</span>
-          </span>
-          {/* Out total, with the combined total stacked under it. */}
-          <span className="flex w-28 shrink-0 flex-col items-end gap-0.5">
-            <span className="text-foreground whitespace-nowrap text-sm font-semibold tabular-nums">
+        <div className="border-border bg-surface-secondary flex flex-col items-end gap-0.5 border-t px-3 py-2.5">
+          {/* Broken-down In/Out totals — small, columns aligned with the rows. */}
+          <div className="flex items-baseline gap-x-4">
+            <span className="text-foreground-weak w-28 shrink-0 whitespace-nowrap text-right text-xs tabular-nums">
+              {dirStr(model, totalIn, "input")}{" "}
+              <span className="text-foreground-muted">in</span>
+            </span>
+            <span className="text-foreground-weak w-28 shrink-0 whitespace-nowrap text-right text-xs tabular-nums">
               {dirStr(model, totalOut, "output")}{" "}
-              <span className="text-foreground-weak font-normal">out</span>
+              <span className="text-foreground-muted">out</span>
             </span>
-            <span className="text-foreground-weak whitespace-nowrap text-xs tabular-nums">
-              {abbreviateTokens(totalIn + totalOut)}
-              {combinedCost !== null && ` ~${formatPenny(combinedCost)}`} total
-            </span>
-          </span>
+          </div>
+          {/* Combined total — the headline number, larger. */}
+          <div className="text-foreground whitespace-nowrap text-base font-semibold tabular-nums">
+            {abbreviateTokens(totalIn + totalOut)}
+            {combinedCost !== null && ` ~${formatPenny(combinedCost)}`} total
+          </div>
         </div>
       )}
     </div>
