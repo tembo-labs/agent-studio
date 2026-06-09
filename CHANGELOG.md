@@ -15,6 +15,11 @@ they are no longer release versions. Phase scope now lives in
 ## [Unreleased]
 
 ### Added
+- **Fathom Native MCP.** Added [Fathom](https://fathom.video) (meeting
+  notes/transcripts) as a native MCP provider — connect it from Connections with
+  TAS-managed OAuth (Fathom supports dynamic client registration + PKCE, so
+  there's no per-customer OAuth-app setup). Agents reach it with
+  `connections: [{ type: fathom, source: native-mcp }]`.
 - **Free-text agent names.** Name an agent in normal text (e.g. "Inbox Triage")
   — the create form slugifies it for the filename and saves the text as a new
   optional `title:` field on the spec. The agents list, agent page, and chat

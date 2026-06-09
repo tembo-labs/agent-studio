@@ -16,7 +16,7 @@
 
 import { getPublicOrigin } from "@/lib/config";
 
-export type McpProviderSlug = "attio" | "pylon" | "hubspot";
+export type McpProviderSlug = "attio" | "pylon" | "hubspot" | "fathom";
 
 export type McpProvider = {
   slug: McpProviderSlug;
@@ -69,6 +69,22 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     mcpServerUrl: "https://mcp.hubspot.com",
     oauthAuthorizationServerOrigins: ["https://mcp.hubspot.com"],
     authMode: "manual",
+  },
+  fathom: {
+    slug: "fathom",
+    displayName: "Fathom",
+    // Verified: POST /mcp → 401 + WWW-Authenticate Bearer pointing at
+    // /.well-known/oauth-protected-resource, which advertises the auth server
+    // as https://api.fathom.ai. Auth-server metadata supports DCR
+    // (registration_endpoint), PKCE S256, and a public client (auth method
+    // "none") — so it's TAS-managed (no per-customer setup), like Attio.
+    // Note: the token + registration endpoints are on api.fathom.ai, but the
+    // authorization_endpoint is on fathom.video — both origins are allowed.
+    mcpServerUrl: "https://api.fathom.ai/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.fathom.ai",
+      "https://fathom.video",
+    ],
   },
 };
 
