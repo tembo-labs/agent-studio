@@ -331,10 +331,10 @@ function AuditRow({
   const tone = SOURCE_TONE[entry.source];
   return (
     <tr className="hover:bg-surface-secondary transition-colors">
-      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
+      <td className="text-foreground-weak whitespace-nowrap px-3 py-2 align-top text-sm">
         <LocalTime iso={entry.at} style="relative" />
       </td>
-      <td className="text-foreground px-3 py-2 align-top text-sm">
+      <td className="text-foreground whitespace-nowrap px-3 py-2 align-top text-sm">
         {entry.actorDisplayName ?? (
           <span className="text-foreground-muted italic">System</span>
         )}

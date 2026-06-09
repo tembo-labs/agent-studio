@@ -8,6 +8,7 @@ import { IconPlusLarge } from "central-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 import { dismissPendingCreateAction } from "./inventory-actions";
 
@@ -95,6 +96,8 @@ export function AgentsInventory({
   // null = "all" (no facet selected). Selecting a pill switches the
   // visible rows to that bucket only.
   const [bucket, setBucket] = useState<StatusBucket | null>(null);
+  const [labelFilter, setLabelFilter] = useState("");
+  const [modelFilter, setModelFilter] = useState("");
   // Default sort: alphabetical by name. The user can re-sort by clicking
   // column headers.
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -118,21 +121,51 @@ export function AgentsInventory({
     return c;
   }, [enriched]);
 
+  // Distinct labels + models across live agents, for the filter dropdowns.
+  const labelOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const { agent } of enriched) {
+      if (agent.kind === "live") for (const l of agent.labels) set.add(l);
+    }
+    return [
+      { value: "", label: "All labels" },
+      ...[...set].sort().map((l) => ({ value: l, label: l })),
+    ];
+  }, [enriched]);
+  const modelOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const { agent } of enriched) {
+      if (agent.kind === "live" && agent.model) set.add(agent.model);
+    }
+    return [
+      { value: "", label: "All models" },
+      ...[...set].sort().map((m) => ({ value: m, label: shortModel(m) })),
+    ];
+  }, [enriched]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filteredByText = q
+    let rows = q
       ? enriched.filter(({ agent }) =>
           searchHaystack(agent).toLowerCase().includes(q),
         )
       : enriched;
-    const filteredByBucket =
-      bucket === null
-        ? filteredByText
-        : filteredByText.filter((e) => e.bucket === bucket);
-    return [...filteredByBucket].sort((a, b) =>
+    if (bucket !== null) rows = rows.filter((e) => e.bucket === bucket);
+    if (labelFilter) {
+      rows = rows.filter(
+        ({ agent }) =>
+          agent.kind === "live" && agent.labels.includes(labelFilter),
+      );
+    }
+    if (modelFilter) {
+      rows = rows.filter(
+        ({ agent }) => agent.kind === "live" && agent.model === modelFilter,
+      );
+    }
+    return [...rows].sort((a, b) =>
       compareRows(a.agent, b.agent, a.bucket, b.bucket, sortKey, sortDir),
     );
-  }, [enriched, query, bucket, sortKey, sortDir]);
+  }, [enriched, query, bucket, labelFilter, modelFilter, sortKey, sortDir]);
 
   function onHeaderClick(key: SortKey) {
     if (key === sortKey) {
@@ -175,7 +208,27 @@ export function AgentsInventory({
         )}
       </div>
 
-      <FacetPills counts={counts} active={bucket} onChange={setBucket} />
+      <div className="flex flex-wrap items-center gap-2">
+        <FacetPills counts={counts} active={bucket} onChange={setBucket} />
+        {labelOptions.length > 1 && (
+          <Select
+            value={labelFilter}
+            onValueChange={setLabelFilter}
+            options={labelOptions}
+            ariaLabel="Filter by label"
+            className="min-w-[130px]"
+          />
+        )}
+        {modelOptions.length > 1 && (
+          <Select
+            value={modelFilter}
+            onValueChange={setModelFilter}
+            options={modelOptions}
+            ariaLabel="Filter by model"
+            className="min-w-[130px]"
+          />
+        )}
+      </div>
 
       {filtered.length === 0 ? (
         <div className="text-foreground-weak flex flex-col items-center gap-2 rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm">
