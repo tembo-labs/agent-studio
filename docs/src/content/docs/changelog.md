@@ -15,9 +15,11 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
-## [Unreleased]
+## [v2026.6.15] — Fathom MCP, free-text agent names — shipped 2026-06-09
 
 ### Added
+- **Run input on the run view.** A run started with an optional message now shows
+  that text as an **Input** field (under Trigger) on the run detail page.
 - **Fathom Native MCP.** Added [Fathom](https://fathom.video) (meeting
   notes/transcripts) as a native MCP provider — connect it from Connections with
   TAS-managed OAuth (Fathom supports dynamic client registration + PKCE, so
@@ -30,6 +32,11 @@ they are no longer release versions. Phase scope now lives in
   stable identifier for URLs, runs, and automations, so nothing else changes.
 
 ### Fixed
+- **Run-now dropped the optional message.** The "Run now" dialog's submit button
+  was a Radix `AlertDialogAction`, which dismissed (unmounted) the dialog the
+  instant it was clicked — racing the form submission and sending the agent an
+  empty `user_message` (so it behaved as if no input was given). Now a plain
+  submit button: success redirects, errors keep the dialog open with the input.
 - **Historical run-cost backfill.** Recomputed the stored `cost_usd` on existing
   runs against the corrected model rates (Opus $5/$25; gpt-5.x priced per
   variant), so the Runs list and dashboard totals match the run-detail estimates
