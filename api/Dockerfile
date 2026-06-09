@@ -54,7 +54,8 @@ ENV PYDANTIC_AI_PY="${PYDANTIC_AI_VENV}/bin/python3"
 # rebuild. Rev versions via PR so we can vet the changelog.
 RUN python3 -m venv "${PYDANTIC_AI_VENV}" && \
     "${PYDANTIC_AI_VENV}/bin/pip" install --no-cache-dir \
-        'pydantic-ai[mcp]==1.102.0' pyyaml==6.0.2 composio==0.13.1
+        'pydantic-ai[mcp]==1.102.0' pyyaml==6.0.2 composio==0.13.1 \
+        pydantic-ai-skills==0.11.0
 
 # Extra deps for agent sidecar tool modules (`tools_module:`). Ships
 # empty; customers add ETL libraries (pandas, drivers, …) here and

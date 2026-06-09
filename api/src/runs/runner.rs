@@ -62,6 +62,9 @@ pub struct RunContext {
     /// `tools_module:`) passed to the wrapper as TAS_TOOLS_MODULE_CONTENT.
     /// Pydantic-only; cargo-ai ignores it.
     pub tools_module_content: Option<String>,
+    /// Files of the Agent Skills the agent opts into, as `{ repoPath: content }`,
+    /// passed to the wrapper as TAS_SKILLS_CONTENT (JSON). Pydantic-only.
+    pub skills_content: Option<std::collections::HashMap<String, String>>,
 }
 
 struct RunOutcome {
@@ -435,6 +438,15 @@ async fn run_pydantic(
         None
     };
 
+    // Skill files the agent opts into, JSON-encoded `{repoPath: content}`. The
+    // wrapper writes them to a temp dir and mounts pydantic-ai-skills.
+    let skills_content_json: Option<String> = ctx
+        .skills_content
+        .as_ref()
+        .filter(|m| !m.is_empty())
+        .map(|m| serde_json::to_string(m).unwrap_or_default())
+        .filter(|s| !s.is_empty());
+
     if openai_key.is_none() && anthropic_key.is_none() {
         // Pydantic-ai would fail inside the subprocess with a less
         // friendly message; intercept here so the run row's error
@@ -461,6 +473,7 @@ async fn run_pydantic(
         composio_connected_accounts_json: composio_connected_accounts_json.as_deref(),
         native_mcp_connections_json: native_mcp_connections_json.as_deref(),
         tools_module_content: ctx.tools_module_content.as_deref(),
+        skills_content_json: skills_content_json.as_deref(),
         secrets_json: secrets_json.as_deref(),
         workspace_id: ctx.workspace_id,
         acting_user_id: ctx.acting_user_id.as_str(),

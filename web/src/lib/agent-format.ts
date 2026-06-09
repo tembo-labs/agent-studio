@@ -75,6 +75,13 @@ export type PydanticAgentSpec = AgentSpecBase & {
    */
   connections: AgentConnection[];
   /**
+   * Agent Skills this agent opts into, by folder name. Each name maps to a
+   * `skills/<name>/` folder (SKILL.md + resources) installed in the connected
+   * repo. The runner mounts the named skill folders so the model can load
+   * their instructions + run their scripts. Empty = no skills.
+   */
+  skills: string[];
+  /**
    * Optional sidecar Python module of custom tool functions the model
    * may call (e.g. deterministic ETL transforms). A bare filename
    * resolved in the spec's own directory — the runner reads it and
@@ -167,9 +174,33 @@ function parsePydanticSpec(
       model,
       instructions,
       connections,
+      skills: parseSkillsField(obj.skills),
       toolsModule: parseToolsModuleField(obj.tools_module),
     },
   };
+}
+
+/**
+ * Accept `skills: [pdf, my-skill]` or `skills: "pdf, my-skill"`. Each entry is
+ * the folder name of a skill installed under `skills/<name>/` in the repo
+ * (lowercase, hyphenated, matching the SKILL.md name). Normalized + deduped.
+ * Path separators are stripped so an entry can only name a top-level skill
+ * folder. Malformed entries are dropped — the runner mounts what it finds.
+ */
+function parseSkillsField(raw: unknown): string[] {
+  let values: string[] = [];
+  if (Array.isArray(raw)) {
+    values = raw.filter((v): v is string => typeof v === "string");
+  } else if (typeof raw === "string") {
+    values = raw.split(",");
+  }
+  return Array.from(
+    new Set(
+      values
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s && !s.includes("/") && !s.includes("\\")),
+    ),
+  );
 }
 
 /**

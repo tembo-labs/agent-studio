@@ -35,6 +35,10 @@ export type CreateRunInput = {
   // functions the pydantic wrapper exposes to the model as tools. Read
   // from the repo at dispatch time; runtime-only (not persisted).
   toolsModuleContent?: string;
+  // Files of the Agent Skills the agent opts into, as { repoPath: content }.
+  // Read from the repo at dispatch; the wrapper materializes them to a temp
+  // dir and mounts pydantic-ai-skills. Runtime-only (not persisted).
+  skillsContent?: Record<string, string>;
   // Defaults to "manual" on the API side. Slack/webhook dispatch passes
   // "event" so the run is attributed correctly in /runs.
   trigger?: RunTrigger;
@@ -137,6 +141,7 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
       spec_content: input.specContent,
       spec_format: input.specFormat,
       tools_module_content: input.toolsModuleContent,
+      skills_content: input.skillsContent,
       trigger: input.trigger,
       agent_version_id: input.agentVersionId,
       agent_version_label: input.agentVersionLabel,

@@ -166,6 +166,10 @@ pub struct PydanticArgs<'a> {
     /// surfaced as `TAS_TOOLS_MODULE_CONTENT`. The wrapper execs it and
     /// exposes its `tools = [...]` export to the agent. None = no module.
     pub tools_module_content: Option<&'a str>,
+    /// Agent Skills the agent opts into, as `{repoPath: content}` JSON,
+    /// surfaced as `TAS_SKILLS_CONTENT`. The wrapper writes them to a temp
+    /// dir and mounts pydantic-ai-skills. None = no skills.
+    pub skills_content_json: Option<&'a str>,
     /// Workspace Secrets (the 3rd substrate) as flat `{slug: value}` JSON,
     /// surfaced as `TAS_SECRETS`. Sidecar tools read a value via
     /// `tas_tools.secret("<slug>")`. Only set when the run has a tools
@@ -283,6 +287,11 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
     // `tools = [...]` export. Only set when the agent declared one.
     if let Some(tools_module) = args.tools_module_content {
         cmd.env("TAS_TOOLS_MODULE_CONTENT", tools_module);
+    }
+    // Agent Skills — {repoPath: content} the wrapper materializes to a temp
+    // dir and mounts via pydantic-ai-skills. Only set when the agent opts in.
+    if let Some(skills) = args.skills_content_json {
+        cmd.env("TAS_SKILLS_CONTENT", skills);
     }
     // Workspace Secrets — flat {slug: value} the sidecar tools read via
     // tas_tools.secret(). Only set when the run has a tools module.

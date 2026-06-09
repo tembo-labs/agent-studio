@@ -235,6 +235,7 @@ export async function sendToAgentAction(args: {
       specContent: result.raw,
       specFormat: agent.format,
       toolsModuleContent: result.toolsModuleContent,
+      skillsContent: result.skillsContent,
       // Chat is the iterate-on-draft surface — always runs the live file.
       agentVersionId: null,
       agentVersionLabel: "draft",

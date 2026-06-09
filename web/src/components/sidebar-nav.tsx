@@ -8,6 +8,7 @@ import { SidebarNavItem } from "@/components/sidebar-nav-item";
 import { cn } from "@/lib/utils";
 import {
   IconApiConnection,
+  IconBook,
   IconBulletList,
   IconCalendarRepeat,
   IconChatBubbles,
@@ -75,6 +76,7 @@ export function SidebarNav({ home }: { home: string }) {
           icon: <IconApiConnection />,
         },
         { href: `${home}/tools`, label: "Tools", icon: <IconHammer /> },
+        { href: `${home}/skills`, label: "Skills", icon: <IconBook /> },
       ],
     },
     {

@@ -277,6 +277,7 @@ export async function dispatchToAgent(args: {
       specContent: r.specContent,
       specFormat: r.specFormat,
       toolsModuleContent: r.toolsModuleContent,
+      skillsContent: r.skillsContent,
       trigger: "event",
       agentVersionId: r.versionId,
       agentVersionLabel: r.versionLabel,

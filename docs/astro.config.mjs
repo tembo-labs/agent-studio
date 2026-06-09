@@ -58,6 +58,7 @@ export default defineConfig({
           label: "Integrations",
           items: [
             { label: "Connections", slug: "connections" },
+            { label: "Skills", slug: "skills" },
             { label: "Tools & Tool uses", slug: "tools-and-tool-uses" },
             { label: "Slack apps", slug: "slack-apps" },
           ],

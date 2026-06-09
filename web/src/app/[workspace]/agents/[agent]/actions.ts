@@ -179,6 +179,7 @@ export async function runNowAction(
       specContent: r.specContent,
       specFormat: r.specFormat,
       toolsModuleContent: r.toolsModuleContent,
+      skillsContent: r.skillsContent,
       userMessage,
       agentVersionId: r.versionId,
       agentVersionLabel: r.versionLabel,

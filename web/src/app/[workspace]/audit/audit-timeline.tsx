@@ -486,6 +486,14 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
           {commitModeLabel(p.from)} → {commitModeLabel(p.to)}
         </span>
       );
+    case "skill.installed":
+    case "skill.removed":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.name ?? "")}
+          {p.source ? ` · ${String(p.source)}` : ""}
+        </span>
+      );
     case "secret.set":
     case "secret.rotated":
     case "secret.removed":
@@ -645,6 +653,8 @@ function humanKind(kind: string): string {
     "repo.disconnected": "Repository disconnected",
     "workspace.renamed": "Workspace renamed",
     "workspace.commit_mode_changed": "Delivery mode changed",
+    "skill.installed": "Skill installed",
+    "skill.removed": "Skill removed",
     "member.added": "Member added",
     "member.role_changed": "Member role changed",
     "member.removed": "Member removed",

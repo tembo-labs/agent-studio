@@ -30,6 +30,7 @@
     "clsx": "^2.1.1",
     "cron-parser": "^5.5.0",
     "cronstrue": "^3.14.0",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",
     "pg": "^8.21.0",

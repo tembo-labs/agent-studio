@@ -31,6 +31,7 @@ import inspect
 import json
 import os
 import sys
+import tempfile
 import traceback
 
 import yaml
@@ -52,6 +53,67 @@ PROGRESS_SENTINEL = "__TAS_PROGRESS__:"
 # expose its `tools = [...]` export to the agent as callable functions —
 # deterministic work the model supervises instead of paying tokens for.
 TOOLS_MODULE_ENV = "TAS_TOOLS_MODULE_CONTENT"
+
+# Agent Skills: the files of the skills the agent opts into (`skills:`), keyed
+# by repo path (e.g. "skills/pdf/SKILL.md"), JSON-encoded by the web layer. We
+# materialize them to a temp dir and mount pydantic-ai-skills so the model can
+# load_skill / read_skill_resource / run_skill_script — all local, in-process,
+# any model. No Anthropic code-execution container involved.
+SKILLS_ENV = "TAS_SKILLS_CONTENT"
+
+
+def build_skills_toolset():
+    """Materialize TAS_SKILLS_CONTENT to a temp dir and mount it.
+
+    Returns a `SkillsToolset` (pydantic-ai-skills) pointed at the directory
+    that holds the agent's opted-in skill folders, or None when no skills are
+    declared / the package is unavailable. Files arrive keyed by repo path
+    ("skills/<name>/SKILL.md"); we write them under a temp root and point the
+    toolset at "<tmp>/skills" (the dir containing the skill folders). Skills
+    run locally and in-process — no Anthropic container.
+    """
+    raw = os.environ.get(SKILLS_ENV)
+    if not raw:
+        return None
+    try:
+        files = json.loads(raw)
+    except (ValueError, TypeError) as e:
+        sys.stderr.write(f"[tas] skills: ignoring bad {SKILLS_ENV} json: {e}\n")
+        return None
+    if not isinstance(files, dict) or not files:
+        return None
+
+    try:
+        from pydantic_ai_skills import SkillsToolset
+    except ImportError:
+        sys.stderr.write(
+            "[tas] skills: pydantic-ai-skills not installed; running without "
+            "the declared skills\n"
+        )
+        return None
+
+    tmp = tempfile.mkdtemp(prefix="tas-skills-")
+    for relpath, content in files.items():
+        # Keep every write sandboxed under tmp — drop anything that escapes.
+        safe = os.path.normpath(str(relpath)).lstrip("/")
+        if safe.startswith(".."):
+            continue
+        dest = os.path.join(tmp, safe)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, "w", encoding="utf-8") as f:
+            f.write(content if isinstance(content, str) else str(content))
+
+    skills_dir = os.path.join(tmp, "skills")
+    if not os.path.isdir(skills_dir):
+        return None
+    names = sorted(
+        n for n in os.listdir(skills_dir)
+        if os.path.isdir(os.path.join(skills_dir, n))
+    )
+    if not names:
+        return None
+    sys.stderr.write(f"[tas] mounted {len(names)} skill(s): {names}\n")
+    return SkillsToolset(directories=[skills_dir])
 
 
 def load_tools_module(source: str) -> list:
@@ -946,6 +1008,13 @@ async def run(spec: dict, user_message: str) -> None:
 
     native_toolsets = build_native_mcp_toolsets(connections)
     toolsets.extend(native_toolsets)
+
+    # Agent Skills the agent opts into (`skills:`). Mounted as a local toolset
+    # (load_skill / run_skill_script); composes with the connection toolsets
+    # above and works with any model.
+    skills_toolset = build_skills_toolset()
+    if skills_toolset is not None:
+        toolsets.append(skills_toolset)
 
     # Preamble framing: if every connection's tools are attached
     # directly (composio in DIRECT_TOOLS mode, or any native-MCP

@@ -167,6 +167,7 @@ export async function POST(
         spec_content: r.specContent,
         spec_format: r.specFormat,
         tools_module_content: r.toolsModuleContent,
+        skills_content: r.skillsContent,
         trigger: "event",
         agent_version_id: r.versionId,
         agent_version_label: r.versionLabel,

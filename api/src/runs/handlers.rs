@@ -52,6 +52,12 @@ pub struct CreateRunRequest {
     /// time; transient like spec_content (not persisted on the run row).
     #[serde(default)]
     pub tools_module_content: Option<String>,
+    /// Files of the Agent Skills the agent opts into, as
+    /// `{ repoPath: content }`. The web layer reads them from the repo at
+    /// dispatch; the wrapper materializes them and mounts pydantic-ai-skills.
+    /// Transient like spec_content (not persisted on the run row).
+    #[serde(default)]
+    pub skills_content: Option<std::collections::HashMap<String, String>>,
     /// Where the run came from. Defaults to "manual" so existing
     /// callers (Run-now button, chat) don't need to change. The
     /// scheduler passes "schedule" + automation_id when firing on
@@ -125,6 +131,7 @@ pub async fn create_run(
         .unwrap_or(runner::Framework::Pydantic);
     let spec_content = req.spec_content;
     let tools_module_content = req.tools_module_content;
+    let skills_content = req.skills_content;
     let spec_format = match req.spec_format.as_deref() {
         Some("yaml") => runner::SpecFormat::Yaml,
         // JSON is the default so cargo-ai callers (which never
@@ -151,6 +158,7 @@ pub async fn create_run(
                 spec_content,
                 spec_format,
                 tools_module_content,
+                skills_content,
             },
         )
         .await;

@@ -26,6 +26,7 @@ import {
   type RepoRef,
 } from "@/lib/github";
 import { getWorkspaceRepo, getWorkspaceSecretPlaintext } from "@/lib/workspace";
+import { readSkillFolder } from "@/lib/workspace-skills";
 
 const AGENTS_DIR = "agents";
 
@@ -55,6 +56,50 @@ const TOOLS_MODULE_MAX_BYTES = 256 * 1024;
 /** The `tools_module` value, only meaningful for Pydantic specs. */
 function specToolsModule(spec: AgentSpec): string | undefined {
   return spec.framework === "pydantic-agentspec" ? spec.toolsModule : undefined;
+}
+
+// ── Agent Skills ──────────────────────────────────────────────────────
+//
+// A Pydantic agent may opt into `skills: [name]` — folders under skills/<name>/
+// in the repo. We read the named folders at dispatch and thread their files to
+// the runner (which mounts them for pydantic-ai-skills). A declared-but-missing
+// skill fails resolution, same as a missing tools_module.
+
+const SKILLS_TOTAL_MAX_BYTES = 1024 * 1024;
+
+function specSkills(spec: AgentSpec): string[] {
+  return spec.framework === "pydantic-agentspec" ? spec.skills : [];
+}
+
+async function loadDispatchSkills(
+  workspaceId: string,
+  skills: string[],
+): Promise<
+  { ok: true; content?: Record<string, string> } | { ok: false; detail: string }
+> {
+  if (skills.length === 0) return { ok: true };
+  const repo = await getWorkspaceRepo(workspaceId);
+  if (!repo) return { ok: false, detail: "no connected repo" };
+  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
+  const ref: RepoRef = {
+    owner: repo.owner,
+    name: repo.name,
+    branch: repo.defaultBranch,
+  };
+  const content: Record<string, string> = {};
+  let total = 0;
+  for (const name of skills) {
+    const folder = await readSkillFolder(token, ref, name);
+    if (!folder.ok) return { ok: false, detail: `skill "${name}": ${folder.detail}` };
+    for (const [path, body] of Object.entries(folder.files)) {
+      total += body.length;
+      if (total > SKILLS_TOTAL_MAX_BYTES) {
+        return { ok: false, detail: "declared skills exceed the size limit" };
+      }
+      content[path] = body;
+    }
+  }
+  return { ok: true, content };
 }
 
 /** Resolve a bare filename in the same directory as the agent file. */
@@ -249,6 +294,8 @@ export async function getAgentByName(
    *  Best-effort here (undefined on any failure) — dispatch does the
    *  strict load that surfaces a missing module as a run error. */
   toolsModuleContent?: string;
+  /** Files of the agent's opted-in skills, best-effort (same caveat). */
+  skillsContent?: Record<string, string>;
 } | null> {
   const list = await listAgents(workspaceId);
   if (!list.ok) return null;
@@ -278,7 +325,14 @@ export async function getAgentByName(
     if (mod.ok) toolsModuleContent = mod.content;
   }
 
-  return { agent: match, raw: read.content, toolsModuleContent };
+  let skillsContent: Record<string, string> | undefined;
+  const skills = match.ok ? specSkills(match.spec) : [];
+  if (skills.length > 0) {
+    const loaded = await loadDispatchSkills(workspaceId, skills);
+    if (loaded.ok) skillsContent = loaded.content;
+  }
+
+  return { agent: match, raw: read.content, toolsModuleContent, skillsContent };
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -306,6 +360,10 @@ export type ResolvedDispatch = {
    *  module is read live from the default branch (not snapshotted with
    *  the version yet); a declared-but-missing module fails resolution. */
   toolsModuleContent?: string;
+  /** Files of the skills the agent opts into, as { repoPath: content }
+   *  (e.g. "skills/pdf/SKILL.md"). Read live from the default branch, like
+   *  tools_module; a declared-but-missing skill fails resolution. */
+  skillsContent?: Record<string, string>;
   /** External services the agent declares (Pydantic only; [] otherwise).
    *  Used to pre-flight the acting user's connections before a run. */
   connections: AgentConnection[];
@@ -361,6 +419,19 @@ export async function resolveAgentForDispatch(
           },
         };
       }
+      const stableSkills = await loadDispatchSkills(
+        workspaceId,
+        stableParsed.ok ? specSkills(stableParsed.spec) : [],
+      );
+      if (!stableSkills.ok) {
+        return {
+          ok: false,
+          error: {
+            kind: "invalid",
+            message: `Agent "${agentName}" opts into a skill that couldn't be loaded: ${stableSkills.detail}`,
+          },
+        };
+      }
       return {
         ok: true,
         resolved: {
@@ -373,6 +444,7 @@ export async function resolveAgentForDispatch(
           versionId: stable.id,
           versionLabel: `v${stable.versionNumber}`,
           toolsModuleContent: stableMod.content,
+          skillsContent: stableSkills.content,
           connections:
             stableParsed.ok &&
             stableParsed.spec.framework === "pydantic-agentspec"
@@ -429,6 +501,16 @@ export async function resolveAgentForDispatch(
       },
     };
   }
+  const skills = await loadDispatchSkills(workspaceId, specSkills(spec));
+  if (!skills.ok) {
+    return {
+      ok: false,
+      error: {
+        kind: "invalid",
+        message: `Agent "${agentName}" opts into a skill that couldn't be loaded: ${skills.detail}`,
+      },
+    };
+  }
   return {
     ok: true,
     resolved: {
@@ -441,6 +523,7 @@ export async function resolveAgentForDispatch(
       versionId: null,
       versionLabel: "draft",
       toolsModuleContent: mod.content,
+      skillsContent: skills.content,
       connections:
         spec.framework === "pydantic-agentspec" ? spec.connections : [],
     },

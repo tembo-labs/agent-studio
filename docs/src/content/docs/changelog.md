@@ -18,6 +18,15 @@ they are no longer release versions. Phase scope now lives in
 ## [Unreleased]
 
 ### Added
+- **Agent Skills.** A workspace **Skills** area to install reusable Agent Skills
+  (Anthropic's `SKILL.md` folders) into your repo under `skills/`, from three
+  sources: the [skills.sh](https://www.skills.sh/) directory (by slug / GitHub
+  URL), a custom `.zip` upload, or **imported from the Claude Skills API** (the
+  org's custom skills + Anthropic's pre-built ones, via the version-content
+  export). An agent opts in with a `skills:` field; at run time the named skill
+  folders are mounted via pydantic-ai-skills so the model can load their
+  instructions and run their scripts — **locally, with any model** (no Anthropic
+  code-execution sandbox). Install/remove is workspace-admin and audited.
 - **YOLO (direct-commit) delivery mode.** A per-workspace setting
   (**Settings → Tembo Coding Agent → Improvements delivery**) chooses how the
   coding agent's changes land: **Always PR** (default — a reviewable pull

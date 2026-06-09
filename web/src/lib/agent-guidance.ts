@@ -449,6 +449,37 @@ Standard library + \`httpx\` + \`pydantic\` are available. For other
 third-party deps (pandas, drivers), add a pinned line to
 \`api/scripts/requirements-tools.txt\` in the TAS deployment and redeploy.
 
+### skills (TAS extension — reusable Agent Skills)
+
+Opt the agent into one or more **Agent Skills** — reusable \`SKILL.md\`
+folders (instructions + optional scripts/resources) installed in this
+repo under \`skills/<name>/\`. At run time the model can load a skill's
+instructions and run its scripts. Skills are installed out-of-band (the
+Skills page: skills.sh, a custom upload, or imported from the Claude
+API), so only reference skills that already exist under \`skills/\`.
+
+\`\`\`yaml
+name: deck-builder
+model: anthropic:claude-opus-4-7
+skills:
+  - pptx                 # folder name under skills/pptx/
+  - brand-guidelines
+instructions: |
+  Build the deck from the user's outline using the pptx skill, applying
+  brand-guidelines.
+\`\`\`
+
+Rules:
+
+- Each entry is a **skill folder name** under \`skills/\` (lowercase,
+  hyphenated) — not a path. Don't invent names; use ones already
+  installed (the operator manages them on the Skills page).
+- A declared skill that's missing from \`skills/\` **fails the run** —
+  same as a missing \`tools_module\`.
+- Skills run locally (any model), not in an Anthropic container. Use a
+  skill for reusable procedural knowledge; use \`tools_module\` for
+  deterministic in-repo Python; use \`connections:\` for external APIs.
+
 ### connections
 
 External services this agent calls at run time. Each entry resolves

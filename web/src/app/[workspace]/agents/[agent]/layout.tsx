@@ -141,6 +141,22 @@ export default async function AgentLayout({
             {connectionIcons.length > 0 && (
               <AgentConnectionIcons connections={connectionIcons} />
             )}
+            {agent.ok &&
+              agent.spec.framework === "pydantic-agentspec" &&
+              agent.spec.skills.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-foreground-muted mr-0.5 text-xs uppercase tracking-wide">
+                    Skills
+                  </span>
+                  {agent.spec.skills.map((s) => (
+                    <Link key={s} href={`/${workspace.slug}/skills`}>
+                      <Badge variant="gray" size="small">
+                        {s}
+                      </Badge>
+                    </Link>
+                  ))}
+                </div>
+              )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Button asChild variant="ghost">
