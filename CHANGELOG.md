@@ -12,6 +12,45 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.13] — In-app docs, workspace rename, Automations area — shipped 2026-06-09
+
+### Added
+- **In-app documentation.** The product manual now ships inside the app, pinned
+  to the exact version you're running — a **Docs** link in the sidebar opens a
+  full viewer with search, a sticky collapsible nav whose open/closed state
+  persists across sessions, and a GitHub-stars link in the footer. Content is
+  organized by audience — **For Operators** (The Basics / Advanced), **For
+  Admins** (workspace admin + self-hosting), and **For Instance Admins** — and
+  every page, including the live **Changelog** and **Roadmap**, is bundled at
+  build time so it always matches the deployed release.
+- **Rename a workspace.** A new **Settings → General** section (workspace-admin
+  only, now the default Settings tab) renames a workspace. GitHub-org style: the
+  URL slug follows the name, and the previous slug is kept alive as a redirect —
+  preserving deep links (`/old/agents/x` → `/new/agents/x`) — so existing links
+  and bookmarks never break. Renames are recorded in the audit log. *(migration
+  0046 `workspace_slug_alias`)*
+- **Workspace-level Automations area.** A dedicated **Automations** section in the
+  sidebar with its own nav — **Schedules**, **Triggers**, and **Webhooks** — so
+  recurring runs and event wiring have a home across the whole workspace, not
+  just per-agent. On the agent page, Schedules moved to the top of the renamed
+  **Automation** tab.
+- **Role badge in the shell.** Your workspace role (Workspace Admin / Operator /
+  Viewer) now shows under your name in the bottom-left user menu.
+- **Agents table filters.** Filter the agents inventory by label and by model.
+
+### Changed
+- **Roadmap rewritten** as a simple, unphased list of ideas — each described in a
+  couple of sentences and linked to a GitHub Discussion holding a draft **TASIP**
+  (Tembo Agent Studio Improvement Proposal) where you can weigh in.
+- **Docs stay in sync by policy.** `AGENTS.md` now instructs coding agents to
+  update the docs alongside feature changes, backed by a non-blocking CI reminder
+  when app code changes without a matching docs change.
+
+### Fixed
+- **Reliable merged-PR detection for improvements.** Improvements with a known PR
+  number are now confirmed via a direct PR fetch instead of the search API, so a
+  merged improvement no longer lingers as "open".
+
 ## [v2026.6.12] — Live run timeline, output discipline, Native MCP admin — shipped 2026-06-08
 
 ### Added
