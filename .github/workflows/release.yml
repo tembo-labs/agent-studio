@@ -147,36 +147,56 @@ jobs:
     if: github.event_name == 'push' && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     permissions:
-      contents: write # push the bump branch
+      contents: write # create the bump branch + commit
       pull-requests: write # open the PR
     steps:
-      - name: Check out main
-        uses: actions/checkout@v6
-        with:
-          ref: main
-
-      - name: Open a PR bumping the TAS_VERSION default
+      # The whole job runs through the GitHub API (no checkout, no local git).
+      # Commits made via the Contents API are signed with GitHub's web-flow
+      # GPG key, so the bump satisfies main's `required_signatures` ruleset and
+      # the PR squash-merges cleanly — a bot doing `git commit` + `git push`
+      # would push an UNSIGNED commit and the merge would need an admin override.
+      - name: Open a signed PR bumping the TAS_VERSION default
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          sed -E -i "s/(TAS_VERSION:-)[^}]+/\1${VERSION}/g" compose.release.yaml
-          if git diff --quiet -- compose.release.yaml; then
+          VERSION="${REF_NAME#v}"
+          BRANCH="release/bump-compose-${VERSION}"
+          TITLE="release: bump compose.release.yaml default to ${VERSION}"
+
+          # Current main head + the file's blob sha and decoded content.
+          BASE_SHA="$(gh api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha')"
+          FILE_JSON="$(gh api "repos/${REPO}/contents/compose.release.yaml?ref=main")"
+          FILE_SHA="$(jq -r '.sha' <<<"$FILE_JSON")"
+          CONTENT="$(jq -r '.content' <<<"$FILE_JSON" | base64 -d)"
+
+          # Bump every `TAS_VERSION:-<old>` default to the new version.
+          NEW_CONTENT="$(sed -E "s/(TAS_VERSION:-)[^}]+/\1${VERSION}/g" <<<"$CONTENT")"
+          if [ "$NEW_CONTENT" = "$CONTENT" ]; then
             echo "compose.release.yaml already at ${VERSION}; nothing to do."
             exit 0
           fi
-          BRANCH="release/bump-compose-${VERSION}"
-          TITLE="release: bump compose.release.yaml default to ${VERSION}"
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "${BRANCH}"
-          git add compose.release.yaml
-          git commit -m "${TITLE}"
-          # force-with-lease so re-running the same tag updates the branch
-          # cleanly instead of failing on a non-fast-forward.
-          git push --force-with-lease origin "${BRANCH}"
+
+          # Point the bump branch at main's head (create, or reset if re-running
+          # the same tag) so the commit below applies onto current main.
+          if gh api "repos/${REPO}/git/ref/heads/${BRANCH}" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/${REPO}/git/refs/heads/${BRANCH}" \
+              -f sha="${BASE_SHA}" -F force=true >/dev/null
+          else
+            gh api -X POST "repos/${REPO}/git/refs" \
+              -f ref="refs/heads/${BRANCH}" -f sha="${BASE_SHA}" >/dev/null
+          fi
+
+          # Commit the bump via the Contents API (signed by web-flow).
+          gh api -X PUT "repos/${REPO}/contents/compose.release.yaml" \
+            -f message="${TITLE}" \
+            -f branch="${BRANCH}" \
+            -f sha="${FILE_SHA}" \
+            -f content="$(printf '%s\n' "$NEW_CONTENT" | base64 -w0)" >/dev/null
+
           # Create the PR, or no-op if one is already open for this branch.
-          gh pr create --base main --head "${BRANCH}" --title "${TITLE}" \
-            --body "Automated: keep \`compose.release.yaml\`'s default pin in lockstep with the \`${GITHUB_REF_NAME}\` release, so customers deploying from published images get the matching version out of the box. The api applies DB migrations on boot." \
+          gh pr create --repo "${REPO}" --base main --head "${BRANCH}" --title "${TITLE}" \
+            --body "Automated: keep \`compose.release.yaml\`'s default pin in lockstep with the \`${REF_NAME}\` release, so customers deploying from published images get the matching version out of the box. The api applies DB migrations on boot." \
             || echo "PR already exists for ${BRANCH}; branch updated."
