@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Section } from "@/components/section";
 import { listAnthropicSkills } from "@/lib/anthropic-skills";
+import { listCatalogSkills } from "@/lib/skills-catalog";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/workspace";
 import { listInstalledSkills } from "@/lib/workspace-skills";
 
+import { SkillsCatalogBrowser } from "./skills-catalog-browser";
 import {
   AddFromGitHubForm,
   ImportFromClaudeForm,
@@ -36,6 +38,14 @@ export default async function SkillsPage({
 
   const repo = await getWorkspaceRepo(workspace.id);
   const installed = repo ? await listInstalledSkills(workspace.id) : [];
+  const installedNames = installed.map((s) => s.name);
+
+  // Browsable catalog (curated GitHub collections). The workspace token lifts
+  // GitHub's rate limit; best-effort.
+  const githubToken = repo
+    ? await getWorkspaceSecretPlaintext(workspace.id, "github_pat")
+    : null;
+  const catalog = repo ? await listCatalogSkills(githubToken ?? undefined) : [];
 
   // Best-effort list of the org's Claude API skills for the import dropdown.
   const anthropicKey = await getWorkspaceSecretPlaintext(
@@ -125,10 +135,22 @@ export default async function SkillsPage({
           <div className="divide-y divide-[var(--color-border-weak)]">
             <div className="pb-6">
               <Section
-                title="Add from skills.sh"
-                description="Install a skill from the open Agent Skills directory or any GitHub folder."
+                title="Browse the catalog"
+                description="Curated Agent Skills from public collections. Search and install with one click."
               >
-                <AddFromGitHubForm workspaceSlug={slug} />
+                <SkillsCatalogBrowser
+                  workspaceSlug={slug}
+                  catalog={catalog}
+                  installed={installedNames}
+                />
+                <details className="mt-4">
+                  <summary className="text-foreground-weak hover:text-foreground cursor-pointer text-sm">
+                    Install from another source (skills.sh slug or GitHub URL)
+                  </summary>
+                  <div className="mt-3">
+                    <AddFromGitHubForm workspaceSlug={slug} />
+                  </div>
+                </details>
               </Section>
             </div>
             <div className="py-6">
