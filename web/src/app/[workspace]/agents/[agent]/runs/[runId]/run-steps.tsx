@@ -58,8 +58,6 @@ export function RunSteps({
       hasTokens = true;
     }
   }
-  const totalInCost = estimateTokenCost(model, totalIn, "input");
-  const totalOutCost = estimateTokenCost(model, totalOut, "output");
   const combinedCost = estimateRunCost(model, totalIn, totalOut);
 
   return (
@@ -69,9 +67,9 @@ export function RunSteps({
         return (
           <div
             key={s.ordinal}
-            className={`flex items-start justify-between gap-4 px-3 py-2 ${i > 0 ? "border-border border-t" : ""}`}
+            className={`flex items-start gap-x-4 px-3 py-2 ${i > 0 ? "border-border border-t" : ""}`}
           >
-            {/* Col 1: narration + the tool calls. Col 2: In/Out. */}
+            {/* Col 1: narration + tool calls. Cols 2/3: In / Out. */}
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               {s.summary && (
                 <div className="text-foreground whitespace-pre-wrap text-base leading-6">
@@ -112,63 +110,48 @@ export function RunSteps({
                 );
               })}
             </div>
-            <TokenBox
-              model={model}
-              inputTokens={s.inputTokens}
-              outputTokens={s.outputTokens}
-            />
+            <span className="text-foreground-muted w-28 shrink-0 whitespace-nowrap text-right text-xs leading-6 tabular-nums">
+              {dirStr(model, s.inputTokens, "input")}{" "}
+              <span className="text-foreground-weak">in</span>
+            </span>
+            <span className="text-foreground-muted w-28 shrink-0 whitespace-nowrap text-right text-xs leading-6 tabular-nums">
+              {dirStr(model, s.outputTokens, "output")}{" "}
+              <span className="text-foreground-weak">out</span>
+            </span>
+            {/* reserve the totals column so In/Out align with the footer */}
+            <span className="w-28 shrink-0" aria-hidden />
           </div>
         );
       })}
 
       {hasTokens && (
-        <div className="border-border bg-surface-secondary flex flex-col items-end gap-0.5 border-t px-3 py-2.5">
-          <div className="text-foreground text-sm font-semibold tabular-nums">
-            {abbreviateTokens(totalIn)} in
-            {totalInCost !== null && ` ~${formatPenny(totalInCost)}`} ·{" "}
-            {abbreviateTokens(totalOut)} out
-            {totalOutCost !== null && ` ~${formatPenny(totalOutCost)}`}
-          </div>
-          <div className="text-foreground-weak text-xs tabular-nums">
+        <div className="border-border bg-surface-secondary flex items-baseline gap-x-4 border-t px-3 py-2.5">
+          <span className="min-w-0 flex-1" />
+          <span className="text-foreground w-28 shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums">
+            {dirStr(model, totalIn, "input")}{" "}
+            <span className="text-foreground-weak font-normal">in</span>
+          </span>
+          <span className="text-foreground w-28 shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums">
+            {dirStr(model, totalOut, "output")}{" "}
+            <span className="text-foreground-weak font-normal">out</span>
+          </span>
+          <span className="text-foreground-weak w-28 shrink-0 whitespace-nowrap text-right text-xs tabular-nums">
             total {abbreviateTokens(totalIn + totalOut)}
             {combinedCost !== null && ` ~${formatPenny(combinedCost)}`}
-          </div>
+          </span>
         </div>
       )}
     </div>
   );
 }
 
-// This step's In/Out tokens + each direction's cost, on one line, pinned tight
-// to the step's top-right (no box chrome). Shows a placeholder per direction
-// until the step's tokens land.
-function TokenBox({
-  model,
-  inputTokens,
-  outputTokens,
-}: {
-  model: string;
-  inputTokens: number | null;
-  outputTokens: number | null;
-}) {
-  const inCost =
-    inputTokens !== null ? estimateTokenCost(model, inputTokens, "input") : null;
-  const outCost =
-    outputTokens !== null
-      ? estimateTokenCost(model, outputTokens, "output")
-      : null;
-  const inStr =
-    inputTokens !== null
-      ? `${abbreviateTokens(inputTokens)}${inCost !== null ? ` ~${formatPenny(inCost)}` : ""}`
-      : "··";
-  const outStr =
-    outputTokens !== null
-      ? `${abbreviateTokens(outputTokens)}${outCost !== null ? ` ~${formatPenny(outCost)}` : ""}`
-      : "··";
-  return (
-    <div className="text-foreground-muted shrink-0 whitespace-nowrap text-right text-xs leading-6 tabular-nums">
-      {inStr} <span className="text-foreground-weak">in</span> ·{" "}
-      {outStr} <span className="text-foreground-weak">out</span>
-    </div>
-  );
+// "9.50k ~$.04" for one direction's tokens + cost; "··" until tokens land.
+function dirStr(
+  model: string,
+  tokens: number | null,
+  direction: "input" | "output",
+): string {
+  if (tokens === null) return "··";
+  const cost = estimateTokenCost(model, tokens, direction);
+  return `${abbreviateTokens(tokens)}${cost !== null ? ` ~${formatPenny(cost)}` : ""}`;
 }
