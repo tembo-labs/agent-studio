@@ -7,7 +7,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { IconChevronDownSmall, IconGithub, IconStar } from "central-icons";
 
-import { DOC_SECTIONS, type DocSection } from "./nav";
+import { DOC_SECTIONS, type DocGroup, type DocSection } from "./nav";
 
 // Left rail for the in-app docs. Two audience sections (Operators / Admins),
 // each a collapsible header over grouped pages. Everyone sees both; the Admins
@@ -108,33 +108,58 @@ function AudienceSection({
       </button>
 
       {open && (
-        <div className="mt-1 flex flex-col gap-3">
+        <div className="mt-1 flex flex-col gap-2">
           {section.groups.map((group) => (
-            <div key={group.label} className="flex flex-col gap-0.5">
-              <span className="text-foreground-weak px-2 text-xs font-semibold">
-                {group.label}
-              </span>
-              <div className="flex flex-col gap-0.5">
-                {group.items.map((item) => {
-                  const href = `${base}/${item.slug}`;
-                  const active = pathname === href;
-                  return (
-                    <Link
-                      key={item.slug}
-                      href={href}
-                      className={
-                        active
-                          ? "bg-surface-secondary text-foreground ml-1 rounded-md px-2 py-1 text-sm font-medium"
-                          : "text-foreground-weak hover:bg-surface hover:text-foreground ml-1 rounded-md px-2 py-1 text-sm"
-                      }
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
+            <GroupSection key={group.label} group={group} base={base} />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GroupSection({ group, base }: { group: DocGroup; base: string }) {
+  const pathname = usePathname();
+  const hasActive = group.items.some((i) => pathname === `${base}/${i.slug}`);
+  const [userOpen, setUserOpen] = useState(true);
+  const open = userOpen || hasActive;
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <button
+        type="button"
+        onClick={() => setUserOpen((o) => !o)}
+        aria-expanded={open}
+        className="text-foreground-weak hover:text-foreground flex items-center justify-between gap-2 border-b border-[var(--color-border-weak)] px-2 pb-1 text-xs font-semibold transition-colors"
+      >
+        <span>{group.label}</span>
+        <IconChevronDownSmall
+          aria-hidden
+          className={cn(
+            "text-foreground-muted h-3 w-3 transition-transform",
+            open ? "" : "-rotate-90",
+          )}
+        />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-0.5 pt-0.5">
+          {group.items.map((item) => {
+            const href = `${base}/${item.slug}`;
+            const active = pathname === href;
+            return (
+              <Link
+                key={item.slug}
+                href={href}
+                className={
+                  active
+                    ? "bg-surface-secondary text-foreground ml-1 rounded-md px-2 py-1 text-sm font-medium"
+                    : "text-foreground-weak hover:bg-surface hover:text-foreground ml-1 rounded-md px-2 py-1 text-sm"
+                }
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
