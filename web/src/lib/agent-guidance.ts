@@ -254,7 +254,7 @@ output_schema:
   digits, hyphens.
 - **\`model\`** (required) — format \`provider:model\`. Examples:
   \`anthropic:claude-fable-5\`, \`anthropic:claude-opus-4-8\`,
-  \`anthropic:claude-sonnet-4-6\`, \`openai:gpt-5.2\`,
+  \`anthropic:claude-sonnet-4-6\`, \`openai:gpt-5.5\`,
   \`openai:gpt-4o-mini\`. The provider's API key must be set under the
   workspace's Settings → API keys. See *Choosing a model* below for
   which to pick.
@@ -294,9 +294,10 @@ Model choice is a cost/reliability tradeoff. Default playbook:
   If Sonnet hedges on tool calls, go back to Opus and don't fight it.
 - **No tools? Sonnet is the right starting point** — the hedging
   problem only shows up with tool use.
-- **OpenAI alternatives**: \`openai:gpt-5.2\` is roughly Opus-tier
-  for tool-use reliability; \`openai:gpt-4o-mini\` and
-  \`openai:gpt-4.1-mini\` are roughly Sonnet-tier. The Anthropic /
+- **OpenAI alternatives**: \`openai:gpt-5.5\` is the flagship /
+  Opus-tier option for tool-use reliability (\`openai:gpt-5.4\` is the
+  cheaper balance); \`openai:gpt-4o-mini\` and \`openai:gpt-4.1-mini\`
+  are roughly Sonnet-tier. The Anthropic /
   OpenAI choice is a separate axis from the tier — pick based on
   which provider key the workspace has + which provider your team
   is already auditing for governance.

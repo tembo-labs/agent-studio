@@ -29,6 +29,14 @@ static ANTHROPIC_RATES: Lazy<Vec<ModelRate>> = Lazy::new(|| {
 
 static OPENAI_RATES: Lazy<Vec<ModelRate>> = Lazy::new(|| {
     vec![
+        // GPT-5.x — specific patterns before the bare `^gpt-5` catch-all so it
+        // doesn't swallow the 5.x variants. 5.5/5.4 are the current flagships.
+        rate("^gpt-5\\.5", 5.0, 30.0),
+        rate("^gpt-5\\.4-mini", 0.75, 4.5),
+        rate("^gpt-5\\.4-nano", 0.2, 1.25),
+        rate("^gpt-5\\.4", 2.5, 15.0),
+        rate("^gpt-5\\.2", 0.875, 7.0),
+        rate("^gpt-5\\.1", 0.625, 5.0),
         rate("^gpt-5-mini", 0.25, 2.0),
         rate("^gpt-5-nano", 0.05, 0.4),
         rate("^gpt-5", 1.25, 10.0),
@@ -118,6 +126,21 @@ mod tests {
         let c = estimate_run_cost("openai:gpt-4o-mini", 1_000_000, 1_000_000).expect("priced");
         // 0.15 + 0.6 = 0.75
         assert!((c - 0.75).abs() < 1e-9, "expected ~0.75, got {c}");
+    }
+
+    #[test]
+    fn openai_gpt_5_5_not_swallowed_by_catch_all() {
+        // gpt-5.5 must hit its own $5/$30 rate, not the bare ^gpt-5 ($1.25/$10).
+        let c = estimate_run_cost("openai:gpt-5.5", 1_000_000, 1_000_000).expect("priced");
+        // 5 + 30 = 35
+        assert!((c - 35.0).abs() < 1e-9, "expected ~35.0, got {c}");
+    }
+
+    #[test]
+    fn openai_gpt_5_base() {
+        let c = estimate_run_cost("openai:gpt-5", 1_000_000, 1_000_000).expect("priced");
+        // 1.25 + 10 = 11.25
+        assert!((c - 11.25).abs() < 1e-9, "expected ~11.25, got {c}");
     }
 
     #[test]

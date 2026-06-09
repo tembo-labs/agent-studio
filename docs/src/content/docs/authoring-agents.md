@@ -33,7 +33,7 @@ Key fields:
 - **`name`** (required) — must match the filename (`name: foo` → `foo.yaml`);
   lowercase letters, digits, hyphens.
 - **`model`** (required) — `provider:model`, e.g. `anthropic:claude-fable-5`,
-  `anthropic:claude-opus-4-8`, `anthropic:claude-sonnet-4-6`, `openai:gpt-5.2`,
+  `anthropic:claude-opus-4-8`, `anthropic:claude-sonnet-4-6`, `openai:gpt-5.5`,
   `openai:gpt-4o-mini`. The provider's key must be set in
   **Settings → LLM Providers**.
 - **`instructions`** (required) — the system prompt, usually a `|` block scalar.

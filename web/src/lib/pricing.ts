@@ -22,7 +22,16 @@ const ANTHROPIC_RATES: Array<{ pattern: RegExp; rate: Rate }> = [
 // OpenAI public list pricing per 1M tokens, by model family.
 // Source: https://platform.openai.com/docs/pricing
 const OPENAI_RATES: Array<{ pattern: RegExp; rate: Rate }> = [
-  // GPT-5 family (current premium tier).
+  // GPT-5.x family. Order matters — `find` takes the first match, so the more
+  // specific patterns precede the bare `^gpt-5` catch-all (which would
+  // otherwise swallow every 5.x variant). gpt-5.5/5.4 are the current flagship
+  // tier (2026); gpt-5.1/5.2 and the original gpt-5 sit below.
+  { pattern: /^gpt-5\.5/i, rate: { input: 5, output: 30 } },
+  { pattern: /^gpt-5\.4-mini/i, rate: { input: 0.75, output: 4.5 } },
+  { pattern: /^gpt-5\.4-nano/i, rate: { input: 0.2, output: 1.25 } },
+  { pattern: /^gpt-5\.4/i, rate: { input: 2.5, output: 15 } },
+  { pattern: /^gpt-5\.2/i, rate: { input: 0.875, output: 7 } },
+  { pattern: /^gpt-5\.1/i, rate: { input: 0.625, output: 5 } },
   { pattern: /^gpt-5-mini/i, rate: { input: 0.25, output: 2 } },
   { pattern: /^gpt-5-nano/i, rate: { input: 0.05, output: 0.4 } },
   { pattern: /^gpt-5/i, rate: { input: 1.25, output: 10 } },

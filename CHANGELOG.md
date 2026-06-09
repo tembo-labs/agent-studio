@@ -26,6 +26,12 @@ they are no longer release versions. Phase scope now lives in
   $15/$75 to the current $5/$25 per MTok (current Opus 4.5–4.8), so cost
   estimates and the stored `cost_usd` are accurate. (The $15/$75 rate only ever
   applied to the deprecated Opus 4.1/4.0.)
+- **OpenAI gpt-5.x run-cost estimates.** The single `gpt-5` rate ($1.25/$10) was
+  mis-pricing the whole gpt-5.x family. Added per-model rates for the current
+  flagships and intermediate releases — gpt-5.5 ($5/$30), gpt-5.4 ($2.50/$15,
+  + mini/nano), gpt-5.2 ($0.875/$7), gpt-5.1 ($0.625/$5) — ahead of the bare
+  `gpt-5` catch-all. gpt-4o / gpt-4.1 / o3 were already correct. Authoring
+  guidance now references `openai:gpt-5.5` instead of the older gpt-5.2.
 - **Agent Skills.** A workspace **Skills** area to install reusable Agent Skills
   (Anthropic's `SKILL.md` folders) into your repo under `skills/`, from three
   sources: the [skills.sh](https://www.skills.sh/) directory (by slug / GitHub
