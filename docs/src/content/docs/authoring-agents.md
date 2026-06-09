@@ -32,9 +32,10 @@ Key fields:
 
 - **`name`** (required) — must match the filename (`name: foo` → `foo.yaml`);
   lowercase letters, digits, hyphens.
-- **`model`** (required) — `provider:model`, e.g. `anthropic:claude-opus-4-8`,
-  `anthropic:claude-sonnet-4-6`, `openai:gpt-5.2`, `openai:gpt-4o-mini`. The
-  provider's key must be set in **Settings → LLM Providers**.
+- **`model`** (required) — `provider:model`, e.g. `anthropic:claude-fable-5`,
+  `anthropic:claude-opus-4-8`, `anthropic:claude-sonnet-4-6`, `openai:gpt-5.2`,
+  `openai:gpt-4o-mini`. The provider's key must be set in
+  **Settings → LLM Providers**.
 - **`instructions`** (required) — the system prompt, usually a `|` block scalar.
 - **`connections:`** (optional) — external services the agent calls; see
   [Connections](/agent-studio/connections/).
@@ -55,6 +56,10 @@ Model choice is a cost/reliability tradeoff:
   `anthropic:claude-opus-4-8`). Lower tiers tend to *hedge* on tool use — asking
   "would you like me to…" instead of acting — and a decisive model is easier to
   prove out.
+- **Need more than Opus?** `anthropic:claude-fable-5` is Anthropic's most
+  capable widely-released model (Mythos-class) — best on the hardest reasoning
+  and long-horizon agentic work, at ~2× the cost. Reach for it only when Opus
+  4.8 isn't enough.
 - **Then downgrade and measure.** `anthropic:claude-sonnet-4-6` is much cheaper
   and usually fine when the agent has a single, well-defined job with imperative
   instructions and narrow `connections:`. Compare cost side-by-side on the

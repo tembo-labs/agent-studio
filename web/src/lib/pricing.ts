@@ -9,6 +9,9 @@ type Rate = { input: number; output: number };
 // specific versions — providers re-use the same tier across versions
 // inside a family. Update as providers publish new rates.
 const ANTHROPIC_RATES: Array<{ pattern: RegExp; rate: Rate }> = [
+  // Fable 5 (Mythos-class) is the premium tier — list it first; it doesn't
+  // overlap the opus/sonnet/haiku patterns. $10/$50 per MTok (GA 2026-06-09).
+  { pattern: /claude-fable/i, rate: { input: 10, output: 50 } },
   { pattern: /claude-opus/i, rate: { input: 15, output: 75 } },
   { pattern: /claude-sonnet/i, rate: { input: 3, output: 15 } },
   { pattern: /claude-haiku/i, rate: { input: 1, output: 5 } },

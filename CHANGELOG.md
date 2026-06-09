@@ -15,6 +15,11 @@ they are no longer release versions. Phase scope now lives in
 ## [Unreleased]
 
 ### Added
+- **Claude Fable 5 support.** Agents can use `anthropic:claude-fable-5` —
+  Anthropic's most capable widely-released model (Mythos-class, 1M context),
+  GA on the Claude API as of 2026-06-09. Priced in the run-cost estimates at
+  $10/$50 per MTok (web + API tables), and added to the authoring guidance as
+  the top-capability step-up above Opus 4.8.
 - **Agent Skills.** A workspace **Skills** area to install reusable Agent Skills
   (Anthropic's `SKILL.md` folders) into your repo under `skills/`, from three
   sources: the [skills.sh](https://www.skills.sh/) directory (by slug / GitHub

@@ -17,6 +17,8 @@ struct ModelRate {
 
 static ANTHROPIC_RATES: Lazy<Vec<ModelRate>> = Lazy::new(|| {
     vec![
+        // Fable 5 (Mythos-class) — premium tier, $10/$50 per MTok (GA 2026-06-09).
+        rate("claude-fable", 10.0, 50.0),
         rate("claude-opus", 15.0, 75.0),
         rate("claude-sonnet", 3.0, 15.0),
         rate("claude-haiku", 1.0, 5.0),
@@ -91,6 +93,14 @@ mod tests {
             estimate_run_cost("anthropic:claude-sonnet-4-6", 1_000_000, 1_000_000).expect("priced");
         // 3 + 15 = 18 USD for 1M in + 1M out
         assert!((c - 18.0).abs() < 1e-9, "expected ~18.0, got {c}");
+    }
+
+    #[test]
+    fn anthropic_fable_5() {
+        let c =
+            estimate_run_cost("anthropic:claude-fable-5", 1_000_000, 1_000_000).expect("priced");
+        // 10 + 50 = 60 USD for 1M in + 1M out
+        assert!((c - 60.0).abs() < 1e-9, "expected ~60.0, got {c}");
     }
 
     #[test]

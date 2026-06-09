@@ -253,10 +253,11 @@ output_schema:
   the filename (\`name: foo\` → \`foo.yaml\`). 2–64 chars, lowercase,
   digits, hyphens.
 - **\`model\`** (required) — format \`provider:model\`. Examples:
-  \`anthropic:claude-opus-4-8\`, \`anthropic:claude-sonnet-4-6\`,
-  \`openai:gpt-5.2\`, \`openai:gpt-4o-mini\`. The provider's API key
-  must be set under the workspace's Settings → API keys. See
-  *Choosing a model* below for which to pick.
+  \`anthropic:claude-fable-5\`, \`anthropic:claude-opus-4-8\`,
+  \`anthropic:claude-sonnet-4-6\`, \`openai:gpt-5.2\`,
+  \`openai:gpt-4o-mini\`. The provider's API key must be set under the
+  workspace's Settings → API keys. See *Choosing a model* below for
+  which to pick.
 - **\`description\`** (optional) — one-line summary. Shows in the
   TAS agent list.
 - **\`instructions\`** (required by TAS) — system prompt as a string
@@ -268,6 +269,12 @@ output_schema:
 
 Model choice is a cost/reliability tradeoff. Default playbook:
 
+- **Default to \`anthropic:claude-opus-4-8\`** for capable agents — it's
+  the sensible high-capability starting point. **\`anthropic:claude-fable-5\`**
+  is Anthropic's most capable widely-released model (Mythos-class, 1M
+  context) and beats Opus on the hardest reasoning + long-horizon agentic
+  work — but it's ~2× the cost ($10/$50 vs $5/$25 per MTok), so reach for
+  it only when an agent genuinely needs more than Opus 4.8 can deliver.
 - **First-run + iterating: start on \`anthropic:claude-opus-4-8\`
   for any agent that calls tools** (i.e. declares \`connections:\`).
   Tool-using agents need to decide when to act without follow-up
