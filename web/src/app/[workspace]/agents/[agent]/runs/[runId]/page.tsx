@@ -212,8 +212,7 @@ export default async function RunDetailPage({
           The copy button grabs just the text parts for pasting elsewhere. */}
       {steps.length > 0 && (
         <Section
-          title="Steps"
-          description="What the agent did, step by step — narration, the tools it called, and the final answer."
+          title="Run Steps"
           actions={
             stepText ? <CopyOutputButton text={stepText} /> : undefined
           }

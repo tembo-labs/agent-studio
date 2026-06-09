@@ -118,26 +118,27 @@ export function RunSteps({
               {dirStr(model, s.outputTokens, "output")}{" "}
               <span className="text-foreground-weak">out</span>
             </span>
-            {/* reserve the totals column so In/Out align with the footer */}
-            <span className="w-28 shrink-0" aria-hidden />
           </div>
         );
       })}
 
       {hasTokens && (
-        <div className="border-border bg-surface-secondary flex items-baseline gap-x-4 border-t px-3 py-2.5">
+        <div className="border-border bg-surface-secondary flex items-start gap-x-4 border-t px-3 py-2.5">
           <span className="min-w-0 flex-1" />
           <span className="text-foreground w-28 shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums">
             {dirStr(model, totalIn, "input")}{" "}
             <span className="text-foreground-weak font-normal">in</span>
           </span>
-          <span className="text-foreground w-28 shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums">
-            {dirStr(model, totalOut, "output")}{" "}
-            <span className="text-foreground-weak font-normal">out</span>
-          </span>
-          <span className="text-foreground-weak w-28 shrink-0 whitespace-nowrap text-right text-xs tabular-nums">
-            total {abbreviateTokens(totalIn + totalOut)}
-            {combinedCost !== null && ` ~${formatPenny(combinedCost)}`}
+          {/* Out total, with the combined total stacked under it. */}
+          <span className="flex w-28 shrink-0 flex-col items-end gap-0.5">
+            <span className="text-foreground whitespace-nowrap text-sm font-semibold tabular-nums">
+              {dirStr(model, totalOut, "output")}{" "}
+              <span className="text-foreground-weak font-normal">out</span>
+            </span>
+            <span className="text-foreground-weak whitespace-nowrap text-xs tabular-nums">
+              {abbreviateTokens(totalIn + totalOut)}
+              {combinedCost !== null && ` ~${formatPenny(combinedCost)}`} total
+            </span>
           </span>
         </div>
       )}
