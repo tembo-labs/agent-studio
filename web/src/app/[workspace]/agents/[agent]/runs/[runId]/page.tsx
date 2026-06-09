@@ -158,6 +158,16 @@ export default async function RunDetailPage({
               )}
             </dd>
           </div>
+          {run.userMessage.trim() && (
+            <div className="flex gap-3">
+              <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+                Input
+              </dt>
+              <dd className="text-foreground whitespace-pre-wrap">
+                {run.userMessage}
+              </dd>
+            </div>
+          )}
           <div className="flex gap-3">
             <dt className="text-foreground-weak w-24 shrink-0 font-medium">
               Queued

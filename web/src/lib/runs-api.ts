@@ -58,6 +58,8 @@ export type RunRecord = {
   workspaceId: string;
   agentName: string;
   agentPath: string;
+  /** Optional user input the run started with ("" when none). */
+  userMessage: string;
   model: string;
   status: "queued" | "running" | "succeeded" | "failed";
   output: string;
@@ -81,6 +83,7 @@ type ApiRunRecord = {
   workspace_id: string;
   agent_name: string;
   agent_path: string;
+  user_message: string;
   model: string;
   status: RunRecord["status"];
   output: string;
@@ -104,6 +107,7 @@ function fromApi(r: ApiRunRecord): RunRecord {
     workspaceId: r.workspace_id,
     agentName: r.agent_name,
     agentPath: r.agent_path,
+    userMessage: r.user_message ?? "",
     model: r.model,
     status: r.status,
     output: r.output,

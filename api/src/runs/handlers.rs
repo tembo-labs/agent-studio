@@ -183,6 +183,8 @@ pub struct RunRecord {
     pub workspace_id: Uuid,
     pub agent_name: String,
     pub agent_path: String,
+    /// The optional user input the run was started with ("" when none).
+    pub user_message: String,
     pub model: String,
     pub status: String,
     pub output: String,
@@ -212,7 +214,7 @@ pub async fn get_run(
     Query(query): Query<GetRunQuery>,
 ) -> Result<Json<RunRecord>, StatusCode> {
     let row: Option<RunRecord> = sqlx::query_as(
-        r#"SELECT id, workspace_id, agent_name, agent_path, model, status,
+        r#"SELECT id, workspace_id, agent_name, agent_path, user_message, model, status,
                   output, streamed_output, error_message, created_by, created_at,
                   started_at, completed_at, tokens_input, tokens_output,
                   trigger, automation_id, agent_version_id, agent_version_label
