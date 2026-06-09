@@ -45,8 +45,9 @@ export default async function ImprovementsPage({
         </h1>
         <p className="text-foreground-weak text-base">
           Each row is an improvement submission from a run&apos;s
-          &ldquo;Improve the Agent&rdquo; form. Status updates when a Tembo
-          task opens a PR and when that PR is merged.
+          &ldquo;Improve the Agent&rdquo; form. Status updates as the Tembo task
+          opens a PR and it&apos;s merged — or, in YOLO mode, as the change is
+          committed straight to the default branch.
         </p>
       </div>
 
@@ -159,6 +160,16 @@ function ImprovementRow({
               PR #{improvement.prNumber} ↗
             </a>
           )}
+          {improvement.commitUrl && (
+            <a
+              href={improvement.commitUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-foreground hover:underline"
+            >
+              Commit ↗
+            </a>
+          )}
         </div>
       </td>
     </tr>
@@ -183,6 +194,12 @@ function StatusBadge({ status }: { status: ImprovementStatus }) {
       return (
         <Badge variant="green" size="small">
           Merged
+        </Badge>
+      );
+    case "committed":
+      return (
+        <Badge variant="green" size="small">
+          Committed
         </Badge>
       );
     case "closed":

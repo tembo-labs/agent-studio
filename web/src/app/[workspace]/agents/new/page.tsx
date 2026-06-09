@@ -49,7 +49,10 @@ export default async function NewAgentPage({
 
       <hr className="border-[var(--color-border-weak)]" />
 
-      <NewAgentForm workspaceSlug={workspace.slug} />
+      <NewAgentForm
+        workspaceSlug={workspace.slug}
+        commitMode={workspace.commitMode}
+      />
     </div>
   );
 }

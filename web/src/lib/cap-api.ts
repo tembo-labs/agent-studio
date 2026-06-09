@@ -8,6 +8,7 @@ import {
   GUIDANCE_ROOT_PATH,
 } from "@/lib/agent-guidance";
 import type { Framework } from "@/lib/agent-framework";
+import type { CommitMode } from "@/lib/commit-mode-constants";
 
 // Thin client for the Tembo Coding Agent Platform task API. The task
 // endpoints live under the **/public-api** namespace and authenticate
@@ -150,6 +151,38 @@ function buildGuidancePointerBlock(framework: Framework): string {
   ].join("\n");
 }
 
+// The delivery directive — how the agent should ship the change, and where to
+// drop the correlation marker. PR mode (the default) opens a pull request with
+// the marker in its description; direct ("YOLO") mode commits straight to the
+// default branch with the marker in the commit message, so /improvements can
+// still correlate the landed change back to the improvement row. Returns the
+// prompt-line array; callers spread it in.
+function deliveryDirective(
+  commitMode: CommitMode,
+  defaultBranch: string,
+  marker: string,
+): string[] {
+  if (commitMode === "direct") {
+    return [
+      `Commit the change directly to the \`${defaultBranch}\` branch. Do not open a pull request.`,
+      "",
+      "IMPORTANT: Include this exact line on its own in the commit message so",
+      "Tembo Agent Studio can correlate the commit with the user's request:",
+      "",
+      marker,
+    ];
+  }
+  return [
+    "Open a pull request with the change.",
+    "",
+    "IMPORTANT: Include this exact line on its own at the end of the pull",
+    "request description so Tembo Agent Studio can correlate the PR with the",
+    "user's request:",
+    "",
+    marker,
+  ];
+}
+
 // Build a chat-to-create prompt. Pass the user's description through
 // verbatim and point Tembo CAP at the repo's checked-in guides for
 // path/shape conventions. We assume external-service connections
@@ -166,6 +199,8 @@ export function buildCreateAgentPrompt(args: {
   agentPath: string;
   description: string;
   improvementMarker: string;
+  commitMode: CommitMode;
+  defaultBranch: string;
   /**
    * Toolkit → authorized slot names for the user creating this
    * agent. When present, the prompt tells Tembo to prefer these
@@ -247,11 +282,11 @@ export function buildCreateAgentPrompt(args: {
     "",
     "---",
     "",
-    "IMPORTANT: Include this exact line on its own at the end of the pull",
-    "request description so the Tembo Agent Studio can correlate the PR",
-    "with the user's request:",
-    "",
-    args.improvementMarker,
+    ...deliveryDirective(
+      args.commitMode,
+      args.defaultBranch,
+      args.improvementMarker,
+    ),
   ].join("\n");
 }
 
@@ -298,6 +333,8 @@ export function buildChatEditPrompt(args: {
   agentPath: string;
   improvement: string;
   improvementMarker: string;
+  commitMode: CommitMode;
+  defaultBranch: string;
 }): string {
   const framework = frameworkFromAgentPath(args.agentPath);
   return [
@@ -307,13 +344,11 @@ export function buildChatEditPrompt(args: {
     "",
     `Improve the agent defined at @${args.agentPath}.`,
     "",
-    "Open a pull request with the targeted change.",
-    "",
-    "IMPORTANT: Include this exact line on its own at the end of the pull",
-    "request description so the Tembo Agent Studio can correlate the PR",
-    "with the user's improvement request:",
-    "",
-    args.improvementMarker,
+    ...deliveryDirective(
+      args.commitMode,
+      args.defaultBranch,
+      args.improvementMarker,
+    ),
     "",
     "## Requested change",
     args.improvement.trim(),
@@ -333,6 +368,8 @@ export function buildImprovePrompt(args: {
   output: string;
   improvement: string;
   improvementMarker: string;
+  commitMode: CommitMode;
+  defaultBranch: string;
 }): string {
   const framework = frameworkFromAgentPath(args.agentPath);
   const trimmedOutput = args.output.length > 4000
@@ -346,13 +383,11 @@ export function buildImprovePrompt(args: {
     "",
     `Improve the agent defined at @${args.agentPath}.`,
     "",
-    "Open a pull request with the targeted change.",
-    "",
-    "IMPORTANT: Include this exact line on its own at the end of the pull",
-    "request description so the Tembo Agent Studio can correlate the PR",
-    "with the user's improvement request:",
-    "",
-    args.improvementMarker,
+    ...deliveryDirective(
+      args.commitMode,
+      args.defaultBranch,
+      args.improvementMarker,
+    ),
     "",
     "## Improvement requested by the user",
     args.improvement.trim(),

@@ -480,6 +480,12 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
             : ""}
         </span>
       );
+    case "workspace.commit_mode_changed":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {commitModeLabel(p.from)} → {commitModeLabel(p.to)}
+        </span>
+      );
     case "secret.set":
     case "secret.rotated":
     case "secret.removed":
@@ -600,6 +606,12 @@ function buildFilterParams(args: {
   return u;
 }
 
+function commitModeLabel(v: unknown): string {
+  if (v === "direct") return "YOLO";
+  if (v === "pull_request") return "Always PR";
+  return String(v ?? "");
+}
+
 function humanKind(kind: string): string {
   // Lookup table for common kinds; fall back to the dotted form for
   // anything we haven't named. New event types render readably without
@@ -632,6 +644,7 @@ function humanKind(kind: string): string {
     "agent.restored": "Agent restored",
     "repo.disconnected": "Repository disconnected",
     "workspace.renamed": "Workspace renamed",
+    "workspace.commit_mode_changed": "Delivery mode changed",
     "member.added": "Member added",
     "member.role_changed": "Member role changed",
     "member.removed": "Member removed",

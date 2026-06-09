@@ -14,6 +14,7 @@ import {
 import {
   createImprovement,
   improvementMarker,
+  setImprovementCommitted,
   setImprovementTask,
 } from "@/lib/improvements-api";
 import { getRun } from "@/lib/runs-api";
@@ -79,6 +80,7 @@ export async function improveAgentAction(args: {
     agentName: run.agentName,
     agentPath: run.agentPath,
     improvementText: improvement,
+    delivery: workspace.commitMode,
     userId,
   });
 
@@ -89,6 +91,8 @@ export async function improveAgentAction(args: {
     output: run.output,
     improvement,
     improvementMarker: improvementMarker(row.id),
+    commitMode: workspace.commitMode,
+    defaultBranch: repo.defaultBranch,
   });
 
   const res = await createTemboTask({
@@ -104,11 +108,21 @@ export async function improveAgentAction(args: {
     return { ok: false, error: formatCapError(res.error) };
   }
 
-  await setImprovementTask({
-    id: row.id,
-    temboTaskId: res.result.taskId,
-    temboTaskHtmlUrl: res.result.htmlUrl,
-  });
+  // Direct/YOLO lands on the branch with no PR — mark committed now; the scan
+  // attaches the commit URL later. PR mode stays 'submitted' until detected.
+  if (workspace.commitMode === "direct") {
+    await setImprovementCommitted({
+      id: row.id,
+      temboTaskId: res.result.taskId,
+      temboTaskHtmlUrl: res.result.htmlUrl,
+    });
+  } else {
+    await setImprovementTask({
+      id: row.id,
+      temboTaskId: res.result.taskId,
+      temboTaskHtmlUrl: res.result.htmlUrl,
+    });
+  }
 
   return {
     ok: true,

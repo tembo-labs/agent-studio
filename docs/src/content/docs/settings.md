@@ -36,6 +36,10 @@ you'd commit spec files by hand instead.
 For Tembo to open PRs, the agents repo must also be authorized in Tembo under
 **Source Control** (see [Setup checklist](/agent-studio/customer-setup/)).
 
+**Improvements delivery** sets how those changes land: **Always PR** (default —
+a reviewable pull request) or **YOLO**, which commits straight to the default
+branch with no PR. See [Improvements → Delivery mode](/agent-studio/improvements/#delivery-mode-always-pr-vs-yolo).
+
 ## Repository
 
 Connect the workspace's GitHub repository (URL + PAT). TAS stores agent

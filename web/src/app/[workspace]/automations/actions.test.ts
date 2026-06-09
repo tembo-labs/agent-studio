@@ -65,6 +65,7 @@ const workspace = {
   createdAt: new Date("2026-01-01T00:00:00Z"),
   updatedAt: new Date("2026-01-01T00:00:00Z"),
   faviconKind: "default-tembo" as const,
+  commitMode: "pull_request" as const,
 };
 
 const existingAutomation = {

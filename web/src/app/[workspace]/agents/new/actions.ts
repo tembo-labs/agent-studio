@@ -18,6 +18,7 @@ import { listConnectionsForUser } from "@/lib/composio-connections";
 import {
   createImprovement,
   improvementMarker,
+  setImprovementCommitted,
   setImprovementTask,
 } from "@/lib/improvements-api";
 import { getAgentByName } from "@/lib/workspace-agents";
@@ -124,6 +125,7 @@ export async function createFromChatAction(
     agentPath,
     improvementText: description,
     kind: "create",
+    delivery: workspace.commitMode,
     userId,
   });
 
@@ -147,6 +149,8 @@ export async function createFromChatAction(
     agentPath,
     description,
     improvementMarker: improvementMarker(row.id),
+    commitMode: workspace.commitMode,
+    defaultBranch: repo.defaultBranch,
     availableSlots,
   });
 
@@ -161,11 +165,22 @@ export async function createFromChatAction(
   if (!res.ok) {
     return { error: formatCapError(res.error) };
   }
-  await setImprovementTask({
-    id: row.id,
-    temboTaskId: res.result.taskId,
-    temboTaskHtmlUrl: res.result.htmlUrl,
-  });
+  // Direct/YOLO: the change lands straight on the branch — mark it committed
+  // now (the scan attaches the commit URL later). PR mode stays 'submitted'
+  // until the PR is detected.
+  if (workspace.commitMode === "direct") {
+    await setImprovementCommitted({
+      id: row.id,
+      temboTaskId: res.result.taskId,
+      temboTaskHtmlUrl: res.result.htmlUrl,
+    });
+  } else {
+    await setImprovementTask({
+      id: row.id,
+      temboTaskId: res.result.taskId,
+      temboTaskHtmlUrl: res.result.htmlUrl,
+    });
+  }
 
   return {
     success: {

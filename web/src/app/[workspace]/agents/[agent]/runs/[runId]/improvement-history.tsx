@@ -55,6 +55,16 @@ export function ImprovementHistory({
                 PR #{i.prNumber} ↗
               </a>
             )}
+            {i.commitUrl && (
+              <a
+                href={i.commitUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-foreground hover:underline"
+              >
+                Commit ↗
+              </a>
+            )}
           </div>
         </li>
       ))}
@@ -80,6 +90,12 @@ function StatusBadge({ status }: { status: ImprovementStatus }) {
       return (
         <Badge variant="green" size="small">
           Merged
+        </Badge>
+      );
+    case "committed":
+      return (
+        <Badge variant="green" size="small">
+          Committed
         </Badge>
       );
     case "closed":

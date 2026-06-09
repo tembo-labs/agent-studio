@@ -29,6 +29,12 @@ export type { FaviconKind } from "@/lib/favicon-constants";
 
 import type { FaviconKind } from "@/lib/favicon-constants";
 
+// Re-exported so server callers don't reach into the client-safe module.
+export { COMMIT_MODES, COMMIT_MODE_LABELS } from "@/lib/commit-mode-constants";
+export type { CommitMode } from "@/lib/commit-mode-constants";
+
+import type { CommitMode } from "@/lib/commit-mode-constants";
+
 export type Workspace = {
   id: string;
   name: string;
@@ -37,6 +43,8 @@ export type Workspace = {
   createdAt: Date;
   updatedAt: Date;
   faviconKind: FaviconKind;
+  // How the Tembo Coding Agent's changes land: PR (default) or direct commit.
+  commitMode: CommitMode;
 };
 
 function rowToWorkspace(row: {
@@ -47,6 +55,7 @@ function rowToWorkspace(row: {
   created_at: Date;
   updated_at: Date;
   favicon_kind: FaviconKind;
+  commit_mode: CommitMode;
 }): Workspace {
   return {
     id: row.id,
@@ -56,6 +65,7 @@ function rowToWorkspace(row: {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     faviconKind: row.favicon_kind,
+    commitMode: row.commit_mode,
   };
 }
 
@@ -67,10 +77,11 @@ type WorkspaceRow = {
   created_at: Date;
   updated_at: Date;
   favicon_kind: FaviconKind;
+  commit_mode: CommitMode;
 };
 
 const WORKSPACE_COLUMNS =
-  "id, name, slug, created_by, created_at, updated_at, favicon_kind";
+  "id, name, slug, created_by, created_at, updated_at, favicon_kind, commit_mode";
 
 export async function listWorkspacesForUser(userId: string): Promise<Workspace[]> {
   // Order by recency-of-last-visit so the "/" redirect lands on
@@ -738,6 +749,20 @@ export async function getWorkspaceSecretPlaintext(
     throw new Error(`workspace secret not found: ${kind}`);
   }
   return decryptSecret(rows[0].ciphertext);
+}
+
+// ── Commit mode (PR vs direct / YOLO) ────────────────────────────────────
+
+export async function setWorkspaceCommitMode(
+  workspaceId: string,
+  mode: CommitMode,
+): Promise<{ ok: true } | { ok: false; error: "no-workspace" }> {
+  const { rowCount } = await db.query(
+    `UPDATE workspace SET commit_mode = $2, updated_at = NOW() WHERE id = $1`,
+    [workspaceId, mode],
+  );
+  if (!rowCount) return { ok: false, error: "no-workspace" };
+  return { ok: true };
 }
 
 export type SetWorkspaceSecretError =

@@ -40,6 +40,7 @@ import {
   renameWorkspace,
   setFaviconCustom,
   setFaviconDefault,
+  setWorkspaceCommitMode,
   setWorkspaceSecret,
   type FaviconKind,
   type RenameWorkspaceError,
@@ -47,6 +48,10 @@ import {
   type SetWorkspaceSecretError,
   type WorkspaceSecretKind,
 } from "@/lib/workspace";
+import {
+  COMMIT_MODE_LABELS,
+  isCommitMode,
+} from "@/lib/commit-mode-constants";
 
 // Keep the union narrow — only kinds the settings UI lets you manage
 // land here. The repo-connect flow writes github_pat; the runtime stores
@@ -844,6 +849,59 @@ export async function renameWorkspaceAction(
 
   revalidatePath(`/${slug}`, "layout");
   return { message: "Workspace name updated." };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Tembo Coding Agent — improvements delivery mode (PR vs YOLO)
+
+export type CommitModeState = {
+  message?: string;
+  error?: string;
+};
+
+/**
+ * Switch how the coding agent's changes ship: pull_request (review-gated) or
+ * direct ("YOLO" — straight to the default branch). Workspace-admin only and
+ * audited, since it changes how code lands.
+ */
+export async function setCommitModeAction(
+  _prev: CommitModeState,
+  formData: FormData,
+): Promise<CommitModeState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const modeRaw = String(formData.get("mode") ?? "");
+  if (!isCommitMode(modeRaw)) return { error: "Unknown delivery mode." };
+
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
+
+  if (workspace.commitMode === modeRaw) {
+    return { message: `Already set to ${COMMIT_MODE_LABELS[modeRaw]}.` };
+  }
+
+  const result = await setWorkspaceCommitMode(workspace.id, modeRaw);
+  if (!result.ok) return { error: "Workspace not found." };
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "workspace.commit_mode_changed",
+    targetType: "workspace",
+    targetId: workspace.id,
+    agentName: null,
+    payload: { from: workspace.commitMode, to: modeRaw },
+  });
+
+  revalidatePath(`/${slug}/settings`);
+  revalidatePath(`/${slug}`, "layout");
+  return {
+    message:
+      modeRaw === "direct"
+        ? "YOLO on — changes now commit directly to the default branch."
+        : "Always PR on — changes now open a pull request for review.",
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────

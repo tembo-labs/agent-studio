@@ -268,6 +268,7 @@ export default async function RunDetailPage({
               workspaceSlug={workspace.slug}
               runId={run.id}
               improvements={improvements}
+              commitMode={workspace.commitMode}
             />
           </>
         )}

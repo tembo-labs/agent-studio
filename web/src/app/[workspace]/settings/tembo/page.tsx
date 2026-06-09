@@ -68,9 +68,12 @@ export default async function TemboSettingsPage({
       <div className="pt-6">
         <Section
           title="Improvements delivery"
-          description="How edits from the Improve form ship to your repo. YOLO commits directly to the default branch and is coming in a later release."
+          description="How the coding agent's changes (new agents, chat-to-edit, Improve) land in your repo. Always PR opens a reviewable pull request; YOLO commits straight to the default branch."
         >
-          <ChangeModeSetting />
+          <ChangeModeSetting
+            workspaceSlug={workspace.slug}
+            current={workspace.commitMode}
+          />
         </Section>
       </div>
     </div>

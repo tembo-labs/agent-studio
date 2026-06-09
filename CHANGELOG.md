@@ -12,6 +12,22 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [Unreleased]
+
+### Added
+- **YOLO (direct-commit) delivery mode.** A per-workspace setting
+  (**Settings → Tembo Coding Agent → Improvements delivery**) chooses how the
+  coding agent's changes land: **Always PR** (default — a reviewable pull
+  request) or **YOLO**, which commits straight to the default branch with no PR.
+  The mode is read per request to shape the Tembo prompt, so toggling takes
+  effect on the next submission with no repo re-sync. YOLO improvements show a
+  terminal **Committed** status and link the landed commit; a best-effort scan
+  finds the marker commit on the default branch to attach it. Switching mode is
+  workspace-admin-only and audited. *(migration 0047 — `workspace.commit_mode`
+  + `improvement.delivery` / `commit_sha` / `commit_url`)*
+  - YOLO requires the default branch to accept direct pushes from the coding
+    agent; if it's protected behind required pull requests, keep Always PR.
+
 ## [v2026.6.13] — In-app docs, workspace rename, Automations area — shipped 2026-06-09
 
 ### Added

@@ -9,8 +9,22 @@ import { db } from "@/lib/db";
 // url once the create-task call returns. PR detection runs later
 // (on /improvements visits) and patches pr_url / pr_state / status.
 
-export type ImprovementStatus = "submitted" | "pr_opened" | "merged" | "closed";
+// "committed" is the direct-commit (YOLO) terminal: the change went straight
+// to the default branch instead of through a PR. It's a "landed" state, the
+// commit analogue of "merged".
+export type ImprovementStatus =
+  | "submitted"
+  | "pr_opened"
+  | "merged"
+  | "closed"
+  | "committed";
 export type ImprovementKind = "edit" | "create";
+
+// How an improvement's change is delivered. Snapshotted at submit time from the
+// workspace's commit mode so the reconcile scan + UI stay correct even if the
+// workspace later toggles the mode.
+import type { CommitMode } from "@/lib/commit-mode-constants";
+export type ImprovementDelivery = CommitMode;
 
 export interface Improvement {
   id: string;
@@ -31,6 +45,9 @@ export interface Improvement {
   prNumber: number | null;
   prState: string | null;
   status: ImprovementStatus;
+  delivery: ImprovementDelivery;
+  commitSha: string | null;
+  commitUrl: string | null;
   createdBy: string;
   createdByName: string | null;
   createdByEmail: string | null;
@@ -52,6 +69,9 @@ type Row = {
   pr_number: number | null;
   pr_state: string | null;
   status: ImprovementStatus;
+  delivery: ImprovementDelivery;
+  commit_sha: string | null;
+  commit_url: string | null;
   created_by: string;
   created_by_name: string | null;
   created_by_email: string | null;
@@ -74,6 +94,9 @@ function rowToImprovement(r: Row): Improvement {
     prNumber: r.pr_number,
     prState: r.pr_state,
     status: r.status,
+    delivery: r.delivery,
+    commitSha: r.commit_sha,
+    commitUrl: r.commit_url,
     createdBy: r.created_by,
     createdByName: r.created_by_name,
     createdByEmail: r.created_by_email,
@@ -88,7 +111,7 @@ function rowToImprovement(r: Row): Improvement {
 const COLUMNS = `
   i.id, i.workspace_id, i.run_id, i.agent_name, i.agent_path, i.improvement_text,
   i.kind, i.tembo_task_id, i.tembo_task_html_url, i.pr_url, i.pr_number, i.pr_state,
-  i.status, i.created_by,
+  i.status, i.delivery, i.commit_sha, i.commit_url, i.created_by,
   u.name AS created_by_name, u.email AS created_by_email,
   i.created_at, i.updated_at
 `;
@@ -103,14 +126,17 @@ export async function createImprovement(input: {
   // Defaults to "edit" so legacy callers (chat-to-edit, run-improve)
   // don't have to pass it explicitly.
   kind?: ImprovementKind;
+  // How this change will be delivered. Defaults to PR so callers that
+  // predate YOLO keep the prior behavior.
+  delivery?: ImprovementDelivery;
   userId: string;
 }): Promise<Improvement> {
   // INSERT into a CTE so we can re-SELECT with the user join applied,
   // matching the projection used everywhere else that returns Improvement.
   const res = await db.query<Row>(
     `WITH inserted AS (
-       INSERT INTO improvement (workspace_id, run_id, agent_name, agent_path, improvement_text, kind, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       INSERT INTO improvement (workspace_id, run_id, agent_name, agent_path, improvement_text, kind, delivery, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *
      )
      SELECT ${COLUMNS}
@@ -123,6 +149,7 @@ export async function createImprovement(input: {
       input.agentPath,
       input.improvementText,
       input.kind ?? "edit",
+      input.delivery ?? "pull_request",
       input.userId,
     ],
   );
@@ -135,12 +162,19 @@ export async function createImprovement(input: {
 export async function listPendingCreatesForWorkspace(
   workspaceId: string,
 ): Promise<Improvement[]> {
+  // A direct-commit create is optimistically 'committed' the moment CAP
+  // accepts it, but the agent file isn't on the branch until the commit
+  // actually lands. Keep its card until the scan attaches the commit URL, so
+  // there's no gap where neither the card nor the real agent shows.
   const res = await db.query<Row>(
     `SELECT ${COLUMNS}
      ${FROM_JOIN}
      WHERE i.workspace_id = $1
        AND i.kind = 'create'
-       AND i.status IN ('submitted', 'pr_opened')
+       AND (
+         i.status IN ('submitted', 'pr_opened')
+         OR (i.delivery = 'direct' AND i.status = 'committed' AND i.commit_url IS NULL)
+       )
      ORDER BY i.created_at DESC`,
     [workspaceId],
   );
@@ -184,6 +218,39 @@ export async function setImprovementTask(input: {
   );
 }
 
+// Direct-commit (YOLO) success: CAP accepted the task and will commit straight
+// to the default branch. We optimistically mark the improvement landed
+// ('committed') with the Tembo task link; the reconcile scan later attaches the
+// actual commit URL once the marker commit appears on the branch.
+export async function setImprovementCommitted(input: {
+  id: string;
+  temboTaskId: string | null;
+  temboTaskHtmlUrl: string | null;
+}): Promise<void> {
+  await db.query(
+    `UPDATE improvement
+     SET tembo_task_id = $2, tembo_task_html_url = $3,
+         status = 'committed', updated_at = NOW()
+     WHERE id = $1`,
+    [input.id, input.temboTaskId, input.temboTaskHtmlUrl],
+  );
+}
+
+// Attach the resolved direct commit (sha + html url) found by the scan. Keeps
+// status 'committed' — this only fills in the link.
+export async function setImprovementCommit(input: {
+  id: string;
+  commitSha: string;
+  commitUrl: string;
+}): Promise<void> {
+  await db.query(
+    `UPDATE improvement
+     SET commit_sha = $2, commit_url = $3, status = 'committed', updated_at = NOW()
+     WHERE id = $1`,
+    [input.id, input.commitSha, input.commitUrl],
+  );
+}
+
 export async function setImprovementPr(input: {
   id: string;
   prUrl: string | null;
@@ -208,11 +275,17 @@ export async function setImprovementPr(input: {
 export async function listOpenImprovements(
   workspaceId: string,
 ): Promise<Improvement[]> {
+  // Plus direct-commit improvements that landed (status 'committed') but whose
+  // commit URL we haven't resolved yet — the scan still needs to find their
+  // marker commit and attach it.
   const res = await db.query<Row>(
     `SELECT ${COLUMNS}
      ${FROM_JOIN}
      WHERE i.workspace_id = $1
-       AND i.status IN ('submitted', 'pr_opened')
+       AND (
+         i.status IN ('submitted', 'pr_opened')
+         OR (i.delivery = 'direct' AND i.status = 'committed' AND i.commit_url IS NULL)
+       )
      ORDER BY i.created_at DESC`,
     [workspaceId],
   );
@@ -276,6 +349,7 @@ export interface ImprovementCounts {
   pr_opened: number;
   merged: number;
   closed: number;
+  committed: number;
   total: number;
 }
 
@@ -295,6 +369,7 @@ export async function countImprovementsSince(
     pr_opened: 0,
     merged: 0,
     closed: 0,
+    committed: 0,
     total: 0,
   };
   for (const row of res.rows) {

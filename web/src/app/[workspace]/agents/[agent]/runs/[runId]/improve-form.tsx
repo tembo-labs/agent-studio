@@ -2,17 +2,18 @@
 
 // "Improve the Agent" form on the run detail page. The user
 // describes what should change in the agent; on submit we ask the
-// Tembo Coding Agent Platform to open a session that produces a PR.
+// Tembo Coding Agent Platform to open a session that produces a PR —
+// or, in YOLO mode, commits straight to the default branch.
 //
-// Mode is a workspace-level setting — see Settings → Improvements
-// delivery. Today there's only one supported mode (Always PR) so we
-// don't re-display it here.
+// Mode is a workspace-level setting (Settings → Tembo Coding Agent →
+// Improvements delivery); we surface it in the copy + button label.
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { Section } from "@/components/section";
 import { Button } from "@/components/ui/button";
+import type { CommitMode } from "@/lib/commit-mode-constants";
 import { type Improvement } from "@/lib/improvements-api";
 
 import { improveAgentAction, type ImproveResult } from "./actions";
@@ -27,11 +28,14 @@ export function ImproveForm({
   workspaceSlug,
   runId,
   improvements,
+  commitMode,
 }: {
   workspaceSlug: string;
   runId: string;
   improvements: Improvement[];
+  commitMode: CommitMode;
 }) {
+  const direct = commitMode === "direct";
   const router = useRouter();
   const [improvement, setImprovement] = useState("");
   const [result, setResult] = useState<ImproveResult | null>(null);
@@ -87,8 +91,10 @@ export function ImproveForm({
         className={`flex flex-col gap-3 ${improvements.length > 0 ? "mt-4" : ""}`}
       >
         <p className="text-foreground-weak text-base">
-          Describe what should change about this agent, and it will be
-          submitted for approval.
+          Describe what should change about this agent.{" "}
+          {direct
+            ? "It will be committed directly to your default branch (YOLO mode)."
+            : "It will be submitted as a pull request for approval."}
         </p>
 
         <textarea
@@ -102,7 +108,7 @@ export function ImproveForm({
 
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={pending || !improvement.trim()}>
-            {pending ? "Asking Tembo…" : "Open a PR"}
+            {pending ? "Asking Tembo…" : direct ? "Commit directly" : "Open a PR"}
           </Button>
           {pending && (
             <span className="text-foreground-weak text-sm">

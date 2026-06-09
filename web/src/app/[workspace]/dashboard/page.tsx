@@ -266,9 +266,11 @@ export default async function DashboardPage({
               value={improvementCounts.pr_opened}
               accent="blue"
             />
+            {/* "Landed" = merged PRs + direct commits (YOLO), since both put
+                the change on the default branch. */}
             <StatCard
-              label="Merged"
-              value={improvementCounts.merged}
+              label="Landed"
+              value={improvementCounts.merged + improvementCounts.committed}
               accent="green"
             />
             <StatCard
@@ -423,6 +425,12 @@ function StatusBadge({ status }: { status: ImprovementStatus }) {
       return (
         <Badge variant="green" size="small">
           Merged
+        </Badge>
+      );
+    case "committed":
+      return (
+        <Badge variant="green" size="small">
+          Committed
         </Badge>
       );
     case "closed":

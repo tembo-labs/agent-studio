@@ -38,6 +38,7 @@ const fakeWorkspace = {
   createdAt: new Date(),
   updatedAt: new Date(),
   faviconKind: "default-tembo" as const,
+  commitMode: "pull_request" as const,
 };
 
 function setSession(userId: string | null) {

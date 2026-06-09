@@ -26,9 +26,11 @@ import { useEffect, useState, useTransition } from "react";
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { CommitMode } from "@/lib/commit-mode-constants";
 import { improvementSubmitterLabel } from "@/lib/improvement-display";
 import {
   type Improvement,
+  type ImprovementDelivery,
   type ImprovementStatus,
 } from "@/lib/improvements-api";
 import { type ChatRun } from "@/lib/runs-db";
@@ -49,11 +51,14 @@ export function ChatThread({
   workspaceSlug,
   agentName,
   turns,
+  commitMode,
 }: {
   workspaceSlug: string;
   agentName: string;
   turns: ChatTurn[];
+  commitMode: CommitMode;
 }) {
+  const direct = commitMode === "direct";
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +113,7 @@ export function ChatThread({
   return (
     <div className="flex flex-col gap-4">
       {turns.length === 0 ? (
-        <EmptyState />
+        <EmptyState direct={direct} />
       ) : (
         <ul className="flex flex-col gap-4">
           {turns.map((t) =>
@@ -153,8 +158,10 @@ export function ChatThread({
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-foreground-weak text-sm">
-            Cmd/Ctrl-Enter sends to the agent. Submit a change to open a PR
-            for review.
+            Cmd/Ctrl-Enter sends to the agent. Submit a change to{" "}
+            {direct
+              ? "commit it directly to the default branch."
+              : "open a PR for review."}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -188,11 +195,14 @@ export function ChatThread({
   );
 }
 
-function EmptyState() {
+function EmptyState({ direct }: { direct: boolean }) {
   return (
     <div className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border-weak)] bg-surface-raised px-4 py-6 text-center text-sm">
       Talk to the agent, or describe a change you&apos;d like to make. Each
-      change request opens a pull request for review.
+      change request{" "}
+      {direct
+        ? "is committed directly to the default branch."
+        : "opens a pull request for review."}
     </div>
   );
 }
@@ -295,6 +305,16 @@ function ImprovementBubble({
                 PR #{improvement.prNumber} ↗
               </a>
             )}
+            {improvement.commitUrl && (
+              <a
+                href={improvement.commitUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-foreground text-sm font-medium hover:underline"
+              >
+                View commit ↗
+              </a>
+            )}
             {improvement.temboTaskHtmlUrl && (
               <a
                 href={improvement.temboTaskHtmlUrl}
@@ -307,7 +327,7 @@ function ImprovementBubble({
             )}
           </div>
           <p className="text-foreground-weak text-sm leading-5">
-            {statusBlurb(improvement.status)}
+            {statusBlurb(improvement.status, improvement.delivery)}
           </p>
         </div>
       </div>
@@ -315,14 +335,21 @@ function ImprovementBubble({
   );
 }
 
-function statusBlurb(status: ImprovementStatus): string {
+function statusBlurb(
+  status: ImprovementStatus,
+  delivery: ImprovementDelivery,
+): string {
   switch (status) {
     case "submitted":
-      return "Sent to Tembo. Waiting for the coding agent to open a PR.";
+      return delivery === "direct"
+        ? "Sent to Tembo. Committing directly to the default branch."
+        : "Sent to Tembo. Waiting for the coding agent to open a PR.";
     case "pr_opened":
       return "Pull request is open and ready for review.";
     case "merged":
       return "Pull request was merged — the change is live on the default branch.";
+    case "committed":
+      return "Committed directly to the default branch.";
     case "closed":
       return "Pull request was closed without merging.";
   }
@@ -346,6 +373,12 @@ function StatusBadge({ status }: { status: ImprovementStatus }) {
       return (
         <Badge variant="green" size="small">
           Merged
+        </Badge>
+      );
+    case "committed":
+      return (
+        <Badge variant="green" size="small">
+          Committed
         </Badge>
       );
     case "closed":

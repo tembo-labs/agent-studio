@@ -11,6 +11,7 @@ import {
   FRAMEWORK_LABELS,
   type Framework,
 } from "@/lib/agent-framework";
+import type { CommitMode } from "@/lib/commit-mode-constants";
 
 import {
   createFromChatAction,
@@ -20,7 +21,14 @@ import {
 const DEFAULT_FRAMEWORK: Framework = "pydantic-agentspec";
 const CHAT_INITIAL: ChatCreateFormState = {};
 
-export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
+export function NewAgentForm({
+  workspaceSlug,
+  commitMode,
+}: {
+  workspaceSlug: string;
+  commitMode: CommitMode;
+}) {
+  const direct = commitMode === "direct";
   const [state, action, pending] = useActionState(
     createFromChatAction,
     CHAT_INITIAL,
@@ -45,13 +53,29 @@ export function NewAgentForm({ workspaceSlug }: { workspaceSlug: string }) {
     return (
       <div className="border-sentiment-positive bg-[var(--color-sentiment-positive-subtle)] flex flex-col gap-2 rounded-lg border p-4 text-sm">
         <span className="text-foreground font-semibold">
-          PR requested for {s.agentName}
+          {direct ? "Building" : "PR requested for"} {s.agentName}
         </span>
         <p className="text-foreground-weak">
-          Tembo is opening a pull request at{" "}
-          <code className="bg-surface rounded px-1 py-0.5">{s.agentPath}</code>
-          . You can watch the Tembo session, and the PR status will appear on
-          the Improvements page once it&apos;s open.
+          {direct ? (
+            <>
+              Tembo is committing the new agent directly to your default branch
+              at{" "}
+              <code className="bg-surface rounded px-1 py-0.5">
+                {s.agentPath}
+              </code>
+              . You can watch the Tembo session; it&apos;ll show on the
+              Improvements page and appear in your agents once the commit lands.
+            </>
+          ) : (
+            <>
+              Tembo is opening a pull request at{" "}
+              <code className="bg-surface rounded px-1 py-0.5">
+                {s.agentPath}
+              </code>
+              . You can watch the Tembo session, and the PR status will appear
+              on the Improvements page once it&apos;s open.
+            </>
+          )}
         </p>
         <p className="text-foreground-weak text-sm">Status: {s.status}</p>
         <div className="flex flex-wrap gap-3 pt-1">

@@ -4,16 +4,22 @@ import "server-only";
 // GitHub. Called when the user visits /<workspace>/improvements (and the
 // dashboard / inventory). No webhook infra — trades freshness for simplicity.
 //
-// Two paths:
-//   1. Improvements that already have a PR number → fetch that PR DIRECTLY
-//      (`GET /repos/:o/:r/pulls/:n`). The direct endpoint reports `merged` /
-//      `merged_at` reliably; the search API does NOT (its `pull_request.
-//      merged_at` is frequently null even for merged PRs, which left merged
-//      improvements stuck showing "PR opened").
-//   2. Improvements with no PR yet → search the repo body for the marker to
-//      discover the PR that Tembo opened.
+// Paths, by delivery mode:
+//   PR mode:
+//     1. Improvements that already have a PR number → fetch that PR DIRECTLY
+//        (`GET /repos/:o/:r/pulls/:n`). The direct endpoint reports `merged` /
+//        `merged_at` reliably; the search API does NOT (its `pull_request.
+//        merged_at` is frequently null even for merged PRs, which left merged
+//        improvements stuck showing "PR opened").
+//     2. Improvements with no PR yet → search the repo body for the marker to
+//        discover the PR that Tembo opened.
+//   Direct (YOLO) mode:
+//     3. Improvements already optimistically 'committed' but with no commit URL
+//        yet → search commit messages for the marker to attach the landed
+//        commit (sha + html url).
 
 import {
+  setImprovementCommit,
   setImprovementPr,
   type Improvement,
   type ImprovementStatus,
@@ -44,6 +50,14 @@ interface GhPull {
   merged: boolean;
 }
 
+interface GhCommitSearch {
+  items: Array<{
+    sha: string;
+    html_url: string;
+    commit: { message: string };
+  }>;
+}
+
 const GH_HEADERS = (token: string) => ({
   Authorization: `Bearer ${token}`,
   Accept: "application/vnd.github+json",
@@ -68,9 +82,16 @@ export async function scanImprovementsForPRs(
 
   const updates = new Map<string, Improvement>();
 
+  // Direct-commit improvements never have a PR; they're reconciled by commit
+  // search (Path 3). Everything else follows the PR paths.
+  const prImprovements = open.filter((i) => i.delivery !== "direct");
+  const directImprovements = open.filter(
+    (i) => i.delivery === "direct" && i.commitUrl === null,
+  );
+
   // ── Path 1: improvements with a known PR number — fetch each PR directly
   // so merged/closed is detected reliably. ───────────────────────────────
-  const withPr = open.filter((i) => i.prNumber !== null);
+  const withPr = prImprovements.filter((i) => i.prNumber !== null);
   await Promise.all(
     withPr.map(async (imp) => {
       const pr = await fetchPull(repo.owner, repo.name, imp.prNumber!, token);
@@ -104,7 +125,7 @@ export async function scanImprovementsForPRs(
   );
 
   // ── Path 2: improvements with no PR yet — discover via body search. ─────
-  const withoutPr = open.filter((i) => i.prNumber === null);
+  const withoutPr = prImprovements.filter((i) => i.prNumber === null);
   if (withoutPr.length > 0) {
     // GitHub's search API caps `in:body` queries by length. Ask for ALL PRs
     // mentioning the marker prefix; match by id client-side. Capped at 100.
@@ -143,6 +164,44 @@ export async function scanImprovementsForPRs(
       const body = await res.text().catch(() => "");
       console.log(
         "[improvement-scan] github search failed",
+        res.status,
+        body.slice(0, 300),
+      );
+    }
+  }
+
+  // ── Path 3: direct-commit improvements — find the marker commit on the
+  // default branch and attach it. ────────────────────────────────────────
+  if (directImprovements.length > 0) {
+    const q = `repo:${repo.owner}/${repo.name} "${IMPROVEMENT_MARKER_PREFIX}"`;
+    const url = `https://api.github.com/search/commits?q=${encodeURIComponent(q)}&per_page=100`;
+    const res = await fetch(url, { headers: GH_HEADERS(token), cache: "no-store" });
+    if (res.ok) {
+      const search = (await res.json()) as GhCommitSearch;
+      const byId = new Map(directImprovements.map((i) => [i.id, i]));
+      for (const c of search.items) {
+        const message = c.commit?.message ?? "";
+        for (const id of byId.keys()) {
+          if (!message.includes(improvementMarker(id))) continue;
+          const existing = byId.get(id);
+          if (!existing) continue;
+          await setImprovementCommit({
+            id,
+            commitSha: c.sha,
+            commitUrl: c.html_url,
+          });
+          updates.set(id, {
+            ...existing,
+            commitSha: c.sha,
+            commitUrl: c.html_url,
+            status: "committed",
+          });
+        }
+      }
+    } else {
+      const body = await res.text().catch(() => "");
+      console.log(
+        "[improvement-scan] github commit search failed",
         res.status,
         body.slice(0, 300),
       );

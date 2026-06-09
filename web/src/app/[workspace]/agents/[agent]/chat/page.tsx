@@ -67,8 +67,10 @@ export default async function AgentChatPage({
           <span className="text-foreground font-medium">
             {canonicalName}
           </span>
-          . Each request opens a pull request for review; merged PRs become
-          live behavior.
+          .{" "}
+          {workspace.commitMode === "direct"
+            ? "Each request is committed directly to the default branch (YOLO mode)."
+            : "Each request opens a pull request for review; merged PRs become live behavior."}
         </p>
       </div>
 
@@ -78,6 +80,7 @@ export default async function AgentChatPage({
         workspaceSlug={workspace.slug}
         agentName={canonicalName}
         turns={turns}
+        commitMode={workspace.commitMode}
       />
     </div>
   );
