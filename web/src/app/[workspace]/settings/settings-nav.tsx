@@ -11,6 +11,7 @@ import { usePathname } from "next/navigation";
 type Item = { slug: string; label: string };
 
 const ITEMS: Item[] = [
+  { slug: "general", label: "General" },
   { slug: "members", label: "Members" },
   { slug: "repository", label: "Repository" },
   { slug: "providers", label: "LLM Providers" },
@@ -39,7 +40,7 @@ export function SettingsNav({ workspaceSlug }: { workspaceSlug: string }) {
         const isActive =
           pathname === href ||
           pathname.startsWith(`${href}/`) ||
-          (pathname === base && item.slug === "members");
+          (pathname === base && item.slug === "general");
         return (
           <Link
             key={item.slug}

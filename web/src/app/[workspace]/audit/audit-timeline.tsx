@@ -471,6 +471,15 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
           {String(p.toolkit ?? "")} · {String(p.oldName ?? "")} → {String(p.newName ?? "")}
         </span>
       );
+    case "workspace.renamed":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.fromName ?? "")} → {String(p.toName ?? "")}
+          {p.fromSlug !== p.toSlug
+            ? ` · /${String(p.fromSlug ?? "")} → /${String(p.toSlug ?? "")}`
+            : ""}
+        </span>
+      );
     case "secret.set":
     case "secret.rotated":
     case "secret.removed":
@@ -622,6 +631,7 @@ function humanKind(kind: string): string {
     "agent.deleted": "Agent deleted",
     "agent.restored": "Agent restored",
     "repo.disconnected": "Repository disconnected",
+    "workspace.renamed": "Workspace renamed",
     "member.added": "Member added",
     "member.role_changed": "Member role changed",
     "member.removed": "Member removed",

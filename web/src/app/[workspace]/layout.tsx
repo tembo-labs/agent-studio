@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/toaster";
@@ -14,6 +15,7 @@ import {
   getWorkspaceRole,
   getWorkspaceSecretPreview,
   listWorkspacesForUser,
+  resolveWorkspaceSlugAlias,
   touchWorkspaceLastVisited,
   userIsMember,
 } from "@/lib/workspace";
@@ -53,7 +55,20 @@ export default async function WorkspaceLayout({
   if (!session) notFound();
 
   const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
+  if (!workspace) {
+    // The slug may be a workspace's *old* slug (renamed). If so, redirect to
+    // its current slug, preserving the rest of the path so deep links survive.
+    // `x-pathname` is set by proxy.ts; fall back to the workspace root.
+    const canonical = await resolveWorkspaceSlugAlias(slug);
+    if (canonical) {
+      const pathname = (await headers()).get("x-pathname") ?? `/${slug}`;
+      const rest = pathname.startsWith(`/${slug}/`)
+        ? pathname.slice(`/${slug}`.length)
+        : "";
+      redirect(`/${canonical}${rest}`);
+    }
+    notFound();
+  }
 
   const isMember = await userIsMember(workspace.id, session.user.id);
   if (!isMember) notFound();

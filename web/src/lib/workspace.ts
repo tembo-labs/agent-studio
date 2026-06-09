@@ -493,6 +493,118 @@ export async function createWorkspace(
   }
 }
 
+// ── Rename + slug aliases ────────────────────────────────────────────────
+
+export type RenameWorkspaceError =
+  | "name-required"
+  | "slug-too-short"
+  | "slug-too-long"
+  | "slug-invalid-chars"
+  | "slug-reserved"
+  | "slug-taken";
+
+export type RenameWorkspaceResult =
+  | { ok: true; workspace: Workspace; slugChanged: boolean }
+  | { ok: false; error: RenameWorkspaceError };
+
+/**
+ * Rename a workspace (GitHub-org style: the URL slug is re-derived from the
+ * new name). When the slug changes, the previous slug is recorded in
+ * `workspace_slug_alias` so old links keep resolving, and any alias that
+ * equals the new slug for THIS workspace is reclaimed. A new slug that's a
+ * live slug or another workspace's alias is rejected as taken.
+ */
+export async function renameWorkspace(
+  workspaceId: string,
+  currentSlug: string,
+  rawName: string,
+): Promise<RenameWorkspaceResult> {
+  const name = rawName.trim();
+  if (!name) return { ok: false, error: "name-required" };
+
+  const slug = suggestSlug(name).trim();
+  const slugError = validateSlug(slug);
+  if (slugError) {
+    return { ok: false, error: `slug-${slugError}` as RenameWorkspaceError };
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    const slugChanged = slug !== currentSlug;
+
+    if (slugChanged) {
+      // Reject if the new slug is a live slug on another workspace…
+      const liveClash = await client.query(
+        `SELECT 1 FROM workspace WHERE slug = $1 AND id <> $2 LIMIT 1`,
+        [slug, workspaceId],
+      );
+      if ((liveClash.rowCount ?? 0) > 0) {
+        await client.query("ROLLBACK");
+        return { ok: false, error: "slug-taken" };
+      }
+      // …or an old slug pointing at a different workspace. If it's one of
+      // ours (the workspace is reverting to an earlier name), reclaim it.
+      const aliasOwner = await client.query<{ workspace_id: string }>(
+        `SELECT workspace_id FROM workspace_slug_alias WHERE old_slug = $1 LIMIT 1`,
+        [slug],
+      );
+      if (aliasOwner.rows[0] && aliasOwner.rows[0].workspace_id !== workspaceId) {
+        await client.query("ROLLBACK");
+        return { ok: false, error: "slug-taken" };
+      }
+      await client.query(
+        `DELETE FROM workspace_slug_alias WHERE old_slug = $1`,
+        [slug],
+      );
+      // Keep the slug we're leaving as an alias for this workspace.
+      await client.query(
+        `INSERT INTO workspace_slug_alias (old_slug, workspace_id)
+         VALUES ($1, $2)
+         ON CONFLICT (old_slug)
+           DO UPDATE SET workspace_id = EXCLUDED.workspace_id, created_at = NOW()`,
+        [currentSlug, workspaceId],
+      );
+    }
+
+    const { rows } = await client.query<WorkspaceRow>(
+      `UPDATE workspace
+          SET name = $1, slug = $2, updated_at = NOW()
+        WHERE id = $3
+        RETURNING ${WORKSPACE_COLUMNS}`,
+      [name, slug, workspaceId],
+    );
+
+    await client.query("COMMIT");
+    return { ok: true, workspace: rowToWorkspace(rows[0]), slugChanged };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Resolve a possibly-stale slug to the workspace's current slug via the
+ * alias table. Returns null when the slug was never a workspace's slug.
+ * Only called on the slug-miss path, so the live-slug hot path pays nothing.
+ */
+export async function resolveWorkspaceSlugAlias(
+  oldSlug: string,
+): Promise<string | null> {
+  const { rows } = await db.query<{ slug: string }>(
+    `SELECT w.slug
+       FROM workspace_slug_alias a
+       JOIN workspace w ON w.id = a.workspace_id
+      WHERE a.old_slug = $1
+      LIMIT 1`,
+    [oldSlug],
+  );
+  return rows[0]?.slug ?? null;
+}
+
 // ── Workspace favicon ────────────────────────────────────────────────────
 
 const FAVICON_ALLOWED_MIMES = new Set([

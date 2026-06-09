@@ -37,10 +37,12 @@ import {
   getWorkspaceSecretPreview,
   removeWorkspaceMember,
   removeWorkspaceSecret,
+  renameWorkspace,
   setFaviconCustom,
   setFaviconDefault,
   setWorkspaceSecret,
   type FaviconKind,
+  type RenameWorkspaceError,
   type SetFaviconError,
   type SetWorkspaceSecretError,
   type WorkspaceSecretKind,
@@ -773,6 +775,75 @@ export async function removeMemberAction(
 
   revalidatePath(`/${slug}/settings`);
   return MEMBER_EMPTY;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// General — rename workspace
+
+export type RenameWorkspaceState = {
+  message?: string;
+  error?: string;
+};
+
+const RENAME_ERROR_MESSAGES: Record<RenameWorkspaceError, string> = {
+  "name-required": "Enter a workspace name.",
+  "slug-too-short":
+    "That name produces too short a URL — use at least two letters or numbers.",
+  "slug-too-long": "That name produces too long a URL (max 32 characters).",
+  "slug-invalid-chars":
+    "That name doesn't produce a usable URL — include some letters or numbers.",
+  "slug-reserved": "That name maps to a reserved URL. Pick a different name.",
+  "slug-taken": "Another workspace already uses that URL. Pick a different name.",
+};
+
+/**
+ * Rename a workspace (workspace-admin only). The URL slug is re-derived from
+ * the new name; if it changes, the old slug is kept as a redirect and we
+ * redirect to the new settings URL. If only the display name changed, we stay
+ * put and revalidate.
+ */
+export async function renameWorkspaceAction(
+  _prev: RenameWorkspaceState,
+  formData: FormData,
+): Promise<RenameWorkspaceState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const name = String(formData.get("name") ?? "");
+
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (auth.denied) return { error: DENIED_MESSAGE };
+  const { workspace, userId } = auth;
+
+  if (name.trim() === workspace.name) {
+    return { message: "No changes — that's already the name." };
+  }
+
+  const result = await renameWorkspace(workspace.id, workspace.slug, name);
+  if (!result.ok) return { error: RENAME_ERROR_MESSAGES[result.error] };
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "workspace.renamed",
+    targetType: "workspace",
+    targetId: workspace.id,
+    agentName: null,
+    payload: {
+      fromName: workspace.name,
+      toName: result.workspace.name,
+      fromSlug: workspace.slug,
+      toSlug: result.workspace.slug,
+    },
+  });
+
+  if (result.slugChanged) {
+    // The URL moved; everything under the old slug now redirects, but send the
+    // admin straight to the canonical settings URL.
+    redirect(`/${result.workspace.slug}/settings/general`);
+  }
+
+  revalidatePath(`/${slug}`, "layout");
+  return { message: "Workspace name updated." };
 }
 
 // ─────────────────────────────────────────────────────────────────────
