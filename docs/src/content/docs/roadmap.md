@@ -3,106 +3,120 @@ title: Roadmap
 description: Where Tembo Agent Studio is headed.
 ---
 
-Tembo Agent Studio reaches users as one product. Internally, we build it in
-six phases — a construction plan, not a release train. Each phase is a
-coherent slab of capability the next one builds on; sequencing them this
-way is how we keep the floor trustworthy before we add the floors above
-it.
+Ideas we're exploring to make Tembo Agent Studio better — in no particular
+order, and none of it promised or dated. Each idea links to a GitHub Discussion
+with a draft **TASIP** (Tembo Agent Studio Improvement Proposal) where you can
+weigh in: tell us your use case, push back, or 👍 the ones you want most. Your
+input is what moves an idea from "maybe" to scheduled work.
 
-Each phase folder under [`context/`](./context/) contains a PRFAQ-style
-`README.md`, a `BLOG_POST.md` external announcement draft, a
-`USER_STORIES.md`, and a `DEMO_SCRIPT.md`. The repo's
-[`CHANGELOG.md`](./CHANGELOG.md) tracks what has actually shipped.
+## Adaptive corrections loop
 
-**Phase numbers are construction milestones, not release versions.**
-Shipping is on [CalVer](https://calver.org/) — year.month tags with a
-per-month release counter, like `v2026.6.4` — so a release can carry work
-from any phase (or none).
-Phase scope is tracked as **GitHub Issues** (label
-[`enhancement`](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement)):
-the [0.5](https://github.com/tembo/agent-studio/milestone/1) and
-[0.6](https://github.com/tembo/agent-studio/milestone/2) milestones hold
-scheduled stories, and enhancement issues with
-[no milestone](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aenhancement)
-are the backlog. The `context/` docs hold design rationale; the issues
-hold status.
+When someone marks an agent's output as wrong, TAS bundles the run, the input,
+and the correction, and a Tembo coding agent proposes a targeted pull request to
+fix it. Every fix is still a reviewable diff, so feedback from real usage flows
+back into the agent without an engineering queue — with a one-click "modify &
+re-run" to confirm the change against the original input.
 
-## [Phase 0.1 — Foundation](./context/shipped/0.1/) · *The trustworthy floor*
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/95)
 
-> **Shipped May 2026.**
+## Behavior variants
 
-Build the floor first: a self-hosted deploy, identity through your IdP, a
-Git repo wired to a workspace, and a baseline agent that runs reliably with
-readable logs. Nothing flashy. Everything that follows depends on this
-layer being dependable, so this is where we resist the urge to demo
-authoring before runs are solid.
+When two teams want an agent to behave differently — terse for support, chatty
+for sales — TAS proposes a *variant* instead of silently averaging contradictory
+feedback. Each variant keeps its own lineage and history, so you can run
+team-specific behavior safely or reconcile them later.
 
-## [Phase 0.2 — Authoring velocity](./context/shipped/0.2/) · *Chat to PR*
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/96)
 
-> **Shipped May 2026.** See [`CHANGELOG.md`](./CHANGELOG.md) for the
-> full list of what landed.
+## Human-in-the-loop steps
 
-Build the loop that lets a non-engineer change an agent without an
-engineering queue. They describe the change in chat; a Tembo coding agent
-reads the existing definition, produces a targeted diff, and opens a pull
-request. Reviewers approve or comment. On merge, the new behavior is live.
-The PR is the contract — even when the author wasn't human.
+Let an agent pause mid-run to ask a person for a decision or input through a
+structured form, then resume with the answer. This unlocks workflows that need
+human judgment at a checkpoint — approval, disambiguation, sign-off — without
+giving up automation everywhere else.
 
-## [Phase 0.3 — Operational surface](./context/shipped/0.3/) · *Forms and dashboards*
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/97)
 
-> **Shipped May 2026.** See [`CHANGELOG.md`](./CHANGELOG.md) for the
-> full list of what landed.
+## Tasks inbox
 
-Build the day-to-day surface that fast authoring demands. Per-agent
-operational dashboards so when something misbehaves at 2am, the triage
-answer is one screen, not four hours of log spelunking. The
-human-in-the-loop forms slice of v0.3 anchored on a substrate
-larger than the phase could absorb and moved to v0.4 — see the
-"Deferred from the v0.3 plan" section in the phase
-[`README.md`](./context/shipped/0.3/) for the full set of carve-outs.
+A single queue of everything agents are waiting on *you* for: paused runs that
+need input, corrections awaiting a decision, PRs to review. One place to triage,
+so the human-in-the-loop parts don't get missed across a dozen screens.
 
-## [Phase 0.4 — Governance depth](./context/shipped/0.4/) · *Audit and access*
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/98)
 
-Build the controls organizations need to scale usage from one team to
-many. An immutable `who/when/why` changelog records every change, run,
-human action, and policy switch — chat sessions, PRs, corrections, and
-overrides all resolve into the same timeline. Role-based access and
-org-level policy templates let large orgs draw boundaries that workspaces
-inherit. The bar is one screen, not four days of spelunking, to answer
-"who changed this, when, and why?" Governance lands *before* adaptive
-loops so the loop can't outrun the audit trail.
+## Direct-commit mode
 
-## [Phase 0.5 — Adaptive intelligence](./context/0.5/) · *Corrections and variants*
+For low-risk, trusted changes, let a correction apply immediately instead of
+waiting on a pull-request review — configurable per agent and per workspace.
+Speeds up safe, routine updates while keeping full review for everything else.
 
-Build the closed loop inside a single TAS deployment. When an end user
-corrects an output, TAS bundles the original, the correction, and the run
-context, and a coding agent proposes a targeted PR. When two teams want
-incompatible behaviors, TAS proposes a **variant** rather than silently
-averaging. Every adaptive change is still a PR. Adaptation is allowed;
-drift is governed.
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/99)
 
-## [Phase 0.6 — Mycelium](./context/0.6/) · *Cross-deployment learning, by policy*
+## Cross-deployment learning
 
-Build the optional inter-deployment substrate. Tembo Mycelium lets TAS
-instances exchange patterns — never raw data — under explicit policy:
-island, share patterns only, share + receive, or receive only. Bilateral
-or group-policy, never a public marketplace. Attribution and provenance
-travel with every pattern, and every import lands in the same v0.4
-changelog as any other change. The default is island; opting in is a
-deliberate org-admin action.
+Optionally let independent TAS deployments exchange behavioral *patterns* — never
+raw data — under explicit policy (island by default, share-only, receive-only,
+or both). Stop reinventing the same agent improvements in parallel while keeping
+strict data isolation; every imported pattern still lands as a reviewable PR with
+its origin attached.
 
-## Phase index
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/100)
 
-| Phase | Theme | Docs |
-| ----- | ----- | ---- |
-| 0.1 | Foundation (shipped) | [`context/shipped/0.1/`](./context/shipped/0.1/) |
-| 0.2 | Authoring velocity (shipped) | [`context/shipped/0.2/`](./context/shipped/0.2/) |
-| 0.3 | Operational surface (shipped) | [`context/shipped/0.3/`](./context/shipped/0.3/) |
-| 0.4 | Governance depth (shipped) | [`context/shipped/0.4/`](./context/shipped/0.4/) |
-| 0.5 | Adaptive intelligence (planned) | [`context/0.5/`](./context/0.5/) · [issues](https://github.com/tembo/agent-studio/milestone/1) |
-| 0.6 | Mycelium (planned) | [`context/0.6/`](./context/0.6/) · [issues](https://github.com/tembo/agent-studio/milestone/2) |
-| —   | Backlog (unscheduled, no milestone) | [`context/backlog/`](./context/backlog/) · [issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+is%3Aopen+no%3Amilestone+label%3Aenhancement) |
+## Self-extending TAS
 
-Shipped phase folders moved under [`context/shipped/`](./context/shipped/) — see [`context/README.md`](./context/README.md) for the convention.
+Point your instance at your own fork so a Tembo coding agent can build the
+platform extensions you need — a new connection type, a custom substrate — and
+PR them back, staying upgrade-safe with upstream. Deep integrations without
+waiting on the core roadmap.
 
-See [`context/README.md`](./context/README.md) for the strategy overview.
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/101)
+
+## Org-level policy templates
+
+Define governance policy once at the org level (e.g. "high-audit" vs
+"light-touch") and have workspaces inherit it — tightening but not loosening.
+Enterprises get consistent guardrails across many teams without micromanaging
+each workspace.
+
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/102)
+
+## Agent labels & grouping
+
+Group the agents list and dashboards by label — sales, support, compliance — so
+a large agent footprint stays navigable, and use labels to scope things like
+which Slack app can launch which agents. (Labels already exist; this adds the
+group-by views.)
+
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/103)
+
+## Scheduled guidance refresh
+
+Keep the authoring guidance in your repo (`AGENTS.md` and friends) automatically
+up to date with the latest TAS best practices on a schedule, instead of manual
+syncs — so the coding agents that write your agents always work from current
+guidance.
+
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/104)
+
+## Richer trigger setup
+
+Replace free-text trigger entry with schema-driven config forms pulled from each
+provider, so setting up an event trigger is discoverable and self-documenting
+instead of memorizing slugs.
+
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/105)
+
+## Audit streaming to your SIEM
+
+Stream audit events to your security tooling (Datadog, Splunk, …) in real time,
+not just exported snapshots, so you can correlate TAS activity with the rest of
+your compliance infrastructure and alert on it.
+
+[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/106)
+
+## Have a different idea?
+
+Open a discussion in the
+[Ideas category](https://github.com/tembo/agent-studio/discussions/categories/ideas)
+— that's where roadmap ideas start.
