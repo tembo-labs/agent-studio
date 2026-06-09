@@ -26,21 +26,21 @@ export function AutomationsSection({
       collapsible
       title={
         automations.length > 0
-          ? `Automations (${automations.length})`
-          : "Automations"
+          ? `Schedules (${automations.length})`
+          : "Schedules"
       }
       description="Schedules that fire this agent on their own. Cron is UTC; times shown are local."
     >
       <div className="mb-3">
         <Button asChild variant="secondary">
-          <Link href={newHref}>New automation</Link>
+          <Link href={newHref}>New schedule</Link>
         </Button>
       </div>
       {automations.length === 0 ? (
         <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
-          No automations yet. Click{" "}
-          <strong className="text-foreground">New automation</strong> to schedule
-          this agent.
+          No schedules yet. Click{" "}
+          <strong className="text-foreground">New schedule</strong> to run this
+          agent automatically.
         </p>
       ) : (
         <ul className="divide-border flex flex-col divide-y border-y border-[var(--color-border)]">

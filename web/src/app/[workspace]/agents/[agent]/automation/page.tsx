@@ -17,8 +17,8 @@ import { WebhooksSection } from "../webhooks-section";
 
 export const dynamic = "force-dynamic";
 
-// Automation tab — every way this agent fires on its own: Composio event
-// triggers, inbound external webhooks, and cron schedules.
+// Automation tab — every way this agent fires on its own: cron schedules,
+// Composio event triggers, and inbound external webhooks.
 
 export default async function AgentAutomationPage({
   params,
@@ -56,6 +56,12 @@ export default async function AgentAutomationPage({
 
   return (
     <>
+      <AutomationsSection
+        automations={automations}
+        workspaceSlug={workspace.slug}
+        agentName={canonicalName}
+      />
+
       <TriggersSection
         workspaceSlug={workspace.slug}
         agentName={canonicalName}
@@ -86,12 +92,6 @@ export default async function AgentAutomationPage({
           lastFiredAtIso: w.lastFiredAt ? w.lastFiredAt.toISOString() : null,
           lastFireError: w.lastFireError,
         }))}
-      />
-
-      <AutomationsSection
-        automations={automations}
-        workspaceSlug={workspace.slug}
-        agentName={canonicalName}
       />
     </>
   );
