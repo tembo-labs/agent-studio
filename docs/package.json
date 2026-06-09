@@ -6,8 +6,10 @@
   "packageManager": "pnpm@10.24.0",
   "description": "User manual for Tembo Agent Studio (Astro Starlight, published to GitHub Pages).",
   "scripts": {
+    "gen:project": "node gen-project-pages.mjs",
     "dev": "astro dev",
     "start": "astro dev",
+    "prebuild": "node gen-project-pages.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"

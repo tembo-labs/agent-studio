@@ -52,11 +52,22 @@ export const DOC_SECTIONS: DocSection[] = [
         label: "Help",
         items: [{ slug: "troubleshooting", label: "Troubleshooting" }],
       },
+      {
+        label: "Project",
+        items: [
+          { slug: "changelog", label: "Changelog" },
+          { slug: "roadmap", label: "Roadmap" },
+        ],
+      },
     ],
   },
   {
     audience: "For Admins",
     groups: [
+      {
+        label: "Start here",
+        items: [{ slug: "admin-introduction", label: "Introduction" }],
+      },
       {
         label: "Workspace admin",
         items: [

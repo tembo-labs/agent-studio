@@ -80,11 +80,19 @@ export default defineConfig({
         {
           label: "Self-hosting",
           items: [
+            { label: "Admin introduction", slug: "admin-introduction" },
             { label: "Overview", slug: "deploying-and-operating" },
             { label: "Setup checklist", slug: "customer-setup" },
             { label: "Deploy on Railway", slug: "deploy-railway" },
             { label: "Deploy on AWS", slug: "deploy-aws" },
             { label: "Deploy on Vercel", slug: "deploy-vercel" },
+          ],
+        },
+        {
+          label: "Project",
+          items: [
+            { label: "Changelog", slug: "changelog" },
+            { label: "Roadmap", slug: "roadmap" },
           ],
         },
       ],
