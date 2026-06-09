@@ -1,7 +1,13 @@
 import { Fragment } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { abbreviateTokens, estimateTokenCost, formatPenny } from "@/lib/pricing";
+import {
+  abbreviateTokens,
+  estimateRunCost,
+  estimateTokenCost,
+  formatCurrency,
+  formatPenny,
+} from "@/lib/pricing";
 import type { RunStep, RunToolCall } from "@/lib/runs-db";
 
 import { RevealText } from "./reveal-text";
@@ -38,6 +44,24 @@ export function RunSteps({
     arr.push(c);
     callsByStep.set(c.stepOrdinal, arr);
   }
+
+  // Run totals for the footer.
+  let totalIn = 0;
+  let totalOut = 0;
+  let hasTokens = false;
+  for (const s of steps) {
+    if (s.inputTokens !== null) {
+      totalIn += s.inputTokens;
+      hasTokens = true;
+    }
+    if (s.outputTokens !== null) {
+      totalOut += s.outputTokens;
+      hasTokens = true;
+    }
+  }
+  const totalInCost = estimateTokenCost(model, totalIn, "input");
+  const totalOutCost = estimateTokenCost(model, totalOut, "output");
+  const combinedCost = estimateRunCost(model, totalIn, totalOut);
 
   return (
     <div className="bg-surface border-border flex flex-col overflow-hidden rounded-lg border">
@@ -95,6 +119,22 @@ export function RunSteps({
           </div>
         );
       })}
+
+      {hasTokens && (
+        <div className="border-border bg-surface-secondary flex flex-col items-end gap-0.5 border-t px-3 py-2.5">
+          <div className="text-foreground text-sm font-semibold tabular-nums">
+            {abbreviateTokens(totalIn)} in
+            {totalInCost !== null && ` ~${formatPenny(totalInCost)}`} ·{" "}
+            {abbreviateTokens(totalOut)} out
+            {totalOutCost !== null && ` ~${formatPenny(totalOutCost)}`}
+          </div>
+          {combinedCost !== null && (
+            <div className="text-foreground-weak text-xs tabular-nums">
+              total ~{formatCurrency(combinedCost)}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -640,9 +640,16 @@ def build_agent(
     name = spec.get("name")
     if isinstance(name, str) and name.strip():
         kwargs["name"] = name
+    # Default to SEQUENTIAL tool calls. parallel_tool_calls=False is a real,
+    # API-level limiter (OpenAI parallel_tool_calls / Anthropic
+    # disable_parallel_tool_use): the model emits one tool call per turn instead
+    # of fanning out many at once, which is what was getting Attio (and other
+    # providers) rate-limited. An agent that genuinely needs parallel calls can
+    # opt back in with model_settings.parallel_tool_calls: true in its spec.
     model_settings = spec.get("model_settings")
-    if isinstance(model_settings, dict) and model_settings:
-        kwargs["model_settings"] = model_settings
+    ms = dict(model_settings) if isinstance(model_settings, dict) else {}
+    ms.setdefault("parallel_tool_calls", False)
+    kwargs["model_settings"] = ms
     retries = spec.get("retries")
     if isinstance(retries, int):
         kwargs["retries"] = retries
