@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: Setting up and operating a Tembo Agent Studio instance — self-hosting, the Tembo API key, roles, and administration.
+description: Setting up and operating a Tembo Agent Studio instance — self-hosting, architecture, the Tembo API key, roles, and deploy guides.
 ---
 
 The admin-side companion to the [operator introduction](/agent-studio/introduction/).
@@ -23,6 +23,22 @@ system calls out to compilers.
 Until a Tembo API key is set, chat-to-PR authoring stays hidden — running
 existing agents only needs an LLM provider key (Anthropic or OpenAI).
 
+## Architecture in one breath
+
+A Next.js web control plane, a Rust (axum + sqlx) API that owns the runtime and
+Postgres migrations, and a Postgres database. Agent definitions live in your
+connected GitHub repo; the API runs agents as subprocess calls into the bundled
+`pydantic-ai` wrapper.
+
+## Ways to run it
+
+- **Local / from source** — `docker compose up --build` brings up web, API, and
+  Postgres. Good for evaluation and development.
+- **From prebuilt images** — `compose.release.yaml` pulls pinned images from
+  GHCR instead of compiling from source.
+- **Managed hosts** — the full stack on **Railway** or **AWS** (ECS Fargate +
+  RDS), or the web tier on **Vercel** with the API on a long-lived host.
+
 ## What admins manage
 
 - **[Settings](/agent-studio/settings/)** — repository, LLM provider keys, the
@@ -33,11 +49,18 @@ existing agents only needs an LLM provider key (Anthropic or OpenAI).
 - **[Slack apps](/agent-studio/slack-apps/)** — installing and scoping the
   workspace Slack apps that launch agents.
 
-## Deploying & operating
+## Deploy guides
 
-- **[Overview](/agent-studio/deploying-and-operating/)** — architecture and
-  day-2 operations.
-- **[Setup checklist](/agent-studio/customer-setup/)** — from zero to a working
-  instance.
-- Platform guides: [Railway](/agent-studio/deploy-railway/),
-  [AWS](/agent-studio/deploy-aws/), and [Vercel](/agent-studio/deploy-vercel/).
+- **[Setup checklist](/agent-studio/customer-setup/)** — start here. A
+  zero-to-running checklist from accounts and keys through first sign-in.
+- **[Deploy on Railway](/agent-studio/deploy-railway/)** — full stack on Railway
+  from published images.
+- **[Deploy on AWS](/agent-studio/deploy-aws/)** — ECS Fargate + RDS.
+- **[Deploy on Vercel](/agent-studio/deploy-vercel/)** — web on Vercel, API on a
+  long-lived host, managed Postgres.
+
+## Versioning
+
+Production instances pin to explicit CalVer release tags (e.g. `v2026.6.12`);
+released container images are published to GHCR with signatures and SBOMs. See
+the [Changelog](/agent-studio/changelog/) for what's in each release.

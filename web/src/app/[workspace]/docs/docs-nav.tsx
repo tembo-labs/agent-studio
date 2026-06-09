@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
-import { IconChevronDownSmall } from "central-icons";
+import { IconChevronDownSmall, IconGithub, IconStar } from "central-icons";
 
 import { DOC_SECTIONS, type DocSection } from "./nav";
 
@@ -13,23 +13,62 @@ import { DOC_SECTIONS, type DocSection } from "./nav";
 // each a collapsible header over grouped pages. Everyone sees both; the Admins
 // section starts collapsed. Three header tiers — UPPERCASE audience (with a
 // chevron) › bold group heading › normal page links — keep them distinct.
-export function DocsNav({ workspaceSlug }: { workspaceSlug: string }) {
+// A GitHub stars link is pegged to the bottom.
+export function DocsNav({
+  workspaceSlug,
+  repoUrl,
+  starCount,
+  version,
+}: {
+  workspaceSlug: string;
+  repoUrl: string;
+  starCount: number | null;
+  version: string | null;
+}) {
   const base = `/${workspaceSlug}/docs`;
   return (
     <nav
       aria-label="Documentation"
-      className="flex w-full shrink-0 flex-col gap-1 sm:w-60"
+      className="flex h-full w-full flex-col sm:w-60"
     >
-      {DOC_SECTIONS.map((section, idx) => (
-        <AudienceSection
-          key={section.audience}
-          section={section}
-          base={base}
-          defaultOpen={idx === 0}
-        />
-      ))}
+      <div className="flex flex-1 flex-col gap-1 overflow-y-auto pb-3">
+        {DOC_SECTIONS.map((section, idx) => (
+          <AudienceSection
+            key={section.audience}
+            section={section}
+            base={base}
+            defaultOpen={idx === 0}
+          />
+        ))}
+      </div>
+
+      <a
+        href={repoUrl}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="text-foreground-weak hover:bg-surface hover:text-foreground mt-2 flex shrink-0 items-center gap-2 border-t border-[var(--color-border-weak)] px-2 pt-3 text-sm"
+      >
+        <IconGithub size={15} />
+        <span>GitHub</span>
+        {starCount !== null && (
+          <span className="text-foreground-muted ml-auto inline-flex items-center gap-1 tabular-nums">
+            <IconStar size={13} />
+            {formatStars(starCount)}
+          </span>
+        )}
+      </a>
+      {version && (
+        <span className="text-foreground-muted px-2 pt-1 text-[11px]">
+          {version}
+        </span>
+      )}
     </nav>
   );
+}
+
+function formatStars(n: number): string {
+  if (n < 1000) return String(n);
+  return `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
 }
 
 function AudienceSection({

@@ -79,7 +79,6 @@ export const DOC_SECTIONS: DocSection[] = [
       {
         label: "Self-hosting",
         items: [
-          { slug: "deploying-and-operating", label: "Overview" },
           { slug: "customer-setup", label: "Setup checklist" },
           { slug: "deploy-railway", label: "Deploy on Railway" },
           { slug: "deploy-aws", label: "Deploy on AWS" },

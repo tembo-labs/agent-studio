@@ -5,7 +5,7 @@ description: Sign in, create or join a workspace, connect a GitHub repo, and add
 
 This page gets you from a freshly deployed (or shared) TAS instance to running
 your first agent. If you're standing up the instance itself, see
-[Deploying & operating](/agent-studio/deploying-and-operating/) first.
+[Deploying & operating](/agent-studio/admin-introduction/) first.
 
 ## 1. Sign in
 

@@ -37,7 +37,7 @@ on the agent detail page, in the **Triggers** section (above Automations).
 Composio trigger webhooks terminate on the **web** service at
 `/api/hooks/composio/{workspace}`. If the web tier sleeps (some serverless
 plans) or scales to zero, event triggers pause until it's reachable again. See
-your [deploy guide](/agent-studio/deploying-and-operating/) for platform-specific
+your [deploy guide](/agent-studio/admin-introduction/) for platform-specific
 notes.
 :::
 
