@@ -83,7 +83,7 @@ export function UserMenu({ name, email, role, isInstanceAdmin }: Props) {
           </span>
         )}
         {role && (
-          <span className="bg-surface-secondary text-foreground-weak mt-1 rounded px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide">
+          <span className="text-foreground-muted mt-0.5 text-[11px] font-medium uppercase tracking-wide">
             {ROLE_LABELS[role]}
           </span>
         )}
