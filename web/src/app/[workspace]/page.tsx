@@ -67,7 +67,13 @@ export default async function WorkspacePage({
     pendingStored,
   );
   const pending = pendingScanned.filter(
-    (p) => p.status === "submitted" || p.status === "pr_opened",
+    (p) =>
+      p.status === "submitted" ||
+      p.status === "pr_opened" ||
+      // YOLO creates are optimistically 'committed' the moment CAP accepts
+      // them, before the file lands. Keep the pending card until the scan
+      // attaches the commit URL (matches listPendingCreatesForWorkspace).
+      (p.delivery === "direct" && p.status === "committed" && !p.commitUrl),
   );
 
   // Live agents have names sourced from the parsed spec. If a pending
