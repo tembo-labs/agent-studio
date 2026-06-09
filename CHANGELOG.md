@@ -12,6 +12,55 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.12] — Live run timeline, output discipline, Native MCP admin — shipped 2026-06-08
+
+### Added
+- **Run view rebuilt as a live step timeline.** The run-detail page now shows
+  one view — built live and identical when finished — of what the agent did,
+  step by step: the model's narration (revealed word-by-word while running), the
+  tools it called (provider logo + ok/failed/running badge inline), and a
+  per-step **In / Out token + cost** readout, with a totals footer (In, Out, and
+  combined total). A "Copy" button lifts the whole transcript (narration +
+  answer + tool calls) as plain text. The final answer is the last step — no
+  separate Output box.
+  - The wrapper streams text deltas + tool-call/result events as they happen; the
+    runner persists `run_step` / `run_tool_call` rows live so the table builds in
+    place, reconciled authoritatively at run end.
+  - Per-step token usage + per-tool-call attribution. *(migrations 0043
+    `run_step`, 0044 `run.streamed_output`, 0045 `run_step.summary`)*
+- **Output discipline for every agent.** A global instruction makes agents work
+  silently — no step-narrating or raw tool-output dumps in the reply — while
+  allowing one short "what I'm doing" line per tool step (which feeds the
+  timeline narration). Stops agents from burning the output-token budget.
+- **Real parallel-tool-call limiter.** Agents now default to
+  `model_settings.parallel_tool_calls = False` — an API-level cap so the model
+  issues one tool call at a time instead of fanning out parallel bursts that get
+  providers (e.g. Attio) rate-limited. Opt back in per-agent via the spec. Paired
+  with tool-use guidance to back off on `retry after` errors.
+- **Native MCP admin screen.** A workspace-admin "Manage providers" screen
+  (Connections → Native MCP) to enable/disable which providers members see and
+  register **multiple named OAuth-app instances** per confidential provider, so a
+  second connection can use a second app. *(migration 0042
+  `workspace_native_mcp_provider` + instance columns on
+  `workspace_native_oauth_client`)*
+
+### Changed
+- **Agents table:** Name is the first column with alphabetical default sort;
+  Labels get their own column; the Framework column is gone; the Model column
+  strips the provider prefix (`anthropic:claude-sonnet-4-6` → `sonnet-4-6`).
+- **Per-agent Runs tab** reuses the workspace Runs table (same columns minus
+  Agent + Input), keeping status/trigger/search filters.
+- **Sidebar "Action needed"** collapses duplicate missing-connection alerts into
+  one card ("HubSpot for 3 agents") instead of one per agent.
+- **Dashboard:** dropped the "Workspace-wide activity" subhead; Recent runs now
+  show who triggered each run.
+
+### Migrations
+- `0042_native_mcp_admin` — provider enable flags + OAuth-app instances.
+- `0043_run_step` — per model-step token usage + `run_tool_call.step_ordinal`.
+- `0044_run_streamed_output` — live partial output column.
+- `0045_run_step_summary` — per-step narration text.
+
 ## [v2026.6.11] — HubSpot via Native MCP (bring-your-own OAuth app) — shipped 2026-06-08
 
 ### Added
