@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { IconChevronDownSmall, IconGithub, IconStar } from "central-icons";
@@ -71,6 +71,29 @@ function formatStars(n: number): string {
   return `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
 }
 
+// Collapse state that survives refreshes + sessions (localStorage). Hydrates the
+// stored preference after mount so SSR and the first client render match.
+function usePersistedOpen(
+  key: string,
+  defaultOpen: boolean,
+): [boolean, (next: boolean) => void] {
+  const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => {
+    const stored = window.localStorage.getItem(key);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (stored !== null) setOpen(stored === "open");
+  }, [key]);
+  const set = (next: boolean) => {
+    setOpen(next);
+    try {
+      window.localStorage.setItem(key, next ? "open" : "closed");
+    } catch {
+      // ignore (private mode / storage disabled)
+    }
+  };
+  return [open, set];
+}
+
 function AudienceSection({
   section,
   base,
@@ -81,7 +104,10 @@ function AudienceSection({
   defaultOpen: boolean;
 }) {
   const pathname = usePathname();
-  const [userOpen, setUserOpen] = useState(defaultOpen);
+  const [userOpen, setUserOpen] = usePersistedOpen(
+    `tas-docs-aud-${section.audience}`,
+    defaultOpen,
+  );
   // Always show the section that contains the current page (even if collapsed
   // by default), without clobbering the user's toggle preference.
   const hasActive = section.groups.some((g) =>
@@ -93,7 +119,7 @@ function AudienceSection({
     <div className="border-[var(--color-border-weak)] pt-2 [&:not(:first-child)]:mt-1 [&:not(:first-child)]:border-t">
       <button
         type="button"
-        onClick={() => setUserOpen((o) => !o)}
+        onClick={() => setUserOpen(!userOpen)}
         aria-expanded={open}
         className="text-foreground-muted hover:text-foreground flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-widest transition-colors"
       >
@@ -121,14 +147,17 @@ function AudienceSection({
 function GroupSection({ group, base }: { group: DocGroup; base: string }) {
   const pathname = usePathname();
   const hasActive = group.items.some((i) => pathname === `${base}/${i.slug}`);
-  const [userOpen, setUserOpen] = useState(true);
+  const [userOpen, setUserOpen] = usePersistedOpen(
+    `tas-docs-grp-${group.label}`,
+    true,
+  );
   const open = userOpen || hasActive;
 
   return (
     <div className="flex flex-col gap-0.5">
       <button
         type="button"
-        onClick={() => setUserOpen((o) => !o)}
+        onClick={() => setUserOpen(!userOpen)}
         aria-expanded={open}
         className="text-foreground-weak hover:text-foreground flex items-center justify-between gap-2 border-b border-[var(--color-border-weak)] px-2 pb-1 text-xs font-semibold transition-colors"
       >

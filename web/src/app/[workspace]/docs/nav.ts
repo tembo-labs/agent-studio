@@ -61,6 +61,17 @@ export const DOC_SECTIONS: DocSection[] = [
       },
     ],
   },
+  {
+    audience: "For Instance Admins",
+    groups: [
+      {
+        label: "The instance",
+        items: [
+          { slug: "instance-admin", label: "Instance administration" },
+        ],
+      },
+    ],
+  },
 ];
 
 /** All slugs that appear in the nav, for internal-link rewriting. */

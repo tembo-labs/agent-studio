@@ -81,6 +81,7 @@ export default defineConfig({
           label: "Self-hosting",
           items: [
             { label: "Admin introduction", slug: "admin-introduction" },
+            { label: "Instance administration", slug: "instance-admin" },
             { label: "Setup checklist", slug: "customer-setup" },
             { label: "Deploy on Railway", slug: "deploy-railway" },
             { label: "Deploy on AWS", slug: "deploy-aws" },
