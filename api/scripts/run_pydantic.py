@@ -200,15 +200,18 @@ def steps_payload(messages) -> list[dict]:
                 tools.append({"name": name, "ok": None})
             else:
                 tools.append({"name": name, "ok": o["ok"], "error": o.get("error")})
-        # The model's own one-line "what I'm doing" preamble for this step (see
-        # OUTPUT_DISCIPLINE). Only attach it to TOOL-CALLING steps — a step with
-        # no tool calls is the final answer, which already lives in the run
-        # output and shouldn't be duplicated as a "summary".
-        summary = " ".join(text_parts).strip()
+        # The model's text for this step: a short "what I'm doing" line on
+        # tool-calling steps (see OUTPUT_DISCIPLINE), or the final answer on the
+        # last step. Both render inline in the run's step timeline, so capture
+        # all of it — tool-step narration stays short; the final answer is kept
+        # whole (just bounded so one runaway can't bloat the row).
+        summary = " ".join(text_parts).strip() or None
+        if summary is not None:
+            summary = summary[:280] if tools else summary[:50_000]
         steps.append(
             {
                 "step": idx,
-                "summary": (summary[:280] if (summary and tools) else None),
+                "summary": summary,
                 "input_tokens": _usage_field(usage_obj, "input_tokens", "request_tokens"),
                 "output_tokens": _usage_field(usage_obj, "output_tokens", "response_tokens"),
                 "cache_read_tokens": _usage_field(usage_obj, "cache_read_tokens"),
@@ -243,8 +246,9 @@ def make_stream_handler():
     following tool node's calls belong to that same step. Every event body is
     guarded — a streaming hiccup must never fail the run."""
 
-    # Mutable across node invocations (each handler call is one node).
-    state = {"step": -1}
+    # Mutable across node invocations (each handler call is one node). prev_in /
+    # prev_out track cumulative usage so we can emit each step's own usage delta.
+    state = {"step": -1, "prev_in": 0, "prev_out": 0}
 
     async def handler(_ctx, event_stream) -> None:
         node_counted = False
@@ -255,16 +259,17 @@ def make_stream_handler():
                     if not node_counted:
                         state["step"] += 1
                         node_counted = True
+                    step = state["step"]
                     if name == "PartDeltaEvent":
                         delta = getattr(event, "delta", None)
                         content = getattr(delta, "content_delta", None)
                         if isinstance(content, str) and content:
-                            _emit_stream_line(DELTA_SENTINEL, {"t": content})
+                            _emit_stream_line(DELTA_SENTINEL, {"t": content, "step": step})
                     elif name == "PartStartEvent":
                         part = getattr(event, "part", None)
                         content = getattr(part, "content", None)
                         if isinstance(content, str) and content:
-                            _emit_stream_line(DELTA_SENTINEL, {"t": content})
+                            _emit_stream_line(DELTA_SENTINEL, {"t": content, "step": step})
                 elif name == "FunctionToolCallEvent":
                     part = getattr(event, "part", None)
                     tool_name = getattr(part, "tool_name", None)
@@ -296,6 +301,32 @@ def make_stream_handler():
                             PROGRESS_SENTINEL,
                             {"kind": "tool_result", "id": cid, "ok": ok, "error": err},
                         )
+            except Exception:
+                pass
+        # A model-request node just finished — emit this step's own token usage
+        # (cumulative-so-far minus the previous step) so In/Out fill in live as
+        # each step completes, not only at the end. Best-effort: if the run
+        # context doesn't expose usage here, the end-of-run __TAS_STEPS__ fills
+        # the tokens in instead.
+        if node_counted:
+            try:
+                usage = getattr(_ctx, "usage", None)
+                in_cum = _usage_field(usage, "input_tokens", "request_tokens")
+                out_cum = _usage_field(usage, "output_tokens", "response_tokens")
+                if in_cum is not None or out_cum is not None:
+                    in_cum = in_cum or 0
+                    out_cum = out_cum or 0
+                    _emit_stream_line(
+                        PROGRESS_SENTINEL,
+                        {
+                            "kind": "step_usage",
+                            "step": state["step"],
+                            "input_tokens": in_cum - state["prev_in"],
+                            "output_tokens": out_cum - state["prev_out"],
+                        },
+                    )
+                    state["prev_in"] = in_cum
+                    state["prev_out"] = out_cum
             except Exception:
                 pass
 

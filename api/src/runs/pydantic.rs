@@ -44,6 +44,8 @@ const STREAM_FLUSH_INTERVAL: Duration = Duration::from_millis(400);
 struct DeltaJson {
     #[serde(default)]
     t: String,
+    #[serde(default)]
+    step: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,6 +62,10 @@ struct ProgressJson {
     ok: Option<bool>,
     #[serde(default)]
     error: Option<String>,
+    #[serde(default)]
+    input_tokens: Option<i32>,
+    #[serde(default)]
+    output_tokens: Option<i32>,
 }
 
 /// One tool call the agent made during the run. `ok` is `Some(true)` on a
@@ -318,20 +324,20 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
     });
 
     // Read stdout line by line: `full` reconstructs the whole stream for the
-    // final parse; `live` accumulates streamed text + tool-call progress, which
-    // we flush (debounced) to the run row so the page shows partial output.
+    // authoritative final parse; the delta/progress sentinels drive live writes
+    // to run_step / run_tool_call so the run page builds the step table as work
+    // happens (text per step, tool calls + their results, per-step tokens).
     let mut full = String::new();
-    let mut live = String::new();
     let mut reader = BufReader::new(stdout);
     let mut line_buf: Vec<u8> = Vec::new();
-    let mut dirty = false;
     let mut last_flush = tokio::time::Instant::now();
-    // Live step-table state: tool-call events insert run_tool_call rows (and the
-    // run_step row they belong to) as they happen so the run page renders the
-    // table building. Reconciled to authoritative rows at run end.
     let mut tool_ordinal: i32 = 0;
     let mut id_to_ordinal: HashMap<String, i32> = HashMap::new();
     let mut steps_seen: HashSet<i32> = HashSet::new();
+    // Per-step accumulated text (the model's narration / final answer) and which
+    // steps changed since the last debounced flush of run_step.summary.
+    let mut step_text: HashMap<i32, String> = HashMap::new();
+    let mut dirty_steps: HashSet<i32> = HashSet::new();
 
     loop {
         line_buf.clear();
@@ -347,8 +353,12 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
         let trimmed = line.trim_end_matches(['\n', '\r']);
         if let Some(json) = trimmed.strip_prefix(DELTA_SENTINEL) {
             if let Ok(d) = serde_json::from_str::<DeltaJson>(json) {
-                live.push_str(&d.t);
-                dirty = true;
+                let step = d.step.unwrap_or(0).max(0);
+                if steps_seen.insert(step) {
+                    live_ensure_step(args.db, args.run_id, step).await;
+                }
+                step_text.entry(step).or_default().push_str(&d.t);
+                dirty_steps.insert(step);
             }
         } else if let Some(json) = trimmed.strip_prefix(PROGRESS_SENTINEL) {
             if let Ok(p) = serde_json::from_str::<ProgressJson>(json) {
@@ -378,19 +388,39 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
                             .await;
                         }
                     }
+                    "step_usage" => {
+                        let step = p.step.unwrap_or(0).max(0);
+                        if steps_seen.insert(step) {
+                            live_ensure_step(args.db, args.run_id, step).await;
+                        }
+                        live_update_step_usage(
+                            args.db,
+                            args.run_id,
+                            step,
+                            p.input_tokens,
+                            p.output_tokens,
+                        )
+                        .await;
+                    }
                     _ => {}
                 }
             }
         }
-        if dirty && last_flush.elapsed() >= STREAM_FLUSH_INTERVAL {
-            write_streamed_output(args.db, args.run_id, &live).await;
-            dirty = false;
+        if !dirty_steps.is_empty() && last_flush.elapsed() >= STREAM_FLUSH_INTERVAL {
+            for step in dirty_steps.drain() {
+                if let Some(text) = step_text.get(&step) {
+                    live_update_step_text(args.db, args.run_id, step, text).await;
+                }
+            }
             last_flush = tokio::time::Instant::now();
         }
     }
-    // Final flush so the last partial is visible until the terminal write.
-    if dirty {
-        write_streamed_output(args.db, args.run_id, &live).await;
+    // Final flush of any step text not yet written (the terminal __TAS_STEPS__
+    // parse reconciles authoritatively right after).
+    for step in dirty_steps.drain() {
+        if let Some(text) = step_text.get(&step) {
+            live_update_step_text(args.db, args.run_id, step, text).await;
+        }
     }
 
     let status = child
@@ -404,17 +434,6 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
         stdout: full.into_bytes(),
         stderr: stderr_buf,
     })
-}
-
-/// Best-effort write of the reconstructed live output to the run row. Guarded
-/// on `status = 'running'` so a late flush can never clobber a terminal row,
-/// and errors are swallowed — streaming is a nicety, not load-bearing.
-async fn write_streamed_output(db: &sqlx::PgPool, run_id: Uuid, text: &str) {
-    let _ = sqlx::query("UPDATE run SET streamed_output = $1 WHERE id = $2 AND status = 'running'")
-        .bind(text)
-        .bind(run_id)
-        .execute(db)
-        .await;
 }
 
 // Live step-table writes (best-effort; errors swallowed). The end-of-run
@@ -465,6 +484,34 @@ async fn live_update_tool_result(
     .bind(error)
     .bind(run_id)
     .bind(ordinal)
+    .execute(db)
+    .await;
+}
+
+async fn live_update_step_text(db: &sqlx::PgPool, run_id: Uuid, step: i32, text: &str) {
+    let _ = sqlx::query("UPDATE run_step SET summary = $1 WHERE run_id = $2 AND ordinal = $3")
+        .bind(text)
+        .bind(run_id)
+        .bind(step)
+        .execute(db)
+        .await;
+}
+
+async fn live_update_step_usage(
+    db: &sqlx::PgPool,
+    run_id: Uuid,
+    step: i32,
+    input_tokens: Option<i32>,
+    output_tokens: Option<i32>,
+) {
+    let _ = sqlx::query(
+        "UPDATE run_step SET input_tokens = $1, output_tokens = $2 \
+         WHERE run_id = $3 AND ordinal = $4",
+    )
+    .bind(input_tokens)
+    .bind(output_tokens)
+    .bind(run_id)
+    .bind(step)
     .execute(db)
     .await;
 }

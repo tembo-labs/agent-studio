@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { abbreviateTokens, estimateTokenCost, formatPenny } from "@/lib/pricing";
 import type { RunStep, RunToolCall } from "@/lib/runs-db";
 
+import { RevealText } from "./reveal-text";
 import { ToolProviderLogo } from "./tool-provider-logo";
 
 // Resolved provider for a tool name, keyed by run_tool_call.tool_name. `slug`
@@ -11,27 +12,24 @@ import { ToolProviderLogo } from "./tool-provider-logo";
 // display name for the tooltip.
 export type ToolProviderMap = Record<string, { slug: string; label: string }>;
 
-// Shared column template so the header, step rows, and tool rows all line up.
-// Fixed widths keep columns aligned even though each row is its own grid.
-// Columns: label · In · Out · Status. In/Out each carry their own cost.
-const ROW =
-  "grid grid-cols-[minmax(0,1fr)_6rem_6rem_5.5rem] items-center gap-x-3";
-
-// Per model-step view of a run, as an aligned table. Tokens are per step (one
-// LLM request) — a step can fire several tool calls that share its tokens.
-// Input tokens include the resent conversation history (so they climb step over
-// step); output is what the model generated that step. Each direction shows its
-// own cost; tool-call outcomes show in the Status column under each step.
+// The run's step timeline. Each step shows the model's narration (or, on the
+// last step, the final answer) — revealed word-by-word while live — the tool
+// calls it made (status badge inline after each name), and a faint per-step
+// token/cost line. Builds live as the run streams; the same view is the final
+// view. Tokens are per step (one LLM request); the in/out costs are each
+// direction's own.
 export function RunSteps({
   model,
   steps,
   calls,
   toolProviders = {},
+  live = false,
 }: {
   model: string;
   steps: RunStep[];
   calls: RunToolCall[];
   toolProviders?: ToolProviderMap;
+  live?: boolean;
 }) {
   const callsByStep = new Map<number, RunToolCall[]>();
   for (const c of calls) {
@@ -42,112 +40,96 @@ export function RunSteps({
   }
 
   return (
-    <div className="bg-surface border-border overflow-hidden rounded-lg border">
-      <div
-        className={`${ROW} text-foreground-muted border-border border-b px-3 py-2 text-[11px] font-medium uppercase tracking-wide`}
-      >
-        <span>Step</span>
-        <span className="text-right">In</span>
-        <span className="text-right">Out</span>
-        <span className="text-right">Status</span>
-      </div>
-
+    <div className="bg-surface border-border flex flex-col overflow-hidden rounded-lg border">
       {steps.map((s, i) => {
         const stepCalls = callsByStep.get(s.ordinal) ?? [];
         return (
-          <Fragment key={s.ordinal}>
-            <div
-              className={`${ROW} px-3 py-2 ${i > 0 ? "border-border border-t" : ""}`}
-            >
-              <span className="text-foreground truncate text-sm font-medium">
-                Step {s.ordinal + 1}
-              </span>
-              <TokenCell model={model} tokens={s.inputTokens} direction="input" />
-              <TokenCell
-                model={model}
-                tokens={s.outputTokens}
-                direction="output"
-                emphasize
-              />
-              <span />
-            </div>
-
+          <div
+            key={s.ordinal}
+            className={`flex flex-col gap-1.5 px-3 py-2.5 ${i > 0 ? "border-border border-t" : ""}`}
+          >
             {s.summary && (
-              <p className="text-foreground-weak px-3 pb-1.5 text-sm italic leading-5">
-                {s.summary}
-              </p>
+              <div className="text-foreground whitespace-pre-wrap text-sm leading-6">
+                <RevealText text={s.summary} live={live} />
+              </div>
             )}
 
             {stepCalls.map((c) => {
               const tp = toolProviders[c.toolName];
               return (
                 <Fragment key={c.ordinal}>
-                  <div className={`${ROW} px-3 pb-1.5`}>
-                    <span className="flex min-w-0 items-center gap-1.5 pl-3">
-                      {tp && (
-                        <ToolProviderLogo providerSlug={tp.slug} title={tp.label} />
-                      )}
-                      <code className="text-foreground-weak truncate text-xs">
-                        {c.toolName}
-                      </code>
-                    </span>
-                    <span />
-                    <span />
-                    <span className="flex justify-end">
-                      {c.ok === true ? (
-                        <Badge variant="green" size="small">
-                          ok
-                        </Badge>
-                      ) : c.ok === false ? (
-                        <Badge variant="red" size="small">
-                          failed
-                        </Badge>
-                      ) : (
-                        <Badge variant="gray" size="small">
-                          no result
-                        </Badge>
-                      )}
-                    </span>
+                  <div className="flex items-center gap-1.5">
+                    {tp && (
+                      <ToolProviderLogo providerSlug={tp.slug} title={tp.label} />
+                    )}
+                    <code className="text-foreground-weak min-w-0 truncate text-xs">
+                      {c.toolName}
+                    </code>
+                    {c.ok === true ? (
+                      <Badge variant="green" size="small">
+                        ok
+                      </Badge>
+                    ) : c.ok === false ? (
+                      <Badge variant="red" size="small">
+                        failed
+                      </Badge>
+                    ) : (
+                      <Badge variant="gray" size="small">
+                        running
+                      </Badge>
+                    )}
                   </div>
                   {c.ok === false && c.errorMessage && (
-                    <p className="text-sentiment-negative line-clamp-2 px-3 pb-1.5 pl-[2.25rem] font-mono text-xs leading-4">
+                    <p className="text-sentiment-negative line-clamp-2 pl-[1.375rem] font-mono text-xs leading-4">
                       {c.errorMessage}
                     </p>
                   )}
                 </Fragment>
               );
             })}
-          </Fragment>
+
+            <TokenMeta
+              model={model}
+              inputTokens={s.inputTokens}
+              outputTokens={s.outputTokens}
+            />
+          </div>
         );
       })}
     </div>
   );
 }
 
-// One In/Out cell: abbreviated token count + its own cost, right-aligned.
-function TokenCell({
+// Faint per-step "9.50k in ~$.04 · 1.30k out ~$.05" line. While a step is still
+// in flight its tokens aren't known yet, so it shows a placeholder.
+function TokenMeta({
   model,
-  tokens,
-  direction,
-  emphasize,
+  inputTokens,
+  outputTokens,
 }: {
   model: string;
-  tokens: number | null;
-  direction: "input" | "output";
-  emphasize?: boolean;
+  inputTokens: number | null;
+  outputTokens: number | null;
 }) {
-  if (tokens === null) {
-    return <span className="text-foreground-muted text-right text-xs">—</span>;
+  if (inputTokens === null && outputTokens === null) {
+    return <span className="text-foreground-muted text-xs">·····</span>;
   }
-  const cost = estimateTokenCost(model, tokens, direction);
+  const parts: string[] = [];
+  if (inputTokens !== null) {
+    const c = estimateTokenCost(model, inputTokens, "input");
+    parts.push(
+      `${abbreviateTokens(inputTokens)} in${c !== null ? ` ~${formatPenny(c)}` : ""}`,
+    );
+  }
+  if (outputTokens !== null) {
+    const c = estimateTokenCost(model, outputTokens, "output");
+    parts.push(
+      `${abbreviateTokens(outputTokens)} out${c !== null ? ` ~${formatPenny(c)}` : ""}`,
+    );
+  }
   return (
-    <span className="text-right text-xs tabular-nums">
-      <span className={emphasize ? "text-foreground font-medium" : "text-foreground-weak"}>
-        {abbreviateTokens(tokens)}
-      </span>
-      {cost !== null && (
-        <span className="text-foreground-muted"> ~{formatPenny(cost)}</span>
-      )}
+    <span className="text-foreground-muted text-xs tabular-nums">
+      {parts.join(" · ")}
     </span>
   );
 }

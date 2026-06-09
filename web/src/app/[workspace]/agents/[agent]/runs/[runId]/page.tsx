@@ -19,7 +19,6 @@ import { CopyOutputButton } from "./copy-output-button";
 import { ImproveForm } from "./improve-form";
 import { RunPoller } from "./run-poller";
 import { RunSteps } from "./run-steps";
-import { ToolsUsed } from "./tools-used";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +69,14 @@ export default async function RunDetailPage({
         : toolkitLabel(t.provider);
     toolProviders[t.slug] = { slug: t.provider, label };
   }
+
+  // The text parts across all steps (narration + the final answer), for the
+  // copy button. `isLive` drives the word-by-word reveal in RunSteps.
+  const stepText = steps
+    .map((s) => s.summary)
+    .filter((x): x is string => Boolean(x))
+    .join("\n\n");
+  const isLive = run.status === "running" || run.status === "queued";
 
   // "Improve the Agent" opens a Tembo CAP task — hide it when no Tembo
   // API key is set (the run + its output still render).
@@ -182,55 +189,55 @@ export default async function RunDetailPage({
 
       <hr className="border-[var(--color-border-weak)]" />
 
-      {steps.length > 0 ? (
+      {/* The step timeline is both the live and the final view — the final
+          answer is the last step's text, so there's no separate Output box.
+          The copy button grabs just the text parts for pasting elsewhere. */}
+      {steps.length > 0 && (
         <Section
           title="Steps"
-          description="One row per model request. Tokens are per step (a step can fire several tool calls that share its tokens) — output is what the model generated, input includes the resent history."
+          description="What the agent did, step by step — narration, the tools it called, and the final answer."
+          actions={
+            stepText ? <CopyOutputButton text={stepText} /> : undefined
+          }
         >
           <RunSteps
             model={run.model}
             steps={steps}
             calls={toolCalls}
             toolProviders={toolProviders}
+            live={isLive}
           />
         </Section>
-      ) : (
-        toolCalls.length > 0 && (
-          <Section
-            title="Tools used"
-            description={`${toolCalls.length} tool call${toolCalls.length === 1 ? "" : "s"}, in order.`}
-          >
-            <ToolsUsed calls={toolCalls} />
-          </Section>
-        )
       )}
 
-      <Section title="Output">
-        {run.status === "queued" && !run.output && (
-          <p className="text-foreground-weak text-base">Waiting to start…</p>
-        )}
-        {run.status === "running" && !run.output && (
-          <p className="text-foreground-weak text-base">
-            Running… the steps build live above.
-          </p>
-        )}
-        {run.output && (
-          <div className="bg-surface-raised border-border group relative overflow-hidden rounded-lg border">
-            <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
-              <CopyOutputButton text={stripStopReason(run.output)} />
+      {/* Fallback Output box for runs with no steps (e.g. cargo-ai) or the
+          "Running…" / "Waiting…" states before the first step lands. */}
+      {steps.length === 0 && run.status !== "failed" && (
+        <Section title="Output">
+          {run.status === "queued" && (
+            <p className="text-foreground-weak text-base">Waiting to start…</p>
+          )}
+          {run.status === "running" && (
+            <p className="text-foreground-weak text-base">Running…</p>
+          )}
+          {run.output && (
+            <div className="bg-surface-raised border-border group relative overflow-hidden rounded-lg border">
+              <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+                <CopyOutputButton text={stripStopReason(run.output)} />
+              </div>
+              <pre className="text-foreground overflow-x-auto whitespace-pre-wrap p-4 text-sm leading-6">
+                {stripStopReason(run.output)}
+              </pre>
             </div>
-            <pre className="text-foreground overflow-x-auto whitespace-pre-wrap p-4 text-sm leading-6">
-              {stripStopReason(run.output)}
-            </pre>
-          </div>
-        )}
-        {run.status === "failed" && run.errorMessage && (
-          <FailedReason
-            run={run}
-            workspaceSlug={workspace.slug}
-          />
-        )}
-      </Section>
+          )}
+        </Section>
+      )}
+
+      {run.status === "failed" && run.errorMessage && (
+        <Section title="Failure">
+          <FailedReason run={run} workspaceSlug={workspace.slug} />
+        </Section>
+      )}
 
       {/* Hide the improvement section while the run is in flight — there's
           nothing to improve on yet, and the form pulling the eye away
