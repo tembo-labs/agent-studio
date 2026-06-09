@@ -12,6 +12,16 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [Unreleased]
+
+### Fixed
+- **Historical run-cost backfill.** Recomputed the stored `cost_usd` on existing
+  runs against the corrected model rates (Opus $5/$25; gpt-5.x priced per
+  variant), so the Runs list and dashboard totals match the run-detail estimates
+  for pre-fix runs. Only rows with token counts + a known model family are
+  touched; unknown models and already-correct families are left as-is.
+  *(migration 0048)*
+
 ## [v2026.6.14] — Agent Skills, YOLO mode, Claude Fable 5 — shipped 2026-06-09
 
 ### Added
