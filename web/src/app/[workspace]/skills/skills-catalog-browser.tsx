@@ -129,16 +129,17 @@ function CatalogCard({
             {skill.name}
           </code>
           <span className="text-foreground-muted truncate text-xs">
-            {skill.source} · {formatInstalls(skill.installs)} installs
+            <a
+              href={`https://skills.sh/${skill.source}/${skill.skillId}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="hover:text-foreground underline underline-offset-2"
+              title="Read more on skills.sh"
+            >
+              {skill.source}
+            </a>{" "}
+            · {formatInstalls(skill.installs)} installs
           </span>
-          <a
-            href={`https://skills.sh/${skill.source}/${skill.skillId}`}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="text-foreground-muted hover:text-foreground w-fit text-xs underline underline-offset-2"
-          >
-            Read more on skills.sh ↗
-          </a>
         </div>
         <Button
           type="submit"
