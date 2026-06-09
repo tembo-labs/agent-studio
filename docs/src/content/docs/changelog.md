@@ -15,26 +15,9 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
-## [Unreleased]
+## [v2026.6.14] — Agent Skills, YOLO mode, Claude Fable 5 — shipped 2026-06-09
 
 ### Added
-- **Claude Fable 5 support.** Agents can use `anthropic:claude-fable-5` —
-  Anthropic's most capable widely-released model (Mythos-class, 1M context),
-  GA on the Claude API as of 2026-06-09. Priced in the run-cost estimates at
-  $10/$50 per MTok (web + API tables), and added to the authoring guidance as
-  the top-capability step-up above Opus 4.8.
-
-### Fixed
-- **Opus run-cost estimates.** Corrected the `claude-opus` rate from the stale
-  $15/$75 to the current $5/$25 per MTok (current Opus 4.5–4.8), so cost
-  estimates and the stored `cost_usd` are accurate. (The $15/$75 rate only ever
-  applied to the deprecated Opus 4.1/4.0.)
-- **OpenAI gpt-5.x run-cost estimates.** The single `gpt-5` rate ($1.25/$10) was
-  mis-pricing the whole gpt-5.x family. Added per-model rates for the current
-  flagships and intermediate releases — gpt-5.5 ($5/$30), gpt-5.4 ($2.50/$15,
-  + mini/nano), gpt-5.2 ($0.875/$7), gpt-5.1 ($0.625/$5) — ahead of the bare
-  `gpt-5` catch-all. gpt-4o / gpt-4.1 / o3 were already correct. Authoring
-  guidance now references `openai:gpt-5.5` instead of the older gpt-5.2.
 - **Agent Skills.** A workspace **Skills** area to install reusable Agent Skills
   (Anthropic's `SKILL.md` folders) into your repo under `skills/`, from three
   sources: the [skills.sh](https://www.skills.sh/) directory (by slug / GitHub
@@ -56,6 +39,23 @@ they are no longer release versions. Phase scope now lives in
   + `improvement.delivery` / `commit_sha` / `commit_url`)*
   - YOLO requires the default branch to accept direct pushes from the coding
     agent; if it's protected behind required pull requests, keep Always PR.
+- **Claude Fable 5 support.** Agents can use `anthropic:claude-fable-5` —
+  Anthropic's most capable widely-released model (Mythos-class, 1M context),
+  GA on the Claude API as of 2026-06-09. Priced in the run-cost estimates at
+  $10/$50 per MTok (web + API tables), and added to the authoring guidance as
+  the top-capability step-up above Opus 4.8.
+
+### Fixed
+- **Opus run-cost estimates.** Corrected the `claude-opus` rate from the stale
+  $15/$75 to the current $5/$25 per MTok (current Opus 4.5–4.8), so cost
+  estimates and the stored `cost_usd` are accurate. (The $15/$75 rate only ever
+  applied to the deprecated Opus 4.1/4.0.)
+- **OpenAI gpt-5.x run-cost estimates.** The single `gpt-5` rate ($1.25/$10) was
+  mis-pricing the whole gpt-5.x family. Added per-model rates for the current
+  flagships and intermediate releases — gpt-5.5 ($5/$30), gpt-5.4 ($2.50/$15,
+  + mini/nano), gpt-5.2 ($0.875/$7), gpt-5.1 ($0.625/$5) — ahead of the bare
+  `gpt-5` catch-all. gpt-4o / gpt-4.1 / o3 were already correct. Authoring
+  guidance now references `openai:gpt-5.5` instead of the older gpt-5.2.
 
 ## [v2026.6.13] — In-app docs, workspace rename, Automations area — shipped 2026-06-09
 
