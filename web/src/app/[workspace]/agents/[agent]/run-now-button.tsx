@@ -11,7 +11,6 @@ import { useActionToast } from "@/lib/use-action-toast";
 
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -172,16 +171,20 @@ export function RunNowButton({
                   Cancel
                 </Button>
               </AlertDialogCancel>
-              <AlertDialogAction asChild>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="big"
-                  disabled={pending}
-                >
-                  {pending ? "Queueing…" : "Run"}
-                </Button>
-              </AlertDialogAction>
+              {/* Plain submit — deliberately NOT AlertDialogAction. Radix's
+                  Action dismisses (unmounts) the dialog the instant it's
+                  clicked, which raced the form submission and dropped the
+                  textarea's user_message (the agent then saw an empty input).
+                  runNowAction redirects on success (dialog unmounts via nav)
+                  and returns an error on failure (dialog stays open). */}
+              <Button
+                type="submit"
+                variant="primary"
+                size="big"
+                disabled={pending}
+              >
+                {pending ? "Queueing…" : "Run"}
+              </Button>
             </AlertDialogFooter>
           </form>
         </AlertDialogContent>
