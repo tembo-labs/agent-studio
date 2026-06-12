@@ -205,6 +205,11 @@ Recommended entry points:
 - [Connections](https://tembo.github.io/agent-studio/connections/)
 - [Automations & triggers](https://tembo.github.io/agent-studio/automations-triggers/)
 
+## Related Projects
+
+- [Tembo monorepo](https://github.com/tembo/monorepo) contains the core Tembo
+  Coding Agent Platform services and applications.
+
 ## License
 
 [MIT](./LICENSE)
