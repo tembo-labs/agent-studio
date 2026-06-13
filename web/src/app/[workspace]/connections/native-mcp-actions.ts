@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
+import { deleteApiKey } from "@/lib/api-keys-db";
 import { writeAuditEvent } from "@/lib/audit-db";
 import { authorizeWorkspace, DENIED_MESSAGE } from "@/lib/auth-server";
 import {
@@ -61,6 +62,13 @@ export async function disconnectNativeMcpConnectionAction(
 
   const ok = await deleteNativeConnection(workspace.id, connectionId);
   if (!ok) return { error: "Connection no longer exists." };
+
+  // Self-key (Tembo) rows own a minted tas_ API key — revoke it so the
+  // credential can't outlive the connection. Other providers' tokens live
+  // only inside the now-deleted row, so there's nothing extra to revoke.
+  if (row.type === "tembo" && typeof row.metadata.api_key_id === "string") {
+    await deleteApiKey(workspace.id, row.metadata.api_key_id);
+  }
 
   // Drop the cached tool catalog for this slot too. A future
   // re-connect under the same name shouldn't inherit a stale list

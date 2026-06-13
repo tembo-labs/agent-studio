@@ -150,6 +150,7 @@ function ProviderRow({
   viewingOther?: boolean;
 }) {
   const isManual = provider.authMode === "manual";
+  const isSelfKey = provider.authMode === "self-key";
 
   if (!connection) {
     // Placeholder "Connect" rows are DCR-only (manual providers connect via the
@@ -170,7 +171,9 @@ function ProviderRow({
             </Badge>
           </div>
           <p className="text-foreground-weak text-sm">
-            Click Connect to log in with your {provider.displayName} account.
+            {isSelfKey
+              ? "Connect to let your agents manage agents, runs, and automations on your behalf — they act with your workspace role."
+              : `Click Connect to log in with your ${provider.displayName} account.`}
           </p>
         </div>
         <Button asChild variant="primary" size="small">
@@ -271,8 +274,10 @@ function ProviderRow({
           </Link>
         )}
         {/* DCR slots are free-named; a manual slot IS its OAuth-app instance,
-            so renaming would desync it from the app — not offered. */}
-        {!isManual && (
+            so renaming would desync it from the app — not offered. Self-key
+            (Tembo) is a single fixed "default" slot agent specs reference by
+            provider, so renaming it would silently break them — not offered. */}
+        {!isManual && !isSelfKey && (
           <RenameNativeMcpConnectionForm
             workspaceSlug={workspaceSlug}
             connectionId={connection.id}

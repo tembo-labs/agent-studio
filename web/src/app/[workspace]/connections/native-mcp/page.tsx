@@ -129,9 +129,12 @@ export default async function NativeMcpConnectionsPage({
     }
   }
 
-  // Visible DCR providers feed the "Add another" named-slot picker.
+  // Visible DCR providers feed the "Add another" named-slot picker. Self-key
+  // (Tembo) is excluded — it's a single per-user "default" slot, not a
+  // multi-account provider, and agent specs reference it as `{type: tembo}`.
   const addableProviders = nativeCatalog.filter(
-    (p) => p.authMode !== "manual" && isVisible(p),
+    (p) =>
+      p.authMode !== "manual" && p.authMode !== "self-key" && isVisible(p),
   );
   // Visible manual providers + their connectable instances.
   const manualConnect: ManualConnectTarget[] = nativeCatalog

@@ -1,13 +1,23 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { writeAuditEvent } from "@/lib/audit-db";
 import { authorizeWorkspace } from "@/lib/auth-server";
 import { getPublicOrigin } from "@/lib/config";
+import { createApiKey, deleteApiKey } from "@/lib/api-keys-db";
+import {
+  getNativeConnection,
+  saveNativeConnection,
+} from "@/lib/connections";
 import {
   getMcpProvider,
   redirectUriFor,
+  tasMcpServerUrl,
+  type McpProvider,
   type McpProviderSlug,
 } from "@/lib/mcp-providers";
+import { fetchNativeMcpTools } from "@/lib/native-mcp-tools";
+import { replaceToolsForConnection } from "@/lib/mcp-tools";
 import {
   noRedirectFetchInit,
   trustedOAuthUrl,
@@ -50,6 +60,102 @@ function back(slug: string, provider: string, detail: string): NextResponse {
   target.searchParams.set("native_mcp", provider);
   target.searchParams.set("result", "error");
   target.searchParams.set("detail", detail.slice(0, 200));
+  return NextResponse.redirect(target, 302);
+}
+
+/**
+ * Self-key connect (Tembo connecting to its own /mcp). No OAuth: mint a
+ * per-user `tas_` API key, store it as the connection's bearer, and point the
+ * row at TAS's own MCP server. Because the key is owned by the connecting user,
+ * /mcp resolves *their* live workspace role at run time — so an agent that uses
+ * this connection acts with the role of whoever the run runs as. Reconnecting
+ * the same slot revokes the previously minted key so we never orphan a live
+ * credential.
+ */
+async function connectSelfKey(
+  provider: McpProvider,
+  workspace: { id: string; slug: string },
+  userId: string,
+  connectionName: string,
+): Promise<NextResponse> {
+  // Capture any key minted by a prior connect on this slot — revoked after the
+  // new one is stored (the saveNativeConnection upsert overwrites credentials).
+  const prior = await getNativeConnection(
+    workspace.id,
+    userId,
+    provider.slug,
+    connectionName,
+  );
+  const priorKeyId =
+    typeof prior?.metadata.api_key_id === "string"
+      ? prior.metadata.api_key_id
+      : null;
+
+  const mcpUrl = tasMcpServerUrl();
+  const { key, token } = await createApiKey({
+    workspaceId: workspace.id,
+    userId,
+    name: "Tembo (native MCP)",
+    createdBy: userId,
+  });
+
+  const saved = await saveNativeConnection({
+    workspaceId: workspace.id,
+    userId,
+    type: provider.slug,
+    name: connectionName,
+    mcpServerUrl: mcpUrl,
+    // "pat", with no token_expires_at, so the OAuth refresh sweep skips it —
+    // the tas_ key doesn't expire.
+    authType: "pat",
+    credentials: { access_token: token },
+    metadata: { api_key_id: key.id },
+  });
+
+  if (priorKeyId && priorKeyId !== key.id) {
+    await deleteApiKey(workspace.id, priorKeyId);
+  }
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "connection.authorized",
+    targetType: "connection",
+    targetId: saved.id,
+    agentName: null,
+    payload: { provider: provider.slug, name: connectionName, source: "native-mcp" },
+  });
+
+  // Best-effort: prime the tool-list cache so the Connections page shows the
+  // TAS tool catalog immediately. Don't block the redirect on failure.
+  try {
+    const tools = await fetchNativeMcpTools(mcpUrl, token);
+    await replaceToolsForConnection({
+      workspaceId: workspace.id,
+      userId,
+      source: "native-mcp",
+      provider: provider.slug,
+      connectionName,
+      tools: tools.map((t) => ({
+        slug: t.slug,
+        displayName: t.name,
+        description: t.description,
+      })),
+    });
+  } catch (e) {
+    console.error(
+      `[native-mcp/${provider.slug}] tool-cache prime failed:`,
+      (e as Error).message,
+    );
+  }
+
+  const target = new URL(
+    `/${workspace.slug}/connections/native-mcp`,
+    getPublicOrigin(),
+  );
+  target.searchParams.set("native_mcp", provider.slug);
+  target.searchParams.set("result", "ok");
   return NextResponse.redirect(target, 302);
 }
 
@@ -126,6 +232,12 @@ export async function GET(
     );
   }
   const { workspace, userId } = auth;
+
+  // Self-key providers (Tembo → its own /mcp) skip the entire OAuth dance:
+  // mint a per-user tas_ key and store it as the connection bearer.
+  if (provider.authMode === "self-key") {
+    return connectSelfKey(provider, workspace, userId, connectionName);
+  }
 
   // ── Step 1: protected-resource discovery ────────────────────────
   let mcpOrigin: string;
