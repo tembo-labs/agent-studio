@@ -37,6 +37,13 @@ export const DOC_SECTIONS: DocSection[] = [
           { slug: "roadmap", label: "Roadmap" },
         ],
       },
+      {
+        label: "Programmatic access",
+        items: [
+          { slug: "api", label: "REST API" },
+          { slug: "mcp", label: "MCP server" },
+        ],
+      },
     ],
   },
   {
