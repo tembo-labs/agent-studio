@@ -57,6 +57,14 @@ tool is allowed only if your live workspace role permits it. Read tools need
 - `request_agent_change` — hand an edit or a new-agent request to the Tembo
   Coding Agent, which opens a PR (or commits directly, per your commit mode).
 
+**Slack bots (workspace_admin):**
+
+- `create_slack_app` — create a Slack bot (metadata only; comes up `configuring`
+  and needs the one-time browser OAuth install before it's live).
+- `update_slack_app` — change a bot's name, the agent labels it may launch,
+  owner, or secrets.
+- `delete_slack_app` — remove a bot.
+
 ## A typical loop with Claude Code
 
 1. Ask Claude Code to read the agent you want to improve (`get_agent`) and the

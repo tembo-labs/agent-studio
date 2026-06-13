@@ -58,7 +58,14 @@ triggers a run, writes an automation, or kicks off the coding agent needs
 | `GET /automations` · `POST /automations` | List / create scheduled automations. | viewer / operator |
 | `GET·PATCH·DELETE /automations/{id}` | Read / update / delete one. | viewer / operator |
 | `GET /slack-apps` · `GET /slack-apps/{id}` | List / read Slack bots (secret-safe). | viewer |
+| `POST /slack-apps` | Create a Slack bot (returns it in `configuring` state). | workspace_admin |
+| `PATCH·DELETE /slack-apps/{id}` | Update (name/labels/owner/secrets) / delete. | workspace_admin |
 | `POST /agent-changes` | Hand an authoring request to the Tembo Coding Agent. | operator |
+
+Creating a Slack bot via the API writes metadata only — it comes up in a
+`configuring` state and isn't live until an admin finishes the one-time browser
+OAuth **install** under Settings → Slack apps. `agentLabels` are the agent
+labels the bot may launch.
 
 ## Examples
 

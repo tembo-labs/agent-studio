@@ -19,13 +19,16 @@ vi.mock("@/lib/api-v1/actions", () => ({
   validateSpec: vi.fn(),
   createAutomationFor: vi.fn(),
   requestAgentChange: vi.fn(),
+  createSlackAppFor: vi.fn(),
+  updateSlackAppFor: vi.fn(),
+  deleteSlackAppFor: vi.fn(),
 }));
 
 import { buildMcpServer, type McpContext } from "./server";
 import { getAgentByName, listAgents } from "@/lib/workspace-agents";
 import { getRun } from "@/lib/runs-api";
 import { listRunsForWorkspace } from "@/lib/runs-db";
-import { triggerRun, validateSpec } from "@/lib/api-v1/actions";
+import { createSlackAppFor, triggerRun, validateSpec } from "@/lib/api-v1/actions";
 import type { WorkspaceRole } from "@/lib/rbac";
 
 const mockListAgents = vi.mocked(listAgents);
@@ -34,6 +37,7 @@ const mockGetRun = vi.mocked(getRun);
 const mockListRuns = vi.mocked(listRunsForWorkspace);
 const mockTriggerRun = vi.mocked(triggerRun);
 const mockValidate = vi.mocked(validateSpec);
+const mockCreateSlackApp = vi.mocked(createSlackAppFor);
 
 function makeCtx(role: WorkspaceRole = "operator"): McpContext {
   return {
@@ -85,6 +89,8 @@ describe("buildMcpServer", () => {
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
       "create_automation",
+      "create_slack_app",
+      "delete_slack_app",
       "get_agent",
       "get_run",
       "list_agents",
@@ -95,6 +101,7 @@ describe("buildMcpServer", () => {
       "list_tools",
       "request_agent_change",
       "trigger_run",
+      "update_slack_app",
       "validate_agent_spec",
     ]);
   });
@@ -270,5 +277,52 @@ describe("buildMcpServer", () => {
     })) as { isError?: boolean; content: { text: string }[] };
     expect(res.isError).toBe(true);
     expect(res.content[0].text).toBe("missing connection");
+  });
+
+  it("create_slack_app is denied for an operator (admin-only) and never calls the action", async () => {
+    const client = await connectedClientFor(makeCtx("operator"));
+    const res = (await client.callTool({
+      name: "create_slack_app",
+      arguments: { name: "Helper" },
+    })) as { isError?: boolean; content: { text: string }[] };
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/workspace_admin/i);
+    expect(mockCreateSlackApp).not.toHaveBeenCalled();
+  });
+
+  it("create_slack_app as workspace_admin delegates and returns the app", async () => {
+    mockCreateSlackApp.mockResolvedValue({
+      ok: true,
+      slackApp: {
+        id: "app-1",
+        workspaceId: "ws-1",
+        name: "Helper",
+        slackAppId: null,
+        hasSigningSecret: false,
+        clientId: null,
+        hasClientSecret: false,
+        hasBotToken: false,
+        teamId: null,
+        botUserId: null,
+        defaultOwnerUserId: "u-1",
+        agentLabels: ["support"],
+        status: "configuring",
+        createdBy: "u-1",
+        createdAt: new Date("2026-06-13T00:00:00Z"),
+        updatedAt: new Date("2026-06-13T00:00:00Z"),
+      },
+    });
+    const client = await connectedClientFor(makeCtx("workspace_admin"));
+    const out = parse(
+      await client.callTool({
+        name: "create_slack_app",
+        arguments: { name: "Helper", agentLabels: ["support"] },
+      }),
+    ) as { slackApp: { id: string; status: string; hasBotToken: boolean } };
+    expect(out.slackApp).toMatchObject({ id: "app-1", status: "configuring", hasBotToken: false });
+    expect(mockCreateSlackApp).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "workspace_admin" }),
+      expect.objectContaining({ name: "Helper", agentLabels: ["support"] }),
+    );
   });
 });
