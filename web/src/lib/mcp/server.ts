@@ -6,8 +6,11 @@ import { z } from "zod";
 import type { AuthorizeApiSuccess } from "@/lib/api-auth";
 import {
   createAutomationFor,
+  createSlackAppFor,
+  deleteSlackAppFor,
   requestAgentChange,
   triggerRun,
+  updateSlackAppFor,
   validateSpec,
 } from "@/lib/api-v1/actions";
 import {
@@ -219,6 +222,11 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     errorResult(
       "This action requires the operator role; this API key's user is a viewer.",
     );
+  const isAdmin = meetsMinRole(ctx.role, "workspace_admin");
+  const adminOnly = () =>
+    errorResult(
+      "This action requires the workspace_admin role.",
+    );
 
   server.registerTool(
     "validate_agent_spec",
@@ -313,6 +321,89 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       const res = await requestAgentChange(ctx, { description, agent, name, framework });
       if (!res.ok) return errorResult(res.error);
       return json(res.result);
+    },
+  );
+
+  // ── Slack-app management (workspace_admin) ──────────────────────────
+  server.registerTool(
+    "create_slack_app",
+    {
+      description:
+        "Create a Slack bot for this workspace (admin only). This creates the " +
+        "app in a `configuring` state with metadata only — finish setup with " +
+        "the one-time browser OAuth install under Settings -> Slack apps before " +
+        "it can run. `agentLabels` are the agent labels this bot may launch.",
+      inputSchema: {
+        name: z.string().describe("Display name (<=35 chars, Slack's limit)."),
+        agentLabels: z.string().array().optional().describe("Agent labels this bot may launch."),
+        defaultOwnerUserId: z.string().optional().describe("Member whose credentials its runs use (defaults to you)."),
+        slackAppId: z.string().optional(),
+        signingSecret: z.string().optional(),
+        clientId: z.string().optional(),
+        clientSecret: z.string().optional(),
+      },
+    },
+    async ({ name, agentLabels, defaultOwnerUserId, slackAppId, signingSecret, clientId, clientSecret }) => {
+      if (!isAdmin) return adminOnly();
+      const res = await createSlackAppFor(ctx, {
+        name,
+        agentLabels,
+        defaultOwnerUserId,
+        slackAppId,
+        signingSecret,
+        clientId,
+        clientSecret,
+      });
+      if (!res.ok) return errorResult(res.error);
+      return json({ slackApp: serializeSlackApp(res.slackApp) });
+    },
+  );
+
+  server.registerTool(
+    "update_slack_app",
+    {
+      description:
+        "Update a Slack bot (admin only): name, the agent labels it may launch, " +
+        "default owner, Slack app id, or secrets. Omitted fields are left " +
+        "unchanged; secrets are only written when a non-empty value is given.",
+      inputSchema: {
+        id: z.string().describe("The Slack app's id."),
+        name: z.string().optional(),
+        agentLabels: z.string().array().optional(),
+        defaultOwnerUserId: z.string().optional(),
+        slackAppId: z.string().optional(),
+        signingSecret: z.string().optional(),
+        clientId: z.string().optional(),
+        clientSecret: z.string().optional(),
+      },
+    },
+    async ({ id, name, agentLabels, defaultOwnerUserId, slackAppId, signingSecret, clientId, clientSecret }) => {
+      if (!isAdmin) return adminOnly();
+      const res = await updateSlackAppFor(ctx, id, {
+        name,
+        agentLabels,
+        defaultOwnerUserId,
+        slackAppId,
+        signingSecret,
+        clientId,
+        clientSecret,
+      });
+      if (!res.ok) return errorResult(res.error);
+      return json({ slackApp: serializeSlackApp(res.slackApp) });
+    },
+  );
+
+  server.registerTool(
+    "delete_slack_app",
+    {
+      description: "Delete a Slack bot from this workspace (admin only).",
+      inputSchema: { id: z.string().describe("The Slack app's id.") },
+    },
+    async ({ id }) => {
+      if (!isAdmin) return adminOnly();
+      const res = await deleteSlackAppFor(ctx, id);
+      if (!res.ok) return errorResult(res.error);
+      return json({ deleted: true, id });
     },
   );
 

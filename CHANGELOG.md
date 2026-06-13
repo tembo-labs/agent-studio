@@ -21,13 +21,15 @@ they are no longer release versions. Phase scope now lives in
   connections), is shown once, and can be disabled or revoked anytime.
   - **REST API** under `/api/v1`: list/read agents, validate a spec, list/read
     and trigger runs, browse the tool catalog and connection status, manage
-    automations, read Slack apps, and hand authoring to the Tembo Coding Agent
-    (`POST /api/v1/agent-changes`). See [REST API](./docs/src/content/docs/api.md).
+    automations, manage Slack bots (create/update/delete, admin only), and hand
+    authoring to the Tembo Coding Agent (`POST /api/v1/agent-changes`). See
+    [REST API](./docs/src/content/docs/api.md).
   - **MCP server** at `/mcp` (Streamable HTTP): the same capabilities as MCP
     tools (`list_agents`, `get_agent`, `validate_agent_spec`, `list_runs`,
     `get_run`, `list_tools`, `list_connections`, `list_automations`,
     `list_slack_apps`, `trigger_run`, `create_automation`,
-    `request_agent_change`). Connect with
+    `request_agent_change`, plus admin-only `create_slack_app` /
+    `update_slack_app` / `delete_slack_app`). Connect with
     `claude mcp add --transport http tas https://<host>/mcp --header "Authorization: Bearer tas_…"`.
     See [MCP server](./docs/src/content/docs/mcp.md).
 
