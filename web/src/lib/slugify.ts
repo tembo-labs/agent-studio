@@ -9,6 +9,7 @@ const SLUG_MAX = 32;
 // Extend as new routes are added.
 export const RESERVED_SLUGS = new Set<string>([
   "api",
+  "mcp",
   "onboarding",
   "signin",
   "signout",

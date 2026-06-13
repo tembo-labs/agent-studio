@@ -64,6 +64,13 @@ export default defineConfig({
           ],
         },
         {
+          label: "Programmatic access",
+          items: [
+            { label: "REST API", slug: "api" },
+            { label: "MCP server", slug: "mcp" },
+          ],
+        },
+        {
           label: "Observability & governance",
           items: [
             { label: "Dashboard & Runs", slug: "dashboard-and-runs" },

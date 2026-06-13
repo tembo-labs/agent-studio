@@ -12,6 +12,25 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [Unreleased]
+
+### Added
+- **Public REST API + MCP server.** Drive a workspace programmatically — from
+  Claude Code or any HTTP/MCP client. A new **personal API key** (Settings →
+  API keys) authenticates both surfaces as you (your role, your per-user
+  connections), is shown once, and can be disabled or revoked anytime.
+  - **REST API** under `/api/v1`: list/read agents, validate a spec, list/read
+    and trigger runs, browse the tool catalog and connection status, manage
+    automations, read Slack apps, and hand authoring to the Tembo Coding Agent
+    (`POST /api/v1/agent-changes`). See [REST API](./docs/src/content/docs/api.md).
+  - **MCP server** at `/mcp` (Streamable HTTP): the same capabilities as MCP
+    tools (`list_agents`, `get_agent`, `validate_agent_spec`, `list_runs`,
+    `get_run`, `list_tools`, `list_connections`, `list_automations`,
+    `list_slack_apps`, `trigger_run`, `create_automation`,
+    `request_agent_change`). Connect with
+    `claude mcp add --transport http tas https://<host>/mcp --header "Authorization: Bearer tas_…"`.
+    See [MCP server](./docs/src/content/docs/mcp.md).
+
 ## [v2026.6.15] — Fathom MCP, free-text agent names — shipped 2026-06-09
 
 ### Added

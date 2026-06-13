@@ -134,6 +134,25 @@ export async function getWorkspaceBySlug(
   return rows[0] ? rowToWorkspace(rows[0]) : null;
 }
 
+/**
+ * Look up a workspace by its UUID. Unlike getWorkspaceBySlug, this is
+ * the entry point for callers that already hold an id — notably
+ * authorizeApiRequest, which resolves the workspace from an API key's
+ * stored workspace_id rather than a URL slug.
+ */
+export async function getWorkspaceById(
+  id: string,
+): Promise<Workspace | null> {
+  const { rows } = await db.query<WorkspaceRow>(
+    `SELECT ${WORKSPACE_COLUMNS}
+       FROM workspace
+      WHERE id = $1
+      LIMIT 1`,
+    [id],
+  );
+  return rows[0] ? rowToWorkspace(rows[0]) : null;
+}
+
 export type WorkspaceMember = {
   userId: string;
   name: string | null;
