@@ -66,7 +66,10 @@ export async function disconnectNativeMcpConnectionAction(
   // Self-key (Tembo) rows own a minted tas_ API key — revoke it so the
   // credential can't outlive the connection. Other providers' tokens live
   // only inside the now-deleted row, so there's nothing extra to revoke.
-  if (row.type === "tembo" && typeof row.metadata.api_key_id === "string") {
+  if (
+    row.type === "tembo-agent-studio" &&
+    typeof row.metadata.api_key_id === "string"
+  ) {
     await deleteApiKey(workspace.id, row.metadata.api_key_id);
   }
 
