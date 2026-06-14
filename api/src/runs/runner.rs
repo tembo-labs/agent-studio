@@ -80,6 +80,10 @@ struct RunOutcome {
 struct Usage {
     input_tokens: i32,
     output_tokens: i32,
+    /// Anthropic prompt-cache halves (0 when caching is off / not Anthropic).
+    /// Priced separately from input_tokens in the cost estimate.
+    cache_read_tokens: i32,
+    cache_write_tokens: i32,
 }
 
 /// Drive a single run from queued through to terminal state. Always
@@ -483,14 +487,14 @@ async fn run_pydantic(
     .await;
 
     let outcome = result.map(|r| {
-        let usage = r
-            .usage
-            .as_ref()
-            .and_then(pydantic::PydanticUsage::input_output)
-            .map(|(input, output)| Usage {
+        let usage = r.usage.as_ref().and_then(|u| {
+            u.input_output().map(|(input, output)| Usage {
                 input_tokens: input,
                 output_tokens: output,
-            });
+                cache_read_tokens: u.cache_read_tokens.unwrap_or(0),
+                cache_write_tokens: u.cache_write_tokens.unwrap_or(0),
+            })
+        });
         RunOutcome {
             output: render_output(&ctx.user_message, &r.output),
             usage,
@@ -575,9 +579,15 @@ async fn mark_succeeded(
     // already in hand, so the runs-list UI doesn't have to map
     // model→rate on every render. None when usage is missing
     // (cargo-ai) or the model isn't in our pricing table.
-    let cost_usd: Option<f64> = match (tokens_in, tokens_out) {
-        (Some(i), Some(o)) => crate::pricing::estimate_run_cost(model, i, o),
-        _ => None,
+    let cost_usd: Option<f64> = match usage {
+        Some(u) => crate::pricing::estimate_run_cost(
+            model,
+            u.input_tokens,
+            u.output_tokens,
+            u.cache_read_tokens,
+            u.cache_write_tokens,
+        ),
+        None => None,
     };
     sqlx::query(
         "UPDATE run SET status = 'succeeded', output = $1, completed_at = $2, \

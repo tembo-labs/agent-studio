@@ -3,6 +3,7 @@ import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   abbreviateTokens,
+  estimateInputCost,
   estimateRunCost,
   estimateTokenCost,
   formatPenny,
@@ -44,21 +45,35 @@ export function RunSteps({
     callsByStep.set(c.stepOrdinal, arr);
   }
 
-  // Run totals for the footer.
-  let totalIn = 0;
+  // Run totals for the footer. Track the cache halves separately from uncached
+  // input: the "in" token count shows the full context processed (input + cache
+  // read + write), but the cost weights the cache portions (read 0.1x, write
+  // 1.25x).
+  let totalInUncached = 0;
+  let totalCacheRead = 0;
+  let totalCacheWrite = 0;
   let totalOut = 0;
   let hasTokens = false;
   for (const s of steps) {
     if (s.inputTokens !== null) {
-      totalIn += s.inputTokens;
+      totalInUncached += s.inputTokens;
       hasTokens = true;
     }
+    if (s.cacheReadTokens !== null) totalCacheRead += s.cacheReadTokens;
+    if (s.cacheWriteTokens !== null) totalCacheWrite += s.cacheWriteTokens;
     if (s.outputTokens !== null) {
       totalOut += s.outputTokens;
       hasTokens = true;
     }
   }
-  const combinedCost = estimateRunCost(model, totalIn, totalOut);
+  const totalInTokens = totalInUncached + totalCacheRead + totalCacheWrite;
+  const combinedCost = estimateRunCost(
+    model,
+    totalInUncached,
+    totalOut,
+    totalCacheRead,
+    totalCacheWrite,
+  );
 
   return (
     <div className="bg-surface border-border flex flex-col overflow-hidden rounded-lg border">
@@ -111,7 +126,7 @@ export function RunSteps({
               })}
             </div>
             <span className="text-foreground-muted w-28 shrink-0 whitespace-nowrap text-right text-xs leading-6 tabular-nums">
-              {dirStr(model, s.inputTokens, "input")}{" "}
+              {inStr(model, s.inputTokens, s.cacheReadTokens, s.cacheWriteTokens)}{" "}
               <span className="text-foreground-weak">in</span>
             </span>
             <span className="text-foreground-muted w-28 shrink-0 whitespace-nowrap text-right text-xs leading-6 tabular-nums">
@@ -127,7 +142,7 @@ export function RunSteps({
           {/* Broken-down In/Out totals — small, columns aligned with the rows. */}
           <div className="flex items-baseline gap-x-4">
             <span className="text-foreground-weak w-28 shrink-0 whitespace-nowrap text-right text-xs tabular-nums">
-              {dirStr(model, totalIn, "input")}{" "}
+              {inStr(model, totalInUncached, totalCacheRead, totalCacheWrite)}{" "}
               <span className="text-foreground-muted">in</span>
             </span>
             <span className="text-foreground-weak w-28 shrink-0 whitespace-nowrap text-right text-xs tabular-nums">
@@ -137,7 +152,7 @@ export function RunSteps({
           </div>
           {/* Combined total — the headline number, larger. */}
           <div className="text-foreground whitespace-nowrap text-base font-semibold tabular-nums">
-            {abbreviateTokens(totalIn + totalOut)}
+            {abbreviateTokens(totalInTokens + totalOut)}
             {combinedCost !== null && ` ~${formatPenny(combinedCost)}`} total
           </div>
         </div>
@@ -154,5 +169,22 @@ function dirStr(
 ): string {
   if (tokens === null) return "··";
   const cost = estimateTokenCost(model, tokens, direction);
+  return `${abbreviateTokens(tokens)}${cost !== null ? ` ~${formatPenny(cost)}` : ""}`;
+}
+
+// Cache-aware "in" cell. Tokens shown = the full context processed (uncached
+// input + cache read + write); the cost weights the cache halves (read 0.1x,
+// write 1.25x). "··" until tokens land.
+function inStr(
+  model: string,
+  inputTokens: number | null,
+  cacheReadTokens: number | null,
+  cacheWriteTokens: number | null,
+): string {
+  if (inputTokens === null) return "··";
+  const cacheRead = cacheReadTokens ?? 0;
+  const cacheWrite = cacheWriteTokens ?? 0;
+  const tokens = inputTokens + cacheRead + cacheWrite;
+  const cost = estimateInputCost(model, inputTokens, cacheRead, cacheWrite);
   return `${abbreviateTokens(tokens)}${cost !== null ? ` ~${formatPenny(cost)}` : ""}`;
 }
