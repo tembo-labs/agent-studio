@@ -8,6 +8,50 @@ import { db } from "@/lib/db";
 
 export type RunTrigger = "manual" | "schedule" | "event";
 
+// A run spawned by another run via the tembo-agent-studio MCP `trigger_run`
+// tool. Shown on the parent run's page so an orchestrator's true cost (its own
+// + every sub-run) is visible in one place.
+export type ChildRun = {
+  id: string;
+  agentName: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  costUsd: number | null;
+  tokensInput: number | null;
+  tokensOutput: number | null;
+  createdAt: Date;
+};
+
+export async function listChildRuns(
+  workspaceId: string,
+  parentRunId: string,
+): Promise<ChildRun[]> {
+  const { rows } = await db.query<{
+    id: string;
+    agent_name: string;
+    status: ChildRun["status"];
+    cost_usd: string | null;
+    tokens_input: number | null;
+    tokens_output: number | null;
+    created_at: Date;
+  }>(
+    `SELECT id, agent_name, status, cost_usd, tokens_input, tokens_output, created_at
+       FROM run
+      WHERE workspace_id = $1 AND parent_run_id = $2
+      ORDER BY created_at ASC`,
+    [workspaceId, parentRunId],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    agentName: r.agent_name,
+    status: r.status,
+    // cost_usd is NUMERIC — pg returns it as a string.
+    costUsd: r.cost_usd === null ? null : Number(r.cost_usd),
+    tokensInput: r.tokens_input,
+    tokensOutput: r.tokens_output,
+    createdAt: r.created_at,
+  }));
+}
+
 export type RunSummary = {
   id: string;
   agentName: string;

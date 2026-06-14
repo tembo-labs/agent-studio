@@ -47,6 +47,9 @@ export type CreateRunInput = {
   // versionLabel is the human string ("v3" | "draft") for the UI.
   agentVersionId?: string | null;
   agentVersionLabel?: string | null;
+  // The run that triggered this one (an orchestrator calling trigger_run from
+  // inside its own run). Recorded so the parent's page can roll up sub-runs.
+  parentRunId?: string;
 };
 
 export type CreateRunResponse = { runId: string };
@@ -149,6 +152,7 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
       trigger: input.trigger,
       agent_version_id: input.agentVersionId,
       agent_version_label: input.agentVersionLabel,
+      parent_run_id: input.parentRunId,
     }),
   });
   if (!res.ok) {

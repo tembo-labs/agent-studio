@@ -57,7 +57,16 @@ function errorResult(message: string) {
 
 const FRAMEWORK_VALUES = FRAMEWORKS as readonly [Framework, ...Framework[]];
 
-export function buildMcpServer(ctx: McpContext): McpServer {
+export type McpServerOptions = {
+  /** The run that's calling /mcp (when an agent calls it mid-run), recorded as
+   *  the parent of any run trigger_run spawns. */
+  parentRunId?: string;
+};
+
+export function buildMcpServer(
+  ctx: McpContext,
+  options: McpServerOptions = {},
+): McpServer {
   const server = new McpServer({
     name: "tembo-agent-studio",
     version: "1.0.0",
@@ -264,7 +273,12 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     },
     async ({ agent, message, preferDraft }) => {
       if (!isOperator) return operatorOnly();
-      const res = await triggerRun(ctx, { agent, message, preferDraft });
+      const res = await triggerRun(ctx, {
+        agent,
+        message,
+        preferDraft,
+        parentRunId: options.parentRunId,
+      });
       if (!res.ok) return errorResult(res.error);
       return json({ runId: res.runId });
     },

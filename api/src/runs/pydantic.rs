@@ -262,6 +262,11 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    // This run's id. The wrapper forwards it as the X-Tas-Parent-Run header on
+    // the tembo-agent-studio MCP toolset only, so that a trigger_run call made
+    // from inside this run records this run as the new run's parent.
+    cmd.env("TAS_RUN_ID", args.run_id.to_string());
+
     // Provider keys flow in via env so the wrapper script doesn't
     // have to know which provider the agent's model: string points
     // to — pydantic-ai's own dispatch handles that.
