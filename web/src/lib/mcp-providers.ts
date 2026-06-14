@@ -113,7 +113,7 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
   },
   tembo: {
     slug: "tembo",
-    displayName: "Tembo",
+    displayName: "Tembo Agent Studio",
     // Self-key: no upstream OAuth. The connect flow branches before any
     // discovery, mints a per-user tas_ key, and stores the row pointing at
     // TAS's own /mcp (resolved via tasMcpServerUrl() at connect time). These
