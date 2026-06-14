@@ -51,9 +51,17 @@ export async function findMissingConnections(
   const composioSlots = new Set(
     composio.filter((c) => c.status === "ACTIVE").map((c) => `${c.toolkit}:${c.name}`),
   );
-  const nativeSlots = new Set(
-    native.filter((c) => c.status === "active").map((c) => `${c.type}:${c.name}`),
-  );
+  const activeNative = native.filter((c) => c.status === "active");
+  const nativeSlots = new Set(activeNative.map((c) => `${c.type}:${c.name}`));
+  // How many active native connections the user has per provider. Used for the
+  // single-connection slot-name fallback (mirrors build_native_mcp_toolsets):
+  // an agent pins a slot by name, but users routinely have the provider under a
+  // different name (e.g. `tembo` vs `default`); when there's exactly one, the
+  // runtime uses it regardless of the declared name, so it isn't "missing".
+  const nativeCountByProvider = new Map<string, number>();
+  for (const c of activeNative) {
+    nativeCountByProvider.set(c.type, (nativeCountByProvider.get(c.type) ?? 0) + 1);
+  }
   const secretSlugs = new Set(secrets.map((s) => s.slug));
 
   const missing: MissingConnection[] = [];
@@ -67,7 +75,9 @@ export async function findMissingConnections(
     if (conn.source === "secret") {
       isMissing = !secretSlugs.has(toolkit);
     } else if (conn.source === "native-mcp") {
-      isMissing = !nativeSlots.has(`${toolkit}:${name}`);
+      isMissing =
+        !nativeSlots.has(`${toolkit}:${name}`) &&
+        nativeCountByProvider.get(toolkit) !== 1;
     } else {
       isMissing = !composioSlots.has(`${toolkit}:${name}`);
     }
