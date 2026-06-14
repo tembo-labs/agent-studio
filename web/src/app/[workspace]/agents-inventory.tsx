@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 
-import { IconPlusLarge } from "central-icons";
+import { IconApiConnection, IconPlusLarge } from "central-icons";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,13 @@ import { dismissPendingCreateAction } from "./inventory-actions";
 // Status facet pills + free-text search live above; the table itself
 // renders every agent — live, pending-create, and invalid — as a
 // single row so the user sees the whole picture in one place.
+
+export type McpIcon = {
+  /** Provider slug for the logo (e.g. "attio", "linear"). */
+  slug: string;
+  /** Human label for the tooltip / filter (e.g. "Attio"). */
+  label: string;
+};
 
 export type InventoryAgent =
   | {
@@ -32,6 +39,11 @@ export type InventoryAgent =
       frameworkLabel: string;
       /** Spec labels (for grouping + Slack-app scoping). */
       labels: string[];
+      /** MCP/provider connections declared on this agent's own spec. */
+      mcps: McpIcon[];
+      /** MCPs reached one level down: providers this agent's sub-agents use
+       *  (derived from the parent_run_id graph). Empty for non-orchestrators. */
+      subMcps: McpIcon[];
       model: string | null;
       /** 30-day window. Zero when the agent has never run in that window. */
       runs30d: number;
@@ -101,6 +113,7 @@ export function AgentsInventory({
   const [bucket, setBucket] = useState<StatusBucket | null>(null);
   const [labelFilter, setLabelFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
+  const [mcpFilter, setMcpFilter] = useState("");
   // Default sort: alphabetical by name. The user can re-sort by clicking
   // column headers.
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -145,6 +158,22 @@ export function AgentsInventory({
       ...[...set].sort().map((m) => ({ value: m, label: shortModel(m) })),
     ];
   }, [enriched]);
+  // Distinct MCPs (top-level + sub-agent) across live agents, slug→label.
+  const mcpOptions = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const { agent } of enriched) {
+      if (agent.kind !== "live") continue;
+      for (const m of [...agent.mcps, ...agent.subMcps]) {
+        if (!labels.has(m.slug)) labels.set(m.slug, m.label);
+      }
+    }
+    return [
+      { value: "", label: "All MCPs" },
+      ...[...labels.entries()]
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([slug, label]) => ({ value: slug, label })),
+    ];
+  }, [enriched]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -165,10 +194,26 @@ export function AgentsInventory({
         ({ agent }) => agent.kind === "live" && agent.model === modelFilter,
       );
     }
+    if (mcpFilter) {
+      rows = rows.filter(
+        ({ agent }) =>
+          agent.kind === "live" &&
+          [...agent.mcps, ...agent.subMcps].some((m) => m.slug === mcpFilter),
+      );
+    }
     return [...rows].sort((a, b) =>
       compareRows(a.agent, b.agent, a.bucket, b.bucket, sortKey, sortDir),
     );
-  }, [enriched, query, bucket, labelFilter, modelFilter, sortKey, sortDir]);
+  }, [
+    enriched,
+    query,
+    bucket,
+    labelFilter,
+    modelFilter,
+    mcpFilter,
+    sortKey,
+    sortDir,
+  ]);
 
   function onHeaderClick(key: SortKey) {
     if (key === sortKey) {
@@ -231,6 +276,15 @@ export function AgentsInventory({
             className="min-w-[130px]"
           />
         )}
+        {mcpOptions.length > 1 && (
+          <Select
+            value={mcpFilter}
+            onValueChange={setMcpFilter}
+            options={mcpOptions}
+            ariaLabel="Filter by MCP"
+            className="min-w-[130px]"
+          />
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -271,6 +325,7 @@ export function AgentsInventory({
                 />
                 <th className="px-3 py-2 text-left font-medium">Labels</th>
                 <th className="px-3 py-2 text-left font-medium">Model</th>
+                <th className="px-3 py-2 text-left font-medium">MCPs</th>
                 <SortableTh
                   label="Runs 30d"
                   active={sortKey === "runs"}
@@ -397,6 +452,60 @@ function SortableTh({
   );
 }
 
+// MCPs column for a live agent: the agent's own connection logos, then —
+// for an orchestrator — a "+" and the (dimmed) logos its sub-agents bring in.
+function McpCell({ mcps, subMcps }: { mcps: McpIcon[]; subMcps: McpIcon[] }) {
+  if (mcps.length === 0 && subMcps.length === 0) {
+    return <span className="text-foreground-muted">—</span>;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {mcps.map((m) => (
+        <McpLogo key={`top:${m.slug}`} icon={m} />
+      ))}
+      {subMcps.length > 0 && (
+        <>
+          <span
+            className="text-foreground-muted px-0.5 text-xs"
+            title="Used by this agent's sub-agents"
+          >
+            +
+          </span>
+          {subMcps.map((m) => (
+            <McpLogo key={`sub:${m.slug}`} icon={m} dimmed />
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+function McpLogo({ icon, dimmed = false }: { icon: McpIcon; dimmed?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  const title = dimmed ? `${icon.label} (sub-agent)` : icon.label;
+  return (
+    <span
+      title={title}
+      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden${
+        dimmed ? " opacity-60" : ""
+      }`}
+    >
+      {failed ? (
+        <IconApiConnection size={12} className="text-foreground-muted" />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`https://logos.composio.dev/api/${encodeURIComponent(icon.slug.toLowerCase())}`}
+          alt=""
+          aria-hidden
+          className="h-4 w-4 object-contain"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </span>
+  );
+}
+
 function InventoryRow({
   agent,
   bucket,
@@ -421,7 +530,7 @@ function InventoryRow({
         </td>
         <td
           className="text-sentiment-negative px-3 py-2 align-middle text-sm"
-          colSpan={5}
+          colSpan={6}
         >
           {agent.error}
           {agent.detail ? ` — ${agent.detail}` : ""}
@@ -439,6 +548,9 @@ function InventoryRow({
         </td>
         <td className="px-3 py-2 align-middle">
           <StatusCell bucket="pending" />
+        </td>
+        <td className="text-foreground-muted px-3 py-2 align-middle text-sm">
+          —
         </td>
         <td className="text-foreground-muted px-3 py-2 align-middle text-sm">
           —
@@ -503,6 +615,9 @@ function InventoryRow({
       </td>
       <td className="text-foreground-weak px-3 py-2 align-middle font-mono text-sm">
         {shortModel(agent.model)}
+      </td>
+      <td className="px-3 py-2 align-middle">
+        <McpCell mcps={agent.mcps} subMcps={agent.subMcps} />
       </td>
       <td className="text-foreground px-3 py-2 text-right align-middle font-mono text-sm">
         {agent.runs30d.toLocaleString("en-US")}
