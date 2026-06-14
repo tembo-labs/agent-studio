@@ -66,14 +66,28 @@ function lookupRate(model: string): Rate | null {
   return null;
 }
 
+// Anthropic prompt-cache multipliers on the base INPUT rate: cache writes
+// (creation) bill at 1.25x, cache reads at 0.1x. `tokensInput` is the uncached
+// input (full rate); the cache halves are separate, non-overlapping counts.
+// Keep in lockstep with api/src/pricing.rs.
+const CACHE_READ_MULTIPLIER = 0.1;
+const CACHE_WRITE_MULTIPLIER = 1.25;
+
 export function estimateRunCost(
   model: string,
   tokensInput: number,
   tokensOutput: number,
+  cacheRead = 0,
+  cacheWrite = 0,
 ): number | null {
   const rate = lookupRate(model);
   if (!rate) return null;
-  return (tokensInput * rate.input + tokensOutput * rate.output) / 1_000_000;
+  const inputCost =
+    (tokensInput +
+      cacheRead * CACHE_READ_MULTIPLIER +
+      cacheWrite * CACHE_WRITE_MULTIPLIER) *
+    rate.input;
+  return (inputCost + tokensOutput * rate.output) / 1_000_000;
 }
 
 /** Cost of just the input or just the output tokens, for per-direction display. */
@@ -85,6 +99,25 @@ export function estimateTokenCost(
   const rate = lookupRate(model);
   if (!rate) return null;
   return (tokens * rate[direction]) / 1_000_000;
+}
+
+/** Cache-aware "input" cost for display: uncached input at full rate plus the
+ *  cache read/write halves at their multipliers. */
+export function estimateInputCost(
+  model: string,
+  uncachedInput: number,
+  cacheRead: number,
+  cacheWrite: number,
+): number | null {
+  const rate = lookupRate(model);
+  if (!rate) return null;
+  return (
+    ((uncachedInput +
+      cacheRead * CACHE_READ_MULTIPLIER +
+      cacheWrite * CACHE_WRITE_MULTIPLIER) *
+      rate.input) /
+    1_000_000
+  );
 }
 
 export function formatTokens(n: number): string {

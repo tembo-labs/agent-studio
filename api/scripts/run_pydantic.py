@@ -425,6 +425,12 @@ def usage_payload(usage_obj) -> dict:
         "response_tokens",
         "total_tokens",
         "requests",
+        # Anthropic prompt-cache counters — uncached input is in input_tokens;
+        # these are the cache write (creation) and read halves, priced
+        # separately (~1.25x / ~0.1x of input). The Rust side uses them for the
+        # run's cost estimate.
+        "cache_read_tokens",
+        "cache_write_tokens",
     ):
         val = getattr(usage_obj, attr, None)
         if val is not None:
@@ -711,6 +717,20 @@ def build_agent(
     model_settings = spec.get("model_settings")
     ms = dict(model_settings) if isinstance(model_settings, dict) else {}
     ms.setdefault("parallel_tool_calls", False)
+    # Anthropic prompt caching. An agentic run re-sends the whole prompt every
+    # step; without caching the big static prefix — system instructions + the
+    # MCP/Composio tool schemas — is re-billed at full input rate on each of the
+    # (often 10+) steps. These breakpoints let Anthropic charge the repeated
+    # prefix at the cache-read rate (~0.1x) after the first step, with a small
+    # one-time write surcharge (~1.25x). `anthropic_cache` adds an auto-rolling
+    # breakpoint that follows the growing conversation; pydantic-ai trims to stay
+    # within Anthropic's 4-slot limit. Default 5m TTL fits a single run's burst.
+    # Anthropic-only settings — applying them to OpenAI models would error, so
+    # gate on the provider prefix. A spec can still override via model_settings.
+    if isinstance(model, str) and model.startswith("anthropic:"):
+        ms.setdefault("anthropic_cache_instructions", True)
+        ms.setdefault("anthropic_cache_tool_definitions", True)
+        ms.setdefault("anthropic_cache", True)
     kwargs["model_settings"] = ms
     retries = spec.get("retries")
     if isinstance(retries, int):
