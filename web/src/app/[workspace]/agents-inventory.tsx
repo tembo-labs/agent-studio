@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { mcpLogoUrl } from "@/lib/mcp-logo";
 
 import { dismissPendingCreateAction } from "./inventory-actions";
 
@@ -495,7 +496,7 @@ function McpLogo({ icon, dimmed = false }: { icon: McpIcon; dimmed?: boolean }) 
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={`https://logos.composio.dev/api/${encodeURIComponent(icon.slug.toLowerCase())}`}
+          src={mcpLogoUrl(icon.slug)}
           alt=""
           aria-hidden
           className="h-4 w-4 object-contain"
