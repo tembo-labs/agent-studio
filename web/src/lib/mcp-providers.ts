@@ -21,7 +21,7 @@ export type McpProviderSlug =
   | "pylon"
   | "hubspot"
   | "fathom"
-  | "dialed";
+  | "dialed"
   | "tembo";
 
 export type McpProvider = {
@@ -110,6 +110,7 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // use the apex.)
     mcpServerUrl: "https://dialed.day/mcp",
     oauthAuthorizationServerOrigins: ["https://dialed.day"],
+  },
   tembo: {
     slug: "tembo",
     displayName: "Tembo",
