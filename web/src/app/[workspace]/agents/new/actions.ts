@@ -16,6 +16,9 @@ import {
   type CapError,
 } from "@/lib/cap-api";
 import { listConnectionsForUser } from "@/lib/composio-connections";
+import { getPublicOrigin } from "@/lib/config";
+import { signForAgentsToken } from "@/lib/for-agents-token";
+import { buildNativeSlots } from "@/lib/native-slots";
 import {
   createImprovement,
   improvementMarker,
@@ -148,6 +151,14 @@ export async function createFromChatAction(
     if (!availableSlots[c.toolkit]) availableSlots[c.toolkit] = [];
     availableSlots[c.toolkit].push(c.name);
   }
+  // Native-MCP connections are a separate substrate; CAP looks up their tool
+  // slugs at this instance's /for-agents reference (signed token in the URL).
+  const nativeSlots = await buildNativeSlots(workspace.id, userId);
+  const nativeToolsKey = signForAgentsToken(
+    workspace.id,
+    userId,
+    Math.floor(Date.now() / 1000),
+  );
 
   const prompt = buildCreateAgentPrompt({
     framework,
@@ -159,6 +170,9 @@ export async function createFromChatAction(
     commitMode: workspace.commitMode,
     defaultBranch: repo.defaultBranch,
     availableSlots,
+    nativeSlots,
+    nativeToolsBaseUrl: `${getPublicOrigin()}/for-agents`,
+    nativeToolsKey,
   });
 
   const res = await createTemboTask({

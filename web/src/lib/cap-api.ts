@@ -210,6 +210,19 @@ export function buildCreateAgentPrompt(args: {
    * authorized yet, so the prompt falls back to `default`.
    */
   availableSlots?: AvailableConnectionSlots;
+  /**
+   * Native-MCP provider slug → authorized slot names for the user.
+   * Rendered as a separate block from `availableSlots`: native connections
+   * must be declared with `source: native-mcp`, and CAP looks up their exact
+   * tool slugs at the TAS-served reference (nativeToolsBaseUrl + nativeToolsKey)
+   * rather than inline.
+   */
+  nativeSlots?: AvailableConnectionSlots;
+  /** Origin + path of this instance's /for-agents reference, e.g.
+   *  "https://tas.example.com/for-agents". */
+  nativeToolsBaseUrl?: string;
+  /** Signed token CAP appends as `?key=` when fetching the reference. */
+  nativeToolsKey?: string;
 }): string {
   const frameworkGuide =
     args.framework === "cargo-ai" ? GUIDANCE_CARGO_AI_PATH : GUIDANCE_PYDANTIC_PATH;
@@ -224,6 +237,11 @@ export function buildCreateAgentPrompt(args: {
     `The agent's \`name:\` field must be exactly \`${args.agentName}\` (it matches the filename). Also set a \`title:\` field to the human display name "${args.title}" (free text — this is what the UI shows). Don't put the file anywhere other than \`${args.agentPath}\`.`,
     "",
     ...renderAvailableSlots(args.availableSlots),
+    ...renderNativeSlots(
+      args.nativeSlots,
+      args.nativeToolsBaseUrl,
+      args.nativeToolsKey,
+    ),
     "If the agent needs to call external services (Slack, Gmail, Google",
     "Sheets, Notion, GitHub, Linear, HubSpot, etc.), declare them via the",
     "`connections:` field. The slug is whatever Composio uses (lowercase,",
@@ -325,6 +343,58 @@ function renderAvailableSlots(
     "doesn't have to re-authorize. For a toolkit not listed above, use",
   );
   lines.push("`default` and TAS will surface a Connect button.");
+  lines.push("");
+  return lines;
+}
+
+// Native-MCP slots block. Native connections must be declared with
+// `source: native-mcp`; their tool slugs aren't inlined (the catalogs are
+// large and provider-specific) — instead CAP fetches a per-provider reference
+// served by this TAS instance, authorized by a signed `?key=` token. Empty
+// slots, or a missing base/key, returns [].
+function renderNativeSlots(
+  slots: AvailableConnectionSlots | undefined,
+  baseUrl: string | undefined,
+  key: string | undefined,
+): string[] {
+  if (!slots || !baseUrl || !key) return [];
+  const entries = Object.entries(slots).filter(([, names]) => names.length > 0);
+  if (entries.length === 0) return [];
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  const q = `?key=${encodeURIComponent(key)}`;
+  const lines: string[] = [
+    "**Native MCP connection slots already authorized in this workspace:**",
+    "",
+  ];
+  for (const [provider, names] of entries) {
+    lines.push(`- \`${provider}\`: ${names.map((n) => `\`${n}\``).join(", ")}`);
+  }
+  const [firstProvider, firstNames] = entries[0];
+  lines.push("");
+  lines.push(
+    "These talk to the provider's official MCP server. Declare them with",
+  );
+  lines.push(
+    "`source: native-mcp` and the existing slot name above. Before writing the",
+  );
+  lines.push(
+    "`tools:` list, fetch the provider's tool reference (lists the exact slugs)",
+  );
+  lines.push("and narrow to what you need — one page per provider:");
+  lines.push("");
+  for (const [provider] of entries) {
+    lines.push(`- \`${provider}\` → ${baseUrl}/${provider}.md${q}`);
+  }
+  lines.push("");
+  lines.push("Example:");
+  lines.push("");
+  lines.push("```yaml");
+  lines.push("connections:");
+  lines.push(`  - ${firstProvider}:`);
+  lines.push("      source: native-mcp");
+  lines.push(`      name: ${firstNames[0]}`);
+  lines.push("      tools: [<slug-from-the-reference-page>]");
+  lines.push("```");
   lines.push("");
   return lines;
 }
