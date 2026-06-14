@@ -52,11 +52,20 @@ const PYLON_OAUTH_ORIGINS: &[&str] = &["https://o.auth.usepylon.com"];
 // metadata says auth_mode=manual.
 const HUBSPOT_MCP_ORIGIN: &str = "https://mcp.hubspot.com";
 const HUBSPOT_OAUTH_ORIGINS: &[&str] = &["https://mcp.hubspot.com"];
+// Fathom's auth server is api.fathom.ai but its authorize endpoint lives on
+// fathom.video — both origins are allowed (matches the web catalog).
+const FATHOM_MCP_ORIGIN: &str = "https://api.fathom.ai";
+const FATHOM_OAUTH_ORIGINS: &[&str] = &["https://api.fathom.ai", "https://fathom.video"];
+// Dialed advertises its auth server as the apex (also the MCP origin).
+const DIALED_MCP_ORIGIN: &str = "https://dialed.day";
+const DIALED_OAUTH_ORIGINS: &[&str] = &["https://dialed.day"];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
     (PYLON_MCP_ORIGIN, PYLON_OAUTH_ORIGINS),
     (HUBSPOT_MCP_ORIGIN, HUBSPOT_OAUTH_ORIGINS),
+    (FATHOM_MCP_ORIGIN, FATHOM_OAUTH_ORIGINS),
+    (DIALED_MCP_ORIGIN, DIALED_OAUTH_ORIGINS),
 ];
 
 #[derive(Deserialize)]
