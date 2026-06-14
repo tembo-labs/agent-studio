@@ -16,7 +16,12 @@
 
 import { getPublicOrigin } from "@/lib/config";
 
-export type McpProviderSlug = "attio" | "pylon" | "hubspot" | "fathom";
+export type McpProviderSlug =
+  | "attio"
+  | "pylon"
+  | "hubspot"
+  | "fathom"
+  | "dialed";
 
 export type McpProvider = {
   slug: McpProviderSlug;
@@ -85,6 +90,19 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
       "https://api.fathom.ai",
       "https://fathom.video",
     ],
+  },
+  dialed: {
+    slug: "dialed",
+    displayName: "Dialed",
+    // Verified: POST https://dialed.day/mcp → 401 + WWW-Authenticate Bearer
+    // pointing at /.well-known/oauth-protected-resource, which advertises the
+    // auth server as the apex https://dialed.day. Auth-server metadata supports
+    // DCR (registration_endpoint /oauth/register), PKCE S256, and a public
+    // client (auth method "none") — so it's TAS-managed (no per-customer
+    // setup), like Attio. (The www.dialed.day host is a non-OAuth PAT endpoint;
+    // use the apex.)
+    mcpServerUrl: "https://dialed.day/mcp",
+    oauthAuthorizationServerOrigins: ["https://dialed.day"],
   },
 };
 
