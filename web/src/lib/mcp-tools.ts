@@ -70,6 +70,12 @@ const COLUMNS = `id, workspace_id, user_id, source, provider,
  * Powers the workspace Tools tab. Sort key chosen so the page
  * groups naturally: source first (composio above native), then
  * provider alphabetical, then connection name, then tool slug.
+ *
+ * Only tools backed by a still-active connection are returned. The cache is
+ * keyed by (source, provider, connection_name), so a connection that was
+ * disconnected, renamed, or whose provider slug changed (e.g. the
+ * `tembo` → `tembo-agent-studio` rename) leaves orphaned rows behind; the
+ * EXISTS guards filter those out instead of showing duplicate/stale tools.
  */
 export async function listToolsForUser(
   workspaceId: string,
@@ -77,9 +83,22 @@ export async function listToolsForUser(
 ): Promise<McpTool[]> {
   const { rows } = await db.query<Row>(
     `SELECT ${COLUMNS}
-       FROM workspace_mcp_tool
-      WHERE workspace_id = $1 AND user_id = $2
-      ORDER BY source ASC, provider ASC, connection_name ASC, slug ASC`,
+       FROM workspace_mcp_tool t
+      WHERE t.workspace_id = $1 AND t.user_id = $2
+        AND (
+          (t.source = 'native-mcp' AND EXISTS (
+            SELECT 1 FROM workspace_connection c
+             WHERE c.workspace_id = t.workspace_id AND c.user_id = t.user_id
+               AND c.type = t.provider AND c.name = t.connection_name
+               AND c.status = 'active'))
+          OR
+          (t.source = 'composio' AND EXISTS (
+            SELECT 1 FROM workspace_composio_connection cc
+             WHERE cc.workspace_id = t.workspace_id AND cc.user_id = t.user_id
+               AND cc.toolkit_slug = t.provider AND cc.name = t.connection_name
+               AND cc.status = 'ACTIVE'))
+        )
+      ORDER BY t.source ASC, t.provider ASC, t.connection_name ASC, t.slug ASC`,
     [workspaceId, userId],
   );
   return rows.map(rowToTool);
