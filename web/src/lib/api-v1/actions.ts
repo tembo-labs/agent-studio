@@ -23,6 +23,9 @@ import {
   type AvailableConnectionSlots,
 } from "@/lib/cap-api";
 import { listConnectionsForUser } from "@/lib/composio-connections";
+import { getPublicOrigin } from "@/lib/config";
+import { signForAgentsToken } from "@/lib/for-agents-token";
+import { buildNativeSlots } from "@/lib/native-slots";
 import {
   findMissingConnections,
   missingConnectionsMessage,
@@ -322,6 +325,14 @@ export async function requestAgentChange(
     if (c.status !== "ACTIVE") continue;
     (availableSlots[c.toolkit] ??= []).push(c.name);
   }
+  // Native-MCP connections are a separate substrate; CAP looks up their tool
+  // slugs at this instance's /for-agents reference (signed token in the URL).
+  const nativeSlots = await buildNativeSlots(ctx.workspace.id, ctx.userId);
+  const nativeToolsKey = signForAgentsToken(
+    ctx.workspace.id,
+    ctx.userId,
+    Math.floor(Date.now() / 1000),
+  );
 
   prompt = buildCreateAgentPrompt({
     framework,
@@ -333,6 +344,9 @@ export async function requestAgentChange(
     commitMode: ctx.workspace.commitMode,
     defaultBranch: repo.defaultBranch,
     availableSlots,
+    nativeSlots,
+    nativeToolsBaseUrl: `${getPublicOrigin()}/for-agents`,
+    nativeToolsKey,
   });
   return finishTask({ ctx, apiKey, repositoryUrl, repo, rowId: row.id, prompt, kind, agentPath });
 }
