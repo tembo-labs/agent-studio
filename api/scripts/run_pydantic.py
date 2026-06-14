@@ -952,7 +952,15 @@ def build_native_mcp_toolsets(
     toolsets: list = []
     missing: list[str] = []
     for provider, name, tools in native:
-        entry = nested.get(provider, {}).get(name)
+        provider_slots = nested.get(provider, {})
+        entry = provider_slots.get(name)
+        # Slot-name fallback: agents pin a connection by slot name, but users
+        # routinely have the provider connected under a different name (e.g.
+        # `tembo` vs `default`). When the named slot is absent but the user has
+        # exactly ONE connection for this provider, use it — so the spec doesn't
+        # have to match the slot name exactly. Ambiguous (2+ slots) still fails.
+        if not entry and len(provider_slots) == 1:
+            entry = next(iter(provider_slots.values()))
         if not entry or not entry.get("mcp_url") or not entry.get("access_token"):
             slot_label = (
                 provider if name == "default" else f"{provider}/{name}"
