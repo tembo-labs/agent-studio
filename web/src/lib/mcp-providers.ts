@@ -22,13 +22,16 @@ export type McpProviderSlug =
   | "hubspot"
   | "fathom"
   | "dialed";
+  | "tembo";
 
 export type McpProvider = {
   slug: McpProviderSlug;
   displayName: string;
   /** The MCP server URL pydantic-ai connects to with the user's
    *  bearer token at run time. The /.well-known endpoints are
-   *  derived from this URL's origin. */
+   *  derived from this URL's origin. Empty for "self-key" providers
+   *  (TAS itself) — resolved at connect time via tasMcpServerUrl(),
+   *  since the origin is env-derived rather than a constant. */
   mcpServerUrl: string;
   /** Exact OAuth authorization-server origins this provider is allowed
    *  to advertise through protected-resource discovery. */
@@ -42,8 +45,12 @@ export type McpProvider = {
    *    provider and stores its client_id/secret in TAS
    *    (workspace_native_oauth_client); the flow uses that confidential
    *    client. HubSpot is the first of these.
+   *  - "self-key": no upstream OAuth at all — the "provider" is TAS's
+   *    own /mcp server. Connect mints a per-user `tas_` API key and
+   *    stores it as the connection's bearer; the key's owner (and their
+   *    live workspace role) is what /mcp enforces. Tembo is the first.
    */
-  authMode?: "dcr" | "manual";
+  authMode?: "dcr" | "manual" | "self-key";
 };
 
 export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
@@ -103,11 +110,31 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // use the apex.)
     mcpServerUrl: "https://dialed.day/mcp",
     oauthAuthorizationServerOrigins: ["https://dialed.day"],
+  tembo: {
+    slug: "tembo",
+    displayName: "Tembo",
+    // Self-key: no upstream OAuth. The connect flow branches before any
+    // discovery, mints a per-user tas_ key, and stores the row pointing at
+    // TAS's own /mcp (resolved via tasMcpServerUrl() at connect time). These
+    // two fields are intentionally empty — the OAuth helpers never run for it.
+    mcpServerUrl: "",
+    oauthAuthorizationServerOrigins: [],
+    authMode: "self-key",
   },
 };
 
 export function getMcpProvider(slug: string): McpProvider | null {
   return MCP_PROVIDERS[slug as McpProviderSlug] ?? null;
+}
+
+/**
+ * The MCP server URL for the "self-key" Tembo provider — TAS's own /mcp
+ * endpoint. Computed from the request/env-derived public origin rather than
+ * baked into the catalog, then stored per-row in workspace_connection so it
+ * can be tuned (e.g. to an internal URL) without code changes.
+ */
+export function tasMcpServerUrl(): string {
+  return `${getPublicOrigin()}/mcp`;
 }
 
 export function listMcpProviders(): McpProvider[] {
