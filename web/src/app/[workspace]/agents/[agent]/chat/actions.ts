@@ -17,6 +17,7 @@ import {
   setImprovementCommitted,
   setImprovementTask,
 } from "@/lib/improvements-api";
+import { buildPromptConnectionContext } from "@/lib/prompt-connections";
 import {
   findMissingConnections,
   missingConnectionsMessage,
@@ -103,6 +104,11 @@ export async function chatSubmitAction(args: {
     improvementMarker: improvementMarker(row.id),
     commitMode: workspace.commitMode,
     defaultBranch: repo.defaultBranch,
+    ...(await buildPromptConnectionContext(
+      workspace.id,
+      userId,
+      Math.floor(Date.now() / 1000),
+    )),
   });
 
   const res = await createTemboTask({

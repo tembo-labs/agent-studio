@@ -20,12 +20,8 @@ import {
   buildChatEditPrompt,
   buildCreateAgentPrompt,
   createTemboTask,
-  type AvailableConnectionSlots,
 } from "@/lib/cap-api";
-import { listConnectionsForUser } from "@/lib/composio-connections";
-import { getPublicOrigin } from "@/lib/config";
-import { signForAgentsToken } from "@/lib/for-agents-token";
-import { buildNativeSlots } from "@/lib/native-slots";
+import { buildPromptConnectionContext } from "@/lib/prompt-connections";
 import {
   findMissingConnections,
   missingConnectionsMessage,
@@ -279,6 +275,11 @@ export async function requestAgentChange(
       improvementMarker: improvementMarker(row.id),
       commitMode: ctx.workspace.commitMode,
       defaultBranch: repo.defaultBranch,
+      ...(await buildPromptConnectionContext(
+        ctx.workspace.id,
+        ctx.userId,
+        Math.floor(Date.now() / 1000),
+      )),
     });
     return finishTask({ ctx, apiKey, repositoryUrl, repo, rowId: row.id, prompt, kind, agentPath });
   }
@@ -317,23 +318,9 @@ export async function requestAgentChange(
     userId: ctx.userId,
   });
 
-  // Surface the user's authorized connection slots so the coding agent writes
-  // real slot names instead of `default` (it reads the repo, not the TAS DB).
-  const myConnections = await listConnectionsForUser(ctx.workspace.id, ctx.userId);
-  const availableSlots: AvailableConnectionSlots = {};
-  for (const c of myConnections) {
-    if (c.status !== "ACTIVE") continue;
-    (availableSlots[c.toolkit] ??= []).push(c.name);
-  }
-  // Native-MCP connections are a separate substrate; CAP looks up their tool
-  // slugs at this instance's /for-agents reference (signed token in the URL).
-  const nativeSlots = await buildNativeSlots(ctx.workspace.id, ctx.userId);
-  const nativeToolsKey = signForAgentsToken(
-    ctx.workspace.id,
-    ctx.userId,
-    Math.floor(Date.now() / 1000),
-  );
-
+  // Surface the user's authorized connection slots (Composio + native MCP) so
+  // CAP writes real slot names instead of `default` (it reads the repo, not the
+  // TAS DB) and can look up native tool slugs at this instance's /for-agents.
   prompt = buildCreateAgentPrompt({
     framework,
     agentName: agentSlug,
@@ -343,10 +330,11 @@ export async function requestAgentChange(
     improvementMarker: improvementMarker(row.id),
     commitMode: ctx.workspace.commitMode,
     defaultBranch: repo.defaultBranch,
-    availableSlots,
-    nativeSlots,
-    nativeToolsBaseUrl: `${getPublicOrigin()}/for-agents`,
-    nativeToolsKey,
+    ...(await buildPromptConnectionContext(
+      ctx.workspace.id,
+      ctx.userId,
+      Math.floor(Date.now() / 1000),
+    )),
   });
   return finishTask({ ctx, apiKey, repositoryUrl, repo, rowId: row.id, prompt, kind, agentPath });
 }

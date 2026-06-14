@@ -1,6 +1,9 @@
 import { type NextRequest } from "next/server";
 
-import { verifyForAgentsToken } from "@/lib/for-agents-token";
+import {
+  bearerFromHeader,
+  verifyForAgentsToken,
+} from "@/lib/for-agents-token";
 import {
   renderProviderMarkdown,
   type ForAgentsTool,
@@ -32,12 +35,15 @@ export async function GET(
   const { provider: raw } = await params;
   const slug = raw.replace(/\.md$/, "");
 
-  const key = request.nextUrl.searchParams.get("key");
-  const payload = key
-    ? verifyForAgentsToken(key, Math.floor(Date.now() / 1000))
+  const token = bearerFromHeader(request.headers.get("authorization"));
+  const payload = token
+    ? verifyForAgentsToken(token, Math.floor(Date.now() / 1000))
     : null;
   if (!payload) {
-    return text("# Unauthorized\n\nMissing or invalid `?key=` token.", 401);
+    return text(
+      "# Unauthorized\n\nSend `Authorization: Bearer <token>`.",
+      401,
+    );
   }
 
   const provider = getMcpProvider(slug);
