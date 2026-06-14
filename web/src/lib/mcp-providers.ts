@@ -22,7 +22,7 @@ export type McpProviderSlug =
   | "hubspot"
   | "fathom"
   | "dialed"
-  | "tembo";
+  | "tembo-agent-studio";
 
 export type McpProvider = {
   slug: McpProviderSlug;
@@ -111,8 +111,8 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     mcpServerUrl: "https://dialed.day/mcp",
     oauthAuthorizationServerOrigins: ["https://dialed.day"],
   },
-  tembo: {
-    slug: "tembo",
+  "tembo-agent-studio": {
+    slug: "tembo-agent-studio",
     displayName: "Tembo Agent Studio",
     // Self-key: no upstream OAuth. The connect flow branches before any
     // discovery, mints a per-user tas_ key, and stores the row pointing at
