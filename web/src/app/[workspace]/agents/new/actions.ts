@@ -12,13 +12,9 @@ import {
 import {
   buildCreateAgentPrompt,
   createTemboTask,
-  type AvailableConnectionSlots,
   type CapError,
 } from "@/lib/cap-api";
-import { listConnectionsForUser } from "@/lib/composio-connections";
-import { getPublicOrigin } from "@/lib/config";
-import { signForAgentsToken } from "@/lib/for-agents-token";
-import { buildNativeSlots } from "@/lib/native-slots";
+import { buildPromptConnectionContext } from "@/lib/prompt-connections";
 import {
   createImprovement,
   improvementMarker,
@@ -138,28 +134,10 @@ export async function createFromChatAction(
     userId,
   });
 
-  // Fetch the requesting user's authorized connections so the
-  // prompt can list the actual slot names (not just suggest
-  // `default`). Tembo's coding agent reads the repo, not the TAS
-  // DB, so without this it has no way to know which slot to write
-  // — leading to PRs that say `name: default` when the workspace
-  // already has a `name: tembo` slot authorized.
-  const myConnections = await listConnectionsForUser(workspace.id, userId);
-  const availableSlots: AvailableConnectionSlots = {};
-  for (const c of myConnections) {
-    if (c.status !== "ACTIVE") continue;
-    if (!availableSlots[c.toolkit]) availableSlots[c.toolkit] = [];
-    availableSlots[c.toolkit].push(c.name);
-  }
-  // Native-MCP connections are a separate substrate; CAP looks up their tool
-  // slugs at this instance's /for-agents reference (signed token in the URL).
-  const nativeSlots = await buildNativeSlots(workspace.id, userId);
-  const nativeToolsKey = signForAgentsToken(
-    workspace.id,
-    userId,
-    Math.floor(Date.now() / 1000),
-  );
-
+  // Fetch the requesting user's authorized connections (Composio + native MCP)
+  // so the prompt lists real slot names (not just `default`) and CAP can look
+  // up native tool slugs. Tembo's coding agent reads the repo, not the TAS DB,
+  // so without this it writes `name: default` even when a slot already exists.
   const prompt = buildCreateAgentPrompt({
     framework,
     agentName: agentSlug,
@@ -169,10 +147,11 @@ export async function createFromChatAction(
     improvementMarker: improvementMarker(row.id),
     commitMode: workspace.commitMode,
     defaultBranch: repo.defaultBranch,
-    availableSlots,
-    nativeSlots,
-    nativeToolsBaseUrl: `${getPublicOrigin()}/for-agents`,
-    nativeToolsKey,
+    ...(await buildPromptConnectionContext(
+      workspace.id,
+      userId,
+      Math.floor(Date.now() / 1000),
+    )),
   });
 
   const res = await createTemboTask({

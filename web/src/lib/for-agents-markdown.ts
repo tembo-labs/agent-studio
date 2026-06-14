@@ -59,27 +59,28 @@ export function renderProviderMarkdown(
   return lines.join("\n");
 }
 
-/** The /for-agents index: links to each provider's page (carrying the key).
- *  `connected` is the set of provider slugs that have cached tools. */
+/** The /for-agents index: links to each provider's page. Every page (and this
+ *  index) requires an `Authorization: Bearer <token>` header. `connected` is
+ *  the set of provider slugs that have cached tools. */
 export function renderIndexMarkdown(
   baseUrl: string,
-  key: string,
   providers: McpProvider[],
   connected: Set<string>,
 ): string {
-  const q = `?key=${encodeURIComponent(key)}`;
   const lines = [
     "# Native MCP tool reference (for agents)",
     "",
     "One page per provider, listing the exact tool slugs to put in an agent's",
-    "`tools:` list when it declares a `source: native-mcp` connection.",
+    "`tools:` list when it declares a `source: native-mcp` connection. Each page",
+    "requires the same `Authorization: Bearer <token>` header used to fetch this",
+    "index.",
     "",
   ];
   for (const p of [...providers].sort((a, b) =>
     a.displayName.localeCompare(b.displayName),
   )) {
     const note = connected.has(p.slug) ? "" : " — _not connected here yet_";
-    lines.push(`- [${p.displayName}](${baseUrl}/${p.slug}.md${q}) — \`${p.slug}\`${note}`);
+    lines.push(`- [${p.displayName}](${baseUrl}/${p.slug}.md) — \`${p.slug}\`${note}`);
   }
   lines.push("");
   return lines.join("\n");

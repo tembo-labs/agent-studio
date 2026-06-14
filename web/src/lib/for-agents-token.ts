@@ -4,10 +4,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 // Signed, expiring token for the agent-facing /for-agents tool reference.
 //
-// The create-agent prompt sent to the Tembo Coding Agent (CAP) links to
-// `${origin}/for-agents/<provider>.md?key=<token>`. CAP fetches that URL to
-// learn a native MCP's exact tool slugs (it can't introspect the provider's
-// server and there's no central catalog). This token authorizes that read,
+// The create-agent prompt sent to the Tembo Coding Agent (CAP) tells it to
+// fetch `${origin}/for-agents/<provider>.md` with an `Authorization: Bearer
+// <token>` header to learn a native MCP's exact tool slugs (it can't introspect
+// the provider's server and there's no central catalog). This token authorizes that read,
 // scoped to one (workspace, user) and short-lived — it grants nothing but the
 // cached tool catalog (tool names + descriptions), so it's deliberately
 // low-privilege. Signed with BETTER_AUTH_SECRET (same key the OAuth state
@@ -85,4 +85,12 @@ export function verifyForAgentsToken(
   }
   if (payload.exp < nowSeconds) return null;
   return payload;
+}
+
+/** Pull the token out of an `Authorization: Bearer <token>` header value
+ *  (case-insensitive scheme). Returns null when absent or malformed. */
+export function bearerFromHeader(header: string | null): string | null {
+  if (!header) return null;
+  const m = /^Bearer[ ]+(.+)$/i.exec(header.trim());
+  return m ? m[1].trim() : null;
 }

@@ -350,18 +350,18 @@ function renderAvailableSlots(
 // Native-MCP slots block. Native connections must be declared with
 // `source: native-mcp`; their tool slugs aren't inlined (the catalogs are
 // large and provider-specific) — instead CAP fetches a per-provider reference
-// served by this TAS instance, authorized by a signed `?key=` token. Empty
-// slots, or a missing base/key, returns [].
+// served by this TAS instance, authorized by a signed bearer token sent in the
+// `Authorization` header. Empty slots, or a missing base/token, returns [].
 function renderNativeSlots(
   slots: AvailableConnectionSlots | undefined,
   baseUrl: string | undefined,
-  key: string | undefined,
+  token: string | undefined,
 ): string[] {
-  if (!slots || !baseUrl || !key) return [];
+  if (!slots || !baseUrl || !token) return [];
   const entries = Object.entries(slots).filter(([, names]) => names.length > 0);
   if (entries.length === 0) return [];
   entries.sort(([a], [b]) => a.localeCompare(b));
-  const q = `?key=${encodeURIComponent(key)}`;
+  const [firstProvider, firstNames] = entries[0];
   const lines: string[] = [
     "**Native MCP connection slots already authorized in this workspace:**",
     "",
@@ -369,7 +369,6 @@ function renderNativeSlots(
   for (const [provider, names] of entries) {
     lines.push(`- \`${provider}\`: ${names.map((n) => `\`${n}\``).join(", ")}`);
   }
-  const [firstProvider, firstNames] = entries[0];
   lines.push("");
   lines.push(
     "These talk to the provider's official MCP server. Declare them with",
@@ -378,13 +377,23 @@ function renderNativeSlots(
     "`source: native-mcp` and the existing slot name above. Before writing the",
   );
   lines.push(
-    "`tools:` list, fetch the provider's tool reference (lists the exact slugs)",
+    "`tools:` list, fetch the provider's tool reference (it lists the exact tool",
   );
-  lines.push("and narrow to what you need — one page per provider:");
+  lines.push(
+    "slugs) and narrow to what you need. Each page requires this HTTP header:",
+  );
+  lines.push("");
+  lines.push(`    Authorization: Bearer ${token}`);
+  lines.push("");
+  lines.push("Reference pages (one per provider):");
   lines.push("");
   for (const [provider] of entries) {
-    lines.push(`- \`${provider}\` → ${baseUrl}/${provider}.md${q}`);
+    lines.push(`- \`${provider}\` → ${baseUrl}/${provider}.md`);
   }
+  lines.push("");
+  lines.push(
+    `e.g. \`curl -H "Authorization: Bearer ${token}" ${baseUrl}/${firstProvider}.md\``,
+  );
   lines.push("");
   lines.push("Example:");
   lines.push("");
@@ -409,6 +418,15 @@ export function buildChatEditPrompt(args: {
   improvementMarker: string;
   commitMode: CommitMode;
   defaultBranch: string;
+  /** Composio toolkit → authorized slot names. Lets CAP add/reference real
+   *  slots when the edit touches `connections:`. */
+  availableSlots?: AvailableConnectionSlots;
+  /** Native-MCP provider slug → authorized slot names. */
+  nativeSlots?: AvailableConnectionSlots;
+  /** Origin + path of this instance's /for-agents reference. */
+  nativeToolsBaseUrl?: string;
+  /** Signed token CAP sends as `Authorization: Bearer` to the reference. */
+  nativeToolsKey?: string;
 }): string {
   const framework = frameworkFromAgentPath(args.agentPath);
   return [
@@ -424,6 +442,14 @@ export function buildChatEditPrompt(args: {
       args.improvementMarker,
     ),
     "",
+    // If the edit adds/changes a `connections:` entry, these tell CAP the real
+    // authorized slot names + where to look up native-MCP tool slugs.
+    ...renderAvailableSlots(args.availableSlots),
+    ...renderNativeSlots(
+      args.nativeSlots,
+      args.nativeToolsBaseUrl,
+      args.nativeToolsKey,
+    ),
     "## Requested change",
     args.improvement.trim(),
   ].join("\n");

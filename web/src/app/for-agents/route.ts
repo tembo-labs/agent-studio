@@ -2,7 +2,10 @@ import { type NextRequest } from "next/server";
 
 import { getPublicOrigin } from "@/lib/config";
 import { renderIndexMarkdown } from "@/lib/for-agents-markdown";
-import { verifyForAgentsToken } from "@/lib/for-agents-token";
+import {
+  bearerFromHeader,
+  verifyForAgentsToken,
+} from "@/lib/for-agents-token";
 import { listMcpProviders } from "@/lib/mcp-providers";
 import { listToolsForUser } from "@/lib/mcp-tools";
 
@@ -13,12 +16,12 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest): Promise<Response> {
-  const key = request.nextUrl.searchParams.get("key");
-  const payload = key
-    ? verifyForAgentsToken(key, Math.floor(Date.now() / 1000))
+  const token = bearerFromHeader(request.headers.get("authorization"));
+  const payload = token
+    ? verifyForAgentsToken(token, Math.floor(Date.now() / 1000))
     : null;
-  if (!key || !payload) {
-    return new Response("# Unauthorized\n\nMissing or invalid `?key=` token.", {
+  if (!payload) {
+    return new Response("# Unauthorized\n\nSend `Authorization: Bearer <token>`.", {
       status: 401,
       headers: { "content-type": "text/markdown; charset=utf-8" },
     });
@@ -30,7 +33,6 @@ export async function GET(request: NextRequest): Promise<Response> {
   );
   const md = renderIndexMarkdown(
     `${getPublicOrigin()}/for-agents`,
-    key,
     listMcpProviders(),
     connected,
   );
