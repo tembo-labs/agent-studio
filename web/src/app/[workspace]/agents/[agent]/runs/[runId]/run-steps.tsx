@@ -150,6 +150,17 @@ export function RunSteps({
               <span className="text-foreground-muted">out</span>
             </span>
           </div>
+          {/* Prompt-cache breakdown — shows caching is working and by how much.
+              `read` tokens billed at ~0.1x, `write` (one-time) at ~1.25x; the
+              `in` cost above already reflects those rates. */}
+          {(totalCacheRead > 0 || totalCacheWrite > 0) && (
+            <div className="text-foreground-muted whitespace-nowrap text-xs tabular-nums">
+              prompt cache: {abbreviateTokens(totalCacheRead)} read
+              {totalCacheWrite > 0
+                ? ` · ${abbreviateTokens(totalCacheWrite)} write`
+                : ""}
+            </div>
+          )}
           {/* Combined total — the headline number, larger. */}
           <div className="text-foreground whitespace-nowrap text-base font-semibold tabular-nums">
             {abbreviateTokens(totalInTokens + totalOut)}
