@@ -21,6 +21,50 @@ export type ChildRun = {
   createdAt: Date;
 };
 
+// Distinct tool names invoked across every sub-run a given run spawned via
+// trigger_run. The caller maps these to provider slugs (via the workspace
+// tool→provider table) to show which MCPs the sub-agents actually used —
+// the orchestrator's own connection row only lists its top-level MCPs.
+export async function listChildRunToolNames(
+  workspaceId: string,
+  parentRunId: string,
+): Promise<string[]> {
+  const { rows } = await db.query<{ tool_name: string }>(
+    `SELECT DISTINCT tc.tool_name
+       FROM run_tool_call tc
+       JOIN run r ON r.id = tc.run_id
+      WHERE r.workspace_id = $1 AND r.parent_run_id = $2`,
+    [workspaceId, parentRunId],
+  );
+  return rows.map((r) => r.tool_name);
+}
+
+// Distinct orchestrator → sub-agent edges across the workspace, derived from
+// the parent_run_id graph: an edge means some run of `parentAgentName` spawned
+// (via trigger_run) a run of `childAgentName`. The agents list uses these to
+// show, per orchestrator, which MCPs its sub-agents bring in. Self-edges
+// (an agent triggering itself) are excluded.
+export async function listAgentSubAgentEdges(
+  workspaceId: string,
+): Promise<{ parentAgentName: string; childAgentName: string }[]> {
+  const { rows } = await db.query<{
+    parent_agent: string;
+    child_agent: string;
+  }>(
+    `SELECT DISTINCT parent.agent_name AS parent_agent,
+            child.agent_name AS child_agent
+       FROM run child
+       JOIN run parent ON parent.id = child.parent_run_id
+      WHERE child.workspace_id = $1
+        AND parent.agent_name <> child.agent_name`,
+    [workspaceId],
+  );
+  return rows.map((r) => ({
+    parentAgentName: r.parent_agent,
+    childAgentName: r.child_agent,
+  }));
+}
+
 export async function listChildRuns(
   workspaceId: string,
   parentRunId: string,

@@ -3,10 +3,12 @@ import { notFound, redirect } from "next/navigation";
 
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
 import { agentDisplayName } from "@/lib/agent-format";
+import { toolkitLabel } from "@/lib/composio-label";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listPendingCreatesForWorkspace } from "@/lib/improvements-api";
+import { getMcpProvider } from "@/lib/mcp-providers";
 import { meetsMinRole } from "@/lib/rbac";
-import { listAgentSummaries30d } from "@/lib/runs-db";
+import { listAgentSubAgentEdges, listAgentSummaries30d } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { listAgents } from "@/lib/workspace-agents";
 import {
@@ -16,7 +18,11 @@ import {
   getWorkspaceSecretPreview,
 } from "@/lib/workspace";
 
-import { AgentsInventory, type InventoryAgent } from "./agents-inventory";
+import {
+  AgentsInventory,
+  type InventoryAgent,
+  type McpIcon,
+} from "./agents-inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +61,62 @@ export default async function WorkspacePage({
   const validNames = agentsResult.ok
     ? agentsResult.agents.filter((a) => a.ok).map((a) => a.spec.name)
     : [];
-  const summaries = await listAgentSummaries30d(workspace.id, validNames);
+  const [summaries, subAgentEdges] = await Promise.all([
+    listAgentSummaries30d(workspace.id, validNames),
+    listAgentSubAgentEdges(workspace.id),
+  ]);
+
+  // Per-agent top-level MCP icons, from each spec's declared connections
+  // (deduped by provider slug). Also drives the orchestrators' sub-agent
+  // rollup below.
+  const mcpsByAgent = new Map<string, McpIcon[]>();
+  if (agentsResult.ok) {
+    for (const a of agentsResult.agents) {
+      if (!a.ok || a.spec.framework !== "pydantic-agentspec") continue;
+      const seen = new Set<string>();
+      const icons: McpIcon[] = [];
+      for (const c of a.spec.connections) {
+        const slug = c.toolkit.trim().toLowerCase();
+        if (!slug || seen.has(slug)) continue;
+        seen.add(slug);
+        icons.push({
+          slug,
+          label:
+            c.source === "native-mcp"
+              ? (getMcpProvider(slug)?.displayName ?? toolkitLabel(slug))
+              : toolkitLabel(slug),
+        });
+      }
+      mcpsByAgent.set(a.spec.name, icons);
+    }
+  }
+
+  // Which sub-agents each orchestrator spawned (parent_run_id graph) → the
+  // union of those sub-agents' MCPs, minus the ones the orchestrator already
+  // declares itself. Lets the list show "top-level MCPs + sub-agent MCPs".
+  const subAgentNamesByParent = new Map<string, Set<string>>();
+  for (const e of subAgentEdges) {
+    let set = subAgentNamesByParent.get(e.parentAgentName);
+    if (!set) {
+      set = new Set<string>();
+      subAgentNamesByParent.set(e.parentAgentName, set);
+    }
+    set.add(e.childAgentName);
+  }
+  const subMcpsByAgent = new Map<string, McpIcon[]>();
+  for (const [parent, children] of subAgentNamesByParent) {
+    const own = new Set((mcpsByAgent.get(parent) ?? []).map((m) => m.slug));
+    const seen = new Set<string>();
+    const icons: McpIcon[] = [];
+    for (const child of children) {
+      for (const m of mcpsByAgent.get(child) ?? []) {
+        if (own.has(m.slug) || seen.has(m.slug)) continue;
+        seen.add(m.slug);
+        icons.push(m);
+      }
+    }
+    if (icons.length > 0) subMcpsByAgent.set(parent, icons);
+  }
 
   // Refresh pending creates' PR status (submitted → pr_opened → merged)
   // so the inventory reflects reality without a separate poll. The
@@ -112,6 +173,8 @@ export default async function WorkspacePage({
             detailHref: `/${workspace.slug}/agents/${encodeURIComponent(a.spec.name)}`,
             frameworkLabel: FRAMEWORK_LABELS[a.spec.framework],
             labels: a.spec.labels,
+            mcps: mcpsByAgent.get(a.spec.name) ?? [],
+            subMcps: subMcpsByAgent.get(a.spec.name) ?? [],
             model: a.spec.model ?? null,
             runs30d: s?.totalRuns30d ?? 0,
             succeeded30d: s?.succeeded30d ?? 0,

@@ -13,6 +13,7 @@ import { listWorkspaceToolProviders } from "@/lib/mcp-tools";
 import { getRun, type RunRecord } from "@/lib/runs-api";
 import {
   listChildRuns,
+  listChildRunToolNames,
   listStepsForRun,
   listToolCallsForRun,
 } from "@/lib/runs-db";
@@ -23,6 +24,7 @@ import { CopyOutputButton } from "./copy-output-button";
 import { ImproveForm } from "./improve-form";
 import { RunPoller } from "./run-poller";
 import { RunSteps } from "./run-steps";
+import { ToolProviderLogo } from "./tool-provider-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -56,12 +58,14 @@ export default async function RunDetailPage({
   // Tools the agent called during this run (pydantic only; empty otherwise),
   // plus the per-step token usage so we can attribute tokens to the model step
   // that fired each call.
-  const [toolCalls, steps, toolProviderRows, childRuns] = await Promise.all([
-    listToolCallsForRun(workspace.id, run.id),
-    listStepsForRun(workspace.id, run.id),
-    listWorkspaceToolProviders(workspace.id),
-    listChildRuns(workspace.id, run.id),
-  ]);
+  const [toolCalls, steps, toolProviderRows, childRuns, childToolNames] =
+    await Promise.all([
+      listToolCallsForRun(workspace.id, run.id),
+      listStepsForRun(workspace.id, run.id),
+      listWorkspaceToolProviders(workspace.id),
+      listChildRuns(workspace.id, run.id),
+      listChildRunToolNames(workspace.id, run.id),
+    ]);
 
   // tool_name → provider (slug for the logo + label for the tooltip). First
   // row wins on the rare slug collision across providers.
@@ -73,6 +77,21 @@ export default async function RunDetailPage({
         ? (getMcpProvider(t.provider)?.displayName ?? toolkitLabel(t.provider))
         : toolkitLabel(t.provider);
     toolProviders[t.slug] = { slug: t.provider, label };
+  }
+
+  // Which MCPs the sub-agents used: map each tool name the child runs invoked
+  // to its provider, deduped by provider slug. The orchestrator's own "Uses"
+  // row (in the agent layout) only lists its top-level connections, so this
+  // surfaces the providers reached one level down.
+  const subAgentProviders: { slug: string; label: string }[] = [];
+  {
+    const seen = new Set<string>();
+    for (const name of childToolNames) {
+      const p = toolProviders[name];
+      if (!p || seen.has(p.slug)) continue;
+      seen.add(p.slug);
+      subAgentProviders.push(p);
+    }
   }
 
   // Plain-text transcript for the copy button: each step's narration (and the
@@ -114,11 +133,28 @@ export default async function RunDetailPage({
     run.tokensInput !== null && run.tokensOutput !== null
       ? estimateRunCost(run.model, run.tokensInput, run.tokensOutput)
       : null;
-  // Sub-runs this run spawned via trigger_run. Roll their cost up so an
-  // orchestrator's page shows its true total, not just its own (small) cost.
+  // Prompt-cache breakdown lives per-step; sum it for the run header so the
+  // cache hit (read 0.1x) vs. write (1.25x) is visible without scanning steps.
+  const cacheReadTokens = steps.reduce(
+    (sum, s) => sum + (s.cacheReadTokens ?? 0),
+    0,
+  );
+  const cacheWriteTokens = steps.reduce(
+    (sum, s) => sum + (s.cacheWriteTokens ?? 0),
+    0,
+  );
+  const hasCache = cacheReadTokens > 0 || cacheWriteTokens > 0;
+  // Sub-runs this run spawned via trigger_run. Roll their tokens + cost up so
+  // an orchestrator's page shows its true total, not just its own (small) cost.
   const subRunsCost = childRuns.reduce((sum, c) => sum + (c.costUsd ?? 0), 0);
+  const subRunsTokens = childRuns.reduce(
+    (sum, c) => sum + (c.tokensInput ?? 0) + (c.tokensOutput ?? 0),
+    0,
+  );
   const grandTotalCost =
     childRuns.length > 0 ? (estimatedCost ?? 0) + subRunsCost : null;
+  const grandTotalTokens =
+    childRuns.length > 0 ? (totalTokens ?? 0) + subRunsTokens : null;
 
 
   return (
@@ -222,18 +258,63 @@ export default async function RunDetailPage({
               </dd>
             </div>
           )}
-          {grandTotalCost !== null && (
+          {hasCache && (
+            <div className="flex gap-3">
+              <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+                Prompt cache
+              </dt>
+              <dd className="text-foreground">
+                {formatTokens(cacheReadTokens)} read
+                <span className="text-foreground-weak">
+                  {" "}
+                  (0.1×)
+                </span>{" "}
+                · {formatTokens(cacheWriteTokens)} write
+                <span className="text-foreground-weak">
+                  {" "}
+                  (1.25×)
+                </span>
+              </dd>
+            </div>
+          )}
+          {grandTotalTokens !== null && (
             <div className="flex gap-3">
               <dt className="text-foreground-weak w-24 shrink-0 font-medium">
                 Combined
               </dt>
               <dd className="text-foreground">
-                ~{formatCurrency(grandTotalCost)}
+                {formatTokens(grandTotalTokens)} tokens
+                {grandTotalCost !== null && (
+                  <span className="text-foreground-weak">
+                    {" "}
+                    (~{formatCurrency(grandTotalCost)})
+                  </span>
+                )}
                 <span className="text-foreground-weak">
                   {" "}
-                  (this run + {childRuns.length} sub-run
-                  {childRuns.length === 1 ? "" : "s"})
+                  · this run + {childRuns.length} sub-run
+                  {childRuns.length === 1 ? "" : "s"}
                 </span>
+              </dd>
+            </div>
+          )}
+          {subAgentProviders.length > 0 && (
+            <div className="flex gap-3">
+              <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+                Sub-agents use
+              </dt>
+              <dd className="flex flex-wrap items-center gap-1.5">
+                {subAgentProviders.map((p) => (
+                  <span
+                    key={p.slug}
+                    className="bg-surface-raised border-border inline-flex shrink-0 items-center gap-1.5 rounded-md border py-0.5 pl-1 pr-2"
+                  >
+                    <ToolProviderLogo providerSlug={p.slug} title={p.label} />
+                    <span className="text-foreground-weak text-xs">
+                      {p.label}
+                    </span>
+                  </span>
+                ))}
               </dd>
             </div>
           )}
@@ -263,8 +344,8 @@ export default async function RunDetailPage({
       )}
 
       {/* Runs this one spawned via trigger_run (an orchestrator fanning work
-          out to per-source agents). Their cost is rolled into "Combined"
-          above; this lists each one with a link to its own run page. */}
+          out to per-source agents). Each links to its own run page; the Total
+          footer rolls this run + every sub-run into one tokens + cost figure. */}
       {childRuns.length > 0 && (
         <Section title={`Sub-runs (${childRuns.length})`}>
           <ul className="divide-y divide-[var(--color-border-weak)]">
@@ -303,6 +384,28 @@ export default async function RunDetailPage({
                 </li>
               );
             })}
+            {/* Total = this orchestrating run + every sub-run it spawned. */}
+            <li className="flex items-center justify-between gap-3 border-t-2 border-[var(--color-border)] px-1 py-2">
+              <span className="text-foreground font-medium">
+                Total
+                <span className="text-foreground-weak font-normal">
+                  {" "}
+                  (this run + {childRuns.length} sub-run
+                  {childRuns.length === 1 ? "" : "s"})
+                </span>
+              </span>
+              <span className="text-foreground shrink-0 font-medium">
+                {grandTotalTokens !== null && (
+                  <>{formatTokens(grandTotalTokens)} tokens</>
+                )}
+                {grandTotalCost !== null && (
+                  <span className="text-foreground-weak font-normal">
+                    {" "}
+                    (~{formatCurrency(grandTotalCost)})
+                  </span>
+                )}
+              </span>
+            </li>
           </ul>
         </Section>
       )}
