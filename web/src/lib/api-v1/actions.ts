@@ -63,6 +63,9 @@ export type TriggerRunInput = {
   agent: string;
   message?: string;
   preferDraft?: boolean;
+  /** The run that triggered this one (set when called from /mcp inside a run),
+   *  recorded on the new run so the parent can roll up its sub-runs' cost. */
+  parentRunId?: string;
 };
 
 export async function triggerRun(
@@ -106,6 +109,7 @@ export async function triggerRun(
       trigger: "manual",
       agentVersionId: r.versionId,
       agentVersionLabel: r.versionLabel,
+      parentRunId: input.parentRunId,
     });
     return { ok: true, runId: res.runId };
   } catch (err) {

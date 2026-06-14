@@ -73,6 +73,11 @@ pub struct CreateRunRequest {
     /// Human label for the version ("v3" | "draft"), shown in the runs UI.
     #[serde(default)]
     pub agent_version_label: Option<String>,
+    /// The run that triggered this one (an orchestrator's run id), when this
+    /// run was started via the tembo-agent-studio MCP `trigger_run` tool from
+    /// inside another run. Lets the parent's page roll up sub-run costs.
+    #[serde(default)]
+    pub parent_run_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize)]
@@ -103,8 +108,8 @@ pub async fn create_run(
         r#"INSERT INTO run
             (id, workspace_id, agent_name, agent_path, model, status,
              created_by, user_message, trigger, automation_id,
-             agent_version_id, agent_version_label)
-            VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8, $9, $10, $11)"#,
+             agent_version_id, agent_version_label, parent_run_id)
+            VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8, $9, $10, $11, $12)"#,
     )
     .bind(run_id)
     .bind(req.workspace_id)
@@ -117,6 +122,7 @@ pub async fn create_run(
     .bind(req.automation_id)
     .bind(req.agent_version_id)
     .bind(&req.agent_version_label)
+    .bind(req.parent_run_id)
     .execute(&state.db)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("db insert: {e}")))?;

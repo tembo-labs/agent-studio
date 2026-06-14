@@ -35,7 +35,10 @@ export async function POST(request: NextRequest): Promise<Response> {
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });
-  const server = buildMcpServer(auth);
+  // Set by the runner when an agent calls /mcp from inside its own run, so
+  // trigger_run can record that run as the parent of the run it spawns.
+  const parentRunId = request.headers.get("x-tas-parent-run") ?? undefined;
+  const server = buildMcpServer(auth, { parentRunId });
   await server.connect(transport);
   return transport.handleRequest(request);
 }

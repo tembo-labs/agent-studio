@@ -11,7 +11,11 @@ import { toolkitLabel } from "@/lib/composio-label";
 import { getMcpProvider } from "@/lib/mcp-providers";
 import { listWorkspaceToolProviders } from "@/lib/mcp-tools";
 import { getRun, type RunRecord } from "@/lib/runs-api";
-import { listStepsForRun, listToolCallsForRun } from "@/lib/runs-db";
+import {
+  listChildRuns,
+  listStepsForRun,
+  listToolCallsForRun,
+} from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, isTemboConfigured } from "@/lib/workspace";
 
@@ -52,10 +56,11 @@ export default async function RunDetailPage({
   // Tools the agent called during this run (pydantic only; empty otherwise),
   // plus the per-step token usage so we can attribute tokens to the model step
   // that fired each call.
-  const [toolCalls, steps, toolProviderRows] = await Promise.all([
+  const [toolCalls, steps, toolProviderRows, childRuns] = await Promise.all([
     listToolCallsForRun(workspace.id, run.id),
     listStepsForRun(workspace.id, run.id),
     listWorkspaceToolProviders(workspace.id),
+    listChildRuns(workspace.id, run.id),
   ]);
 
   // tool_name → provider (slug for the logo + label for the tooltip). First
@@ -109,6 +114,11 @@ export default async function RunDetailPage({
     run.tokensInput !== null && run.tokensOutput !== null
       ? estimateRunCost(run.model, run.tokensInput, run.tokensOutput)
       : null;
+  // Sub-runs this run spawned via trigger_run. Roll their cost up so an
+  // orchestrator's page shows its true total, not just its own (small) cost.
+  const subRunsCost = childRuns.reduce((sum, c) => sum + (c.costUsd ?? 0), 0);
+  const grandTotalCost =
+    childRuns.length > 0 ? (estimatedCost ?? 0) + subRunsCost : null;
 
 
   return (
@@ -212,6 +222,21 @@ export default async function RunDetailPage({
               </dd>
             </div>
           )}
+          {grandTotalCost !== null && (
+            <div className="flex gap-3">
+              <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+                Combined
+              </dt>
+              <dd className="text-foreground">
+                ~{formatCurrency(grandTotalCost)}
+                <span className="text-foreground-weak">
+                  {" "}
+                  (this run + {childRuns.length} sub-run
+                  {childRuns.length === 1 ? "" : "s"})
+                </span>
+              </dd>
+            </div>
+          )}
         </dl>
       </div>
 
@@ -234,6 +259,51 @@ export default async function RunDetailPage({
             toolProviders={toolProviders}
             live={isLive}
           />
+        </Section>
+      )}
+
+      {/* Runs this one spawned via trigger_run (an orchestrator fanning work
+          out to per-source agents). Their cost is rolled into "Combined"
+          above; this lists each one with a link to its own run page. */}
+      {childRuns.length > 0 && (
+        <Section title={`Sub-runs (${childRuns.length})`}>
+          <ul className="divide-y divide-[var(--color-border-weak)]">
+            {childRuns.map((child) => {
+              const childTokens =
+                child.tokensInput !== null && child.tokensOutput !== null
+                  ? child.tokensInput + child.tokensOutput
+                  : null;
+              return (
+                <li key={child.id}>
+                  <Link
+                    href={`/${workspace.slug}/agents/${encodeURIComponent(
+                      child.agentName,
+                    )}/runs/${child.id}`}
+                    className="hover:bg-background-weak flex items-center justify-between gap-3 px-1 py-2"
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <span className="text-foreground truncate font-medium">
+                        {child.agentName}
+                      </span>
+                      <span
+                        className={`${STATUS_TEXT_TONE[child.status]} text-sm`}
+                      >
+                        {STATUS_LABELS[child.status]}
+                      </span>
+                    </span>
+                    <span className="text-foreground-weak shrink-0 text-sm">
+                      {childTokens !== null && (
+                        <>{formatTokens(childTokens)} tokens</>
+                      )}
+                      {child.costUsd !== null && (
+                        <> (~{formatCurrency(child.costUsd)})</>
+                      )}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </Section>
       )}
 
