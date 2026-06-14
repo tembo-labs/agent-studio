@@ -682,6 +682,74 @@ Then have the user re-authorize: open Connections, click **Connect**
 on the Attio row in the "Native MCP connections" section. The old
 Composio Attio connection can be disconnected separately.
 
+### Orchestration — fan work out to sub-agents (preferred for multi-source / multi-step jobs)
+
+When a job pulls from several sources or does several independent
+subtasks (e.g. "round up my open tasks across Linear, Attio, and
+Pylon"), **prefer a thin orchestrator agent that fans the work out to
+focused sub-agents** over one agent that holds every connection's
+tools and accumulates all their output in a single context. The
+orchestrator does this through the \`tembo-agent-studio\` Native MCP
+connection — TAS's own MCP server, which exposes tools to drive the
+studio itself:
+
+\`\`\`yaml
+# Orchestrator
+connections:
+  - { type: tembo-agent-studio, source: native-mcp, name: default,
+      tools: [list_connections, trigger_run, get_run] }
+retries: 2
+instructions: |
+  1. Call list_connections to see which sources the user has connected.
+  2. For each connected source, trigger_run the matching sub-agent
+     (e.g. linear-tasks, attio-tasks). Skip sources that aren't connected.
+  3. Poll get_run until each finishes; parse each sub-agent's structured
+     output and merge the results.
+output_schema: { … merged result … }
+\`\`\`
+
+Each sub-agent is a normal single-purpose agent with its own narrow
+connection and an \`output_schema\` so the orchestrator can parse its
+result:
+
+\`\`\`yaml
+# Sub-agent: linear-tasks
+connections:
+  - linear: { name: default, tools: [LINEAR_LIST_ISSUES] }
+output_schema:
+  type: object
+  properties:
+    source: { type: string }
+    tasks:
+      type: array
+      items:
+        type: object
+        properties: { title: {type: string}, status: {type: string}, url: {type: string} }
+\`\`\`
+
+Why this is the default for these jobs:
+- **Context stays small + cheap.** Each sub-agent loads only its own
+  source's tools and sees only its own output. The orchestrator never
+  accumulates every source's tool schemas + raw data in one growing
+  context — the cost that pattern avoids is real (10×+ on input tokens).
+- **More reliable.** A failure or retry is isolated to one sub-agent;
+  the orchestrator keeps the others.
+- **Costs roll up.** Runs spawned via \`trigger_run\` are linked to the
+  orchestrator's run, so its run page shows each sub-run's tokens + cost
+  and a combined total — you don't lose visibility by splitting.
+
+**Reuse sub-agents whenever one already fits.** Before writing a new
+sub-agent, check the repo (and \`list_connections\`) for an existing
+single-purpose agent that already does the subtask, and have the
+orchestrator \`trigger_run\` that one. Only create a new sub-agent when
+none fits. Keep each sub-agent single-purpose and source-scoped so it's
+reusable across orchestrators rather than duplicated per job.
+
+Make the orchestrator resilient to the user's actual setup: call
+\`list_connections\` first and only \`trigger_run\` sub-agents whose
+source is connected — don't assume every source exists, and don't
+hard-code a slot name the user may not have authorized.
+
 ### retries
 
 Integer or struct. Default behavior is provider-determined. Set
@@ -728,6 +796,11 @@ for production agents.
   (string output) + generous \`max_tokens\` (4096+).
 - **Multi-step reasoner** → add \`capabilities: [Thinking: { effort:
   high }]\` and a permissive \`max_tokens\`.
+- **Orchestrator / multi-source roundup** → a thin agent with the
+  \`tembo-agent-studio\` Native MCP connection (\`list_connections\`,
+  \`trigger_run\`, \`get_run\`) that fans out to focused, reusable
+  sub-agents and merges their structured output. See "Orchestration"
+  above — prefer this over one agent holding every source's tools.
 
 ## Quick reference: minimal valid file
 
