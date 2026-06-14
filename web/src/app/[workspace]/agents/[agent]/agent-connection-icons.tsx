@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { IconApiConnection } from "central-icons";
 
+import { mcpLogoUrl } from "@/lib/mcp-logo";
+
 // A compact row of the external services an agent uses, shown near the top of
 // the agent detail page. Every icon — Composio, Native MCP, or a Secret —
 // borrows its logo from Composio's public logo library
@@ -53,7 +55,7 @@ function ConnectionIcon({ item }: { item: ConnectionIconItem }) {
           // Composio's logo CDN; broken/unknown slugs swap to the fallback.
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={`https://logos.composio.dev/api/${encodeURIComponent(item.slug.toLowerCase())}`}
+            src={mcpLogoUrl(item.slug)}
             alt=""
             aria-hidden
             className="h-4 w-4 object-contain"

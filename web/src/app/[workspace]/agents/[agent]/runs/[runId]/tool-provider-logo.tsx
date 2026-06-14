@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { IconApiConnection } from "central-icons";
 
+import { mcpLogoUrl } from "@/lib/mcp-logo";
+
 // Small provider logo shown next to a tool call in the step view. Borrows the
 // same Composio logo CDN the agent-page connection icons use (provider slugs
 // like "attio", "linear", "slack" all resolve there); falls back to a generic
@@ -26,7 +28,7 @@ export function ToolProviderLogo({
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={`https://logos.composio.dev/api/${encodeURIComponent(providerSlug.toLowerCase())}`}
+          src={mcpLogoUrl(providerSlug)}
           alt=""
           aria-hidden
           className="h-4 w-4 object-contain"
