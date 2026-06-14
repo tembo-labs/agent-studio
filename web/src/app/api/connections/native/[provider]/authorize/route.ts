@@ -173,6 +173,7 @@ type AuthServerMetadata = {
   registration_endpoint?: string;
   token_endpoint_auth_methods_supported?: string[];
   code_challenge_methods_supported?: string[];
+  grant_types_supported?: string[];
 };
 
 type DcrResponse = {
@@ -335,6 +336,22 @@ export async function GET(
       provider.slug,
       `${provider.displayName} authorization server is missing required endpoints.`,
     );
+  }
+  // Ask for a refresh token when the provider can mint one. A server that
+  // supports the `refresh_token` grant typically only ISSUES a refresh_token
+  // when the client also requests the OIDC `offline_access` scope (the
+  // resource's own scopes_supported rarely lists it). Without it the access
+  // token expires — e.g. Dialed's ~3h — and the refresh-before-use sweep has
+  // nothing to renew, so the next run 401s. Only for DCR (public) providers:
+  // manual (BYO-app) providers like HubSpot use their own scope vocabulary and
+  // already mint refresh tokens, so an unknown `offline_access` could break
+  // their connect. Gate on the advertised grant, and never duplicate it.
+  if (
+    !isManual &&
+    (asMeta.grant_types_supported ?? []).includes("refresh_token") &&
+    !scopes.includes("offline_access")
+  ) {
+    scopes.push("offline_access");
   }
   let authorizationEndpoint: URL;
   let tokenEndpoint: URL;
