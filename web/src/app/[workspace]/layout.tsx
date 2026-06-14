@@ -4,6 +4,10 @@ import { notFound, redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/toaster";
+import {
+  buildConnectionSlotSets,
+  isAgentConnectionMissing,
+} from "@/lib/connection-checks";
 import { listConnectionsForUser } from "@/lib/composio-connections";
 import { listNativeConnectionsForUser } from "@/lib/connections";
 import { listSecretConnections } from "@/lib/secret-connections";
@@ -115,25 +119,18 @@ export default async function WorkspaceLayout({
   // workspace's first job is obvious.
   const hasLlmProvider = anthropicKey !== null || openaiKey !== null;
   const switcherList = workspaces.map((w) => ({ slug: w.slug, name: w.name }));
-  // Two parallel slot sets — one per substrate. An agent's
-  // `connections:` entry dispatches by its `source:` field, so a
-  // native-mcp entry checks myNativeSlots and a composio entry
-  // checks mySlots. Mixing them up was the bug that surfaced "Attio
-  // for pipeline-report Connect" in the sidebar even after the user
-  // had authorized Native MCP Attio.
-  const mySlots = new Set(
-    myConnections
-      .filter((c) => c.status === "ACTIVE")
-      .map((c) => `${c.toolkit}:${c.name}`),
+  // Slot inventory + the missing-slot predicate are shared with the run-blocking
+  // pre-flight (findMissingConnections) so the sidebar and the runtime agree —
+  // crucially including the native single-connection fallback (an agent pins a
+  // slot by name, but a user with exactly one connection for that provider runs
+  // fine regardless of the name, so it isn't "missing"). They drifted before:
+  // the sidebar lacked the fallback and nagged "Attio (tembo) Connect" even
+  // though the agent ran.
+  const slotSets = buildConnectionSlotSets(
+    myConnections,
+    myNativeConnections,
+    workspaceSecrets,
   );
-  const myNativeSlots = new Set(
-    myNativeConnections
-      .filter((c) => c.status === "active")
-      .map((c) => `${c.type}:${c.name}`),
-  );
-  // Secrets are workspace-level (one shared key), not per-user — so the
-  // "missing" check is against the workspace's set, keyed by slug alone.
-  const workspaceSecretSlugs = new Set(workspaceSecrets.map((s) => s.slug));
   const missingConnections: {
     toolkit: string;
     name: string;
@@ -148,27 +145,16 @@ export default async function WorkspaceLayout({
         const toolkit = conn.toolkit.trim().toLowerCase();
         const name = conn.name.trim().toLowerCase() || "default";
         if (!toolkit) continue;
-        if (conn.source === "secret") {
-          // Workspace-level: present if any admin set a secret with this slug.
-          if (!workspaceSecretSlugs.has(toolkit)) {
-            missingConnections.push({
-              toolkit,
-              name: "default",
-              agentName: a.spec.name,
-              source: "secret",
-            });
-          }
+        if (!isAgentConnectionMissing(conn.source, toolkit, name, slotSets)) {
           continue;
         }
-        const slots = conn.source === "native-mcp" ? myNativeSlots : mySlots;
-        if (!slots.has(`${toolkit}:${name}`)) {
-          missingConnections.push({
-            toolkit,
-            name,
-            agentName: a.spec.name,
-            source: conn.source,
-          });
-        }
+        missingConnections.push({
+          toolkit,
+          // Secrets are workspace-level (one shared key); normalize the slot.
+          name: conn.source === "secret" ? "default" : name,
+          agentName: a.spec.name,
+          source: conn.source,
+        });
       }
     }
   }
