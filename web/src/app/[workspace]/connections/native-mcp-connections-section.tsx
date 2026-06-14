@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LocalTime } from "@/components/local-time";
+import { McpProviderLogo } from "@/components/mcp-provider-logo";
 import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,7 +103,12 @@ export function NativeMcpConnectionsSection({
                 className="flex items-baseline justify-between gap-3 px-3 py-3"
               >
                 <div className="flex min-w-0 flex-col gap-1">
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-center gap-2">
+                    <McpProviderLogo
+                      slug={provider.slug}
+                      label={provider.displayName}
+                      size={18}
+                    />
                     <span className="text-foreground text-sm font-medium">
                       {provider.displayName}
                     </span>
@@ -162,7 +168,12 @@ function ProviderRow({
     return (
       <li className="flex items-baseline justify-between gap-3 px-3 py-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-center gap-2">
+            <McpProviderLogo
+              slug={provider.slug}
+              label={provider.displayName}
+              size={18}
+            />
             <span className="text-foreground text-sm font-medium">
               {provider.displayName}
             </span>
@@ -205,7 +216,12 @@ function ProviderRow({
   return (
     <li className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 flex-col gap-2">
-        <div className="flex flex-wrap items-baseline gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <McpProviderLogo
+            slug={provider.slug}
+            label={provider.displayName}
+            size={18}
+          />
           <span className="text-foreground text-sm font-medium">
             {provider.displayName}
           </span>
