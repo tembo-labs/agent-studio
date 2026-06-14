@@ -19,6 +19,7 @@ import {
   NativeMcpConnectionsSection,
   type ManualConnectTarget,
 } from "../native-mcp-connections-section";
+import { RemoveDefunctNativeForm } from "../remove-defunct-native-form";
 
 export const dynamic = "force-dynamic";
 
@@ -161,8 +162,29 @@ export default async function NativeMcpConnectionsPage({
         }
       : undefined;
 
+  // Active connections to a provider no longer in the catalog (e.g. the old
+  // `tembo` self-key connection after the rename). They don't render as cards,
+  // so surface a one-click cleanup. Only for your own connections — the action
+  // clears the acting user's rows, not the member you're viewing.
+  const catalogSlugs = new Set(nativeCatalog.map((p) => p.slug));
+  const defunctSlugs = view.viewingOther
+    ? []
+    : [
+        ...new Set(
+          nativeConnections
+            .filter((c) => c.status === "active" && !catalogSlugs.has(c.type))
+            .map((c) => c.type),
+        ),
+      ];
+
   return (
     <>
+      {defunctSlugs.length > 0 && (
+        <RemoveDefunctNativeForm
+          workspaceSlug={workspace.slug}
+          defunctSlugs={defunctSlugs}
+        />
+      )}
       {view.viewingOther && view.viewedMember && (
         <div className="border-border bg-surface-secondary rounded-lg border px-3 py-2 text-sm">
           <span className="text-foreground-weak">

@@ -10,6 +10,7 @@ import {
   deleteNativeConnection,
   getNativeConnectionById,
   getNativeConnectionCredentials,
+  listNativeConnectionsForUser,
   renameNativeConnection,
 } from "@/lib/connections";
 import {
@@ -17,6 +18,7 @@ import {
   renameToolsForConnection,
   replaceToolsForConnection,
 } from "@/lib/mcp-tools";
+import { getMcpProvider } from "@/lib/mcp-providers";
 import { fetchNativeMcpTools } from "@/lib/native-mcp-tools";
 
 // Server actions for native-MCP connection rows. Read-paths live on
@@ -64,12 +66,10 @@ export async function disconnectNativeMcpConnectionAction(
   if (!ok) return { error: "Connection no longer exists." };
 
   // Self-key (Tembo) rows own a minted tas_ API key — revoke it so the
-  // credential can't outlive the connection. Other providers' tokens live
-  // only inside the now-deleted row, so there's nothing extra to revoke.
-  if (
-    row.type === "tembo-agent-studio" &&
-    typeof row.metadata.api_key_id === "string"
-  ) {
+  // credential can't outlive the connection. Keyed on `api_key_id` in metadata
+  // (only self-key connections have it) rather than the provider slug, so a
+  // renamed/defunct provider's leftover key still gets revoked.
+  if (typeof row.metadata.api_key_id === "string") {
     await deleteApiKey(workspace.id, row.metadata.api_key_id);
   }
 
@@ -248,4 +248,58 @@ export async function renameNativeMcpConnectionAction(
 
   revalidatePath(`/${slug}/connections`, "layout");
   return { message: "Connection renamed." };
+}
+
+/**
+ * Remove the acting user's "defunct" native-MCP connections — rows whose
+ * provider slug is no longer in the catalog (e.g. the old `tembo` self-key
+ * connection after the rename to `tembo-agent-studio`). Those rows don't render
+ * on the Connections page (no matching catalog provider) so they can't be
+ * disconnected the normal way, yet they still leak into the create-agent prompt
+ * and keep a minted tas_ key alive. This deletes them, revokes any self-key
+ * API key, and drops their cached tools. Operator+ (own connections).
+ */
+export async function removeDefunctNativeConnectionsAction(
+  _prev: SimpleConnectionActionState,
+  formData: FormData,
+): Promise<SimpleConnectionActionState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+
+  const connections = await listNativeConnectionsForUser(workspace.id, userId);
+  const defunct = connections.filter((c) => !getMcpProvider(c.type));
+  if (defunct.length === 0) return { message: "No defunct connections to remove." };
+
+  for (const row of defunct) {
+    await deleteNativeConnection(workspace.id, row.id);
+    if (typeof row.metadata.api_key_id === "string") {
+      await deleteApiKey(workspace.id, row.metadata.api_key_id);
+    }
+    await deleteToolsForConnection({
+      workspaceId: workspace.id,
+      userId: row.userId,
+      source: "native-mcp",
+      provider: row.type,
+      connectionName: row.name,
+    });
+    await writeAuditEvent({
+      workspaceId: workspace.id,
+      actorUserId: userId,
+      source: "human_action",
+      kind: "connection.disconnected",
+      targetType: "connection",
+      targetId: row.id,
+      agentName: null,
+      payload: { provider: row.type, name: row.name, source: "native-mcp", defunct: true },
+    });
+  }
+
+  revalidatePath(`/${slug}/connections`, "layout");
+  const names = defunct.map((c) => c.type).join(", ");
+  return { message: `Removed ${defunct.length} defunct connection(s): ${names}.` };
 }
