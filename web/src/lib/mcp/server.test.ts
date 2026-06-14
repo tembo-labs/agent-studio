@@ -22,13 +22,19 @@ vi.mock("@/lib/api-v1/actions", () => ({
   createSlackAppFor: vi.fn(),
   updateSlackAppFor: vi.fn(),
   deleteSlackAppFor: vi.fn(),
+  sendSlackMessageFor: vi.fn(),
 }));
 
 import { buildMcpServer, type McpContext } from "./server";
 import { getAgentByName, listAgents } from "@/lib/workspace-agents";
 import { getRun } from "@/lib/runs-api";
 import { listRunsForWorkspace } from "@/lib/runs-db";
-import { createSlackAppFor, triggerRun, validateSpec } from "@/lib/api-v1/actions";
+import {
+  createSlackAppFor,
+  sendSlackMessageFor,
+  triggerRun,
+  validateSpec,
+} from "@/lib/api-v1/actions";
 import type { WorkspaceRole } from "@/lib/rbac";
 
 const mockListAgents = vi.mocked(listAgents);
@@ -38,6 +44,7 @@ const mockListRuns = vi.mocked(listRunsForWorkspace);
 const mockTriggerRun = vi.mocked(triggerRun);
 const mockValidate = vi.mocked(validateSpec);
 const mockCreateSlackApp = vi.mocked(createSlackAppFor);
+const mockSendSlackMessage = vi.mocked(sendSlackMessageFor);
 
 function makeCtx(role: WorkspaceRole = "operator"): McpContext {
   return {
@@ -100,6 +107,7 @@ describe("buildMcpServer", () => {
       "list_slack_apps",
       "list_tools",
       "request_agent_change",
+      "send_slack_message",
       "trigger_run",
       "update_slack_app",
       "validate_agent_spec",
@@ -277,6 +285,38 @@ describe("buildMcpServer", () => {
     })) as { isError?: boolean; content: { text: string }[] };
     expect(res.isError).toBe(true);
     expect(res.content[0].text).toBe("missing connection");
+  });
+
+  it("send_slack_message is denied for a viewer (operator-only) and never calls the action", async () => {
+    const client = await connectedClientFor(makeCtx("viewer"));
+    const res = (await client.callTool({
+      name: "send_slack_message",
+      arguments: { text: "hi", toEmail: "a@b.com" },
+    })) as { isError?: boolean; content: { text: string }[] };
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/operator/i);
+    expect(mockSendSlackMessage).not.toHaveBeenCalled();
+  });
+
+  it("send_slack_message as operator delegates and returns the result", async () => {
+    mockSendSlackMessage.mockResolvedValue({
+      ok: true,
+      channel: "U123",
+      ts: "1700000000.000100",
+    });
+    const client = await connectedClientFor(makeCtx("operator"));
+    const res = (await client.callTool({
+      name: "send_slack_message",
+      arguments: { text: "ping", toEmail: "a@b.com", slackApp: "Helper" },
+    })) as { content: { text: string }[] };
+    expect(mockSendSlackMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "operator" }),
+      expect.objectContaining({ text: "ping", toEmail: "a@b.com", slackApp: "Helper" }),
+    );
+    expect(JSON.parse(res.content[0].text)).toMatchObject({
+      sent: true,
+      channel: "U123",
+    });
   });
 
   it("create_slack_app is denied for an operator (admin-only) and never calls the action", async () => {

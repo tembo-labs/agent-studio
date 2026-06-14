@@ -115,3 +115,18 @@ export async function getUserEmail(
   if (!res.ok) return null;
   return res.user?.profile?.email ?? null;
 }
+
+/** Resolve an email to its Slack user id (so we can DM them). Returns null
+ *  when no workspace member has that email. Needs the `users:read.email`
+ *  scope — same one getUserEmail relies on. */
+export async function lookupUserByEmail(
+  token: string,
+  email: string,
+): Promise<string | null> {
+  const res = await call<{ user?: { id?: string } }>(
+    "users.lookupByEmail",
+    token,
+    { email },
+  );
+  return res.ok ? (res.user?.id ?? null) : null;
+}

@@ -9,6 +9,7 @@ import {
   createSlackAppFor,
   deleteSlackAppFor,
   requestAgentChange,
+  sendSlackMessageFor,
   triggerRun,
   updateSlackAppFor,
   validateSpec,
@@ -321,6 +322,46 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       const res = await requestAgentChange(ctx, { description, agent, name, framework });
       if (!res.ok) return errorResult(res.error);
       return json(res.result);
+    },
+  );
+
+  server.registerTool(
+    "send_slack_message",
+    {
+      description:
+        "Send a Slack message from one of this workspace's Slack apps — the way " +
+        "to actually notify a person. DM someone by `toEmail` (they get a real " +
+        "DM + notification), or post to a channel by `channel` (Slack id). This " +
+        "is NOT the Composio Slack tool, whose 'DM' posts to the bot's own " +
+        "account where nobody sees it. Provide exactly one of toEmail / channel.",
+      inputSchema: {
+        text: z.string().describe("The message text (Slack mrkdwn)."),
+        toEmail: z
+          .string()
+          .optional()
+          .describe("DM this person by email (resolved to their Slack user)."),
+        channel: z
+          .string()
+          .optional()
+          .describe("Or post to this Slack channel/user id (e.g. C0123, U0123)."),
+        slackApp: z
+          .string()
+          .optional()
+          .describe("Which Slack app to send from (by name); optional if one."),
+        threadTs: z.string().optional().describe("Reply under this thread ts."),
+      },
+    },
+    async ({ text, toEmail, channel, slackApp, threadTs }) => {
+      if (!isOperator) return operatorOnly();
+      const res = await sendSlackMessageFor(ctx, {
+        text,
+        toEmail,
+        channel,
+        slackApp,
+        threadTs,
+      });
+      if (!res.ok) return errorResult(res.error);
+      return json({ sent: true, channel: res.channel, ts: res.ts });
     },
   );
 

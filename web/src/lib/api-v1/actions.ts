@@ -13,9 +13,12 @@ import {
   createSlackApp,
   deleteSlackApp,
   getSlackApp,
+  getSlackAppSecrets,
+  listSlackApps,
   updateSlackApp,
   type SlackApp,
 } from "@/lib/slack-apps";
+import { lookupUserByEmail, postMessage } from "@/lib/slack-api";
 import {
   buildChatEditPrompt,
   buildCreateAgentPrompt,
@@ -540,4 +543,109 @@ export async function deleteSlackAppFor(
   if (!existing) return { ok: false, status: 404, error: "slack app not found" };
   await deleteSlackApp(ctx.workspace.id, id);
   return { ok: true };
+}
+
+export type SendSlackMessageApiInput = {
+  text: string;
+  /** DM target: a person's email (resolved to a real DM with a notification). */
+  toEmail?: string;
+  /** Or post to a channel/user by Slack id (e.g. "C0123", "U0123"). */
+  channel?: string;
+  /** Which Slack app to send from (by name). Optional when the workspace has
+   *  exactly one installed app. */
+  slackApp?: string;
+  /** Reply in a thread instead of a top-level message. */
+  threadTs?: string;
+};
+
+/**
+ * Send a Slack message from one of the workspace's TAS-managed Slack apps —
+ * the way to actually notify a person. (Composio's Slack "DM" posts to the
+ * bot's own connected account, which the human never sees.) DMs by email or
+ * posts to a channel. Returns the sent message's channel + ts.
+ */
+export async function sendSlackMessageFor(
+  ctx: ApiCtx,
+  input: SendSlackMessageApiInput,
+): Promise<
+  { ok: true; channel: string; ts: string | null } | ActionFailure
+> {
+  const text = input.text?.trim();
+  if (!text) return { ok: false, status: 400, error: "`text` is required" };
+  const hasEmail = !!input.toEmail?.trim();
+  const hasChannel = !!input.channel?.trim();
+  if (hasEmail === hasChannel) {
+    return {
+      ok: false,
+      status: 400,
+      error: "provide exactly one of `toEmail` or `channel`",
+    };
+  }
+
+  // Resolve which Slack app to send from.
+  const installed = (await listSlackApps(ctx.workspace.id)).filter(
+    (a) => a.status === "installed" && a.hasBotToken,
+  );
+  if (installed.length === 0) {
+    return {
+      ok: false,
+      status: 409,
+      error:
+        "no installed Slack app in this workspace — finish the OAuth install under Settings → Slack apps first",
+    };
+  }
+  let app: SlackApp;
+  const wanted = input.slackApp?.trim();
+  if (wanted) {
+    const match = installed.find(
+      (a) => a.name.toLowerCase() === wanted.toLowerCase(),
+    );
+    if (!match) {
+      return { ok: false, status: 404, error: `no installed Slack app named "${wanted}"` };
+    }
+    app = match;
+  } else if (installed.length === 1) {
+    app = installed[0];
+  } else {
+    return {
+      ok: false,
+      status: 400,
+      error: `multiple Slack apps installed — pass \`slackApp\` (one of: ${installed
+        .map((a) => a.name)
+        .join(", ")})`,
+    };
+  }
+
+  const secrets = await getSlackAppSecrets(app.id);
+  if (!secrets?.botToken) {
+    return { ok: false, status: 409, error: `Slack app "${app.name}" has no bot token` };
+  }
+  const token = secrets.botToken;
+
+  // Resolve the destination channel: a channel id as-is, or an email → the
+  // person's Slack user id (chat.postMessage to a user id opens a DM).
+  let channel: string;
+  if (hasChannel) {
+    channel = input.channel!.trim();
+  } else {
+    const userId = await lookupUserByEmail(token, input.toEmail!.trim());
+    if (!userId) {
+      return {
+        ok: false,
+        status: 404,
+        error: `no Slack user found for ${input.toEmail!.trim()} in this workspace`,
+      };
+    }
+    channel = userId;
+  }
+
+  const res = await postMessage(token, {
+    channel,
+    text,
+    ...(input.threadTs ? { thread_ts: input.threadTs } : {}),
+  });
+  if (!res.ok) {
+    return { ok: false, status: 502, error: `Slack rejected the message: ${res.error}` };
+  }
+  return { ok: true, channel, ts: res.ts ?? null };
 }
