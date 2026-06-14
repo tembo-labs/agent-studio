@@ -21,6 +21,24 @@ export type ChildRun = {
   createdAt: Date;
 };
 
+// Distinct tool names invoked across every sub-run a given run spawned via
+// trigger_run. The caller maps these to provider slugs (via the workspace
+// tool→provider table) to show which MCPs the sub-agents actually used —
+// the orchestrator's own connection row only lists its top-level MCPs.
+export async function listChildRunToolNames(
+  workspaceId: string,
+  parentRunId: string,
+): Promise<string[]> {
+  const { rows } = await db.query<{ tool_name: string }>(
+    `SELECT DISTINCT tc.tool_name
+       FROM run_tool_call tc
+       JOIN run r ON r.id = tc.run_id
+      WHERE r.workspace_id = $1 AND r.parent_run_id = $2`,
+    [workspaceId, parentRunId],
+  );
+  return rows.map((r) => r.tool_name);
+}
+
 export async function listChildRuns(
   workspaceId: string,
   parentRunId: string,
