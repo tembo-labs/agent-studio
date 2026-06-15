@@ -15,6 +15,134 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [v2026.6.16] — Public API & MCP server, sub-agent orchestration, prompt caching — shipped 2026-06-15
+
+### Added
+- **Public REST API + MCP server.** Drive a workspace programmatically — from
+  Claude Code or any HTTP/MCP client. A new **personal API key** (Settings →
+  API keys) authenticates both surfaces as you (your role, your per-user
+  connections), is shown once, and can be disabled or revoked anytime.
+  - **REST API** under `/api/v1`: list/read agents, validate a spec, list/read
+    and trigger runs, browse the tool catalog and connection status, manage
+    automations, manage Slack bots (create/update/delete, admin only), and hand
+    authoring to the Tembo Coding Agent (`POST /api/v1/agent-changes`). See
+    [REST API](./docs/src/content/docs/api.md).
+  - **MCP server** at `/mcp` (Streamable HTTP): the same capabilities as MCP
+    tools (`list_agents`, `get_agent`, `validate_agent_spec`, `list_runs`,
+    `get_run`, `list_tools`, `list_connections`, `list_automations`,
+    `list_slack_apps`, `trigger_run`, `create_automation`,
+    `request_agent_change`, plus admin-only `create_slack_app` /
+    `update_slack_app` / `delete_slack_app`). Connect with
+    `claude mcp add --transport http tas https://<host>/mcp --header "Authorization: Bearer tas_…"`.
+    See [MCP server](./docs/src/content/docs/mcp.md).
+- **Admin Slack-app management over the API & MCP.** The slack-apps surface
+  (previously read-only) now supports create/update/delete, gated at
+  `workspace_admin` on both REST (`POST /api/v1/slack-apps`,
+  `PATCH`/`DELETE /api/v1/slack-apps/{id}`) and MCP (`create_slack_app`,
+  `update_slack_app`, `delete_slack_app`) — matching Settings → Slack apps.
+  Creation writes metadata only (the app comes up `configuring` and isn't live
+  until an admin completes the one-time browser OAuth install), so no secrets
+  are needed to create one over the API.
+- **`send_slack_message` — real Slack DMs and channel posts.** Agents could only
+  reach Slack via Composio, whose "DM" posts to the bot's own connected account
+  (the human never sees it). A new `send_slack_message` MCP tool (operator-gated)
+  + `POST /api/v1/slack-messages` use a workspace Slack app's bot token to DM a
+  real person by `toEmail` (resolved to a real DM + notification) or post to a
+  `channel`. So an agent on the `tembo-agent-studio` MCP can actually notify
+  someone instead of self-DMing through Composio.
+- **Sub-agent orchestration with rolled-up cost.** When an agent calls the
+  `tembo-agent-studio` MCP `trigger_run` from inside its own run (an orchestrator
+  fanning work out to per-source sub-agents), the spawned run is now linked to its
+  parent (`run.parent_run_id`). The parent's run page gets a **Sub-runs** section
+  listing each child with its tokens + cost, a **Combined** total, a **Prompt
+  cache** read/write breakdown, and a **Sub-agents use** row of the MCP logos the
+  children actually invoked.
+- **Agents list: MCPs column + filter.** The agents inventory shows each agent's
+  declared connection logos; for an orchestrator it also shows (dimmed) the MCPs
+  its sub-agents bring in, derived from the `parent_run_id` graph. A **Filter by
+  MCP** dropdown matches an agent on its own or its sub-agents' MCPs.
+- **Native-MCP tool reference for the Tembo Coding Agent (`/for-agents`).** When
+  TAS asks CAP to author or edit an agent, the prompt now lists native-MCP
+  connection slots (provider → authorized names) alongside Composio slots, and
+  links each instance's own cached tool reference at `GET /for-agents/<provider>.md`
+  so CAP can learn a native MCP's exact tool slugs. Auth is a signed, expiring,
+  `(workspace, user)`-scoped bearer token that unlocks only the tool catalog —
+  stateless, no DB key. Connection context is now shared across all three authoring
+  call sites (new-agent form, API `request_agent_change`, in-app chat edit).
+- **Orchestration is the preferred multi-source pattern.** The Pydantic AgentSpec
+  guide TAS syncs into every connected repo now steers CAP toward a thin
+  orchestrator + focused sub-agents (driven through the `tembo-agent-studio` Native
+  MCP: `list_connections` / `trigger_run` / `get_run`) instead of one agent holding
+  every source's tools in one growing context — and to reuse an existing
+  single-purpose sub-agent rather than duplicating it. The guidance version hash
+  auto-bumps, so repos re-bootstrap the refreshed guide on their next request.
+- **Native MCP: Tembo Agent Studio (self-key) and Dialed.** Added a
+  `tembo-agent-studio` self-key native-MCP provider (so an agent can drive its own
+  TAS instance) and [Dialed](https://dialed.day) to the native-MCP catalog. Agents
+  declare them with `connections: [{ type: …, source: native-mcp }]`.
+- **Anthropic prompt caching + cache-aware cost.** An agentic run re-sends the
+  whole prompt every step, so the large static prefix (system instructions + tool
+  schemas) was re-billed at full input rate on each of 10+ steps. The runner now
+  caches the system prompt + tool definitions and rolls a breakpoint over the
+  growing history (Anthropic models; a spec can override), billing the repeated
+  prefix at the cache-read rate (~0.1×) after a one-time write surcharge (~1.25×) —
+  roughly a 3–5× cost cut on tool-heavy runs. Cost accounting is now cache-aware,
+  and the run-steps footer shows a `prompt cache: N read · M write` line when the
+  cache engaged.
+- **Provider logos on native-MCP surfaces.** A shared `mcpLogoUrl(slug)` helper
+  serves local art for providers Composio's logo CDN doesn't carry (Pylon, Dialed,
+  Tembo Agent Studio) and the CDN for everything else. Logos now render on the run
+  page, the agents-list MCPs column, the agent **Uses** row, and all three
+  native-MCP card states on the Connections page (each keeping its generic-glyph
+  fallback).
+
+### Changed
+- **Native-MCP slots fall back to your sole connection.** A spec that pins a
+  provider by a slot name the user didn't use verbatim (e.g. `name: default` vs a
+  connection named `tembo`) was rejected as not-connected. Now, when the named slot
+  is absent but the user has exactly one active connection for that provider, TAS
+  uses it — at both run time and in the pre-run check. Ambiguous (2+ slots, none
+  matching) still requires naming one.
+- **Tool catalog hides orphaned tools.** `listToolsForUser` now surfaces a cached
+  tool only when a matching active connection still exists, so tools from renamed,
+  disconnected, or stale connections no longer linger (e.g. the duplicate listings
+  after the `tembo` → `tembo-agent-studio` slug rename). Applies everywhere the
+  catalog feeds: Tools tab, Connections, `/api/v1/tools`, MCP `list_tools`, and
+  `/for-agents`.
+- **Native-MCP authorizations request `offline_access`.** Providers that only
+  issue a refresh token when the OIDC `offline_access` scope is requested (e.g.
+  Dialed) were going dark when their short-lived access token expired. TAS now
+  appends `offline_access` at authorize time when the auth server supports the
+  refresh-token grant (DCR providers only). Existing such connections must be
+  reconnected once to obtain a refresh token.
+
+### Fixed
+- **Native-MCP token refresh for Dialed/Fathom.** The Rust refresh path validates
+  a connection's origin against its own hardcoded allowlist, which lagged the web
+  catalog — so every Dialed refresh aborted, the expired token was used, and the
+  run 401'd. Added Dialed + Fathom to the allowlist and a vitest drift guard that
+  fails CI if a future catalog provider isn't mirrored into the Rust allowlist.
+- **Defunct native-MCP connections can be cleaned up.** A connection to a provider
+  that left the catalog (e.g. the old `tembo` self-key connection after the rename)
+  lingered as an orphaned row that couldn't be disconnected and kept its minted
+  `tas_` key alive. The Connections → Native MCP page now shows a "removed provider"
+  banner with a one-click Remove that deletes the rows, revokes the self-key, and
+  drops the cached tools.
+- **Sidebar stopped nagging "Connect" under the single-connection fallback.** The
+  sidebar's "Action needed" list reimplemented the missing-connection check with a
+  strict slot-name match and lacked the native single-connection fallback, so it
+  flagged a connected agent as needing attention. Both the sidebar and the run-
+  blocking pre-flight now route through shared helpers so they can't drift again.
+- **YOLO creates show a pending card immediately.** A YOLO (direct-commit) create
+  is optimistically marked committed the moment CAP accepts it, but the agents page
+  re-filtered pending creates to only submitted/PR-opened ones — so a YOLO create
+  showed nothing until Tembo finished building it. The page filter now keeps
+  direct+committed creates too, matching the query.
+
+### Migrations
+- `0049` (per-user, workspace-bound API keys) and `0050` (`run.parent_run_id` for
+  sub-run linking) apply on the next Rust api restart.
+
 ## [v2026.6.15] — Fathom MCP, free-text agent names — shipped 2026-06-09
 
 ### Added
