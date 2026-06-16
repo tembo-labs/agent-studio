@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { writeAuditEvent } from "@/lib/audit-db";
 import { authorizeWorkspace } from "@/lib/auth-server";
 import { getPublicOrigin } from "@/lib/config";
 import { createApiKey, deleteApiKey } from "@/lib/api-keys-db";
@@ -116,16 +115,10 @@ async function connectSelfKey(
     await deleteApiKey(workspace.id, priorKeyId);
   }
 
-  await writeAuditEvent({
-    workspaceId: workspace.id,
-    actorUserId: userId,
-    source: "human_action",
-    kind: "connection.authorized",
-    targetType: "connection",
-    targetId: saved.id,
-    agentName: null,
-    payload: { provider: provider.slug, name: connectionName, source: "native-mcp" },
-  });
+  // No audit event: a self-key (Tembo Agent Studio) connection is minted
+  // implicitly/automatically — and re-minted on reconnect — so logging each one
+  // as "Connection authorized" just floods the timeline with noise. Real OAuth
+  // authorizations (DCR/manual) are still audited in the callback route.
 
   // Best-effort: prime the tool-list cache so the Connections page shows the
   // TAS tool catalog immediately. Don't block the redirect on failure.
