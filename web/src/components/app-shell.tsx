@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { DocsSidebarLink } from "@/components/docs-sidebar-link";
+import { MissingConnectionCards } from "@/components/missing-connection-cards";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -176,79 +177,51 @@ export async function AppShell({
                   </div>
                 );
               })}
-              {groupedMissing.map(({ rep: m, agentNames }) => {
-                // Authorize endpoint differs per substrate: Composio
-                // is one route per workspace (toolkit in query
-                // string), Native MCP is one route per provider
-                // (provider in path). Sidebar dispatches by source
-                // so the Connect button always lands on the right
-                // OAuth flow.
-                let authorizeHref: string;
-                let providerLabel: string;
-                if (m.source === "secret") {
-                  // Secrets are workspace-level: no per-user authorize
-                  // flow — link straight to the Secrets tab where an
-                  // admin sets the key. Labelled by the secret's name.
-                  authorizeHref = `/${workspace.slug}/connections/secrets`;
-                  providerLabel = m.toolkit;
-                } else if (m.source === "native-mcp") {
-                  const params = new URLSearchParams({
-                    workspace: workspace.slug,
-                  });
-                  if (m.name && m.name !== "default") {
-                    params.set("name", m.name);
+              <MissingConnectionCards
+                items={groupedMissing.map(({ rep: m, agentNames }) => {
+                  // Authorize endpoint differs per substrate: Composio is one
+                  // route per workspace (toolkit in query string), Native MCP
+                  // one route per provider (provider in path), secrets link to
+                  // the Secrets tab. Dispatch by source so Connect lands on the
+                  // right flow.
+                  let href: string;
+                  let providerLabel: string;
+                  if (m.source === "secret") {
+                    href = `/${workspace.slug}/connections/secrets`;
+                    providerLabel = m.toolkit;
+                  } else if (m.source === "native-mcp") {
+                    const params = new URLSearchParams({
+                      workspace: workspace.slug,
+                    });
+                    if (m.name && m.name !== "default") params.set("name", m.name);
+                    href = `/api/connections/native/${m.toolkit}/authorize?${params.toString()}`;
+                    providerLabel =
+                      getMcpProvider(m.toolkit)?.displayName ?? m.toolkit;
+                  } else {
+                    const params = new URLSearchParams({
+                      workspace: workspace.slug,
+                      toolkit: m.toolkit,
+                    });
+                    if (m.name && m.name !== "default") params.set("name", m.name);
+                    href = `/api/connections/composio/authorize?${params.toString()}`;
+                    providerLabel = toolkitLabel(m.toolkit);
                   }
-                  authorizeHref = `/api/connections/native/${m.toolkit}/authorize?${params.toString()}`;
-                  providerLabel =
-                    getMcpProvider(m.toolkit)?.displayName ?? m.toolkit;
-                } else {
-                  const params = new URLSearchParams({
-                    workspace: workspace.slug,
-                    toolkit: m.toolkit,
-                  });
-                  if (m.name && m.name !== "default") {
-                    params.set("name", m.name);
-                  }
-                  authorizeHref = `/api/connections/composio/authorize?${params.toString()}`;
-                  providerLabel = toolkitLabel(m.toolkit);
-                }
-                // Show "Gmail (work)" when the slot has a custom name
-                // so the user can tell which account the agent
-                // wants — otherwise just the provider label.
-                const labelWithSlot =
-                  m.name && m.name !== "default"
-                    ? `${providerLabel} (${m.name})`
-                    : providerLabel;
-                return (
-                  <div
-                    key={`${m.source}:${m.toolkit}:${m.name}`}
-                    className="flex items-start gap-2 rounded-md px-2 py-2 bg-[var(--color-sentiment-caution-subtle)]"
-                  >
-                    <IconExclamationTriangle
-                      size={14}
-                      className="mt-0.5 shrink-0 text-[var(--color-icon-sentiment-caution)]"
-                    />
-                    <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
-                      <span className="text-sm leading-tight text-[var(--color-foreground-sentiment-caution)]">
-                        <span className="font-semibold">{labelWithSlot}</span>{" "}
-                        for{" "}
-                        {agentNames.length === 1 ? (
-                          <span className="font-semibold">{agentNames[0]}</span>
-                        ) : (
-                          <span className="font-semibold">
-                            {agentNames.length} agents
-                          </span>
-                        )}
-                      </span>
-                      <Button asChild variant="orange" size="small">
-                        <Link href={authorizeHref}>
-                          {m.source === "secret" ? "Set" : "Connect"}
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+                  const label =
+                    m.name && m.name !== "default"
+                      ? `${providerLabel} (${m.name})`
+                      : providerLabel;
+                  return {
+                    key: `${m.source}:${m.toolkit}:${m.name}`,
+                    label,
+                    agentLabel:
+                      agentNames.length === 1
+                        ? agentNames[0]
+                        : `${agentNames.length} agents`,
+                    href,
+                    action: m.source === "secret" ? "Set" : "Connect",
+                  };
+                })}
+              />
             </div>
           )}
         </nav>
