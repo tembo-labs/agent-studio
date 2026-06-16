@@ -15,7 +15,6 @@ import { SkillsCatalogBrowser } from "./skills-catalog-browser";
 import {
   AddFromGitHubForm,
   ImportFromClaudeForm,
-  RemoveSkillForm,
   UploadSkillForm,
   type ImportableSkill,
 } from "./skills-forms";
@@ -108,21 +107,25 @@ export default async function SkillsPage({
             ) : (
               <ul className="divide-border-weak flex flex-col divide-y rounded-lg border border-[var(--color-border-weak)] bg-surface-raised">
                 {installed.map((s) => (
-                  <li
-                    key={s.name}
-                    className="flex items-start justify-between gap-3 px-3 py-2.5"
-                  >
-                    <div className="flex min-w-0 flex-col">
-                      <code className="text-foreground text-sm font-medium">
-                        {s.name}
-                      </code>
-                      {s.description && (
-                        <span className="text-foreground-weak line-clamp-2 text-sm">
-                          {s.description}
-                        </span>
-                      )}
-                    </div>
-                    <RemoveSkillForm workspaceSlug={slug} name={s.name} />
+                  <li key={s.name}>
+                    <Link
+                      href={`/${slug}/skills/${encodeURIComponent(s.name)}`}
+                      className="hover:bg-surface group flex items-center justify-between gap-3 px-3 py-2.5"
+                    >
+                      <div className="flex min-w-0 flex-col">
+                        <code className="text-foreground group-hover:underline text-sm font-medium">
+                          {s.name}
+                        </code>
+                        {s.description && (
+                          <span className="text-foreground-weak line-clamp-2 text-sm">
+                            {s.description}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-foreground-muted shrink-0 text-sm" aria-hidden>
+                        →
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { exportAnthropicSkill } from "@/lib/anthropic-skills";
 import { writeAuditEvent } from "@/lib/audit-db";
@@ -215,5 +215,6 @@ export async function removeSkillAction(
     payload: { name, deleted: res.deleted },
   });
   revalidatePath(`/${slug}/skills`);
-  return { message: `Removed skill "${name}".` };
+  // Removal is triggered from the skill's detail page, which no longer resolves.
+  redirect(`/${slug}/skills`);
 }

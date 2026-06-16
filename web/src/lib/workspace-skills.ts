@@ -1,6 +1,7 @@
 import "server-only";
 import YAML from "yaml";
 
+import { db } from "@/lib/db";
 import {
   createFile,
   deleteFile,
@@ -102,6 +103,68 @@ export async function listInstalledSkills(
   );
   out.sort((a, b) => a.name.localeCompare(b.name));
   return out;
+}
+
+export type InstalledSkillDetail = {
+  name: string;
+  title: string | null;
+  description: string | null;
+  path: string;
+  /** The full SKILL.md (frontmatter + body) for display. */
+  skillMd: string;
+  /** Total files in the skill folder. */
+  fileCount: number;
+};
+
+/**
+ * One installed skill with its full SKILL.md content, for the detail view.
+ * Returns null when the workspace has no repo or the skill folder is gone.
+ */
+export async function readInstalledSkill(
+  workspaceId: string,
+  name: string,
+): Promise<InstalledSkillDetail | null> {
+  const repo = await getWorkspaceRepo(workspaceId);
+  if (!repo) return null;
+  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
+  const ref = repoRefFor(repo);
+  const res = await readSkillFolder(token ?? "", ref, name);
+  if (!res.ok) return null;
+  const mdKey = Object.keys(res.files).find((k) =>
+    k.toLowerCase().endsWith("/skill.md"),
+  );
+  const skillMd = mdKey ? res.files[mdKey] : "";
+  const meta = skillMd
+    ? parseSkillFrontmatter(skillMd)
+    : { title: null, description: null };
+  return {
+    name,
+    title: meta.title,
+    description: meta.description,
+    path: `${SKILLS_DIR}/${name}`,
+    skillMd,
+    fileCount: Object.keys(res.files).length,
+  };
+}
+
+/**
+ * The source a skill was installed from, read off its most recent
+ * `skill.installed` audit event (e.g. "github:owner/repo", "skills.sh:slug",
+ * "upload", "claude-api"). Null if no install event is recorded.
+ */
+export async function getSkillInstallSource(
+  workspaceId: string,
+  name: string,
+): Promise<string | null> {
+  const { rows } = await db.query<{ payload: { source?: string } | null }>(
+    `SELECT payload FROM audit_event
+      WHERE workspace_id = $1 AND kind = 'skill.installed' AND target_id = $2
+      ORDER BY at DESC
+      LIMIT 1`,
+    [workspaceId, name],
+  );
+  const source = rows[0]?.payload?.source;
+  return typeof source === "string" ? source : null;
 }
 
 /**
