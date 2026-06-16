@@ -82,7 +82,7 @@ export async function setSecretConnectionAction(
   revalidatePath(`/${slugRaw}/connections`, "layout");
   revalidatePath(`/${slugRaw}`, "layout");
   // Land on the secret's connection view (works for both add and rotate).
-  redirect(`/${slugRaw}/connections/secret:${name}`);
+  redirect(`/${slugRaw}/connections/secret~${name}`);
 }
 
 /** Remove a Secret entirely. */

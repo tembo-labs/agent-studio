@@ -152,7 +152,7 @@ async function connectSelfKey(
 
   // Land on the new connection's detail view.
   const target = new URL(
-    `/${workspace.slug}/connections/native:${saved.id}`,
+    `/${workspace.slug}/connections/native~${saved.id}`,
     getPublicOrigin(),
   );
   target.searchParams.set("result", "ok");

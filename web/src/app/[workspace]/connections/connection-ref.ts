@@ -19,19 +19,22 @@ import {
 
 // One Connections list/view/edit surface spans three record types. We address
 // them through a single composite ref encoded into the [id] route segment:
-//   composio:<uuid> | native:<uuid> | secret:<slug>
-// (":" is path-safe; uuids and secret slugs [a-z0-9_-] are too.)
+//   composio~<uuid> | native~<uuid> | secret~<slug>
+// The separator is "~" (RFC 3986 unreserved — never percent-encoded, never
+// special in a path). A ":" reads as a scheme/port to some routers and proxies
+// and broke the [id] route; "~" appears in neither uuids, kinds, nor secret
+// slugs ([a-z0-9_-]), so splitting on the first one is unambiguous.
 
 export type ConnectionKind = "composio" | "native" | "secret";
 
 export type ConnectionRef = { kind: ConnectionKind; key: string };
 
 export function encodeConnectionRef(kind: ConnectionKind, key: string): string {
-  return `${kind}:${key}`;
+  return `${kind}~${key}`;
 }
 
 export function parseConnectionRef(raw: string): ConnectionRef | null {
-  const i = raw.indexOf(":");
+  const i = raw.indexOf("~");
   if (i <= 0) return null;
   const kind = raw.slice(0, i);
   const key = raw.slice(i + 1);

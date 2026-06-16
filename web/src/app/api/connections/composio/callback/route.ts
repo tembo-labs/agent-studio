@@ -193,7 +193,7 @@ export async function GET(request: NextRequest) {
 
   // Land on the new connection's detail view.
   const ok = new URL(
-    `/${payload.workspaceSlug}/connections/composio:${saved.id}`,
+    `/${payload.workspaceSlug}/connections/composio~${saved.id}`,
     getPublicOrigin(),
   );
   ok.searchParams.set("result", "ok");
