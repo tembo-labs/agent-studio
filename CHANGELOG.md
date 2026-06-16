@@ -14,6 +14,42 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.18] — Audit timeline detail + sign-in redirect for deep links — shipped 2026-06-16
+
+### Fixed
+- **Signed-out deep links now go to sign-in, not a 404.** A signed-out visitor
+  following a deep link (e.g. `/<workspace>/audit`) hit a page that gates with
+  `notFound()`, so they saw a 404 — which reads as a broken link, not "please
+  sign in". An auth gate in the proxy (middleware) now redirects them to the
+  sign-in landing with the intended path in `?next=`, and they return there once
+  signed in. `/mcp` and `/for-agents` stay open (they authenticate with a bearer
+  token, not a session).
+
+### Changed
+- **Audit timeline shows real detail for every event.** A full pass over the
+  event log:
+  - **Connections** show the provider (e.g. *Attio*, *Tembo Agent Studio*) and a
+    stack tag (Native MCP / Composio), instead of a bare "· default" — native-MCP
+    events store the provider slug, which the timeline now resolves to a display
+    name.
+  - **Every event kind has a human label and an inline summary** where it carries
+    useful data (API keys, webhooks, native-MCP OAuth apps, provider toggles,
+    secret connections, Slack apps/installs/messages, sign-ins with IP + browser,
+    agent version promotions). Previously ~20 kinds rendered as raw strings like
+    `api_key.created` with no detail.
+  - **A per-row "Details" expander** reveals the full event payload for anything
+    the summary doesn't surface.
+  - **Member events record who invited.** Accepting an invite now records the
+    original inviter (`invited by …`), which was previously lost once the invite
+    was accepted.
+
+### Dependencies
+- **esbuild 0.28.1, vite 8.0.16, js-yaml 4.2.0, @babel/core 7.29.7.** Clears six
+  Dependabot advisories across the two earlier rounds. All are dev/test/build
+  tooling (never in the deployed runtime), and the vectors (Deno install path,
+  Windows dev server, untrusted-YAML parsing the app doesn't do) don't apply to
+  this stack — bumped to keep the security tab clean.
+
 ## [v2026.6.17] — Audit coverage for the API/MCP surface, sign-ins, and membership — shipped 2026-06-16
 
 ### Added
