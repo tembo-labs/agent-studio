@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { deleteApiKey } from "@/lib/api-keys-db";
 import { writeAuditEvent } from "@/lib/audit-db";
@@ -96,7 +96,8 @@ export async function disconnectNativeMcpConnectionAction(
   });
 
   revalidatePath(`/${slug}/connections`, "layout");
-  return { message: "Connection disconnected." };
+  // The detail page this was triggered from no longer resolves — go to the list.
+  redirect(`/${slug}/connections`);
 }
 
 /**

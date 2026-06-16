@@ -422,7 +422,8 @@ export async function disconnectComposioConnectionAction(
 
   revalidatePath(`/${slug}/settings`);
   revalidatePath(`/${slug}/connections`, "layout");
-  return { message: "Connection removed." };
+  // The detail page this was triggered from no longer resolves — go to the list.
+  redirect(`/${slug}/connections`);
 }
 
 export type RefreshComposioToolsFormState = {
