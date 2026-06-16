@@ -33,7 +33,7 @@ export function RefreshNativeMcpToolsForm({
     <form action={formAction}>
       <input type="hidden" name="workspace" value={workspaceSlug} />
       <input type="hidden" name="connectionId" value={connectionId} />
-      <Button type="submit" variant="secondary" size="small" disabled={pending}>
+      <Button type="submit" variant="secondary" disabled={pending}>
         {pending ? "Refreshing…" : (label ?? "Refresh tools")}
       </Button>
     </form>

@@ -128,7 +128,7 @@ export default async function ConnectionDetailPage({
     );
     if (!view.viewingOther) {
       actions.push(
-        <Button key="reconnect" asChild variant="secondary" size="small">
+        <Button key="reconnect" asChild variant="secondary">
           <a href={reconnect}>Reconnect</a>
         </Button>,
         <DisconnectNativeMcpConnectionForm key="disconnect" workspaceSlug={workspace.slug} connectionId={c.id} />,
@@ -171,7 +171,7 @@ export default async function ConnectionDetailPage({
     );
     if (!view.viewingOther) {
       actions.push(
-        <Button key="reconnect" asChild variant="secondary" size="small">
+        <Button key="reconnect" asChild variant="secondary">
           <a href={reconnect}>Reconnect</a>
         </Button>,
         <DisconnectComposioConnectionForm key="disconnect" workspaceSlug={workspace.slug} connectionId={c.id} />,
@@ -183,7 +183,7 @@ export default async function ConnectionDetailPage({
   // we're not viewing another member. Placed first so it leads the cluster.
   if (editable && !view.viewingOther) {
     actions.unshift(
-      <Button key="edit" asChild variant="secondary" size="small">
+      <Button key="edit" asChild variant="secondary">
         <Link href={editHref}>Edit</Link>
       </Button>,
     );
