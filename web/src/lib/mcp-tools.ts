@@ -105,6 +105,48 @@ export async function listToolsForUser(
 }
 
 /**
+ * Every tool across the whole workspace — the union of all members' active
+ * connections, not just one user's. Powers the admin view of the Tools tab,
+ * so a workspace admin can see the full catalog agents can reach without
+ * having to connect every provider themselves.
+ *
+ * Same active-connection guard as listToolsForUser (orphans from disconnects/
+ * renames are filtered out), but correlated on the tool row's own owner
+ * (t.user_id) rather than a fixed acting user. Deduped by
+ * (source, provider, connection_name, slug) via DISTINCT ON, so the same tool
+ * reached through two members' identically-named connections shows once;
+ * differently-named connections still show separately. Same leading sort as
+ * listToolsForUser so the Tools table groups identically.
+ */
+export async function listToolsForWorkspace(
+  workspaceId: string,
+): Promise<McpTool[]> {
+  const { rows } = await db.query<Row>(
+    `SELECT DISTINCT ON (t.source, t.provider, t.connection_name, t.slug)
+            ${COLUMNS}
+       FROM workspace_mcp_tool t
+      WHERE t.workspace_id = $1
+        AND (
+          (t.source = 'native-mcp' AND EXISTS (
+            SELECT 1 FROM workspace_connection c
+             WHERE c.workspace_id = t.workspace_id AND c.user_id = t.user_id
+               AND c.type = t.provider AND c.name = t.connection_name
+               AND c.status = 'active'))
+          OR
+          (t.source = 'composio' AND EXISTS (
+            SELECT 1 FROM workspace_composio_connection cc
+             WHERE cc.workspace_id = t.workspace_id AND cc.user_id = t.user_id
+               AND cc.toolkit_slug = t.provider AND cc.name = t.connection_name
+               AND cc.status = 'ACTIVE'))
+        )
+      ORDER BY t.source ASC, t.provider ASC, t.connection_name ASC, t.slug ASC,
+               t.refreshed_at DESC`,
+    [workspaceId],
+  );
+  return rows.map(rowToTool);
+}
+
+/**
  * Distinct tool-slug → (source, provider) across the whole workspace's tool
  * cache, for resolving a run's recorded tool_name to the provider whose logo
  * to show. Workspace-wide (not per-user) because a tool slug maps to the same

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { listToolsForUser } from "@/lib/mcp-tools";
+import { listToolsForUser, listToolsForWorkspace } from "@/lib/mcp-tools";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug } from "@/lib/workspace";
+import { getWorkspaceBySlug, getWorkspaceRole } from "@/lib/workspace";
 
 import { ToolsTable } from "./tools-table";
 
@@ -35,7 +35,13 @@ export default async function ToolsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const tools = await listToolsForUser(workspace.id, session.user.id);
+  // Admins see the whole workspace's catalog (every member's active
+  // connections); everyone else sees only the tools from their own.
+  const role = await getWorkspaceRole(workspace.id, session.user.id);
+  const isAdmin = role === "workspace_admin";
+  const tools = isAdmin
+    ? await listToolsForWorkspace(workspace.id)
+    : await listToolsForUser(workspace.id, session.user.id);
 
   // URL params seed the table's initial filter state. Connections
   // rows link here with ?source=…&provider=…&connection=… to land
@@ -58,7 +64,13 @@ export default async function ToolsPage({
           Tools
         </h1>
         <p className="text-foreground-weak text-base">
-          Every MCP tool you&apos;ve authorized in{" "}
+          {isAdmin ? (
+            <>
+              Every MCP tool authorized across all members&apos; connections in{" "}
+            </>
+          ) : (
+            <>Every MCP tool you&apos;ve authorized in </>
+          )}
           <span className="text-foreground font-medium">{workspace.name}</span>,
           across Composio and native MCP providers. Tools are cached on
           connect; refresh a connection from{" "}
