@@ -18,12 +18,10 @@ export function DocsNav({
   workspaceSlug,
   repoUrl,
   starCount,
-  version,
 }: {
   workspaceSlug: string;
   repoUrl: string;
   starCount: number | null;
-  version: string | null;
 }) {
   const base = `/${workspaceSlug}/docs`;
   return (
@@ -57,11 +55,6 @@ export function DocsNav({
           </span>
         )}
       </a>
-      {version && (
-        <span className="text-foreground-muted px-2 pt-1 text-[11px]">
-          {version}
-        </span>
-      )}
     </nav>
   );
 }

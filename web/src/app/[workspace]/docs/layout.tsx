@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { getAppVersion } from "@/lib/config";
 import { DOCS } from "@/lib/docs-content";
 import { getRepoStars, REPO_URL } from "@/lib/repo-stars";
 import { getServerSession } from "@/lib/session";
@@ -31,7 +30,6 @@ export default async function DocsLayout({
   if (!workspace) notFound();
   if (!(await userIsMember(workspace.id, session.user.id))) notFound();
 
-  const version = getAppVersion();
   const stars = await getRepoStars();
 
   // Lightweight search index over the bundled docs (title + description + a
@@ -62,7 +60,6 @@ export default async function DocsLayout({
             workspaceSlug={workspace.slug}
             repoUrl={REPO_URL}
             starCount={stars}
-            version={version ? `Version ${version}` : null}
           />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-6">{children}</div>
