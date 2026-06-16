@@ -18,5 +18,10 @@
     "@astrojs/starlight": "^0.39.3",
     "astro": "^6.4.4",
     "sharp": "^0.34.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "esbuild": "^0.28.1"
+    }
   }
 }
