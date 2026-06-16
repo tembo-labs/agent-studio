@@ -19,12 +19,18 @@ import { getWorkspaceById, getWorkspaceRole, type Workspace } from "@/lib/worksp
 // Error strings are intentionally vague — never leak whether a token, a
 // workspace, or a membership is the thing that's missing.
 
+/** Which programmatic surface a request came in on — stamped onto audit
+ *  events (`payload.via`) so the timeline distinguishes a REST-API change
+ *  from an MCP-tool change from an in-app (UI) one. */
+export type ApiSurface = "api" | "mcp";
+
 export type AuthorizeApiSuccess = {
   ok: true;
   workspace: Workspace;
   userId: string;
   role: WorkspaceRole;
   apiKeyId: string;
+  surface: ApiSurface;
 };
 
 export type AuthorizeApiFailure = {
@@ -54,6 +60,7 @@ function bearerToken(request: Request): string | null {
 export async function authorizeApiRequest(
   request: Request,
   minRole: WorkspaceRole = "viewer",
+  surface: ApiSurface = "api",
 ): Promise<AuthorizeApiResult> {
   const token = bearerToken(request);
   if (!token) return UNAUTHORIZED;
@@ -86,5 +93,6 @@ export async function authorizeApiRequest(
     userId: row.userId,
     role: role as WorkspaceRole,
     apiKeyId: row.id,
+    surface,
   };
 }

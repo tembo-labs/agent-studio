@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { AuthorizeApiSuccess } from "@/lib/api-auth";
+import { writeAuditEvent } from "@/lib/audit-db";
+import type { AuditSource } from "@/lib/audit";
 import {
   detectFormat,
   parseAgentContent,
@@ -57,6 +59,36 @@ export type ApiCtx = AuthorizeApiSuccess;
 
 export type ActionFailure = { ok: false; status: number; error: string };
 
+// Audit a mutation made through a programmatic surface (REST API or MCP).
+// Stamps `via` (the surface) and the acting `apiKeyId` into the payload so the
+// audit timeline can tell an API/MCP change apart from an in-app one and trace
+// it back to a specific key. Mirrors the in-app server actions' writeAuditEvent
+// calls; runs and improvements are intentionally NOT audited here — they live in
+// their own tables and already project into the timeline (attributed to
+// ctx.userId), so an explicit event would just duplicate them.
+async function auditApiMutation(
+  ctx: ApiCtx,
+  e: {
+    kind: string;
+    targetType: string;
+    targetId: string | null;
+    agentName?: string | null;
+    source?: AuditSource;
+    payload?: Record<string, unknown>;
+  },
+): Promise<void> {
+  await writeAuditEvent({
+    workspaceId: ctx.workspace.id,
+    actorUserId: ctx.userId,
+    source: e.source ?? "human_action",
+    kind: e.kind,
+    targetType: e.targetType,
+    targetId: e.targetId,
+    agentName: e.agentName ?? null,
+    payload: { via: ctx.surface, apiKeyId: ctx.apiKeyId, ...e.payload },
+  });
+}
+
 // ── trigger a run ─────────────────────────────────────────────────────
 
 export type TriggerRunInput = {
@@ -111,6 +143,8 @@ export async function triggerRun(
       agentVersionLabel: r.versionLabel,
       parentRunId: input.parentRunId,
     });
+    // Not audited explicitly: the run row projects into the audit timeline as a
+    // run.* event attributed to ctx.userId (see auditApiMutation note).
     return { ok: true, runId: res.runId };
   } catch (err) {
     return {
@@ -195,6 +229,13 @@ export async function createAutomationFor(
     userId: ctx.userId,
     useDraft: input.useDraft ?? false,
   });
+  await auditApiMutation(ctx, {
+    kind: "automation.created",
+    targetType: "automation",
+    targetId: automation.id,
+    agentName: input.agent,
+    payload: { name: input.name.trim(), cron: input.cron, enabled: input.enabled ?? true },
+  });
   return { ok: true, automation };
 }
 
@@ -225,6 +266,9 @@ const FRAMEWORK_PATH: Record<Framework, { dir: string; ext: AgentFileFormat }> =
   "cargo-ai": { dir: "cargo-ai", ext: "json" },
 };
 
+// Not audited explicitly: this creates an improvement row, which projects into
+// the audit timeline as an improvement.* event attributed to ctx.userId (see
+// the auditApiMutation note above).
 export async function requestAgentChange(
   ctx: ApiCtx,
   input: RequestAgentChangeInput,
@@ -478,6 +522,12 @@ export async function createSlackAppFor(
       },
       ctx.userId,
     );
+    await auditApiMutation(ctx, {
+      kind: "slack_app.created",
+      targetType: "slack_app",
+      targetId: slackApp.id,
+      payload: { name },
+    });
     return { ok: true, slackApp };
   } catch (e) {
     const dup = e instanceof Error && /unique|duplicate/i.test(e.message);
@@ -536,6 +586,19 @@ export async function updateSlackAppFor(
   const updated = await getSlackApp(ctx.workspace.id, id);
   // getSlackApp can't be null here (we just updated it), but narrow for types.
   if (!updated) return { ok: false, status: 502, error: "slack app vanished after update" };
+  await auditApiMutation(ctx, {
+    kind: "slack_app.updated",
+    targetType: "slack_app",
+    targetId: id,
+    payload: {
+      name: updated.name,
+      // Note which secrets were (re)written — never the values themselves.
+      rotatedSecrets: [
+        input.signingSecret ? "signing_secret" : null,
+        input.clientSecret ? "client_secret" : null,
+      ].filter(Boolean),
+    },
+  });
   return { ok: true, slackApp: updated };
 }
 
@@ -546,6 +609,12 @@ export async function deleteSlackAppFor(
   const existing = await findSlackApp(ctx.workspace.id, id);
   if (!existing) return { ok: false, status: 404, error: "slack app not found" };
   await deleteSlackApp(ctx.workspace.id, id);
+  await auditApiMutation(ctx, {
+    kind: "slack_app.deleted",
+    targetType: "slack_app",
+    targetId: id,
+    payload: { name: existing.name },
+  });
   return { ok: true };
 }
 
@@ -651,5 +720,18 @@ export async function sendSlackMessageFor(
   if (!res.ok) {
     return { ok: false, status: 502, error: `Slack rejected the message: ${res.error}` };
   }
+  await auditApiMutation(ctx, {
+    kind: "slack_message.sent",
+    targetType: "slack_app",
+    targetId: app.id,
+    // Record where it went and how long it was — never the message body, which
+    // can carry sensitive content (it's a real DM/channel post to a person).
+    payload: {
+      slackApp: app.name,
+      destination: hasEmail ? `email:${input.toEmail!.trim()}` : `channel:${channel}`,
+      textLength: text.length,
+      threaded: !!input.threadTs,
+    },
+  });
   return { ok: true, channel, ts: res.ts ?? null };
 }

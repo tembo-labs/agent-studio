@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { writeAuditEvent } from "@/lib/audit-db";
 import { isInstanceAdminEmail } from "@/lib/config";
 import { getServerSession } from "@/lib/session";
 import { createWorkspace, type CreateWorkspaceError } from "@/lib/workspace";
@@ -39,6 +40,17 @@ export async function createWorkspaceAction(
   if (!result.ok) {
     return { error: ERROR_MESSAGES[result.error] };
   }
+
+  await writeAuditEvent({
+    workspaceId: result.workspace.id,
+    actorUserId: session.user.id,
+    source: "human_action",
+    kind: "workspace.created",
+    targetType: "workspace",
+    targetId: result.workspace.id,
+    agentName: null,
+    payload: { name: result.workspace.name, slug: result.workspace.slug },
+  });
 
   // Repo connect is the required next step. The workspace home page also
   // enforces this — going directly to /{slug} without a repo will redirect

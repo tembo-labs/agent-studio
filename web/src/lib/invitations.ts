@@ -1,5 +1,6 @@
 import "server-only";
 
+import { writeAuditEvent } from "@/lib/audit-db";
 import { db } from "@/lib/db";
 import { isWorkspaceRole, type WorkspaceRole } from "@/lib/rbac";
 
@@ -125,16 +126,20 @@ export async function listPendingInvitations(
   }));
 }
 
+/** Delete a pending invite. Returns the deleted invite's email + role (for
+ *  the caller's audit entry), or null if nothing matched. */
 export async function revokeInvitation(
   id: string,
   workspaceId: string,
-): Promise<boolean> {
-  const res = await db.query(
+): Promise<{ email: string; role: WorkspaceRole } | null> {
+  const res = await db.query<{ email: string; role: string }>(
     `DELETE FROM workspace_invitation
-      WHERE id = $1 AND workspace_id = $2 AND accepted_at IS NULL`,
+      WHERE id = $1 AND workspace_id = $2 AND accepted_at IS NULL
+      RETURNING email, role`,
     [id, workspaceId],
   );
-  return (res.rowCount ?? 0) > 0;
+  const row = res.rows[0];
+  return row ? { email: row.email, role: row.role as WorkspaceRole } : null;
 }
 
 /** Closed-instance gate input: does any pending invite match this email? */
@@ -174,8 +179,11 @@ export async function resolvePendingInvitesForUser(
       [e],
     );
     let joined = 0;
+    // Workspaces where a NEW membership row was actually created (ON CONFLICT
+    // skips re-runs) — audited after the commit so we don't log on rollback.
+    const added: { workspaceId: string; role: string }[] = [];
     for (const inv of rows) {
-      await client.query(
+      const ins = await client.query(
         `INSERT INTO workspace_member (workspace_id, user_id, role)
          VALUES ($1, $2, $3)
          ON CONFLICT (workspace_id, user_id) DO NOTHING`,
@@ -187,9 +195,31 @@ export async function resolvePendingInvitesForUser(
           WHERE id = $1`,
         [inv.id, userId],
       );
+      if ((ins.rowCount ?? 0) > 0) {
+        added.push({ workspaceId: inv.workspace_id, role: inv.role });
+      }
       joined += 1;
     }
     await client.query("COMMIT");
+
+    // Best-effort audit (post-commit, off the transaction client). The user
+    // accepting their own invite is the actor.
+    for (const a of added) {
+      try {
+        await writeAuditEvent({
+          workspaceId: a.workspaceId,
+          actorUserId: userId,
+          source: "policy_change",
+          kind: "member.added",
+          targetType: "member",
+          targetId: userId,
+          agentName: null,
+          payload: { role: a.role, via: "invite_accepted" },
+        });
+      } catch (e) {
+        console.error("[audit] member.added write failed:", e);
+      }
+    }
     return joined;
   } catch (err) {
     await client.query("ROLLBACK");

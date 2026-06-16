@@ -578,7 +578,7 @@ export async function syncGuidanceAction(
   const slug = String(formData.get("workspace") ?? "");
   const auth = await authorizeWorkspace(slug, "workspace_admin");
   if (auth.denied) return { error: DENIED_MESSAGE };
-  const { workspace } = auth;
+  const { workspace, userId } = auth;
   const result = await refreshAllGuidanceFiles(workspace.id);
   if (!result.ok) {
     if (result.error === "no-repo") {
@@ -586,6 +586,16 @@ export async function syncGuidanceAction(
     }
     return { error: result.error };
   }
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "guidance.synced",
+    targetType: "workspace",
+    targetId: null,
+    agentName: null,
+    payload: {},
+  });
   return {
     message:
       "Synced agents/AGENTS.md and the per-framework AGENT_GUIDE.md files. Check the repo for new commits.",
@@ -645,9 +655,30 @@ export async function inviteMemberAction(
 
   // Existing account → added straight to the workspace, no invite to send.
   if (result.joinedDirectly) {
+    await writeAuditEvent({
+      workspaceId: workspace.id,
+      actorUserId: userId,
+      source: "policy_change",
+      kind: "member.added",
+      targetType: "member",
+      targetId: null,
+      agentName: null,
+      payload: { email, role, via: "admin_added_existing" },
+    });
     revalidatePath(`/${slug}/settings`);
     return { message: `Added ${email} to the workspace.`, invitedEmail: email };
   }
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "policy_change",
+    kind: "member.invited",
+    targetType: "member",
+    targetId: result.invitation.id,
+    agentName: null,
+    payload: { email, role },
+  });
 
   // Build the copy-paste invite (no email infra yet — the admin sends it).
   const [instanceName] = await Promise.all([getInstanceName()]);
@@ -678,7 +709,19 @@ export async function revokeInvitationAction(formData: FormData): Promise<void> 
   const auth = await authorizeWorkspace(slug, "workspace_admin");
   if (auth.denied) return;
 
-  await revokeInvitation(invitationId, auth.workspace.id);
+  const revoked = await revokeInvitation(invitationId, auth.workspace.id);
+  if (revoked) {
+    await writeAuditEvent({
+      workspaceId: auth.workspace.id,
+      actorUserId: auth.userId,
+      source: "policy_change",
+      kind: "member.invite_revoked",
+      targetType: "member",
+      targetId: invitationId,
+      agentName: null,
+      payload: { email: revoked.email, role: revoked.role },
+    });
+  }
   revalidatePath(`/${slug}/settings`);
 }
 

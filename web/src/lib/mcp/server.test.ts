@@ -62,6 +62,7 @@ function makeCtx(role: WorkspaceRole = "operator"): McpContext {
     userId: "u-1",
     role,
     apiKeyId: "key-1",
+    surface: "mcp" as const,
   };
 }
 

@@ -26,7 +26,7 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest): Promise<Response> {
   // Min role viewer to connect; write tools re-check operator on the resolved
   // context (ctx.role) inside buildMcpServer.
-  const auth = await authorizeApiRequest(request, "viewer");
+  const auth = await authorizeApiRequest(request, "viewer", "mcp");
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
