@@ -150,11 +150,11 @@ async function connectSelfKey(
     );
   }
 
+  // Land on the new connection's detail view.
   const target = new URL(
-    `/${workspace.slug}/connections/native-mcp`,
+    `/${workspace.slug}/connections/native:${saved.id}`,
     getPublicOrigin(),
   );
-  target.searchParams.set("native_mcp", provider.slug);
   target.searchParams.set("result", "ok");
   return NextResponse.redirect(target, 302);
 }

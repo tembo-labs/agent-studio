@@ -33,7 +33,7 @@ function backToConnections(
   // landing is on the canonical host even if Composio bounces the
   // browser to a request.url that resolved to 0.0.0.0 inside the
   // container.
-  const target = new URL(`/${slug}/connections/composio`, getPublicOrigin());
+  const target = new URL(`/${slug}/connections`, getPublicOrigin());
   target.searchParams.set("composio", toolkit);
   target.searchParams.set("result", status);
   if (detail) target.searchParams.set("detail", detail.slice(0, 200));
@@ -191,10 +191,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  return backToConnections(
-    request,
-    payload.workspaceSlug,
-    payload.toolkit,
-    "ok",
+  // Land on the new connection's detail view.
+  const ok = new URL(
+    `/${payload.workspaceSlug}/connections/composio:${saved.id}`,
+    getPublicOrigin(),
   );
+  ok.searchParams.set("result", "ok");
+  return NextResponse.redirect(ok, 302);
 }

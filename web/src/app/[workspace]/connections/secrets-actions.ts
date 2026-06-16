@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { writeAuditEvent } from "@/lib/audit-db";
 import { authorizeWorkspace, DENIED_MESSAGE } from "@/lib/auth-server";
@@ -81,7 +81,8 @@ export async function setSecretConnectionAction(
 
   revalidatePath(`/${slugRaw}/connections`, "layout");
   revalidatePath(`/${slugRaw}`, "layout");
-  return { message: existing ? `Rotated "${name}".` : `Added "${name}".` };
+  // Land on the secret's connection view (works for both add and rotate).
+  redirect(`/${slugRaw}/connections/secret:${name}`);
 }
 
 /** Remove a Secret entirely. */
@@ -117,5 +118,5 @@ export async function removeSecretConnectionAction(
 
   revalidatePath(`/${slugRaw}/connections`, "layout");
   revalidatePath(`/${slugRaw}`, "layout");
-  return { message: `Removed "${name}".` };
+  redirect(`/${slugRaw}/connections`);
 }

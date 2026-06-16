@@ -29,10 +29,8 @@ function connectionsErrorRedirect(
   // otherwise leave them on 0.0.0.0:3000 where the session cookie
   // (bound to localhost) isn't sent and the workspace 404s.
   //
-  // Target the /composio sub-page specifically (matching the callback
-  // route): the bare /connections index redirects to /native-mcp and would
-  // drop these error query params, silently swallowing the failure.
-  const target = new URL(`/${slug}/connections/composio`, getPublicOrigin());
+  // The Connections list reads ?result=error&detail to show a banner.
+  const target = new URL(`/${slug}/connections`, getPublicOrigin());
   target.searchParams.set("composio", toolkit);
   target.searchParams.set("result", "error");
   target.searchParams.set("detail", detail.slice(0, 200));

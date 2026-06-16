@@ -31,7 +31,7 @@ function back(
   status: "ok" | "error",
   detail?: string,
 ): NextResponse {
-  const target = new URL(`/${slug}/connections/native-mcp`, getPublicOrigin());
+  const target = new URL(`/${slug}/connections`, getPublicOrigin());
   target.searchParams.set("native_mcp", provider);
   target.searchParams.set("result", status);
   if (detail) target.searchParams.set("detail", detail.slice(0, 200));
@@ -271,5 +271,11 @@ export async function GET(
     );
   }
 
-  return back(state.workspaceSlug, provider.slug, "ok");
+  // Land on the new connection's detail view.
+  const ok = new URL(
+    `/${state.workspaceSlug}/connections/native:${saved.id}`,
+    getPublicOrigin(),
+  );
+  ok.searchParams.set("result", "ok");
+  return NextResponse.redirect(ok, 302);
 }
