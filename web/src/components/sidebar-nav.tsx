@@ -18,6 +18,7 @@ import {
   IconHistory,
   IconSettingsSliderHor,
   IconShield,
+  IconSlack,
 } from "central-icons";
 
 // Two-level workspace nav: a standalone Dashboard plus collapsible
@@ -46,6 +47,11 @@ export function SidebarNav({ home }: { home: string }) {
           href: `${home}/automations`,
           label: "Automations",
           icon: <IconCalendarRepeat />,
+        },
+        {
+          href: `${home}/slack-apps`,
+          label: "Slack apps",
+          icon: <IconSlack />,
         },
         {
           href: `${home}/improvements`,

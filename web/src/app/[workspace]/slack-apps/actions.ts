@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { authorizeWorkspace, DENIED_MESSAGE } from "@/lib/auth-server";
 import { writeAuditEvent } from "@/lib/audit-db";
@@ -13,7 +13,8 @@ import {
 } from "@/lib/slack-apps";
 
 // Slack-app admin actions. All workspace_admin-only (managing a Slack app
-// is a privileged, instance-affecting operation).
+// is a privileged, instance-affecting operation). Create/update redirect to
+// the app's detail view on success; failures return an inline error.
 
 export type SlackAppFormState = { error?: string; message?: string };
 
@@ -75,8 +76,10 @@ export async function createSlackAppAction(
     agentName: null,
     payload: { name },
   });
-  revalidatePath(`/${slug}/settings/slack`);
-  return { message: `Created "${name}".` };
+  revalidatePath(`/${slug}/slack-apps`);
+  // Land on the detail view so the admin can finish setup (manifest, creds,
+  // install) right away.
+  redirect(`/${slug}/slack-apps/${created.id}`);
 }
 
 export async function updateSlackAppAction(
@@ -134,8 +137,9 @@ export async function updateSlackAppAction(
       ].filter(Boolean),
     },
   });
-  revalidatePath(`/${slug}/settings/slack`);
-  return { message: "Saved." };
+  revalidatePath(`/${slug}/slack-apps`);
+  revalidatePath(`/${slug}/slack-apps/${id}`);
+  redirect(`/${slug}/slack-apps/${id}`);
 }
 
 export async function deleteSlackAppAction(formData: FormData): Promise<void> {
@@ -155,5 +159,6 @@ export async function deleteSlackAppAction(formData: FormData): Promise<void> {
     agentName: null,
     payload: existing ? { name: existing.name } : {},
   });
-  revalidatePath(`/${slug}/settings/slack`);
+  revalidatePath(`/${slug}/slack-apps`);
+  redirect(`/${slug}/slack-apps`);
 }

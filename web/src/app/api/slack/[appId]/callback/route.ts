@@ -39,8 +39,9 @@ export async function GET(
     return NextResponse.redirect(`${origin}/`, 302);
   }
   const slug = state.workspaceSlug;
+  // Bounce back to the app's detail view in the Build → Slack apps area.
   const back = (result: string, detail?: string) => {
-    const u = new URL(`${origin}/${slug}/settings/slack`);
+    const u = new URL(`${origin}/${slug}/slack-apps/${appId}`);
     u.searchParams.set("slack", result);
     if (detail) u.searchParams.set("detail", detail);
     return NextResponse.redirect(u.toString(), 302);
