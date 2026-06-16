@@ -273,7 +273,7 @@ export async function GET(
 
   // Land on the new connection's detail view.
   const ok = new URL(
-    `/${state.workspaceSlug}/connections/native:${saved.id}`,
+    `/${state.workspaceSlug}/connections/native~${saved.id}`,
     getPublicOrigin(),
   );
   ok.searchParams.set("result", "ok");
