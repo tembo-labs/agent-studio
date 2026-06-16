@@ -43,15 +43,28 @@ function describeAuthError(raw: string): string {
   return `Sign-in failed (${raw}). If this instance is invite-only, ask an admin to invite your email.`;
 }
 
+// `next` carries the path a signed-out visitor was originally headed to (set
+// by the proxy auth gate). Only accept a same-origin absolute path — reject
+// protocol-relative (`//host`) and backslash tricks so it can't become an
+// open redirect to another site.
+function safeNext(raw?: string | string[]): string | null {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (!v || !v.startsWith("/") || v.startsWith("//") || v.startsWith("/\\")) {
+    return null;
+  }
+  return v;
+}
+
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string | string[] }>;
+  searchParams: Promise<{ error?: string | string[]; next?: string | string[] }>;
 }) {
   const session = await getServerSession();
   const instanceName = await getInstanceName();
-  const { error } = await searchParams;
+  const { error, next } = await searchParams;
   const errorCode = Array.isArray(error) ? error[0] : error;
+  const dest = safeNext(next);
 
   if (session) {
     // Auto-join any pending workspace invites for this account before
@@ -61,6 +74,10 @@ export default async function Home({
       await resolvePendingInvitesForUserId(session.user.id);
     } catch (e) {
       console.error("[invites] resolve on landing failed:", e);
+    }
+    // A returning deep-link visitor lands back where they were headed.
+    if (dest && dest !== "/") {
+      redirect(dest);
     }
     const workspaces = await listWorkspacesForUser(session.user.id);
     if (workspaces.length === 0) {
@@ -82,7 +99,10 @@ export default async function Home({
           </CardTitle>
         </CardHeader>
         <CardContent className="px-1 pb-1">
-          <SignInButtons providers={providers} />
+          <SignInButtons
+            providers={providers}
+            callbackURL={dest ? `/?next=${encodeURIComponent(dest)}` : "/"}
+          />
         </CardContent>
       </Card>
     ) : (

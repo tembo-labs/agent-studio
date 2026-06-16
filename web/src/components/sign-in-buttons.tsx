@@ -11,7 +11,16 @@ import { Button } from "@/components/ui/button";
 // (Microsoft Entra, OIDC) go through signIn.oauth2.
 type Provider = { id: string; label: string; kind: "social" | "oauth2" };
 
-export function SignInButtons({ providers }: { providers: Provider[] }) {
+export function SignInButtons({
+  providers,
+  // Where better-auth sends the user after a successful OAuth round-trip.
+  // Defaults to the landing page; a deep-link visitor passes the path they
+  // were headed to so they return there after signing in.
+  callbackURL = "/",
+}: {
+  providers: Provider[];
+  callbackURL?: string;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -24,11 +33,11 @@ export function SignInButtons({ providers }: { providers: Provider[] }) {
         p.kind === "social"
           ? await authClient.signIn.social({
               provider: p.id as "google",
-              callbackURL: "/",
+              callbackURL,
             })
           : await authClient.signIn.oauth2({
               providerId: p.id,
-              callbackURL: "/",
+              callbackURL,
             });
       if (result.error) {
         setError(result.error.message ?? "Sign-in failed.");
