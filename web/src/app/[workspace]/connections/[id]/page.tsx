@@ -60,29 +60,30 @@ export default async function ConnectionDetailPage({
   const resultParam = typeof sp.result === "string" ? sp.result : undefined;
   const detailParam = typeof sp.detail === "string" ? sp.detail : undefined;
 
-  let header: ReactNode;
-  let body: ReactNode;
+  let title: string;
+  let logoSlug: string | null;
+  let editable = false;
+  const rows: { label: string; value: ReactNode }[] = [];
+  const actions: ReactNode[] = [];
 
   if (loaded.kind === "secret") {
     const s = loaded.secret;
-    header = (
-      <Title logoSlug={null} title={s.slug} typeLabel="Secret" />
-    );
-    body = (
-      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[10rem_1fr]">
-        <Row label="Value">
-          <code className="text-foreground">••••••••{s.last4}</code>
-        </Row>
-        {s.description && <Row label="Description">{s.description}</Row>}
-        <Row label="Updated">
-          <LocalTime iso={s.updatedAt} />
-        </Row>
-        <Row label="Used by agents">
+    title = s.slug;
+    logoSlug = null;
+    editable = true;
+    rows.push(
+      { label: "Type", value: "Secret" },
+      { label: "Value", value: <code className="text-foreground">••••••••{s.last4}</code> },
+      ...(s.description ? [{ label: "Description", value: s.description }] : []),
+      { label: "Updated", value: <LocalTime iso={s.updatedAt} /> },
+      {
+        label: "Used by agents",
+        value: (
           <code className="text-foreground">
             tas_tools.secret(&quot;{s.slug}&quot;)
           </code>
-        </Row>
-      </dl>
+        ),
+      },
     );
   } else if (loaded.kind === "native") {
     const c = loaded.conn;
@@ -95,64 +96,44 @@ export default async function ConnectionDetailPage({
       c.name,
     );
     const isManual = provider?.authMode === "manual";
+    editable = provider?.authMode === "dcr";
+    title = provider?.displayName ?? c.type;
+    logoSlug = c.type;
     const reconnect = `/api/connections/native/${c.type}/authorize?workspace=${encodeURIComponent(
       workspace.slug,
     )}&${isManual ? "app" : "name"}=${encodeURIComponent(c.name)}`;
-    header = (
-      <Title
-        logoSlug={c.type}
-        title={provider?.displayName ?? c.type}
-        slot={c.name}
-        typeLabel="Native MCP"
-        statusLabel={c.status}
-        statusVariant={nativeVariant(c.status)}
-      />
+    rows.push(
+      { label: "Type", value: "Native MCP" },
+      { label: "Connection", value: <code className="text-foreground">{c.name}</code> },
+      { label: "Status", value: <Badge variant={nativeVariant(c.status)} size="small">{c.status}</Badge> },
+      { label: "Auth", value: c.authType === "pat" ? "API key" : "OAuth" },
+      { label: "Connected", value: <LocalTime iso={c.createdAt.toISOString()} /> },
+      ...(c.tokenExpiresAt
+        ? [{ label: "Token expires", value: <LocalTime iso={c.tokenExpiresAt.toISOString()} /> }]
+        : []),
+      {
+        label: "Tools",
+        value: (
+          <Link
+            href={`/${workspace.slug}/tools?source=native-mcp&provider=${encodeURIComponent(c.type)}&connection=${encodeURIComponent(c.name)}`}
+            className="text-foreground underline underline-offset-2"
+          >
+            {tools.length} cached
+          </Link>
+        ),
+      },
     );
-    body = (
-      <>
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[10rem_1fr]">
-          <Row label="Auth">{c.authType === "pat" ? "API key" : "OAuth"}</Row>
-          <Row label="Connected">
-            <LocalTime iso={c.createdAt.toISOString()} />
-          </Row>
-          {c.tokenExpiresAt && (
-            <Row label="Token expires">
-              <LocalTime iso={c.tokenExpiresAt.toISOString()} />
-            </Row>
-          )}
-          <Row label="Tools">
-            <Link
-              href={`/${workspace.slug}/tools?source=native-mcp&provider=${encodeURIComponent(
-                c.type,
-              )}&connection=${encodeURIComponent(c.name)}`}
-              className="text-foreground underline underline-offset-2"
-            >
-              {tools.length} cached
-            </Link>
-          </Row>
-        </dl>
-        <div className="flex flex-wrap items-center gap-4">
-          <RefreshNativeMcpToolsForm
-            workspaceSlug={workspace.slug}
-            connectionId={c.id}
-          />
-          {!view.viewingOther && (
-            <>
-              <a
-                href={reconnect}
-                className="text-foreground-weak hover:text-foreground text-sm underline underline-offset-2"
-              >
-                Reconnect →
-              </a>
-              <DisconnectNativeMcpConnectionForm
-                workspaceSlug={workspace.slug}
-                connectionId={c.id}
-              />
-            </>
-          )}
-        </div>
-      </>
+    actions.push(
+      <RefreshNativeMcpToolsForm key="refresh" workspaceSlug={workspace.slug} connectionId={c.id} />,
     );
+    if (!view.viewingOther) {
+      actions.push(
+        <Button key="reconnect" asChild variant="secondary" size="small">
+          <a href={reconnect}>Reconnect</a>
+        </Button>,
+        <DisconnectNativeMcpConnectionForm key="disconnect" workspaceSlug={workspace.slug} connectionId={c.id} />,
+      );
+    }
   } else {
     const c = loaded.conn;
     const tools = await listToolsForConnection(
@@ -162,73 +143,76 @@ export default async function ConnectionDetailPage({
       c.toolkit,
       c.name,
     );
+    editable = true;
+    title = toolkitLabel(c.toolkit);
+    logoSlug = c.toolkit;
     const reconnect = `/api/connections/composio/authorize?workspace=${encodeURIComponent(
       workspace.slug,
     )}&toolkit=${encodeURIComponent(c.toolkit)}&name=${encodeURIComponent(c.name)}`;
-    header = (
-      <Title
-        logoSlug={c.toolkit}
-        title={toolkitLabel(c.toolkit)}
-        slot={c.name}
-        typeLabel="Composio"
-        statusLabel={c.status.toLowerCase()}
-        statusVariant={c.status.toLowerCase() === "active" ? "green" : "yellow"}
-      />
+    rows.push(
+      { label: "Type", value: "Composio" },
+      { label: "Connection", value: <code className="text-foreground">{c.name}</code> },
+      { label: "Status", value: <Badge variant={c.status.toLowerCase() === "active" ? "green" : "yellow"} size="small">{c.status.toLowerCase()}</Badge> },
+      { label: "Updated", value: <LocalTime iso={c.updatedAt.toISOString()} /> },
+      {
+        label: "Tools",
+        value: (
+          <Link
+            href={`/${workspace.slug}/tools?source=composio&provider=${encodeURIComponent(c.toolkit)}&connection=${encodeURIComponent(c.name)}`}
+            className="text-foreground underline underline-offset-2"
+          >
+            {tools.length} cached
+          </Link>
+        ),
+      },
     );
-    body = (
-      <>
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[10rem_1fr]">
-          <Row label="Updated">
-            <LocalTime iso={c.updatedAt.toISOString()} />
-          </Row>
-          <Row label="Tools">
-            <Link
-              href={`/${workspace.slug}/tools?source=composio&provider=${encodeURIComponent(
-                c.toolkit,
-              )}&connection=${encodeURIComponent(c.name)}`}
-              className="text-foreground underline underline-offset-2"
-            >
-              {tools.length} cached
-            </Link>
-          </Row>
-        </dl>
-        <div className="flex flex-wrap items-center gap-4">
-          <RefreshComposioToolsForm
-            workspaceSlug={workspace.slug}
-            connectionId={c.id}
-          />
-          {!view.viewingOther && (
-            <>
-              <a
-                href={reconnect}
-                className="text-foreground-weak hover:text-foreground text-sm underline underline-offset-2"
-              >
-                Reconnect →
-              </a>
-              <DisconnectComposioConnectionForm
-                workspaceSlug={workspace.slug}
-                connectionId={c.id}
-              />
-            </>
-          )}
-        </div>
-      </>
+    actions.push(
+      <RefreshComposioToolsForm key="refresh" workspaceSlug={workspace.slug} connectionId={c.id} />,
+    );
+    if (!view.viewingOther) {
+      actions.push(
+        <Button key="reconnect" asChild variant="secondary" size="small">
+          <a href={reconnect}>Reconnect</a>
+        </Button>,
+        <DisconnectComposioConnectionForm key="disconnect" workspaceSlug={workspace.slug} connectionId={c.id} />,
+      );
+    }
+  }
+
+  // Edit only when the connection has something to edit (rename / rotate) and
+  // we're not viewing another member. Placed first so it leads the cluster.
+  if (editable && !view.viewingOther) {
+    actions.unshift(
+      <Button key="edit" asChild variant="secondary" size="small">
+        <Link href={editHref}>Edit</Link>
+      </Button>,
     );
   }
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-2">
-        <BackLink
-          href={`/${workspace.slug}/connections${userQs}`}
-          label="Connections"
-        />
-        <div className="flex items-start justify-between gap-3">
-          {header}
-          {!view.viewingOther && (
-            <Button asChild variant="secondary" size="small">
-              <Link href={editHref}>Edit</Link>
-            </Button>
+        <BackLink href={`/${workspace.slug}/connections${userQs}`} label="Connections" />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {logoSlug ? (
+              <McpProviderLogo slug={logoSlug} label={title} size={24} />
+            ) : (
+              <span
+                className="bg-surface-secondary text-foreground-muted inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-sm"
+                aria-hidden
+              >
+                ⚿
+              </span>
+            )}
+            <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
+              {title}
+            </h1>
+          </div>
+          {actions.length > 0 && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {actions}
+            </div>
           )}
         </div>
       </div>
@@ -248,7 +232,14 @@ export default async function ConnectionDetailPage({
         </div>
       )}
 
-      {body}
+      <dl className="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[10rem_1fr]">
+        {rows.map((r) => (
+          <div key={r.label} className="contents">
+            <dt className="text-foreground-muted">{r.label}</dt>
+            <dd className="text-foreground-weak flex items-center">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
@@ -261,56 +252,4 @@ function nativeVariant(
     : status === "revoked"
       ? "red"
       : "yellow";
-}
-
-function Title({
-  logoSlug,
-  title,
-  slot,
-  typeLabel,
-  statusLabel,
-  statusVariant,
-}: {
-  logoSlug: string | null;
-  title: string;
-  slot?: string;
-  typeLabel: string;
-  statusLabel?: string;
-  statusVariant?: StatusVariant;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      {logoSlug ? (
-        <McpProviderLogo slug={logoSlug} label={title} size={24} />
-      ) : (
-        <span
-          className="bg-surface-secondary text-foreground-muted inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-sm"
-          aria-hidden
-        >
-          ⚿
-        </span>
-      )}
-      <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
-        {title}
-      </h1>
-      {slot && <span className="text-foreground-muted text-base">· {slot}</span>}
-      {statusLabel && statusVariant && (
-        <Badge variant={statusVariant} size="small">
-          {statusLabel}
-        </Badge>
-      )}
-      <span className="text-foreground-muted text-xs uppercase tracking-wide">
-        {typeLabel}
-      </span>
-    </div>
-  );
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <>
-      <dt className="text-foreground-muted">{label}</dt>
-      <dd className="text-foreground-weak">{children}</dd>
-    </>
-  );
 }

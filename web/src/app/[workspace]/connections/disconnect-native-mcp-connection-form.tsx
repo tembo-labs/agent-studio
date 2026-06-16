@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+
+import { Button } from "@/components/ui/button";
 import { useActionToast } from "@/lib/use-action-toast";
 
 import {
@@ -10,10 +12,9 @@ import {
 
 const INITIAL: SimpleConnectionActionState = {};
 
-// Plain text-link styling matches the Composio Disconnect row so
-// both connection modes share a visual rhythm on the Connections
-// page. Destructive intent is signaled by the sentiment-negative
-// hover color, not a heavy button background.
+// Disconnect (delete) a native-MCP connection. Rendered as a destructive
+// button in the detail-view action cluster; on success the action redirects
+// back to the Connections list.
 export function DisconnectNativeMcpConnectionForm({
   workspaceSlug,
   connectionId,
@@ -27,23 +28,12 @@ export function DisconnectNativeMcpConnectionForm({
   );
   useActionToast(state);
   return (
-    <div className="flex flex-col items-end gap-1">
-      <form action={formAction}>
-        <input type="hidden" name="workspace" value={workspaceSlug} />
-        <input type="hidden" name="connectionId" value={connectionId} />
-        <button
-          type="submit"
-          disabled={pending}
-          className="text-foreground hover:text-sentiment-negative text-sm font-medium hover:underline disabled:opacity-60"
-        >
-          {pending ? "Disconnecting…" : "Disconnect"}
-        </button>
-      </form>
-      {state.error && (
-        <p className="text-sentiment-negative max-w-xs text-right text-sm">
-          {state.error}
-        </p>
-      )}
-    </div>
+    <form action={formAction}>
+      <input type="hidden" name="workspace" value={workspaceSlug} />
+      <input type="hidden" name="connectionId" value={connectionId} />
+      <Button type="submit" variant="destructive" size="small" disabled={pending}>
+        {pending ? "Disconnecting…" : "Disconnect"}
+      </Button>
+    </form>
   );
 }

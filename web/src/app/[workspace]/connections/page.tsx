@@ -3,14 +3,13 @@ import { notFound } from "next/navigation";
 
 import { IconPlusLarge } from "central-icons";
 
-import { McpProviderLogo } from "@/components/mcp-provider-logo";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { resolveConnectionsView } from "@/lib/connections-view";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, listWorkspaceMembers } from "@/lib/workspace";
 
-import { listAllConnections, type ConnectionRow } from "./connection-ref";
+import { listAllConnections } from "./connection-ref";
+import { ConnectionsTable } from "./connections-table";
 import { ViewAsSelect } from "./view-as-select";
 
 export const dynamic = "force-dynamic";
@@ -111,16 +110,11 @@ export default async function ConnectionsPage({
       </div>
 
       {rows.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          {rows.map((row) => (
-            <ConnectionRowLink
-              key={row.ref}
-              row={row}
-              workspaceSlug={workspace.slug}
-              viewUserId={view.viewingOther ? view.userId : undefined}
-            />
-          ))}
-        </div>
+        <ConnectionsTable
+          workspaceSlug={workspace.slug}
+          rows={rows}
+          viewUserId={view.viewingOther ? view.userId : undefined}
+        />
       ) : (
         <p className="text-foreground-muted rounded-lg border border-dashed border-[var(--color-border)] px-3 py-10 text-center text-sm">
           No connections yet. Connect a provider or add a secret to give agents
@@ -128,59 +122,5 @@ export default async function ConnectionsPage({
         </p>
       )}
     </div>
-  );
-}
-
-function ConnectionRowLink({
-  row,
-  workspaceSlug,
-  viewUserId,
-}: {
-  row: ConnectionRow;
-  workspaceSlug: string;
-  viewUserId?: string;
-}) {
-  // Carry the viewed-member through so an admin keeps the same view on the
-  // detail page.
-  const href = `/${workspaceSlug}/connections/${row.ref}${
-    viewUserId ? `?user=${encodeURIComponent(viewUserId)}` : ""
-  }`;
-  return (
-    <Link
-      href={href}
-      className="border-border bg-surface hover:bg-surface-secondary group flex items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors"
-    >
-      <div className="flex min-w-0 items-center gap-2.5">
-        {row.logoSlug ? (
-          <McpProviderLogo slug={row.logoSlug} label={row.title} size={20} />
-        ) : (
-          <span
-            className="bg-surface-secondary text-foreground-muted inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-xs"
-            aria-hidden
-          >
-            ⚿
-          </span>
-        )}
-        <span className="text-foreground group-hover:underline font-medium">
-          {row.title}
-        </span>
-        {row.slot && (
-          <span className="text-foreground-muted truncate text-sm">
-            · {row.slot}
-          </span>
-        )}
-        <span className="text-foreground-muted text-xs uppercase tracking-wide">
-          {row.typeLabel}
-        </span>
-      </div>
-      <div className="flex shrink-0 items-center gap-3">
-        <Badge variant={row.statusVariant} size="small">
-          {row.statusLabel}
-        </Badge>
-        <span className="text-foreground-muted text-sm" aria-hidden>
-          →
-        </span>
-      </div>
-    </Link>
   );
 }

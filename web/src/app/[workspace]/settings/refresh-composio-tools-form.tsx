@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+
+import { Button } from "@/components/ui/button";
 import { useActionToast } from "@/lib/use-action-toast";
 
 import {
@@ -10,8 +12,8 @@ import {
 
 const INITIAL: RefreshComposioToolsFormState = {};
 
-// Mirror of RefreshNativeMcpToolsForm — text-link styling so both
-// connection-mode rows share the same visual rhythm.
+// Re-prime a Composio connection's cached tool list. Rendered as a button in
+// the connection detail-view action cluster; errors surface via toast.
 export function RefreshComposioToolsForm({
   workspaceSlug,
   connectionId,
@@ -27,23 +29,12 @@ export function RefreshComposioToolsForm({
   );
   useActionToast(state);
   return (
-    <div className="flex flex-col items-end gap-1">
-      <form action={formAction}>
-        <input type="hidden" name="workspace" value={workspaceSlug} />
-        <input type="hidden" name="connectionId" value={connectionId} />
-        <button
-          type="submit"
-          disabled={pending}
-          className="text-foreground-weak hover:text-foreground text-sm font-medium hover:underline disabled:opacity-60"
-        >
-          {pending ? "Refreshing…" : (label ?? "Refresh tools")}
-        </button>
-      </form>
-      {state.error && (
-        <p className="text-sentiment-negative max-w-xs text-right text-sm">
-          {state.error}
-        </p>
-      )}
-    </div>
+    <form action={formAction}>
+      <input type="hidden" name="workspace" value={workspaceSlug} />
+      <input type="hidden" name="connectionId" value={connectionId} />
+      <Button type="submit" variant="secondary" size="small" disabled={pending}>
+        {pending ? "Refreshing…" : (label ?? "Refresh tools")}
+      </Button>
+    </form>
   );
 }
