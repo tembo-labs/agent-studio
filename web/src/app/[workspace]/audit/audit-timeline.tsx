@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ALL_AUDIT_SOURCES, type AuditSource } from "@/lib/audit";
+import { getMcpProvider } from "@/lib/mcp-providers";
 
 import { loadAuditAction } from "./actions";
 import type { LoadedAuditEntry } from "./shape";
@@ -351,9 +352,28 @@ function AuditRow({
             <TargetLink entry={entry} workspaceSlug={workspaceSlug} />
           </div>
           <EventSummary entry={entry} />
+          <RawPayload payload={entry.payload} />
         </div>
       </td>
     </tr>
+  );
+}
+
+// Full detail for any event, on demand. The per-kind summary above is a glance;
+// this <details> (no JS) exposes the complete payload — the source of truth for
+// fields the summary doesn't render. Hidden when the payload is empty.
+function RawPayload({ payload }: { payload: Record<string, unknown> }) {
+  const keys = Object.keys(payload ?? {});
+  if (keys.length === 0) return null;
+  return (
+    <details className="group mt-0.5">
+      <summary className="text-foreground-muted hover:text-foreground-weak cursor-pointer text-xs select-none">
+        Details
+      </summary>
+      <pre className="bg-surface-secondary text-foreground-weak mt-1 overflow-x-auto rounded-md p-2 text-xs">
+        {JSON.stringify(payload, null, 2)}
+      </pre>
+    </details>
   );
 }
 
@@ -459,18 +479,28 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
         </span>
       );
     case "connection.authorized":
-    case "connection.disconnected":
+    case "connection.disconnected": {
+      const provider = connectionProviderLabel(p);
+      const tag = connectionSourceTag(p);
       return (
         <span className="text-foreground-weak text-sm">
-          {String(p.toolkit ?? "")} · {String(p.name ?? "default")}
+          {provider || "connection"} · {String(p.name ?? "default")}
+          {tag ? ` · ${tag}` : ""}
         </span>
       );
-    case "connection.renamed":
+    }
+    case "connection.renamed": {
+      // Composio uses oldName/newName; native-MCP uses old_name/new_name.
+      const oldName = String(p.oldName ?? p.old_name ?? "");
+      const newName = String(p.newName ?? p.new_name ?? "");
+      const provider = connectionProviderLabel(p);
       return (
         <span className="text-foreground-weak text-sm">
-          {String(p.toolkit ?? "")} · {String(p.oldName ?? "")} → {String(p.newName ?? "")}
+          {provider ? `${provider} · ` : ""}
+          {oldName} → {newName}
         </span>
       );
+    }
     case "workspace.renamed":
       return (
         <span className="text-foreground-weak text-sm">
@@ -544,6 +574,106 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
         </span>
       );
     }
+    case "member.invited":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.email ?? "")}
+          {p.role ? ` as ${String(p.role)}` : ""}
+        </span>
+      );
+    case "member.invite_revoked":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.email ?? "")}
+        </span>
+      );
+    case "auth.login": {
+      const parts: string[] = [];
+      if (p.ipAddress) parts.push(String(p.ipAddress));
+      if (p.userAgent) parts.push(shortUserAgent(String(p.userAgent)));
+      return parts.length ? (
+        <span className="text-foreground-weak text-sm">{parts.join(" · ")}</span>
+      ) : null;
+    }
+    case "repo.connected":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.repo ?? "")}
+          {p.defaultBranch ? ` · ${String(p.defaultBranch)}` : ""}
+        </span>
+      );
+    case "workspace.created":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.name ?? "")}
+          {p.slug ? ` · /${String(p.slug)}` : ""}
+        </span>
+      );
+    case "slack_app.created":
+    case "slack_app.deleted":
+      return (
+        <span className="text-foreground-weak text-sm">{String(p.name ?? "")}</span>
+      );
+    case "slack_app.updated": {
+      const rotated = Array.isArray(p.rotatedSecrets)
+        ? (p.rotatedSecrets as string[])
+        : [];
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.name ?? "")}
+          {rotated.length ? ` · rotated ${rotated.join(", ")}` : ""}
+        </span>
+      );
+    }
+    case "slack_message.sent":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.slackApp ?? "")} → {String(p.destination ?? "")}
+        </span>
+      );
+    case "webhook.created":
+    case "webhook.rotated":
+    case "webhook.enabled":
+    case "webhook.disabled":
+    case "webhook.deleted":
+      return (
+        <span className="text-foreground-weak text-sm">{String(p.name ?? "")}</span>
+      );
+    case "native_oauth_client.set":
+    case "native_oauth_client.removed":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {connectionProviderLabel(p)}
+          {p.instance ? ` · ${String(p.instance)}` : ""}
+        </span>
+      );
+    case "native_mcp_provider.enabled":
+    case "native_mcp_provider.disabled":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {connectionProviderLabel(p)}
+        </span>
+      );
+    case "secret_connection.set":
+    case "secret_connection.rotated":
+    case "secret_connection.removed":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.slug ?? "")}
+        </span>
+      );
+    case "agent.version.promoted":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {p.versionNumber ? `v${String(p.versionNumber)}` : ""}
+        </span>
+      );
+    case "guidance.synced":
+      return (
+        <span className="text-foreground-weak text-sm">
+          agents/AGENTS.md + per-framework guides
+        </span>
+      );
     default:
       return null;
   }
@@ -618,6 +748,47 @@ function commitModeLabel(v: unknown): string {
   if (v === "direct") return "YOLO";
   if (v === "pull_request") return "Always PR";
   return String(v ?? "");
+}
+
+// Condense a User-Agent string to a recognizable browser/OS for the login row;
+// fall back to a truncated raw string. Full UA stays in the raw-payload details.
+function shortUserAgent(ua: string): string {
+  const browser =
+    /Edg\//.test(ua) ? "Edge"
+    : /OPR\/|Opera/.test(ua) ? "Opera"
+    : /Chrome\//.test(ua) ? "Chrome"
+    : /Firefox\//.test(ua) ? "Firefox"
+    : /Safari\//.test(ua) ? "Safari"
+    : null;
+  const os =
+    /Mac OS X/.test(ua) ? "macOS"
+    : /Windows/.test(ua) ? "Windows"
+    : /Android/.test(ua) ? "Android"
+    : /(iPhone|iPad)/.test(ua) ? "iOS"
+    : /Linux/.test(ua) ? "Linux"
+    : null;
+  if (browser && os) return `${browser} on ${os}`;
+  if (browser) return browser;
+  return ua.length > 40 ? `${ua.slice(0, 40)}…` : ua;
+}
+
+// Connection events come from two stacks with different payload keys: Composio
+// records `toolkit` (a slug), native-MCP records `provider` (a slug we map to a
+// display name). Prefer the human name so a row reads "Attio", not blank.
+function connectionProviderLabel(p: Record<string, unknown>): string {
+  if (typeof p.provider === "string") {
+    return getMcpProvider(p.provider)?.displayName ?? p.provider;
+  }
+  if (typeof p.toolkit === "string") return p.toolkit;
+  return "";
+}
+
+// A short tag for which connection stack the event came from.
+function connectionSourceTag(p: Record<string, unknown>): string | null {
+  if (p.source === "native-mcp") return "Native MCP";
+  if (p.source === "secret") return "secret";
+  if (typeof p.toolkit === "string") return "Composio";
+  return null;
 }
 
 function humanKind(kind: string): string {
