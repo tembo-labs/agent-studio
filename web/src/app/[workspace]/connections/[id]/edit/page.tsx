@@ -7,9 +7,10 @@ import { getMcpProvider } from "@/lib/mcp-providers";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
 
+import { renameComposioConnectionAction } from "../../../settings/actions";
 import { loadConnection, parseConnectionRef } from "../../connection-ref";
-import { RenameComposioConnectionForm } from "../../../settings/rename-composio-connection-form";
-import { RenameNativeMcpConnectionForm } from "../../rename-native-mcp-connection-form";
+import { renameNativeMcpConnectionAction } from "../../native-mcp-actions";
+import { ConnectionRenameField } from "./connection-rename-field";
 import { SecretEditForm } from "./secret-edit-form";
 
 export const dynamic = "force-dynamic";
@@ -38,10 +39,17 @@ export default async function EditConnectionPage({
     session.user.id,
     requestedUser,
   );
-  // Editing acts on the connection; an admin viewing another member can rename
-  // (the rename action allows it), but secrets edit is admin-only via the action.
   const loaded = await loadConnection(workspace.id, view.userId, ref);
   if (!loaded) notFound();
+
+  // Native manual / self-key connections have nothing to edit (name is fixed) —
+  // the detail view hides their Edit button, so reaching here is a stray URL.
+  if (
+    loaded.kind === "native" &&
+    getMcpProvider(loaded.conn.type)?.authMode !== "dcr"
+  ) {
+    notFound();
+  }
 
   const userQs = view.viewingOther
     ? `?user=${encodeURIComponent(view.userId)}`
@@ -73,42 +81,20 @@ export default async function EditConnectionPage({
           description={loaded.secret.description}
         />
       ) : loaded.kind === "composio" ? (
-        <Section title="Connection name">
-          <RenameComposioConnectionForm
-            workspaceSlug={workspace.slug}
-            connectionId={loaded.conn.id}
-            currentName={loaded.conn.name}
-          />
-        </Section>
-      ) : getMcpProvider(loaded.conn.type)?.authMode === "dcr" ? (
-        <Section title="Connection name">
-          <RenameNativeMcpConnectionForm
-            workspaceSlug={workspace.slug}
-            connectionId={loaded.conn.id}
-            currentName={loaded.conn.name}
-          />
-        </Section>
+        <ConnectionRenameField
+          action={renameComposioConnectionAction}
+          workspaceSlug={workspace.slug}
+          connectionId={loaded.conn.id}
+          currentName={loaded.conn.name}
+        />
       ) : (
-        <p className="text-foreground-weak text-sm">
-          This connection can&apos;t be renamed — its name is fixed by the
-          provider. To remove it, use Disconnect on the connection page.
-        </p>
+        <ConnectionRenameField
+          action={renameNativeMcpConnectionAction}
+          workspaceSlug={workspace.slug}
+          connectionId={loaded.conn.id}
+          currentName={loaded.conn.name}
+        />
       )}
-    </div>
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-foreground text-sm font-medium">{title}</span>
-      {children}
     </div>
   );
 }
