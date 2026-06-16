@@ -31,7 +31,7 @@ export function DisconnectNativeMcpConnectionForm({
     <form action={formAction}>
       <input type="hidden" name="workspace" value={workspaceSlug} />
       <input type="hidden" name="connectionId" value={connectionId} />
-      <Button type="submit" variant="destructive" size="small" disabled={pending}>
+      <Button type="submit" variant="destructive" disabled={pending}>
         {pending ? "Disconnecting…" : "Disconnect"}
       </Button>
     </form>
