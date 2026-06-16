@@ -17,6 +17,31 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.19] — Connections & Slack apps reworked into list / view / edit — shipped 2026-06-16
+
+### Changed
+- **Connections reworked into an agents-style list.** The tabbed Connections
+  shell (Native MCP / Composio / Secrets + an admin sub-page) is now one list of
+  every connection you have — native-MCP and Composio OAuth plus workspace
+  secrets — each row tagged by type, with a **"+ New connection"** button and,
+  for admins, **"Manage providers"** (provider enable/disable + bring-your-own
+  OAuth apps moved to `/connections/providers`).
+  - **New connection** is a two-step picker: choose an option (a provider,
+    a Composio toolkit, or a secret), then fill in just that option's form.
+  - Each connection gets a **detail view** (status, tools, token expiry, with
+    Refresh / Reconnect / Disconnect) and an **edit** view (rename, or rotate a
+    secret). OAuth flows land you on the new connection's detail page; old
+    `/connections/{native-mcp,composio,secrets}` URLs redirect to the new shape.
+- **Slack apps moved to the Build menu, reworked into list / detail / edit.**
+  Slack apps left Settings for **Build → Slack apps**: a list of apps (rows),
+  a dedicated **New Slack app** view, a detail view with the setup checklist /
+  request URLs / manifest / install, and an edit view for credentials. The
+  install flow returns to the app's detail page.
+- **Tools: admins see the whole workspace's catalog.** A workspace admin now
+  sees tools from every member's active connections on the Tools tab, not just
+  their own — so they can see what agents across the workspace can reach.
+  (API/MCP/agent surfaces stay per-user.)
+
 ## [v2026.6.18] — Audit timeline detail + sign-in redirect for deep links — shipped 2026-06-16
 
 ### Fixed
