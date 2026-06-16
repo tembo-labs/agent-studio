@@ -168,7 +168,7 @@ export function RemoveSkillForm({
     <form action={action} className="flex items-center gap-2">
       <input type="hidden" name="workspace" value={workspaceSlug} />
       <input type="hidden" name="name" value={name} />
-      <Button type="submit" variant="ghost" size="small" disabled={pending}>
+      <Button type="submit" variant="destructive" size="small" disabled={pending}>
         {pending ? "Removing…" : "Remove"}
       </Button>
       {state.error && (
