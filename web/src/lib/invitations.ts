@@ -168,20 +168,33 @@ export async function resolvePendingInvitesForUser(
   const client = await db.connect();
   try {
     await client.query("BEGIN");
+    // Join the inviter (invited_by) so the acceptance audit event can record
+    // *who* invited this user — otherwise that link is lost once the invite
+    // row is marked accepted.
     const { rows } = await client.query<{
       id: string;
       workspace_id: string;
       role: string;
+      invited_by: string | null;
+      invited_by_name: string | null;
+      invited_by_email: string | null;
     }>(
-      `SELECT id, workspace_id, role FROM workspace_invitation
-        WHERE lower(email) = $1 AND accepted_at IS NULL
-        FOR UPDATE`,
+      `SELECT i.id, i.workspace_id, i.role, i.invited_by,
+              u.name AS invited_by_name, u.email AS invited_by_email
+         FROM workspace_invitation i
+         LEFT JOIN "user" u ON u.id = i.invited_by
+        WHERE lower(i.email) = $1 AND i.accepted_at IS NULL
+        FOR UPDATE OF i`,
       [e],
     );
     let joined = 0;
     // Workspaces where a NEW membership row was actually created (ON CONFLICT
     // skips re-runs) — audited after the commit so we don't log on rollback.
-    const added: { workspaceId: string; role: string }[] = [];
+    const added: {
+      workspaceId: string;
+      role: string;
+      invitedBy: string | null;
+    }[] = [];
     for (const inv of rows) {
       const ins = await client.query(
         `INSERT INTO workspace_member (workspace_id, user_id, role)
@@ -196,14 +209,19 @@ export async function resolvePendingInvitesForUser(
         [inv.id, userId],
       );
       if ((ins.rowCount ?? 0) > 0) {
-        added.push({ workspaceId: inv.workspace_id, role: inv.role });
+        added.push({
+          workspaceId: inv.workspace_id,
+          role: inv.role,
+          invitedBy: inv.invited_by_name ?? inv.invited_by_email ?? null,
+        });
       }
       joined += 1;
     }
     await client.query("COMMIT");
 
     // Best-effort audit (post-commit, off the transaction client). The user
-    // accepting their own invite is the actor.
+    // accepting their own invite is the actor; the payload records who invited
+    // them so the chain (invited by X → accepted) is preserved.
     for (const a of added) {
       try {
         await writeAuditEvent({
@@ -214,7 +232,11 @@ export async function resolvePendingInvitesForUser(
           targetType: "member",
           targetId: userId,
           agentName: null,
-          payload: { role: a.role, via: "invite_accepted" },
+          payload: {
+            role: a.role,
+            via: "invite_accepted",
+            ...(a.invitedBy ? { invitedBy: a.invitedBy } : {}),
+          },
         });
       } catch (e) {
         console.error("[audit] member.added write failed:", e);

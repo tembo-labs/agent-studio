@@ -533,11 +533,24 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
         </span>
       );
     case "member.added": {
+      const role = String(p.role ?? "");
+      // Two flavors: an admin adding an existing user (payload has `email`;
+      // the actor column is the admin), or a user accepting their own invite
+      // (the actor column is that user; `invitedBy` records who invited them).
+      if (p.via === "invite_accepted") {
+        return (
+          <span className="text-foreground-weak text-sm">
+            accepted invite{role ? ` as ${role}` : ""}
+            {p.invitedBy ? ` · invited by ${String(p.invitedBy)}` : ""}
+          </span>
+        );
+      }
       const t = p.target as { name?: string; email?: string } | undefined;
-      const who = t?.name ?? t?.email ?? "";
+      const who = String(p.email ?? t?.name ?? t?.email ?? "");
       return (
         <span className="text-foreground-weak text-sm">
-          {who} as {String(p.role ?? "")}
+          {who}
+          {role ? ` as ${role}` : ""}
         </span>
       );
     }
@@ -672,6 +685,28 @@ function EventSummary({ entry }: { entry: LoadedAuditEntry }) {
       return (
         <span className="text-foreground-weak text-sm">
           agents/AGENTS.md + per-framework guides
+        </span>
+      );
+    case "api_key.created":
+    case "api_key.enabled":
+    case "api_key.disabled":
+    case "api_key.deleted":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.name ?? "")}
+        </span>
+      );
+    case "slack_app.installed":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {p.teamId ? `Slack team ${String(p.teamId)}` : ""}
+        </span>
+      );
+    case "slack.dispatch":
+      return (
+        <span className="text-foreground-weak text-sm">
+          {String(p.slackAppName ?? "")}
+          {p.channel ? ` · ${String(p.channel)}` : ""}
         </span>
       );
     default:
@@ -840,6 +875,27 @@ function humanKind(kind: string): string {
     "member.removed": "Member removed",
     "auth.login": "Signed in",
     "audit.exported": "Audit exported",
+    "api_key.created": "API key created",
+    "api_key.enabled": "API key enabled",
+    "api_key.disabled": "API key disabled",
+    "api_key.deleted": "API key deleted",
+    "agent.version.promoted": "Agent version promoted",
+    "agent.owner.changed": "Agent owner changed",
+    "webhook.created": "Webhook created",
+    "webhook.rotated": "Webhook secret rotated",
+    "webhook.enabled": "Webhook enabled",
+    "webhook.disabled": "Webhook disabled",
+    "webhook.deleted": "Webhook deleted",
+    "secret_connection.set": "Secret connection saved",
+    "secret_connection.rotated": "Secret connection rotated",
+    "secret_connection.removed": "Secret connection removed",
+    "native_oauth_client.set": "MCP OAuth app saved",
+    "native_oauth_client.removed": "MCP OAuth app removed",
+    "native_mcp_provider.enabled": "MCP provider enabled",
+    "native_mcp_provider.disabled": "MCP provider disabled",
+    "slack_app.installed": "Slack app installed",
+    "slack.dispatch": "Run launched from Slack",
+    "improvement.dismissed": "Pending agent dismissed",
   };
   return map[kind] ?? kind;
 }
