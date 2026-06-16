@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
 import { authorizeWorkspace, DENIED_MESSAGE } from "@/lib/auth-server";
+import { writeAuditEvent } from "@/lib/audit-db";
 import {
   createSlackApp,
   deleteSlackApp,
+  getSlackApp,
   updateSlackApp,
 } from "@/lib/slack-apps";
 
@@ -48,8 +50,9 @@ export async function createSlackAppAction(
     if (auth.reason === "denied") return { error: DENIED_MESSAGE };
     notFound();
   }
+  let created;
   try {
-    await createSlackApp(
+    created = await createSlackApp(
       auth.workspace.id,
       { name, defaultOwnerUserId: defaultOwner, agentLabels },
       auth.userId,
@@ -62,6 +65,16 @@ export async function createSlackAppAction(
         : "Couldn't create the Slack app.",
     };
   }
+  await writeAuditEvent({
+    workspaceId: auth.workspace.id,
+    actorUserId: auth.userId,
+    source: "human_action",
+    kind: "slack_app.created",
+    targetType: "slack_app",
+    targetId: created.id,
+    agentName: null,
+    payload: { name },
+  });
   revalidatePath(`/${slug}/settings/slack`);
   return { message: `Created "${name}".` };
 }
@@ -104,6 +117,23 @@ export async function updateSlackAppAction(
     ...(clientSecret ? { clientSecret } : {}),
   });
 
+  await writeAuditEvent({
+    workspaceId: auth.workspace.id,
+    actorUserId: auth.userId,
+    source: "human_action",
+    kind: "slack_app.updated",
+    targetType: "slack_app",
+    targetId: id,
+    agentName: null,
+    payload: {
+      ...(name !== null ? { name: String(name).trim() } : {}),
+      // Record which secrets were (re)written — never the values.
+      rotatedSecrets: [
+        signingSecret ? "signing_secret" : null,
+        clientSecret ? "client_secret" : null,
+      ].filter(Boolean),
+    },
+  });
   revalidatePath(`/${slug}/settings/slack`);
   return { message: "Saved." };
 }
@@ -113,6 +143,17 @@ export async function deleteSlackAppAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   const auth = await authorizeWorkspace(slug, "workspace_admin");
   if (!auth.ok) return;
+  const existing = await getSlackApp(auth.workspace.id, id);
   await deleteSlackApp(auth.workspace.id, id);
+  await writeAuditEvent({
+    workspaceId: auth.workspace.id,
+    actorUserId: auth.userId,
+    source: "human_action",
+    kind: "slack_app.deleted",
+    targetType: "slack_app",
+    targetId: id,
+    agentName: null,
+    payload: existing ? { name: existing.name } : {},
+  });
   revalidatePath(`/${slug}/settings/slack`);
 }

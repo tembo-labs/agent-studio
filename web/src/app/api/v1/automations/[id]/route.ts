@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { authorizeApiRequest } from "@/lib/api-auth";
+import { writeAuditEvent } from "@/lib/audit-db";
 import { apiError, authErrorResponse } from "@/lib/api-v1/http";
 import { serializeAutomation } from "@/lib/api-v1/serializers";
 import {
@@ -76,6 +77,22 @@ export async function PATCH(
     ownerUserId: existing.ownerUserId,
     useDraft: typeof body.useDraft === "boolean" ? body.useDraft : existing.useDraft,
   });
+  await writeAuditEvent({
+    workspaceId: auth.workspace.id,
+    actorUserId: auth.userId,
+    source: "human_action",
+    kind: "automation.updated",
+    targetType: "automation",
+    targetId: id,
+    agentName: updated.agentName,
+    payload: {
+      via: auth.surface,
+      apiKeyId: auth.apiKeyId,
+      name: updated.name,
+      cron: updated.cron,
+      enabled: updated.enabled,
+    },
+  });
   return NextResponse.json({ automation: serializeAutomation(updated) });
 }
 
@@ -92,5 +109,15 @@ export async function DELETE(
     return apiError(404, "automation not found");
   }
   await deleteAutomation(id);
+  await writeAuditEvent({
+    workspaceId: auth.workspace.id,
+    actorUserId: auth.userId,
+    source: "human_action",
+    kind: "automation.deleted",
+    targetType: "automation",
+    targetId: id,
+    agentName: existing.agentName,
+    payload: { via: auth.surface, apiKeyId: auth.apiKeyId, name: existing.name },
+  });
   return new NextResponse(null, { status: 204 });
 }

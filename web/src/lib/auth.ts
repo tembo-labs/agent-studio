@@ -5,11 +5,13 @@ import { Pool } from "pg";
 
 import { resolveAuthSecret } from "@/lib/auth-secret";
 import { genericOAuthConfigs } from "@/lib/auth-providers";
+import { writeAuditEvent } from "@/lib/audit-db";
 import { isInstanceAdminEmail } from "@/lib/config";
 import {
   hasPendingInvite,
   resolvePendingInvitesForUser,
 } from "@/lib/invitations";
+import { listWorkspacesForUser } from "@/lib/workspace";
 
 // We intentionally do not throw on missing env at module load time:
 // Next.js evaluates this file during `next build` to collect page data,
@@ -72,6 +74,45 @@ export const auth = betterAuth({
             await resolvePendingInvitesForUser(user.id, user.email);
           } catch (e) {
             console.error("[invites] resolve on signup failed:", e);
+          }
+        },
+      },
+    },
+    // Audit sign-ins. A session is created on every successful login (the
+    // OAuth/OIDC callback), so this is our login event. The audit log is
+    // workspace-scoped (audit_event.workspace_id is NOT NULL), so we write one
+    // `auth.login` per workspace the user belongs to — each workspace's
+    // timeline then shows when its members signed in. Best-effort: never let an
+    // audit write block a login.
+    //
+    // Not covered here: logout (better-auth exposes no session-delete database
+    // hook in this version) and rejected sign-ups (the `user.create.before`
+    // gate above throws for uninvited emails, but a rejected user has no
+    // workspace to attribute the event to).
+    session: {
+      create: {
+        after: async (session) => {
+          try {
+            const workspaces = await listWorkspacesForUser(session.userId);
+            await Promise.all(
+              workspaces.map((w) =>
+                writeAuditEvent({
+                  workspaceId: w.id,
+                  actorUserId: session.userId,
+                  source: "human_action",
+                  kind: "auth.login",
+                  targetType: "user",
+                  targetId: session.userId,
+                  agentName: null,
+                  payload: {
+                    ipAddress: session.ipAddress ?? null,
+                    userAgent: session.userAgent ?? null,
+                  },
+                }),
+              ),
+            );
+          } catch (e) {
+            console.error("[audit] auth.login write failed:", e);
           }
         },
       },

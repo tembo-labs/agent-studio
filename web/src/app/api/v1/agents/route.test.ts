@@ -37,6 +37,7 @@ beforeEach(() => {
     userId: "u-1",
     role: "viewer",
     apiKeyId: "key-1",
+    surface: "api",
   });
 });
 
