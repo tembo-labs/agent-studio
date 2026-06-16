@@ -15,6 +15,40 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
+## [Unreleased]
+
+## [v2026.6.17] — Audit coverage for the API/MCP surface, sign-ins, and membership — shipped 2026-06-16
+
+### Added
+- **Audit coverage for the public API & MCP surface.** Mutations made through
+  the REST API (`/api/v1`) and MCP server (`/mcp`) — which shipped unaudited in
+  v2026.6.16 — now write to the audit timeline, stamped with `via` (`api` or
+  `mcp`) and the acting API key so a programmatic change is distinguishable from
+  an in-app one and traceable to a key. Covers automation create/update/delete,
+  Slack-app create/update/delete, and `send_slack_message` (destination + length
+  only — never the message body). Runs and agent-change requests aren't
+  double-logged — they already project into the timeline from their own tables.
+  The in-app Slack-app management actions, which were also never audited, now
+  record the same events.
+- **Sign-in audit events.** A successful login now writes an `auth.login` event
+  (with IP address and user agent) to the timeline of each workspace the user
+  belongs to, via a better-auth session hook.
+- **Membership & setup audit events.** New events for inviting a member
+  (`member.invited`), revoking an invite (`member.invite_revoked`), a member
+  joining (`member.added` — on both admin-add and invite-accept), connecting a
+  repo (`repo.connected`, which stores a GitHub PAT), creating a workspace
+  (`workspace.created`), and syncing agent guidance (`guidance.synced`).
+
+### Dependencies
+- **esbuild → 0.28.1.** Clears two Dependabot advisories
+  ([GHSA-gv7w-rqvm-qjhr](https://github.com/advisories/GHSA-gv7w-rqvm-qjhr),
+  [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr)).
+  esbuild is dev/test-only here (transitive via vitest/tsx/vite in `web` and the
+  Astro toolchain in `docs`, never in the deployed runtime), and neither
+  vector — the Deno install path and the Windows dev server — applies to this
+  stack, but bumped to keep the security tab clean. `docs` needed a
+  `pnpm.overrides` pin since `astro`/`vite 7` held esbuild at 0.27.x.
+
 ## [v2026.6.16] — Public API & MCP server, sub-agent orchestration, prompt caching — shipped 2026-06-15
 
 ### Added
