@@ -1,10 +1,22 @@
-# Tembo Agent Studio
+<div align="center">
+  <a href="https://github.com/tembo/agent-studio">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/tembo-dark.svg">
+      <img alt="Tembo Agent Studio logo" src=".github/assets/tembo-light.svg" height="128">
+    </picture>
+  </a>
+  <h1>Tembo Agent Studio</h1>
+
+<a href="https://tembo.io"><img alt="Made by Tembo" src="https://img.shields.io/badge/MADE%20BY%20TEMBO-0f172a.svg?style=for-the-badge&labelColor=000"></a>
+<a href="https://github.com/tembo/agent-studio/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/tembo/agent-studio.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://github.com/tembo/agent-studio/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/tembo/agent-studio.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://github.com/tembo/agent-studio/tree/main/docs"><img alt="Documentation" src="https://img.shields.io/badge/Docs-0f172a.svg?style=for-the-badge&labelColor=000000"></a>
+
+</div>
 
 > Self-hosted control plane for AI agents. Definitions live in Git, every
 > change becomes a PR, and runs, audit logs, and identity stay in your
 > environment.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 Tembo Agent Studio (TAS) treats agents like production software instead of
 editable prompts in a vendor console. Agent definitions live in a repository
