@@ -740,7 +740,7 @@ def build_agent(
         model = AnthropicModel(
             model.removeprefix("anthropic:"),
             anthropic_client=AsyncAnthropic(
-                timeout=httpx.Timeout(timeout=None, connect=10.0)
+                timeout=httpx.Timeout(timeout=300.0, connect=10.0)
             ),
         )
     kwargs["model_settings"] = ms
