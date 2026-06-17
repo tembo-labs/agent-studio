@@ -41,6 +41,9 @@ function parseFrameworkField(raw: unknown): Framework | null {
 const FRAMEWORK_PATH: Record<Framework, { dir: string; ext: "yaml" | "json" }> = {
   "pydantic-agentspec": { dir: "pydantic-agentspec", ext: "yaml" },
   "cargo-ai": { dir: "cargo-ai", ext: "json" },
+  // Eve agents are directories; the entrypoint path is computed specially
+  // below. ext is unused for eve.
+  eve: { dir: "eve", ext: "json" },
 };
 
 export type ChatCreateFormState = {
@@ -116,7 +119,10 @@ export async function createFromChatAction(
   }
 
   const { dir, ext } = FRAMEWORK_PATH[framework];
-  const agentPath = `agents/${dir}/${agentSlug}.${ext}`;
+  const agentPath =
+    framework === "eve"
+      ? `agents/eve/${agentSlug}/agent/agent.ts`
+      : `agents/${dir}/${agentSlug}.${ext}`;
 
   // Persist the request as an improvement row before talking to
   // Tembo so we own the id we embed in the prompt. agent_name +

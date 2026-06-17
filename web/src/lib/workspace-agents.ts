@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  buildEveSpec,
   detectFormat,
   parseAgentContent,
   parseAgentFile,
@@ -38,9 +39,97 @@ const AGENTS_DIR = "agents";
 const FRAMEWORK_DIRS: Record<Framework, string> = {
   "pydantic-agentspec": "pydantic-agentspec",
   "cargo-ai": "cargo-ai",
+  eve: "eve",
 };
 
-const FRAMEWORK_DIR_VALUES = Object.values(FRAMEWORK_DIRS);
+// File-based frameworks only — Eve is a directory per agent and is scanned
+// separately (listEveAgents), so it's excluded from the one-file-per-agent walk.
+const FILE_FRAMEWORK_DIR_VALUES = [
+  FRAMEWORK_DIRS["pydantic-agentspec"],
+  FRAMEWORK_DIRS["cargo-ai"],
+];
+
+const EVE_DIR = `${AGENTS_DIR}/${FRAMEWORK_DIRS.eve}`;
+// Eve agent directory total-size cap (TS + config; deps are NOT included — the
+// runner installs them from package.json at run time).
+const EVE_DIR_MAX_BYTES = 2 * 1024 * 1024;
+const EVE_MAX_DEPTH = 8;
+
+/**
+ * Read a whole Eve agent directory (`agents/eve/<name>/`) as
+ * `{ project-relative path: content }` — e.g. `agent/agent.ts`. Skips
+ * `node_modules` and the build output. Returns ok:false when the directory has
+ * no `agent/agent.ts` (not an Eve agent) or exceeds the size cap.
+ */
+export async function readEveAgentDir(
+  token: string,
+  ref: RepoRef,
+  name: string,
+): Promise<
+  { ok: true; files: Record<string, string> } | { ok: false; detail: string }
+> {
+  const root = `${EVE_DIR}/${name}`;
+  const files: Record<string, string> = {};
+  let total = 0;
+
+  async function walk(path: string, depth: number): Promise<string | null> {
+    if (depth > EVE_MAX_DEPTH) return null;
+    const listing = await listDirectory(token, ref, path);
+    if (!listing.ok) return listing.detail ?? listing.error;
+    if ("missing" in listing && listing.missing) {
+      return depth === 0 ? `Eve agent "${root}" not found` : null;
+    }
+    for (const entry of listing.entries) {
+      if (entry.name === "node_modules" || entry.name === ".output") continue;
+      if (entry.type === "dir") {
+        const err = await walk(entry.path, depth + 1);
+        if (err) return err;
+      } else if (entry.type === "file") {
+        const read = await readFile(token, ref, entry.path);
+        if (!read.ok) return read.detail ?? read.error;
+        total += read.content.length;
+        if (total > EVE_DIR_MAX_BYTES) {
+          return `Eve agent "${name}" exceeds the ${EVE_DIR_MAX_BYTES}-byte limit`;
+        }
+        // Strip the `agents/eve/<name>/` prefix → project-relative path.
+        const rel = entry.path.slice(root.length + 1);
+        files[rel] = read.content;
+      }
+    }
+    return null;
+  }
+
+  const err = await walk(root, 0);
+  if (err) return { ok: false, detail: err };
+  if (!files["agent/agent.ts"]) {
+    return { ok: false, detail: `Eve agent "${name}" has no agent/agent.ts` };
+  }
+  return { ok: true, files };
+}
+
+/** List Eve agents — one per subdirectory of `agents/eve/` with an agent.ts. */
+async function listEveAgents(
+  token: string,
+  ref: RepoRef,
+): Promise<ListedAgent[]> {
+  const listing = await listDirectory(token, ref, EVE_DIR);
+  if (!listing.ok || ("missing" in listing && listing.missing)) return [];
+  const out: ListedAgent[] = [];
+  for (const entry of listing.entries) {
+    if (entry.type !== "dir") continue;
+    const name = entry.name;
+    const agentTs = await readFile(token, ref, `${entry.path}/agent/agent.ts`);
+    if (!agentTs.ok) continue; // not an Eve agent dir
+    out.push({
+      filename: name,
+      path: entry.path,
+      format: "json",
+      ok: true,
+      spec: buildEveSpec(name, agentTs.content),
+    });
+  }
+  return out;
+}
 
 // ── Sidecar tools module ─────────────────────────────────────────────
 //
@@ -213,7 +302,7 @@ export async function listAgents(workspaceId: string): Promise<ListAgentsResult>
   // fresh repo won't have an agents/cargo-ai/ directory yet) — those
   // surface as `entries: []` from listDirectory's `missing: true` path.
   const subfolderListings = await Promise.all(
-    FRAMEWORK_DIR_VALUES.map((dir) =>
+    FILE_FRAMEWORK_DIR_VALUES.map((dir) =>
       listDirectory(token, ref, `${AGENTS_DIR}/${dir}`),
     ),
   );
@@ -266,6 +355,9 @@ export async function listAgents(workspaceId: string): Promise<ListAgentsResult>
     }),
   );
 
+  // Eve agents are directories, scanned separately, then merged in.
+  agents.push(...(await listEveAgents(token, ref)));
+
   // Stable order: valid first (by name), then invalid (by filename).
   agents.sort((a, b) => {
     if (a.ok !== b.ok) return a.ok ? -1 : 1;
@@ -315,6 +407,14 @@ export async function getAgentByName(
     name: repo.name,
     branch: repo.defaultBranch,
   };
+  // Eve agents are directories: there's no single file to read. Surface the
+  // entrypoint (agent/agent.ts) as `raw` for the definition view.
+  if (match.ok && match.spec.framework === "eve") {
+    const dir = await readEveAgentDir(token, ref, match.spec.name);
+    const raw = dir.ok ? (dir.files["agent/agent.ts"] ?? "") : "";
+    return { agent: match, raw };
+  }
+
   const read = await readFile(token, ref, match.path);
   if (!read.ok) return null;
 
@@ -367,6 +467,10 @@ export type ResolvedDispatch = {
   /** External services the agent declares (Pydantic only; [] otherwise).
    *  Used to pre-flight the acting user's connections before a run. */
   connections: AgentConnection[];
+  /** The whole Eve agent directory as { project-relative path: content }.
+   *  Set only for framework "eve" (its specContent is empty — the directory is
+   *  the agent). The runner ships this to the Node harness as agent_files. */
+  agentFiles?: Record<string, string>;
 };
 
 export type ResolveDispatchError =
@@ -476,6 +580,48 @@ export async function resolveAgentForDispatch(
       },
     };
   }
+
+  // Eve agents are directories with no stable snapshot (v1): always run the live
+  // directory. Ship the whole tree as agentFiles; the model lives in agent.ts so
+  // an empty `model` is fine here.
+  if (found.agent.spec.framework === "eve") {
+    const repo = await getWorkspaceRepo(workspaceId);
+    if (!repo) {
+      return { ok: false, error: { kind: "not-found", message: "no connected repo" } };
+    }
+    const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
+    const ref: RepoRef = {
+      owner: repo.owner,
+      name: repo.name,
+      branch: repo.defaultBranch,
+    };
+    const eveDir = await readEveAgentDir(token, ref, agentName);
+    if (!eveDir.ok) {
+      return {
+        ok: false,
+        error: {
+          kind: "invalid",
+          message: `Eve agent "${agentName}" couldn't be read: ${eveDir.detail}`,
+        },
+      };
+    }
+    return {
+      ok: true,
+      resolved: {
+        agentName: found.agent.spec.name,
+        agentPath: found.agent.path,
+        framework: "eve",
+        model: found.agent.spec.model ?? "",
+        specContent: "",
+        specFormat: "json",
+        versionId: null,
+        versionLabel: "draft",
+        agentFiles: eveDir.files,
+        connections: [],
+      },
+    };
+  }
+
   const spec = found.agent.spec;
   const model = spec.model ?? "";
   if (!model) {

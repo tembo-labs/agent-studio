@@ -28,9 +28,13 @@ export type CreateRunInput = {
   // upstream tool — Pydantic agents through the bundled Python
   // wrapper, Cargo AI agents through the bundled cargo-ai CLI. The
   // runner needs the raw file contents and format for both.
-  framework?: "pydantic-agentspec" | "cargo-ai";
+  framework?: "pydantic-agentspec" | "cargo-ai" | "eve";
   specContent?: string;
   specFormat?: "yaml" | "json";
+  // The whole Eve agent directory as { project-relative path: content }. Set
+  // only for framework "eve" (Eve agents are directories, not single files);
+  // the API forwards it to the Node harness. Runtime-only (not persisted).
+  agentFiles?: Record<string, string>;
   // Optional sidecar Python module (the agent's `tools_module:`) whose
   // functions the pydantic wrapper exposes to the model as tools. Read
   // from the repo at dispatch time; runtime-only (not persisted).
@@ -147,6 +151,7 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
       framework: input.framework,
       spec_content: input.specContent,
       spec_format: input.specFormat,
+      agent_files: input.agentFiles,
       tools_module_content: input.toolsModuleContent,
       skills_content: input.skillsContent,
       trigger: input.trigger,

@@ -149,6 +149,7 @@ async function maybeFire(a: Automation, now: Date) {
       framework: r.framework,
       spec_content: r.specContent,
       spec_format: r.specFormat,
+      agent_files: r.agentFiles,
       tools_module_content: r.toolsModuleContent,
       skills_content: r.skillsContent,
       trigger: "schedule",

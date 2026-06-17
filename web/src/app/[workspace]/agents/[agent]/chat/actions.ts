@@ -185,6 +185,16 @@ export async function sendToAgentAction(args: {
   }
   const spec = agent.spec;
 
+  // Eve agents are directories (no single raw file the chat surface threads
+  // through); run them from the agent page / API instead. v1 scope.
+  if (spec.framework === "eve") {
+    return {
+      ok: false,
+      error:
+        "Chat-run isn't supported for Eve agents yet — use Run on the agent page.",
+    };
+  }
+
   // Same dispatch the Run-now action uses — both frameworks pass
   // the raw file bytes to the api, which hands them to the
   // appropriate subprocess wrapper (cargo-ai CLI or pydantic-ai

@@ -123,7 +123,48 @@ export type CargoAiSpec = AgentSpecBase & {
   model: string | null;
 };
 
-export type AgentSpec = PydanticAgentSpec | CargoAiSpec;
+/**
+ * An Eve agent. Unlike the other two frameworks it is a *directory*, not a
+ * single parseable file — so it's never produced by `parseAgentContent`. It's
+ * built from the directory listing by `buildEveSpec`; `model` is a best-effort
+ * read of `agent/agent.ts` (the source of truth at run time is agent.ts itself).
+ */
+export type EveSpec = AgentSpecBase & {
+  framework: "eve";
+  model: string | null;
+};
+
+export type AgentSpec = PydanticAgentSpec | CargoAiSpec | EveSpec;
+
+/**
+ * Best-effort model string from an Eve agent's `agent/agent.ts`. Matches both
+ * the direct-provider form `anthropic("claude-…")` / `openai("…")` and the
+ * gateway string `model: "anthropic/claude-…"`. Returns null when unrecognized
+ * — cost estimation falls back gracefully and the run still uses agent.ts.
+ */
+export function extractEveModel(agentTs: string | undefined): string | null {
+  if (!agentTs) return null;
+  const direct = agentTs.match(
+    /\b(anthropic|openai|google|groq|mistral|xai)\s*\(\s*["'`]([^"'`]+)["'`]/,
+  );
+  if (direct) return `${direct[1]}:${direct[2]}`;
+  const gateway = agentTs.match(/\bmodel\s*:\s*["'`]([^"'`]+)["'`]/);
+  if (gateway) return gateway[1];
+  return null;
+}
+
+/** Build an EveSpec from a directory name + its `agent/agent.ts` content. */
+export function buildEveSpec(name: string, agentTs: string | undefined): EveSpec {
+  return {
+    name,
+    title: undefined,
+    description: undefined,
+    labels: [],
+    raw: {},
+    framework: "eve",
+    model: extractEveModel(agentTs),
+  };
+}
 
 export type AgentFileFormat = "yaml" | "json";
 

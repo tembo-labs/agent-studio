@@ -150,6 +150,7 @@ export async function triggerRun(
       framework: r.framework,
       specContent: r.specContent,
       specFormat: r.specFormat,
+      agentFiles: r.agentFiles,
       toolsModuleContent: r.toolsModuleContent,
       skillsContent: r.skillsContent,
       userMessage: input.message ?? "",
@@ -282,6 +283,8 @@ export type RequestAgentChangeResult = {
 const FRAMEWORK_PATH: Record<Framework, { dir: string; ext: AgentFileFormat }> = {
   "pydantic-agentspec": { dir: "pydantic-agentspec", ext: "yaml" },
   "cargo-ai": { dir: "cargo-ai", ext: "json" },
+  // Eve agents are directories; entrypoint path computed specially below.
+  eve: { dir: "eve", ext: "json" },
 };
 
 // Not audited explicitly: this creates an improvement row, which projects into
@@ -375,7 +378,10 @@ export async function requestAgentChange(
   const { dir, ext } = FRAMEWORK_PATH[framework];
   kind = "create";
   agentName = agentSlug;
-  agentPath = `agents/${dir}/${agentSlug}.${ext}`;
+  agentPath =
+    framework === "eve"
+      ? `agents/eve/${agentSlug}/agent/agent.ts`
+      : `agents/${dir}/${agentSlug}.${ext}`;
 
   const row = await createImprovement({
     workspaceId: ctx.workspace.id,

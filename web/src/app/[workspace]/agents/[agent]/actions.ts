@@ -182,6 +182,7 @@ export async function runNowAction(
       framework: r.framework,
       specContent: r.specContent,
       specFormat: r.specFormat,
+      agentFiles: r.agentFiles,
       toolsModuleContent: r.toolsModuleContent,
       skillsContent: r.skillsContent,
       userMessage,
@@ -247,6 +248,11 @@ export async function promoteAgentAction(
     };
   }
   const spec = found.agent.spec;
+  // Eve agents are directories with no single-file snapshot — versioned
+  // promotion isn't supported in v1; they always run the live directory.
+  if (spec.framework === "eve") {
+    return { error: "Eve agents don't support versioned promotion yet." };
+  }
   const framework: "pydantic-agentspec" | "cargo-ai" =
     spec.framework === "pydantic-agentspec" ? "pydantic-agentspec" : "cargo-ai";
 

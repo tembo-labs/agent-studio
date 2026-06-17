@@ -16,10 +16,17 @@
 // agent flow) is a *different* concept and is intentionally deferred until
 // raw-coding-agent flows are first-class — likely v0.3+.
 
-export const FRAMEWORKS = ["pydantic-agentspec", "cargo-ai"] as const;
+//   - `eve` — Vercel's Eve framework. Unlike the other two, an Eve agent is a
+//     *directory* of TypeScript files (agent/agent.ts, tools/, …), not a single
+//     spec file. TAS runs it one-shot in-process via the Node harness (see
+//     api/scripts/run_eve.mjs); the model is configured in agent.ts with a
+//     direct @ai-sdk provider.
+
+export const FRAMEWORKS = ["pydantic-agentspec", "cargo-ai", "eve"] as const;
 export type Framework = (typeof FRAMEWORKS)[number];
 
 export const FRAMEWORK_LABELS: Record<Framework, string> = {
   "pydantic-agentspec": "Pydantic",
   "cargo-ai": "Cargo AI",
+  eve: "Eve",
 };

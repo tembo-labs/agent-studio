@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 // (workspace_id, agent_name) — see migration 0037 for the identity model.
 
 export type AgentStage = "stable" | "beta" | "draft" | "archived";
-export type AgentFramework = "pydantic-agentspec" | "cargo-ai";
+export type AgentFramework = "pydantic-agentspec" | "cargo-ai" | "eve";
 export type SpecFormat = "yaml" | "json";
 
 export type AgentVersion = {
