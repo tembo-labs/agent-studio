@@ -60,7 +60,7 @@ export default async function SlackAppDetailPage({
               {app.status}
             </Badge>
           </div>
-          <Button asChild variant="secondary" size="small">
+          <Button asChild variant="secondary">
             <Link href={`/${workspace.slug}/slack-apps/${app.id}/edit`}>
               Edit
             </Link>
