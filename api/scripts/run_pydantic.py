@@ -739,8 +739,10 @@ def build_agent(
         # turns in multi-step agentic runs and causes ReadTimeout errors mid-run.
         model = AnthropicModel(
             model.removeprefix("anthropic:"),
-            anthropic_client=AsyncAnthropic(
-                timeout=httpx.Timeout(timeout=300.0, connect=10.0)
+            provider=AnthropicProvider(
+                anthropic_client=AsyncAnthropic(
+                    timeout=httpx.Timeout(timeout=300.0, connect=10.0)
+                )
             ),
         )
     kwargs["model_settings"] = ms
