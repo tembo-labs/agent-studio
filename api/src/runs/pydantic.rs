@@ -705,7 +705,7 @@ async fn mark_connection_stale(
 /// and the parsed usage payload. A missing or malformed sentinel
 /// is non-fatal — we just record no usage rather than failing the
 /// run because token counts aren't critical.
-fn parse_output(stdout: &str) -> PydanticResult {
+pub(crate) fn parse_output(stdout: &str) -> PydanticResult {
     let mut output_lines: Vec<&str> = Vec::new();
     let mut usage = None;
     for line in stdout.lines() {
@@ -743,7 +743,7 @@ fn parse_output(stdout: &str) -> PydanticResult {
 /// Pull the `__TAS_TOOLS__:[...]` sentinel (a JSON array of
 /// `{name, ok, error}`) out of the wrapper's stdout. Absent or malformed
 /// is non-fatal — we just record no tool calls.
-fn extract_tool_calls(stdout: &str) -> Vec<ToolCall> {
+pub(crate) fn extract_tool_calls(stdout: &str) -> Vec<ToolCall> {
     for line in stdout.lines() {
         if let Some(json_part) = line.strip_prefix(TOOLS_SENTINEL) {
             if let Ok(parsed) = serde_json::from_str::<Vec<ToolCallJson>>(json_part) {
@@ -765,7 +765,7 @@ fn extract_tool_calls(stdout: &str) -> Vec<ToolCall> {
 /// Pull the `__TAS_STEPS__:[...]` sentinel (a JSON array of per-model-request
 /// usage + the tool calls each request emitted) out of the wrapper's stdout.
 /// Absent or malformed is non-fatal — we just record no steps.
-fn extract_steps(stdout: &str) -> Vec<RunStep> {
+pub(crate) fn extract_steps(stdout: &str) -> Vec<RunStep> {
     for line in stdout.lines() {
         if let Some(json_part) = line.strip_prefix(STEPS_SENTINEL) {
             if let Ok(parsed) = serde_json::from_str::<Vec<StepJson>>(json_part) {
@@ -802,7 +802,7 @@ fn extract_steps(stdout: &str) -> Vec<RunStep> {
 /// Flatten the tool calls across steps into a single call-ordered list,
 /// preserving each call's originating step_ordinal. Steps arrive in request
 /// order and their calls in emission order, so this is the run's call order.
-fn flatten_step_tool_calls(steps: &[RunStep]) -> Vec<ToolCall> {
+pub(crate) fn flatten_step_tool_calls(steps: &[RunStep]) -> Vec<ToolCall> {
     steps.iter().flat_map(|s| s.tool_calls.clone()).collect()
 }
 

@@ -35,7 +35,7 @@ WORKDIR /app
 # installed as a bundled binary one stage up — both frameworks now
 # get their full power instead of a Rust-side hand-rolled subset.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates libssl3 curl \
+        ca-certificates libssl3 curl xz-utils \
         python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
@@ -66,9 +66,30 @@ COPY scripts/requirements-tools.txt /opt/requirements-tools.txt
 RUN "${PYDANTIC_AI_VENV}/bin/pip" install --no-cache-dir \
         -r /opt/requirements-tools.txt
 
+# Node.js + pnpm are runtime deps for the Eve agent path: the Eve runner
+# (api/src/runs/eve.rs) shells out to a Node harness (run_eve.mjs) that builds
+# the agent's TypeScript project and runs one turn in-process. Eve requires
+# Node >= 24. Node lands under /usr/local (node -> /usr/local/bin/node, matching
+# EVE_NODE); pnpm is installed globally (not via corepack) so no network
+# resolution happens at run time. Pin both; bump via PR to vet changelogs.
+ENV NODE_VERSION=24.16.0
+RUN ARCH="$(dpkg --print-architecture)" \
+    && case "$ARCH" in \
+         amd64) NODE_ARCH=x64 ;; \
+         arm64) NODE_ARCH=arm64 ;; \
+         *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" -o /tmp/node.tar.xz \
+    && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.xz \
+    && npm install -g pnpm@10.34.3 \
+    && node --version && pnpm --version
+
 COPY --from=builder /app/tas-api /usr/local/bin/tas-api
 COPY --from=builder /opt/cargo-ai/bin/cargo-ai /usr/local/bin/cargo-ai
 COPY scripts/run_pydantic.py /usr/local/bin/run_pydantic.py
+# Eve agent runner harness (Node). See api/src/runs/eve.rs + EVE_SPIKE_NOTES.md.
+COPY scripts/run_eve.mjs /usr/local/bin/run_eve.mjs
 # Sidecar-tools helper importable by tool modules (`import tas_tools`).
 # Lives next to the wrapper; the wrapper adds this dir to sys.path.
 COPY scripts/tas_tools.py /usr/local/bin/tas_tools.py
@@ -83,6 +104,12 @@ COPY scripts/tas_tools.py /usr/local/bin/tas_tools.py
 RUN groupadd --system --gid 1001 tas \
     && useradd --system --uid 1001 --gid tas --create-home --home-dir /home/tas tas
 ENV HOME=/home/tas
+
+# Persistent pnpm store for the Eve runner (EVE_PNPM_STORE in eve.rs), writable
+# by the runtime user so per-run `pnpm install` is mostly hardlinks. Lives in the
+# container fs (warms within a container's lifetime); mount a volume here to
+# persist across restarts.
+RUN mkdir -p /opt/eve-store && chown -R tas:tas /opt/eve-store
 
 # [::] is dual-stack on Linux (serves IPv4 + IPv6), so Compose keeps
 # working and IPv6-only private networks (e.g. Railway) reach the api

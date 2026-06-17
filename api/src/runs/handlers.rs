@@ -58,6 +58,11 @@ pub struct CreateRunRequest {
     /// Transient like spec_content (not persisted on the run row).
     #[serde(default)]
     pub skills_content: Option<std::collections::HashMap<String, String>>,
+    /// The whole Eve agent directory as `{ project-relative path: content }`.
+    /// Required for the "eve" framework; the web layer reads the directory at
+    /// dispatch (transient, not persisted on the run row).
+    #[serde(default)]
+    pub agent_files: Option<std::collections::HashMap<String, String>>,
     /// Where the run came from. Defaults to "manual" so existing
     /// callers (Run-now button, chat) don't need to change. The
     /// scheduler passes "schedule" + automation_id when firing on
@@ -138,6 +143,7 @@ pub async fn create_run(
     let spec_content = req.spec_content;
     let tools_module_content = req.tools_module_content;
     let skills_content = req.skills_content;
+    let agent_files = req.agent_files;
     let spec_format = match req.spec_format.as_deref() {
         Some("yaml") => runner::SpecFormat::Yaml,
         // JSON is the default so cargo-ai callers (which never
@@ -165,6 +171,7 @@ pub async fn create_run(
                 spec_format,
                 tools_module_content,
                 skills_content,
+                agent_files,
             },
         )
         .await;
@@ -179,6 +186,7 @@ pub async fn create_run(
 fn parse_framework(s: &str) -> runner::Framework {
     match s {
         "cargo-ai" => runner::Framework::CargoAi,
+        "eve" => runner::Framework::Eve,
         _ => runner::Framework::Pydantic,
     }
 }

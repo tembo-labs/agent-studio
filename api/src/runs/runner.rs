@@ -9,7 +9,7 @@ use anyhow::{anyhow, Context};
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::runs::{cargo_ai, pydantic};
+use crate::runs::{cargo_ai, eve, pydantic};
 use crate::workspace::{
     get_workspace_secret_plaintext, list_active_composio_connections,
     list_active_native_connections, list_workspace_secret_connections, SecretKind,
@@ -20,6 +20,7 @@ use crate::AppState;
 pub enum Framework {
     Pydantic,
     CargoAi,
+    Eve,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -65,6 +66,10 @@ pub struct RunContext {
     /// Files of the Agent Skills the agent opts into, as `{ repoPath: content }`,
     /// passed to the wrapper as TAS_SKILLS_CONTENT (JSON). Pydantic-only.
     pub skills_content: Option<std::collections::HashMap<String, String>>,
+    /// The whole Eve agent directory as `{ project-relative path: content }`
+    /// (the web layer strips the `agents/eve/<name>/` prefix). Required for the
+    /// Eve framework; ignored by the others.
+    pub agent_files: Option<std::collections::HashMap<String, String>>,
 }
 
 struct RunOutcome {
@@ -180,8 +185,83 @@ async fn run_inner(
                 Vec::new(),
             )
         }
+        Framework::Eve => run_eve(state, ctx).await,
         Framework::Pydantic => run_pydantic(state, ctx).await,
     }
+}
+
+async fn run_eve(
+    state: &AppState,
+    ctx: &RunContext,
+) -> (
+    anyhow::Result<RunOutcome>,
+    Vec<pydantic::ToolCall>,
+    Vec<pydantic::RunStep>,
+) {
+    let agent_files = match ctx.agent_files.as_ref().filter(|m| !m.is_empty()) {
+        Some(f) => f,
+        None => {
+            return (
+                Err(anyhow!("Eve run is missing the agent's directory files")),
+                Vec::new(),
+                Vec::new(),
+            )
+        }
+    };
+
+    // Eve agents call their model through a direct @ai-sdk provider, which reads
+    // the provider key from env. Load whichever the workspace has set.
+    let openai_key = get_workspace_secret_plaintext(
+        &state.db,
+        &state.encryption_key,
+        ctx.workspace_id,
+        SecretKind::OpenAiApiKey,
+    )
+    .await
+    .ok();
+    let anthropic_key = get_workspace_secret_plaintext(
+        &state.db,
+        &state.encryption_key,
+        ctx.workspace_id,
+        SecretKind::AnthropicApiKey,
+    )
+    .await
+    .ok();
+    if openai_key.is_none() && anthropic_key.is_none() {
+        return (
+            Err(anyhow!(
+                "No provider API keys set for this workspace. \
+                 Add either an OpenAI or Anthropic API key under \
+                 Settings → API keys before running an agent."
+            )),
+            Vec::new(),
+            Vec::new(),
+        );
+    }
+
+    let (result, tool_calls, steps) = eve::invoke(eve::EveArgs {
+        agent_files,
+        user_message: &ctx.user_message,
+        openai_api_key: openai_key.as_deref(),
+        anthropic_api_key: anthropic_key.as_deref(),
+    })
+    .await;
+
+    let outcome = result.map(|r| {
+        let usage = r.usage.as_ref().and_then(|u| {
+            u.input_output().map(|(input, output)| Usage {
+                input_tokens: input,
+                output_tokens: output,
+                cache_read_tokens: u.cache_read_tokens.unwrap_or(0),
+                cache_write_tokens: u.cache_write_tokens.unwrap_or(0),
+            })
+        });
+        RunOutcome {
+            output: render_output(&ctx.user_message, &r.output),
+            usage,
+        }
+    });
+    (outcome, tool_calls, steps)
 }
 
 async fn run_cargo_ai(
