@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/tembo/agent-studio">
-    <img alt="Tembo Agent Studio logo" src=".github/assets/tas.svg" width="128" height="128">
+    <img alt="Tembo Agent Studio logo" src=".github/assets/tembo.svg" width="165" height="140">
   </a>
   <h1>Tembo Agent Studio</h1>
 
