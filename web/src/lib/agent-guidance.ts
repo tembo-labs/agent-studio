@@ -964,6 +964,54 @@ export const GUIDANCE_ADDITIONAL_PATH = "ADDITIONAL_AGENT_INSTRUCTIONS.md";
 export const GUIDANCE_INDEX_PATH = "agents/AGENTS.md";
 export const GUIDANCE_PYDANTIC_PATH = "agents/pydantic-agentspec/AGENT_GUIDE.md";
 export const GUIDANCE_CARGO_AI_PATH = "agents/cargo-ai/AGENT_GUIDE.md";
+export const GUIDANCE_EVE_PATH = "agents/eve/AGENT_GUIDE.md";
+
+// Eve agents are directories (not single-file specs). TAS runs them one-shot,
+// in-process, with no Vercel deploy and no AI Gateway — so the single
+// non-negotiable rule is: configure the model with a DIRECT @ai-sdk provider,
+// not the gateway string. Everything else is standard Eve.
+const EVE_GUIDE: string = `# Eve Agent Guide (Tembo Agent Studio)
+
+An Eve agent is a **directory** under \`agents/eve/<name>/\`, scaffolded by the
+Eve CLI. Minimum shape:
+
+\`\`\`
+agents/eve/<name>/
+  agent/agent.ts          # model + config (defineAgent)
+  agent/instructions.md   # system prompt
+  package.json            # deps incl. eve + a direct @ai-sdk provider
+  pnpm-lock.yaml          # commit this — the runner installs from it
+\`\`\`
+
+The directory name, the \`name:\`, and how TAS lists the agent must all match.
+
+## CRITICAL: use a direct provider, not the AI Gateway
+
+TAS runs Eve agents locally with the workspace's \`ANTHROPIC_API_KEY\` /
+\`OPENAI_API_KEY\` — it does **not** have Vercel AI Gateway credentials. The
+default scaffold's gateway model string (\`model: "anthropic/claude-…"\`) will
+fail with "AI Gateway received no credentials". Use a direct \`LanguageModel\`:
+
+\`\`\`ts
+import { defineAgent } from "eve";
+import { anthropic } from "@ai-sdk/anthropic";
+
+export default defineAgent({
+  model: anthropic("claude-opus-4-8"),
+});
+\`\`\`
+
+Add the provider to dependencies (matching your \`ai\` version), e.g.
+\`@ai-sdk/anthropic\` for \`ai@7\` betas, and commit the updated lockfile.
+
+## What TAS uses (and doesn't)
+
+- TAS drives **one turn** per run and captures the reply + token usage.
+- Tools defined under \`agent/tools/\` work; tool execution uses Eve's local
+  sandbox.
+- Channels, schedules, and durable/deploy features are **not** used by a TAS run
+  — TAS is the runner. Keep the agent runnable headless.
+`;
 
 // Customer-managed instructions slot. Created once, never refreshed.
 // No version marker — TAS treats this file as opaque after first
@@ -992,6 +1040,11 @@ export function guidanceFilesFor(framework: Framework): GuidanceFile[] {
       path: GUIDANCE_CARGO_AI_PATH,
       content: withVersionMarker(CARGO_AI_GUIDE),
     });
+  } else if (framework === "eve") {
+    files.push({
+      path: GUIDANCE_EVE_PATH,
+      content: withVersionMarker(EVE_GUIDE),
+    });
   } else {
     files.push({
       path: GUIDANCE_PYDANTIC_PATH,
@@ -1013,6 +1066,10 @@ export function allGuidanceFiles(): GuidanceFile[] {
     {
       path: GUIDANCE_CARGO_AI_PATH,
       content: withVersionMarker(CARGO_AI_GUIDE),
+    },
+    {
+      path: GUIDANCE_EVE_PATH,
+      content: withVersionMarker(EVE_GUIDE),
     },
     {
       path: GUIDANCE_PYDANTIC_PATH,

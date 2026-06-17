@@ -3,11 +3,19 @@ import "server-only";
 import {
   GUIDANCE_ADDITIONAL_PATH,
   GUIDANCE_CARGO_AI_PATH,
+  GUIDANCE_EVE_PATH,
   GUIDANCE_INDEX_PATH,
   GUIDANCE_PYDANTIC_PATH,
   GUIDANCE_ROOT_PATH,
 } from "@/lib/agent-guidance";
 import type { Framework } from "@/lib/agent-framework";
+
+/** The per-framework guide path for prompt pointers. */
+function frameworkGuidePath(framework: Framework): string {
+  if (framework === "eve") return GUIDANCE_EVE_PATH;
+  if (framework === "cargo-ai") return GUIDANCE_CARGO_AI_PATH;
+  return GUIDANCE_PYDANTIC_PATH;
+}
 import type { CommitMode } from "@/lib/commit-mode-constants";
 
 // Thin client for the Tembo Coding Agent Platform task API. The task
@@ -119,6 +127,7 @@ export async function createTemboTask(args: {
 // it's the safer default.
 function frameworkFromAgentPath(path: string): Framework {
   if (path.startsWith("agents/cargo-ai/")) return "cargo-ai";
+  if (path.startsWith("agents/eve/")) return "eve";
   return "pydantic-agentspec";
 }
 
@@ -133,8 +142,7 @@ function frameworkFromAgentPath(path: string): Framework {
 // this PR touches so Tembo doesn't waste tokens reading the other
 // framework's guide.
 function buildGuidancePointerBlock(framework: Framework): string {
-  const frameworkGuide =
-    framework === "cargo-ai" ? GUIDANCE_CARGO_AI_PATH : GUIDANCE_PYDANTIC_PATH;
+  const frameworkGuide = frameworkGuidePath(framework);
   return [
     "**Step 1 — Read the agent guidance first**",
     "",
@@ -224,8 +232,7 @@ export function buildCreateAgentPrompt(args: {
   /** Signed token CAP appends as `?key=` when fetching the reference. */
   nativeToolsKey?: string;
 }): string {
-  const frameworkGuide =
-    args.framework === "cargo-ai" ? GUIDANCE_CARGO_AI_PATH : GUIDANCE_PYDANTIC_PATH;
+  const frameworkGuide = frameworkGuidePath(args.framework);
   return [
     `Create an agent at \`${args.agentPath}\` named \`${args.agentName}\` using these docs in the connected repo as your guide:`,
     "",

@@ -82,3 +82,27 @@ Model choice is a cost/reliability tradeoff:
 - **Promote** a draft to a stable version when you're happy with it; automated
   runs serve stable by default. See
   [Agent lifecycle → promoting](/agent-studio/agent-lifecycle/#promoting-to-stable).
+
+## Eve agents (experimental)
+
+Alongside Pydantic AgentSpec and Cargo AI, TAS can run agents built with
+[Vercel Eve](https://github.com/vercel/eve). Unlike the others, an Eve agent is
+a **directory** of TypeScript files under `agents/eve/<name>/` (an `agent/agent.ts`,
+`agent/instructions.md`, a `package.json`, and a committed lockfile) rather than a
+single spec file. TAS runs it one turn at a time, locally and in-process — no
+Vercel deployment required.
+
+One rule matters when authoring for TAS: **configure the model with a direct
+`@ai-sdk` provider, not the AI Gateway string.** TAS runs with your workspace's
+Anthropic/OpenAI key and has no Gateway credentials, so:
+
+```ts
+import { defineAgent } from "eve";
+import { anthropic } from "@ai-sdk/anthropic";
+
+export default defineAgent({ model: anthropic("claude-opus-4-8") });
+```
+
+Add the provider package to the project's dependencies and commit the lockfile.
+Current scope: Eve agents always run their live directory (no versioned promotion
+yet), and chat-run isn't available for them — use **Run** on the agent page.
