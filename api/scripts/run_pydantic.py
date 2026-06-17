@@ -33,9 +33,12 @@ import os
 import sys
 import tempfile
 import traceback
-
+import httpx
 import yaml
+
+from anthropic import AsyncAnthropic
 from pydantic_ai import Agent, capture_run_messages
+from pydantic_ai.models.anthropic import AnthropicModel
 
 
 USAGE_SENTINEL = "__TAS_USAGE__:"
@@ -731,6 +734,17 @@ def build_agent(
         ms.setdefault("anthropic_cache_instructions", True)
         ms.setdefault("anthropic_cache_tool_definitions", True)
         ms.setdefault("anthropic_cache", True)
+        # Swap the string for an AnthropicModel backed by a client with no read
+        # timeout. The default httpx read timeout is too short for long streaming
+        # turns in multi-step agentic runs and causes ReadTimeout errors mid-run.
+        model = AnthropicModel(
+            model.removeprefix("anthropic:"),
+            provider=AnthropicProvider(
+                anthropic_client=AsyncAnthropic(
+                    timeout=httpx.Timeout(timeout=300.0, connect=10.0)
+                )
+            ),
+        )
     kwargs["model_settings"] = ms
     retries = spec.get("retries")
     if isinstance(retries, int):
