@@ -10,7 +10,7 @@
 <a href="https://tembo.io"><img alt="Made by Tembo" src="https://img.shields.io/badge/MADE%20BY%20TEMBO-0f172a.svg?style=for-the-badge&labelColor=000"></a>
 <a href="https://github.com/tembo/agent-studio/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/tembo/agent-studio.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://github.com/tembo/agent-studio/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/tembo/agent-studio.svg?style=for-the-badge&labelColor=000000"></a>
-<a href="https://github.com/tembo/agent-studio/tree/main/docs"><img alt="Documentation" src="https://img.shields.io/badge/Docs-0f172a.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://github.com/tembo/agent-studio/discussions"><img alt="Join the community on GitHub" src="https://img.shields.io/badge/Join%20the%20community-blueviolet.svg?style=for-the-badge&logo=Github&labelColor=000000&logoWidth=20"></a>
 
 </div>
 
