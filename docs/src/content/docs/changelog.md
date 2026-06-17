@@ -17,6 +17,42 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.20] — Connections index polish, Skills detail, sidebar dismiss — shipped 2026-06-17
+
+### Changed
+- **Connections index is now searchable, filterable, and sortable.** The list
+  reads like the agents/tools tables — a search box, a type filter, and
+  sortable column headers (default A→Z by name) instead of a flat list.
+- **Connection detail/edit cleanup.** Every attribute moved into the detail
+  table (the header is just the logo + name); all actions (Refresh / Reconnect /
+  Edit / Disconnect) sit top-right as buttons styled like the agent view. Edit
+  shows only when the connection is actually editable (secret, Composio, or DCR
+  native MCP), and renaming is a direct field on the edit page rather than an
+  expand-to-rename toggle.
+- **New connection is a two-step picker** — choose a provider / Composio /
+  secret, then fill in just that option's form.
+- **Skills: clickable detail view.** Each installed skill links to a detail page
+  showing its install source (linked), repo path, file count, and the full
+  SKILL.md rendered as markdown, with Remove top-right.
+- **Sidebar "Action needed" prompts are dismissible.** A small Dismiss link next
+  to Connect hides a connection prompt you don't intend to act on (per-user,
+  persisted locally).
+
+### Fixed
+- **Self-key (Tembo) connections no longer flood the audit log.** The implicit
+  Tembo Agent Studio connection is re-minted automatically; it no longer writes
+  a "Connection authorized" event each time. Real OAuth authorizations are still
+  audited.
+- **Create-agent prompt hides defunct/renamed native providers** so the Tembo
+  Coding Agent isn't offered connections that no longer exist.
+- **CI lockfile.** Repaired a corrupted `web/pnpm-lock.yaml` (duplicate mapping
+  keys) that broke `pnpm install --frozen-lockfile`.
+
+### Dependencies
+- Sweep of routine bumps: Next 16.2.9, axum 0.8.9, thiserror 2.0, shadcn 4.11,
+  plus the Astro group, `@tailwindcss/postcss`, `eslint-config-next`, chrono,
+  regex, uuid, `@types/node`, and `actions/checkout` v6.
+
 ## [v2026.6.19] — Connections & Slack apps reworked into list / view / edit — shipped 2026-06-16
 
 ### Changed
