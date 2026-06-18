@@ -13,6 +13,12 @@ import {
 import { toolkitLabel } from "@/lib/composio-label";
 import { getMcpProvider } from "@/lib/mcp-providers";
 import {
+  getManualCredentialProvider,
+  listManualCredentialProviders,
+  manualCredentialSecretSlugs,
+  type ManualCredentialProvider,
+} from "@/lib/manual-credential-providers";
+import {
   listSecretConnections,
   type SecretConnectionPreview,
 } from "@/lib/secret-connections";
@@ -25,7 +31,7 @@ import {
 // and broke the [id] route; "~" appears in neither uuids, kinds, nor secret
 // slugs ([a-z0-9_-]), so splitting on the first one is unambiguous.
 
-export type ConnectionKind = "composio" | "native" | "secret";
+export type ConnectionKind = "composio" | "native" | "secret" | "manual-cred";
 
 export type ConnectionRef = { kind: ConnectionKind; key: string };
 
@@ -39,7 +45,12 @@ export function parseConnectionRef(raw: string): ConnectionRef | null {
   const kind = raw.slice(0, i);
   const key = raw.slice(i + 1);
   if (!key) return null;
-  if (kind === "composio" || kind === "native" || kind === "secret") {
+  if (
+    kind === "composio" ||
+    kind === "native" ||
+    kind === "secret" ||
+    kind === "manual-cred"
+  ) {
     return { kind, key };
   }
   return null;
@@ -124,7 +135,13 @@ export async function listAllConnections(
     }))
     .sort((a, b) => a.title.localeCompare(b.title));
 
+  // Secrets owned by a manual-credential provider are shown as one grouped row
+  // (below), not as individual secret rows.
+  const owned = manualCredentialSecretSlugs();
+  const present = new Set(secrets.map((s) => s.slug));
+
   const secretRows: ConnectionRow[] = secrets
+    .filter((s) => !owned.has(s.slug))
     .map((s) => ({
       ref: encodeConnectionRef("secret", s.slug),
       kind: "secret" as const,
@@ -137,13 +154,38 @@ export async function listAllConnections(
     }))
     .sort((a, b) => a.title.localeCompare(b.title));
 
-  return [...nativeRows, ...composioRows, ...secretRows];
+  // One row per manual-credential provider that has at least one field set;
+  // "connected" when every required field's secret exists, else "incomplete".
+  const manualRows: ConnectionRow[] = [];
+  for (const p of listManualCredentialProviders()) {
+    if (!p.fields.some((f) => present.has(f.key))) continue;
+    const complete = p.fields.every((f) => !f.required || present.has(f.key));
+    manualRows.push({
+      ref: encodeConnectionRef("manual-cred", p.slug),
+      kind: "manual-cred",
+      title: p.displayName,
+      slot: null,
+      typeLabel: "Manual credential",
+      logoSlug: null,
+      statusLabel: complete ? "connected" : "incomplete",
+      statusVariant: complete ? "green" : "yellow",
+    });
+  }
+  manualRows.sort((a, b) => a.title.localeCompare(b.title));
+
+  return [...nativeRows, ...composioRows, ...manualRows, ...secretRows];
 }
 
 export type LoadedConnection =
   | { kind: "native"; conn: WorkspaceConnection }
   | { kind: "composio"; conn: WorkspaceComposioConnection }
-  | { kind: "secret"; secret: SecretConnectionPreview };
+  | { kind: "secret"; secret: SecretConnectionPreview }
+  | {
+      kind: "manual-cred";
+      provider: ManualCredentialProvider;
+      /** Per-field preview (last4/updatedAt) when set, else null. */
+      fields: { field: ManualCredentialProvider["fields"][number]; preview: SecretConnectionPreview | null }[];
+    };
 
 /**
  * Resolve a ref to its record, scoped to the view-user (the acting user, or the
@@ -164,6 +206,19 @@ export async function loadConnection(
     const conn = await getComposioConnectionById(workspaceId, ref.key);
     if (!conn || conn.userId !== viewUserId) return null;
     return { kind: "composio", conn };
+  }
+  if (ref.kind === "manual-cred") {
+    const provider = getManualCredentialProvider(ref.key);
+    if (!provider) return null;
+    const secrets = await listSecretConnections(workspaceId);
+    const bySlug = new Map(secrets.map((s) => [s.slug, s]));
+    const fields = provider.fields.map((field) => ({
+      field,
+      preview: bySlug.get(field.key) ?? null,
+    }));
+    // Only a "connection" if at least one field is set.
+    if (fields.every((f) => f.preview === null)) return null;
+    return { kind: "manual-cred", provider, fields };
   }
   const secret = (await listSecretConnections(workspaceId)).find(
     (s) => s.slug === ref.key,

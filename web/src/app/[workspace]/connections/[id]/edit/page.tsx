@@ -50,6 +50,9 @@ export default async function EditConnectionPage({
   ) {
     notFound();
   }
+  // Manual-credential edits are done via the connect form (/connections/new),
+  // not this rename/rotate page.
+  if (loaded.kind === "manual-cred") notFound();
 
   const userQs = view.viewingOther
     ? `?user=${encodeURIComponent(view.userId)}`
