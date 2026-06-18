@@ -8,6 +8,7 @@ import {
   completeInboxItem,
   dismissInboxItem,
   getInboxItem,
+  snoozeInboxItem,
 } from "@/lib/inbox-api";
 import { executeInboxOption } from "@/lib/inbox-executors";
 
@@ -149,6 +150,42 @@ export async function executeInboxOptionAction(args: {
     targetId: args.itemId,
     agentName: null,
     payload: { optionId: option.id, provider: option.execute?.provider ?? null, op: option.execute?.op ?? null },
+  });
+
+  return { ok: true };
+}
+
+// "Wait": snooze the item out of the inbox for `hours`, after which it reappears
+// automatically. No external action — just hides it until then.
+export async function snoozeInboxItemAction(args: {
+  workspaceSlug: string;
+  itemId: string;
+  hours: number;
+}): Promise<InboxActionResult> {
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+
+  const hours = Math.max(1, Math.min(Math.round(args.hours), 24 * 90)); // 1h … 90d
+  const until = new Date(Date.now() + hours * 3_600_000);
+
+  const ok = await snoozeInboxItem(args.itemId, workspace.id, until);
+  if (!ok) {
+    return { ok: false, error: "This item was already resolved. Refresh the page." };
+  }
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "hitl_response",
+    kind: "inbox.snoozed",
+    targetType: "inbox_item",
+    targetId: args.itemId,
+    agentName: null,
+    payload: { untilIso: until.toISOString() },
   });
 
   return { ok: true };

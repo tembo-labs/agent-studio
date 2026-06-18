@@ -19,9 +19,19 @@ import type { InboxOption } from "@/lib/inbox-api";
 import {
   dismissInboxItemAction,
   executeInboxOptionAction,
+  snoozeInboxItemAction,
   submitInboxItemAction,
   type InboxActionResult,
 } from "../actions";
+
+// "Wait" durations (hours).
+const WAIT_OPTIONS = [
+  { label: "1 day", hours: 24 },
+  { label: "3 days", hours: 72 },
+  { label: "1 week", hours: 168 },
+  { label: "2 weeks", hours: 336 },
+  { label: "1 month", hours: 720 },
+];
 
 /** Friendly confirmation copy per option, by what it does. */
 function successFor(opt: InboxOption): string {
@@ -84,8 +94,8 @@ export function ReviewForm({
     });
   };
 
-  if (options && options.length > 0) {
-    return (
+  const section =
+    options && options.length > 0 ? (
       <ActionMenu
         workspaceSlug={workspaceSlug}
         itemId={itemId}
@@ -95,19 +105,83 @@ export function ReviewForm({
         error={error}
         run={run}
       />
+    ) : (
+      <FreeTextForm
+        workspaceSlug={workspaceSlug}
+        itemId={itemId}
+        proposedText={proposedText}
+        pending={pending}
+        busy={busy}
+        error={error}
+        run={run}
+      />
     );
-  }
 
   return (
-    <FreeTextForm
-      workspaceSlug={workspaceSlug}
-      itemId={itemId}
-      proposedText={proposedText}
-      pending={pending}
-      busy={busy}
-      error={error}
-      run={run}
-    />
+    <div className="flex flex-col gap-5">
+      {section}
+      <WaitControl
+        workspaceSlug={workspaceSlug}
+        itemId={itemId}
+        pending={pending}
+        busy={busy}
+        run={run}
+      />
+    </div>
+  );
+}
+
+// "Wait": snooze the item out of the inbox for a chosen duration; it returns
+// automatically. Available on every item, both modes.
+function WaitControl({
+  workspaceSlug,
+  itemId,
+  pending,
+  busy,
+  run,
+}: {
+  workspaceSlug: string;
+  itemId: string;
+  pending: boolean;
+  busy: string | null;
+  run: (
+    key: string,
+    fn: () => Promise<InboxActionResult>,
+    successMsg?: string,
+  ) => void;
+}) {
+  const [hours, setHours] = useState(72);
+  const label = WAIT_OPTIONS.find((o) => o.hours === hours)?.label ?? "a while";
+  return (
+    <div className="border-border-weak flex flex-wrap items-center gap-2 border-t pt-4">
+      <span className="text-foreground-weak text-sm">Not now — wait</span>
+      <select
+        value={hours}
+        onChange={(e) => setHours(Number(e.target.value))}
+        disabled={pending}
+        className="bg-input text-foreground rounded-md px-2 py-1 text-sm shadow-[0_0_0_1px_var(--color-border)] focus:outline-none"
+      >
+        {WAIT_OPTIONS.map((o) => (
+          <option key={o.hours} value={o.hours}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={pending}
+        onClick={() =>
+          run(
+            "wait",
+            () => snoozeInboxItemAction({ workspaceSlug, itemId, hours }),
+            `Waiting ${label}`,
+          )
+        }
+      >
+        {busy === "wait" ? "Waiting…" : "Wait"}
+      </Button>
+    </div>
   );
 }
 

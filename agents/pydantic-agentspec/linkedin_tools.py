@@ -208,7 +208,16 @@ def _parse_conversations(data: dict, limit: int, my_id: str) -> list[dict]:
         melems = msgs.get("elements") if isinstance(msgs, dict) else None
         if melems:
             last = _text((melems[-1] or {}).get("body"))
-        out.append({"convId": urn, "name": name, "headline": headline, "lastMessage": last})
+        out.append(
+            {
+                "convId": urn,
+                "name": name,
+                "headline": headline,
+                "lastMessage": last,
+                # Epoch-ms freshness marker → externalTs (reopen on new activity).
+                "lastActivityAt": c.get("lastActivityAt"),
+            }
+        )
     return out[:limit]
 
 

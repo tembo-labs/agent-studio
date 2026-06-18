@@ -35,6 +35,7 @@ export default async function InboxPage({
     itemType: i.itemType,
     status: i.status,
     createdAtIso: i.createdAt.toISOString(),
+    snoozedUntilIso: i.snoozedUntil ? i.snoozedUntil.toISOString() : null,
   }));
 
   return (

@@ -428,6 +428,14 @@ export function buildMcpServer(
         title: z.string().describe("Short label for the triage list row."),
         source: z.string().optional().describe("Where it came from (default 'agent')."),
         externalRef: z.string().optional().describe("Producer's id for idempotent re-pushes."),
+        externalTs: z
+          .number()
+          .optional()
+          .describe(
+            "Source's latest-activity time (epoch ms). If a later run reports a " +
+            "NEWER value for the same externalRef, the item reopens + refreshes " +
+            "(e.g. a reply to an archived thread comes back).",
+          ),
         context: z.record(z.string(), z.unknown()).optional().describe("The raw payload to review (JSON)."),
         proposedActionText: z.string().optional().describe("Your proposed reply / decision."),
         proposedActionFields: z.record(z.string(), z.unknown()).optional().describe("Structured proposal params."),
@@ -456,7 +464,7 @@ export function buildMcpServer(
           ),
       },
     },
-    async ({ itemType, title, source, externalRef, context, proposedActionText, proposedActionFields, options: actionOptions }) => {
+    async ({ itemType, title, source, externalRef, externalTs, context, proposedActionText, proposedActionFields, options: actionOptions }) => {
       if (!isOperator) return operatorOnly();
       const proposedAction =
         proposedActionText || proposedActionFields
@@ -470,6 +478,7 @@ export function buildMcpServer(
         title,
         source,
         externalRef,
+        externalTs,
         context,
         proposedAction,
         options: actionOptions,

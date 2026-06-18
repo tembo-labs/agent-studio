@@ -496,6 +496,8 @@ export type ProduceInboxItemInput = {
   proposedAction?: InboxAction;
   /** Action menu rendered as buttons; one may be `recommended`. */
   options?: InboxOption[];
+  /** Source's latest-activity time (epoch ms); newer than stored reopens the item. */
+  externalTs?: number;
   /** The run producing this item (set when called from /mcp inside a run). */
   parentRunId?: string;
 };
@@ -519,6 +521,7 @@ export async function produceInboxItemFor(
     context: input.context ?? {},
     proposedAction: input.proposedAction ?? null,
     options: input.options ?? null,
+    externalTs: input.externalTs ?? null,
     // A proposal (or an action menu) ready for review is awaiting_human;
     // otherwise it's open for a human or agent to pick up and propose against.
     status: input.proposedAction || input.options?.length ? "awaiting_human" : "open",

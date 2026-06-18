@@ -58,6 +58,8 @@ export interface InboxItem {
   proposedAction: InboxAction | null;
   finalAction: InboxAction | null;
   options: InboxOption[] | null;
+  /** Source's latest-activity time (epoch ms). Drives reopen-on-new-activity. */
+  externalTs: number | null;
   status: InboxItemStatus;
   assigneeKind: InboxAssigneeKind | null;
   assigneeId: string | null;
@@ -71,6 +73,9 @@ export interface InboxItem {
   createdAt: Date;
   updatedAt: Date;
   resolvedAt: Date | null;
+  /** When set + in the future, the item is "Waiting" and hidden from the active
+   *  inbox until this time passes (then it reappears). */
+  snoozedUntil: Date | null;
 }
 
 type Row = {
@@ -84,6 +89,7 @@ type Row = {
   proposed_action: InboxAction | null;
   final_action: InboxAction | null;
   options: InboxOption[] | null;
+  external_ts: string | null;
   status: InboxItemStatus;
   assignee_kind: InboxAssigneeKind | null;
   assignee_id: string | null;
@@ -96,6 +102,7 @@ type Row = {
   created_at: Date;
   updated_at: Date;
   resolved_at: Date | null;
+  snoozed_until: Date | null;
 };
 
 function rowToInboxItem(r: Row): InboxItem {
@@ -110,6 +117,7 @@ function rowToInboxItem(r: Row): InboxItem {
     proposedAction: r.proposed_action,
     finalAction: r.final_action,
     options: r.options,
+    externalTs: r.external_ts == null ? null : Number(r.external_ts),
     status: r.status,
     assigneeKind: r.assignee_kind,
     assigneeId: r.assignee_id,
@@ -122,6 +130,7 @@ function rowToInboxItem(r: Row): InboxItem {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     resolvedAt: r.resolved_at,
+    snoozedUntil: r.snoozed_until,
   };
 }
 
@@ -130,11 +139,11 @@ function rowToInboxItem(r: Row): InboxItem {
 // rows (created_by IS NULL) visible.
 const COLUMNS = `
   i.id, i.workspace_id, i.source, i.external_ref, i.item_type, i.title,
-  i.context, i.proposed_action, i.final_action, i.options, i.status,
+  i.context, i.proposed_action, i.final_action, i.options, i.external_ts, i.status,
   i.assignee_kind, i.assignee_id, i.produced_by_run_id, i.improvement_id,
   i.signal_consumed_at, i.created_by,
   u.name AS created_by_name, u.email AS created_by_email,
-  i.created_at, i.updated_at, i.resolved_at
+  i.created_at, i.updated_at, i.resolved_at, i.snoozed_until
 `;
 const FROM_JOIN = `FROM inbox_item i LEFT JOIN "user" u ON u.id = i.created_by`;
 
@@ -147,6 +156,9 @@ export interface CreateInboxItemInput {
   context?: Record<string, unknown>;
   proposedAction?: InboxAction | null;
   options?: InboxOption[] | null;
+  /** Source's latest-activity time (epoch ms) — newer than the stored value
+   *  reopens + refreshes the item. */
+  externalTs?: number | null;
   // 'open' = needs a proposal/claim; 'awaiting_human' = has a proposal, ready
   // for review. Caller decides (the produce action sets awaiting_human when it
   // ships a proposedAction).
@@ -167,16 +179,31 @@ export interface CreateInboxItemInput {
 export async function createInboxItem(
   input: CreateInboxItemInput,
 ): Promise<InboxItem> {
+  // Reopen + refresh an existing item only when the producer reports NEWER
+  // activity than we stored (e.g. a reply landed on an archived/handled thread);
+  // otherwise the conflict is a plain idempotent re-push (just bump updated_at).
+  const fresher =
+    "(EXCLUDED.external_ts IS NOT NULL AND " +
+    "(inbox_item.external_ts IS NULL OR EXCLUDED.external_ts > inbox_item.external_ts))";
   const res = await db.query<Row>(
     `WITH upserted AS (
        INSERT INTO inbox_item (
          workspace_id, source, external_ref, item_type, title, context,
          proposed_action, options, status, assignee_kind, assignee_id,
-         produced_by_run_id, created_by
+         produced_by_run_id, created_by, external_ts
        )
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14)
        ON CONFLICT (workspace_id, source, external_ref) WHERE external_ref IS NOT NULL
-       DO UPDATE SET updated_at = NOW()
+       DO UPDATE SET
+         updated_at = NOW(),
+         title = CASE WHEN ${fresher} THEN EXCLUDED.title ELSE inbox_item.title END,
+         context = CASE WHEN ${fresher} THEN EXCLUDED.context ELSE inbox_item.context END,
+         proposed_action = CASE WHEN ${fresher} THEN EXCLUDED.proposed_action ELSE inbox_item.proposed_action END,
+         options = CASE WHEN ${fresher} THEN EXCLUDED.options ELSE inbox_item.options END,
+         external_ts = CASE WHEN ${fresher} THEN EXCLUDED.external_ts ELSE inbox_item.external_ts END,
+         status = CASE WHEN ${fresher} THEN 'awaiting_human' ELSE inbox_item.status END,
+         resolved_at = CASE WHEN ${fresher} THEN NULL ELSE inbox_item.resolved_at END,
+         final_action = CASE WHEN ${fresher} THEN NULL ELSE inbox_item.final_action END
        RETURNING *
      )
      SELECT ${COLUMNS}
@@ -196,6 +223,7 @@ export async function createInboxItem(
       input.assigneeId ?? null,
       input.producedByRunId ?? null,
       input.createdBy ?? null,
+      input.externalTs ?? null,
     ],
   );
   return rowToInboxItem(res.rows[0]);
@@ -273,16 +301,35 @@ export async function listInboxItems(
   return res.rows.map(rowToInboxItem);
 }
 
-/** Count of active (unresolved) items — the sidebar badge. */
+/** Count of active (unresolved, not snoozed) items — the sidebar badge. */
 export async function countActiveInboxItems(
   workspaceId: string,
 ): Promise<number> {
   const res = await db.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM inbox_item
-      WHERE workspace_id = $1 AND status IN ('open', 'claimed', 'awaiting_human')`,
+      WHERE workspace_id = $1 AND status IN ('open', 'claimed', 'awaiting_human')
+        AND (snoozed_until IS NULL OR snoozed_until <= now())`,
     [workspaceId],
   );
   return Number(res.rows[0]?.n ?? 0);
+}
+
+/** "Wait": snooze an item out of the active inbox until `until`. It reappears
+ *  automatically once the time passes (the active views filter on snoozed_until).
+ *  Allowed only on unresolved items. */
+export async function snoozeInboxItem(
+  id: string,
+  workspaceId: string,
+  until: Date,
+): Promise<boolean> {
+  const res = await db.query(
+    `UPDATE inbox_item
+        SET snoozed_until = $3, updated_at = NOW()
+      WHERE id = $1 AND workspace_id = $2
+        AND status NOT IN ('done', 'dismissed')`,
+    [id, workspaceId, until],
+  );
+  return (res.rowCount ?? 0) > 0;
 }
 
 export async function getInboxItem(

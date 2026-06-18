@@ -29,6 +29,8 @@ instructions: |
        - itemType: "linkedin_message"
        - source: "linkedin"
        - externalRef: the convId  (so re-runs don't duplicate the item)
+       - externalTs: the conversation's lastActivityAt  (so a NEW reply reopens
+         the item even if I'd archived/handled it)
        - title: e.g. "Reply to {name}"  (their headline in parens if useful)
        - context: { from, headline, lastMessage, messages }  # include the thread so I can review it
        - proposedActionText: your drafted reply  (mirrors the recommended option,

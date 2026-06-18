@@ -20,10 +20,12 @@ export type InboxRow = {
   itemType: string;
   status: "open" | "claimed" | "awaiting_human" | "done" | "dismissed";
   createdAtIso: string;
+  snoozedUntilIso: string | null;
 };
 
 type StatusFacet =
   | "active"
+  | "snoozed"
   | "awaiting_human"
   | "open"
   | "claimed"
@@ -37,6 +39,11 @@ const ACTIVE_STATUSES: InboxRow["status"][] = [
   "claimed",
   "awaiting_human",
 ];
+
+/** Currently snoozed = a "Wait" set to a future time. */
+function isSnoozed(i: InboxRow): boolean {
+  return !!i.snoozedUntilIso && new Date(i.snoozedUntilIso).getTime() > Date.now();
+}
 
 export function InboxList({
   items,
@@ -55,6 +62,7 @@ export function InboxList({
   const counts = useMemo(() => {
     const c = {
       active: 0,
+      snoozed: 0,
       awaiting_human: 0,
       open: 0,
       claimed: 0,
@@ -62,6 +70,11 @@ export function InboxList({
       dismissed: 0,
     };
     for (const i of items) {
+      // Snoozed (waiting) items are counted only under "snoozed", out of active.
+      if (isSnoozed(i)) {
+        c.snoozed++;
+        continue;
+      }
       c[i.status]++;
       if (ACTIVE_STATUSES.includes(i.status)) c.active++;
     }
@@ -85,9 +98,12 @@ export function InboxList({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let rows = items.filter((i) =>
-      facet === "active" ? ACTIVE_STATUSES.includes(i.status) : i.status === facet,
-    );
+    let rows = items.filter((i) => {
+      if (facet === "snoozed") return isSnoozed(i);
+      if (isSnoozed(i)) return false; // snoozed items hide from all other facets
+      if (facet === "active") return ACTIVE_STATUSES.includes(i.status);
+      return i.status === facet;
+    });
     if (q) {
       rows = rows.filter((i) =>
         `${i.title} ${i.source} ${i.itemType}`.toLowerCase().includes(q),
@@ -167,6 +183,7 @@ export function InboxList({
     { key: "awaiting_human", label: "Needs review" },
     { key: "open", label: "Open" },
     { key: "claimed", label: "Claimed" },
+    { key: "snoozed", label: "Waiting" },
     { key: "done", label: "Done" },
     { key: "dismissed", label: "Dismissed" },
   ];
