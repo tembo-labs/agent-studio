@@ -68,8 +68,10 @@ const LINEAR_OAUTH_ORIGINS: &[&str] = &["https://mcp.linear.app"];
 // lives on a separate origin (oauth2.googleapis.com) — both must be trusted so
 // the refresh-before-use sweep can renew the access token.
 const GMAIL_MCP_ORIGIN: &str = "https://gmailmcp.googleapis.com";
-const GMAIL_OAUTH_ORIGINS: &[&str] =
-    &["https://accounts.google.com", "https://oauth2.googleapis.com"];
+const GMAIL_OAUTH_ORIGINS: &[&str] = &[
+    "https://accounts.google.com",
+    "https://oauth2.googleapis.com",
+];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
@@ -363,14 +365,21 @@ async fn discover_token_endpoint(
                 continue;
             }
         };
-        match http.get(url).header("Accept", "application/json").send().await {
+        match http
+            .get(url)
+            .header("Accept", "application/json")
+            .send()
+            .await
+        {
             Ok(resp) => match resp.error_for_status() {
                 Ok(ok) => match ok.json::<ProtectedResourceMeta>().await {
                     Ok(meta) => {
                         pr = Some(meta);
                         break;
                     }
-                    Err(e) => last_err = Some(anyhow!(e).context("protected-resource metadata not JSON")),
+                    Err(e) => {
+                        last_err = Some(anyhow!(e).context("protected-resource metadata not JSON"))
+                    }
                 },
                 Err(e) => {
                     last_err = Some(anyhow!(e).context("protected-resource discovery error status"))
