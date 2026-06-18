@@ -24,7 +24,7 @@ use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use uuid::Uuid;
 
@@ -348,11 +348,32 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
         .ok_or_else(|| anyhow!("pydantic-ai wrapper stderr not captured"))?;
 
     // Drain stderr concurrently — a chatty wrapper would otherwise deadlock on
-    // a full stderr pipe while we're blocked reading stdout.
+    // a full stderr pipe while we're blocked reading stdout. We also forward
+    // each line to the api's own logs as it arrives: the wrapper + sidecars
+    // print operational diagnostics (e.g. `[scaledown]`, `[linkedin]`) to
+    // stderr, and without this they were only ever surfaced on FAILURE (the
+    // buffer feeds the error message) — invisible on successful runs. Lines are
+    // still accumulated into the buffer for that failure path.
+    let stderr_run_id = args.run_id;
     let stderr_task = tokio::spawn(async move {
         let mut buf = Vec::new();
         let mut rd = BufReader::new(stderr);
-        let _ = rd.read_to_end(&mut buf).await;
+        let mut line = Vec::new();
+        loop {
+            line.clear();
+            match rd.read_until(b'\n', &mut line).await {
+                Ok(0) => break,
+                Ok(_) => {
+                    buf.extend_from_slice(&line);
+                    let text = String::from_utf8_lossy(&line);
+                    let trimmed = text.trim_end();
+                    if !trimmed.is_empty() {
+                        tracing::info!(run_id = %stderr_run_id, "wrapper: {trimmed}");
+                    }
+                }
+                Err(_) => break,
+            }
+        }
         buf
     });
 
