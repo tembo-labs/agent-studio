@@ -273,17 +273,29 @@ def _inbox_state() -> tuple[dict, set]:
     now = datetime.now(timezone.utc)
     tracked: dict = {}
     active_refs: set = set()
+    dbg: list = []
     for it in items:
         ref = it.get("externalRef")
         if not (isinstance(ref, str) and ref):
             continue
         ts = it.get("externalTs")
         tracked[ref] = ts if isinstance(ts, int) else None
-        if it.get("status") not in ("open", "claimed", "awaiting_human"):
+        status = it.get("status")
+        if status not in ("open", "claimed", "awaiting_human"):
             continue  # done / dismissed — not occupying the inbox
-        if _is_future(it.get("snoozedUntil"), now):
+        snoozed = _is_future(it.get("snoozedUntil"), now)
+        dbg.append(
+            {
+                "ref": ref.rsplit(":", 1)[-1],
+                "status": status,
+                "snoozedUntil": it.get("snoozedUntil"),
+                "counted": "snoozed" if snoozed else "ACTIVE",
+            }
+        )
+        if snoozed:
             continue  # snoozed — hidden, doesn't occupy a cap slot
         active_refs.add(ref)
+    print(f"[linkedin] unresolved inbox items: {dbg}", file=sys.stderr)
     return tracked, active_refs
 
 
