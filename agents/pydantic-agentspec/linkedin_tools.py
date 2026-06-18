@@ -1,25 +1,32 @@
 """Sidecar tools for the linkedin-inbox agent.
 
-Pulls recent LinkedIn conversations via the unofficial Voyager API using the
-workspace's stored session (li_at + JSESSIONID cookie). Uses httpx (already in
-the runner venv) — no extra dependency.
+Reads recent LinkedIn conversations via the (unofficial) Voyager **GraphQL**
+messaging API using the stored session cookie. Uses httpx (already in the runner
+venv) — no extra dependency.
 
-⚠️ UNVERIFIED: Voyager is undocumented and changes; the endpoint + response
-shape below follow the long-standing classic messaging API but must be checked
-against a live session and adjusted. Errors are surfaced (not swallowed) so a
-bad cookie / changed shape shows up clearly in the run output.
+⚠️ UNOFFICIAL + VERSION-SENSITIVE: LinkedIn's messaging moved to GraphQL with a
+rotating `queryId` hash. The CONV_LIST_QUERY_ID below was captured from a live
+session; if this 500s/404s again, re-capture it: linkedin.com/messaging →
+DevTools → Network → filter `messengerConversations` → reload → copy the
+queryId from the request URL.
 
-Auth: LinkedIn's CSRF scheme requires the `csrf-token` header to equal the
-JSESSIONID value; the User-Agent should match the browser the li_at came from.
+Auth: cookie (li_at + JSESSIONID) + csrf-token header == JSESSIONID value; the
+User-Agent must be the DESKTOP browser the cookie came from (a mobile UA gets
+403'd by the desktop API).
 """
 
 from __future__ import annotations
+
+import json
+import re
 
 import httpx
 
 import tas_tools
 
 VOYAGER_BASE = "https://www.linkedin.com/voyager/api"
+# Rotating per LinkedIn release — see module docstring to re-capture.
+CONV_LIST_QUERY_ID = "messengerConversations.0d5e6781bbee71c3e51c8843c6519f48"
 
 
 def _session() -> dict:
@@ -38,76 +45,105 @@ def _session() -> dict:
         "x-restli-protocol-version": "2.0.0",
         "user-agent": user_agent,
         "accept": "application/json",
+        "x-li-lang": "en_US",
+        "accept-language": "en-US,en;q=0.9",
     }
 
 
-def _conv_id(entity_urn: str) -> str:
-    # "urn:li:fs_conversation:2-abc==" / "urn:li:fsd_conversation:2-abc==" → "2-abc=="
-    return entity_urn.rsplit(":", 1)[-1] if entity_urn else entity_urn
+def _profile_id(client: httpx.Client) -> str:
+    """Your own profile id (the ACoAA… in urn:li:fsd_profile:…), needed as the
+    mailbox for the conversation list. Derived from /voyager/api/me so nothing
+    account-specific is hard-coded."""
+    r = client.get(f"{VOYAGER_BASE}/me")
+    if r.status_code >= 400:
+        raise RuntimeError(f"LinkedIn /me {r.status_code}: {r.text[:300]!r}")
+    m = re.search(r"(?:fs_miniProfile|fsd_profile|fs_profile):([A-Za-z0-9_-]{15,})", r.text)
+    if not m:
+        raise RuntimeError(f"Couldn't find profile id in /me response: {r.text[:300]!r}")
+    return m.group(1)
+
+
+def _text(v) -> str:
+    """LinkedIn GraphQL wraps display strings as {'text': '...'}; also accept raw."""
+    if isinstance(v, dict):
+        return v.get("text") or ""
+    return v or ""
 
 
 def fetch_recent_conversations(limit: int = 3) -> list[dict]:
-    """Return up to `limit` recent LinkedIn conversations.
-
-    Each item: { convId, name, headline, lastMessage }. `convId` is what the
-    Inbox action executor passes back to LinkedIn for reply/archive, so the read
-    and write sides must agree on its format (the id after the conversation urn
-    prefix).
-    """
+    """Up to `limit` recent LinkedIn conversations: {convId, name, headline,
+    lastMessage}. `convId` is the conversation entity urn the reply/archive
+    executor passes back to LinkedIn."""
     headers = _session()
-    # follow_redirects: LinkedIn answers the first Voyager call with a 302 to the
-    # same URL while setting a routing cookie (lidc); httpx persists that cookie
-    # across the hop on the same client, so the followed retry succeeds. Without
-    # this you get "302 Found" on raise_for_status.
     with httpx.Client(timeout=30, headers=headers, follow_redirects=True) as client:
-        resp = client.get(
-            f"{VOYAGER_BASE}/messaging/conversations",
-            params={"keyVersion": "LEGACY_INBOX"},
-        )
+        mailbox = f"urn:li:fsd_profile:{_profile_id(client)}"
+        # RestLi variables format: literal parens, colons percent-encoded — matches
+        # what the browser sends. Build the query string by hand so httpx doesn't
+        # reshape it.
+        variables = f"(mailboxUrn:{mailbox})".replace(":", "%3A")
+        url = f"{VOYAGER_BASE}/voyagerMessagingGraphQL/graphql?queryId={CONV_LIST_QUERY_ID}&variables={variables}"
+        resp = client.get(url)
         if resp.status_code >= 400:
-            # Surface LinkedIn's actual reason (CSRF check, challenge, etc.) +
-            # which headers we sent, so failures are debuggable.
             raise RuntimeError(
-                f"LinkedIn {resp.status_code} on /messaging/conversations. "
-                f"Body: {resp.text[:400]!r}. "
-                f"Sent UA={headers.get('user-agent')!r}; "
-                f"csrf-token len={len(headers.get('csrf-token', ''))}."
+                f"LinkedIn {resp.status_code} on messengerConversations. "
+                f"Body: {resp.text[:400]!r}. UA={headers.get('user-agent')!r}"
             )
         data = resp.json()
 
+    out = _parse_conversations(data, limit)
+    if not out:
+        # Field paths likely drifted — surface the actual shape so we can fix the
+        # parser in one pass instead of guessing.
+        types = sorted({
+            e.get("$type", "?") for e in data.get("included", []) if isinstance(e, dict)
+        })
+        raise RuntimeError(
+            "Parsed 0 conversations. data keys=" + repr(list(data.keys()))
+            + " | included $types=" + repr(types)
+            + " | sample=" + json.dumps(data.get("included", [])[:1])[:1200]
+        )
+    return out
+
+
+def _parse_conversations(data: dict, limit: int) -> list[dict]:
+    """Best-effort parse of the messenger GraphQL response. The list lives in
+    `included` as com.linkedin.messenger.* entities cross-referenced by urn."""
+    included = [e for e in data.get("included", []) if isinstance(e, dict)]
+    by_urn = {e.get("entityUrn"): e for e in included if e.get("entityUrn")}
+
+    def is_type(e, suffix):
+        return str(e.get("$type", "")).endswith(suffix)
+
+    convs = [e for e in included if is_type(e, ".Conversation")]
     out: list[dict] = []
-    for el in (data.get("elements") or [])[:limit]:
-        entity_urn = el.get("entityUrn", "")
-        # Participant name (first non-self participant).
-        name = "Unknown"
-        headline = ""
-        for p in el.get("participants", []):
-            mm = (
-                p.get("com.linkedin.voyager.messaging.MessagingMember", {})
-                .get("miniProfile", {})
+    for c in convs[: limit * 3]:  # over-fetch; we slice after sorting
+        urn = c.get("entityUrn", "")
+        # Participants: resolve participant urns → member name/headline.
+        name, headline = "Unknown", ""
+        parts = c.get("conversationParticipants") or c.get("*conversationParticipants") or []
+        for p in parts:
+            pe = by_urn.get(p) if isinstance(p, str) else p
+            if not isinstance(pe, dict):
+                continue
+            member = (
+                (pe.get("participantType") or {}).get("member")
+                or (pe.get("participantType") or {}).get("organization")
+                or {}
             )
-            if mm:
-                name = " ".join(
-                    x for x in [mm.get("firstName"), mm.get("lastName")] if x
-                ) or name
-                headline = mm.get("occupation", "") or headline
+            fn, ln = _text(member.get("firstName")), _text(member.get("lastName"))
+            nm = (fn + " " + ln).strip() or _text(member.get("name"))
+            if nm:
+                name = nm
+                headline = _text(member.get("headline"))
                 break
         # Last message body.
         last = ""
-        events = el.get("events", [])
-        if events:
-            ev = events[0].get("eventContent", {})
-            msg = ev.get("com.linkedin.voyager.messaging.event.MessageEvent", {})
-            last = msg.get("body", "") or ""
-        out.append(
-            {
-                "convId": _conv_id(entity_urn),
-                "name": name,
-                "headline": headline,
-                "lastMessage": last,
-            }
-        )
-    return out
+        msgs = c.get("messages") or {}
+        elems = msgs.get("elements") if isinstance(msgs, dict) else None
+        if elems:
+            last = _text((elems[-1] or {}).get("body"))
+        out.append({"convId": urn, "name": name, "headline": headline, "lastMessage": last})
+    return out[:limit]
 
 
 tools = [fetch_recent_conversations]
