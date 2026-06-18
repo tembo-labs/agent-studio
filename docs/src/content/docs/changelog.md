@@ -17,6 +17,34 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.22] — ScaleDown prompt compression + agent cost/run — shipped 2026-06-18
+
+### Added
+- **ScaleDown prompt compression.** Optionally route bulky prompt/context through
+  [ScaleDown](https://scaledown.ai) to cut frontier-model tokens. Set a ScaleDown
+  key under Settings → LLM Providers, then opt in per agent with `scaledown: off |
+  prompt | aggressive`. `prompt` compresses the static instructions once
+  (cache-friendly); `aggressive` also compresses bulky history blocks each turn,
+  memoized so Anthropic prompt caching keeps working. Best-effort end to end — any
+  ScaleDown failure falls back to the original text, so it never fails a run.
+  Savings show on the run detail ("5.1K → 1.8K tokens").
+- **Avg cost/run on the agents table.** A new sortable column showing each
+  agent's average estimated USD cost over its costed runs in the last 30 days.
+- **`request_limit` agent-spec field** — cap an agent's model requests per run
+  via Pydantic AI `UsageLimits` (#183).
+
+### Changed
+- **Automations table gained Run as.** The unified automations table now shows
+  (and filters by) which user's credentials each automation runs as.
+- **Run page polls less aggressively.** The run-detail auto-refresh now backs off
+  (2s → 15s) instead of a fixed 1-second tick, so long runs don't trigger a full
+  server re-render every second.
+
+### Fixed
+- **Sidebar "Action needed" failure card.** Uses the proper
+  `sentiment-negative-subtle` surface (no more muddy brown in dark mode) and a red
+  CTA instead of an orange-on-red clash.
+
 ## [v2026.6.21] — Tasks Inbox + LinkedIn triage agent — shipped 2026-06-17
 
 ### Added
