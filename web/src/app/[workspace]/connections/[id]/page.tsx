@@ -22,6 +22,7 @@ import {
 import { DisconnectComposioConnectionForm } from "../../settings/disconnect-composio-connection-form";
 import { RefreshComposioToolsForm } from "../../settings/refresh-composio-tools-form";
 import { DisconnectNativeMcpConnectionForm } from "../disconnect-native-mcp-connection-form";
+import { DisconnectManualCredentialForm } from "../disconnect-manual-credential-form";
 import { RefreshNativeMcpToolsForm } from "../refresh-native-mcp-tools-form";
 
 export const dynamic = "force-dynamic";
@@ -132,6 +133,35 @@ export default async function ConnectionDetailPage({
           <a href={reconnect}>Reconnect</a>
         </Button>,
         <DisconnectNativeMcpConnectionForm key="disconnect" workspaceSlug={workspace.slug} connectionId={c.id} />,
+      );
+    }
+  } else if (loaded.kind === "manual-cred") {
+    const { provider, fields } = loaded;
+    title = provider.displayName;
+    logoSlug = null;
+    rows.push({ label: "Type", value: "Manual credential" });
+    for (const { field, preview } of fields) {
+      rows.push({
+        label: field.label,
+        value: preview ? (
+          <code className="text-foreground">••••••••{preview.last4}</code>
+        ) : (
+          <span className="text-foreground-muted">Not set</span>
+        ),
+      });
+    }
+    if (!view.viewingOther) {
+      actions.push(
+        <Button key="edit" asChild variant="secondary">
+          <Link href={`/${workspace.slug}/connections/new?type=manual&provider=${encodeURIComponent(provider.slug)}`}>
+            Edit credentials
+          </Link>
+        </Button>,
+        <DisconnectManualCredentialForm
+          key="disconnect"
+          workspaceSlug={workspace.slug}
+          providerSlug={provider.slug}
+        />,
       );
     }
   } else {

@@ -22,3 +22,6 @@ api/target/
 *.log
 *.db
 __pycache__/
+
+# JetBrains IDEs
+.idea/

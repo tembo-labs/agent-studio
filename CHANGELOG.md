@@ -14,6 +14,56 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.21] — Tasks Inbox + LinkedIn triage agent — shipped 2026-06-17
+
+### Added
+- **Tasks Inbox.** One workspace queue of everything your agents are waiting on
+  you for, pinned to the top of the sidebar with a live count badge. Each item
+  carries the agent's proposed action — you review, edit, and submit. Search,
+  filters, sortable columns, friendly (non-JSON) context rendering, and success
+  toasts on every action.
+- **Snooze.** Move an item out of the inbox for a set duration; it returns on its
+  own — or sooner if a newer reply lands on the thread.
+- **Agents work the inbox too.** It's a tool surface over Native MCP and the
+  `/api/v1/inbox` REST API (`produce_inbox_item`, `list_inbox_items` with
+  search / filter / sort, plus claim / propose / complete) — humans and agents
+  act on the same queue as peers.
+- **Action menus + one-click execution.** A producer can attach a set of typed
+  options (a reply with an editable draft, or one-click actions), one marked
+  recommended. The inbox renders them as buttons and *runs* the action on click
+  (e.g. send or archive on the source system), not just records it.
+- **Self-learning loop.** What you change versus what the agent proposed is a
+  signal. Agents in "learning mode" aggregate signals and open a single
+  improvement PR per cycle, rather than one per correction.
+- **LinkedIn inbox-triage agent.** Pulls recent LinkedIn threads into the Tasks
+  Inbox, drafts a reply from the full thread, and offers one-click **Send**,
+  **Send + Archive**, or **Archive**. Keeps the queue capped at a few open
+  threads (tops up, never piles on), skips threads you've archived / handled /
+  snoozed, and pages back for fresh ones when the recent list is all handled.
+- **Manual-credential connections.** Connect services with no OAuth (e.g.
+  LinkedIn) by pasting a few values alongside setup instructions, stored as
+  workspace secrets. "New connection" is now a four-type picker — Native MCP /
+  Composio / Manual credential / Secret.
+
+### Changed
+- **Automations is one full-width table.** Schedules, event triggers, and
+  inbound webhooks now live in a single searchable / filterable table instead of
+  a three-tab split. "+ New Automation" opens a type picker (Schedule / Event
+  trigger / Webhook), mirroring New connection.
+- **Shared DataTable across every list.** Agents, runs, connections, inbox,
+  automations, and the rest share one table component — consistent row hover,
+  whole-row click, and sortable headers everywhere.
+- **Skills page restructured** into a table of installed skills with a top-right
+  "+ New Skill" picker and a clickable per-skill detail view.
+
+### Fixed
+- **Inbox sidebar count updates the moment you act on an item** — the workspace
+  layout is revalidated on submit / dismiss / execute / snooze.
+- **Runner:** import `AnthropicProvider` correctly when building Pydantic AI
+  agents, and apply an explicit 300s read timeout on the Anthropic streaming
+  client (#178).
+- **API:** use axum 0.8 path syntax for `/runs/{id}`.
+
 ## [v2026.6.20] — Connections index polish, Skills detail, sidebar dismiss — shipped 2026-06-17
 
 ### Changed

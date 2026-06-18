@@ -8,7 +8,6 @@
 // calling loadRunsAction.
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -21,6 +20,7 @@ import {
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/pricing";
@@ -71,7 +71,6 @@ export function RunsList({
   initialFilters,
   lockedAgent,
 }: Props) {
-  const router = useRouter();
   const agentScoped = Boolean(lockedAgent);
 
   const [statuses, setStatuses] = useState<RunStatus[]>(
@@ -186,6 +185,131 @@ export function RunsList({
     [agentNames],
   );
 
+  // Column definitions — conditional columns are included/excluded based on
+  // agentScoped so the list stays consistent across the global Runs page and
+  // the per-agent Runs tab.
+  const columns = useMemo<Column<LoadedRun>[]>(() => {
+    const cols: Column<LoadedRun>[] = [];
+
+    cols.push({
+      key: "status",
+      header: "Status",
+      cell: (run) => (
+        <Badge variant={STATUS_BADGE[run.status]} size="small">
+          {STATUS_LABELS[run.status]}
+        </Badge>
+      ),
+    });
+
+    if (!agentScoped) {
+      cols.push({
+        key: "agent",
+        header: "Agent",
+        cell: (run) => {
+          const agentHref = `/${workspaceSlug}/agents/${encodeURIComponent(run.agentName)}`;
+          return (
+            <Link
+              href={agentHref}
+              onClick={(e) => e.stopPropagation()}
+              className="text-foreground hover:underline"
+            >
+              {run.agentName}
+            </Link>
+          );
+        },
+      });
+    }
+
+    cols.push({
+      key: "source",
+      header: "Source",
+      cell: (run) => <SourceCell run={run} />,
+    });
+
+    if (!agentScoped) {
+      cols.push({
+        key: "input",
+        header: "Input",
+        tdClassName: "text-foreground max-w-md",
+        cell: (run) => (
+          <>
+            {run.userMessagePreview ? (
+              <div className="truncate">{run.userMessagePreview}</div>
+            ) : !run.errorMessagePreview ? (
+              <span className="text-foreground-muted">—</span>
+            ) : null}
+            {run.errorMessagePreview && (
+              <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-sm leading-4">
+                {run.errorMessagePreview}
+              </div>
+            )}
+          </>
+        ),
+      });
+    }
+
+    cols.push({
+      key: "queued",
+      header: "Queued",
+      tdClassName: "text-foreground-weak",
+      cell: (run) => <QueuedAt iso={run.createdAt} />,
+    });
+
+    cols.push({
+      key: "duration",
+      header: "Duration",
+      tdClassName: "text-foreground-weak relative",
+      cell: (run) => {
+        const durationMs =
+          run.startedAt && run.completedAt
+            ? new Date(run.completedAt).getTime() -
+              new Date(run.startedAt).getTime()
+            : null;
+        if (durationMs !== null && maxDurationMs > 0) {
+          return (
+            <>
+              <span
+                aria-hidden
+                className="bg-interactive-state-hover absolute inset-y-1 left-1 rounded-sm"
+                style={{
+                  width: `calc(${Math.max(2, (durationMs / maxDurationMs) * 100)}% - 8px)`,
+                }}
+              />
+              <span className="relative">{formatDuration(durationMs)}</span>
+            </>
+          );
+        }
+        if (run.startedAt) return <span>Running</span>;
+        return <span className="text-foreground-muted">—</span>;
+      },
+    });
+
+    cols.push({
+      key: "cost",
+      header: "Cost",
+      tdClassName: "text-foreground-weak relative",
+      cell: (run) => {
+        if (run.costUsd !== null && maxCostUsd > 0) {
+          return (
+            <>
+              <span
+                aria-hidden
+                className="bg-interactive-state-hover absolute inset-y-1 left-1 rounded-sm"
+                style={{
+                  width: `calc(${Math.max(2, (run.costUsd / maxCostUsd) * 100)}% - 8px)`,
+                }}
+              />
+              <span className="relative">{formatCurrency(run.costUsd)}</span>
+            </>
+          );
+        }
+        return <span className="text-foreground-muted">—</span>;
+      },
+    });
+
+    return cols;
+  }, [agentScoped, workspaceSlug, maxDurationMs, maxCostUsd]);
+
   return (
     <div className="flex flex-col gap-5">
       {/* Filter row */}
@@ -264,38 +388,15 @@ export function RunsList({
       </div>
 
       {rows.length > 0 && (
-        <div className="border-border overflow-hidden rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">Status</th>
-                {!agentScoped && (
-                  <th className="px-3 py-2 text-left font-medium">Agent</th>
-                )}
-                <th className="px-3 py-2 text-left font-medium">Source</th>
-                {!agentScoped && (
-                  <th className="px-3 py-2 text-left font-medium">Input</th>
-                )}
-                <th className="px-3 py-2 text-left font-medium">Queued</th>
-                <th className="px-3 py-2 text-left font-medium">Duration</th>
-                <th className="px-3 py-2 text-left font-medium">Cost</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-weak)]">
-              {rows.map((r) => (
-                <RunRow
-                  key={r.id}
-                  run={r}
-                  workspaceSlug={workspaceSlug}
-                  agentScoped={agentScoped}
-                  maxDurationMs={maxDurationMs}
-                  maxCostUsd={maxCostUsd}
-                  onNavigate={(href) => router.push(href)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(r) => r.id}
+          rowHref={(r) => {
+            const agentHref = `/${workspaceSlug}/agents/${encodeURIComponent(r.agentName)}`;
+            return `${agentHref}/runs/${r.id}`;
+          }}
+        />
       )}
 
       {more && rows.length > 0 && (
@@ -311,109 +412,6 @@ export function RunsList({
         </div>
       )}
     </div>
-  );
-}
-
-function RunRow({
-  run,
-  workspaceSlug,
-  agentScoped,
-  maxDurationMs,
-  maxCostUsd,
-  onNavigate,
-}: {
-  run: LoadedRun;
-  workspaceSlug: string;
-  agentScoped: boolean;
-  maxDurationMs: number;
-  maxCostUsd: number;
-  onNavigate: (href: string) => void;
-}) {
-  const agentHref = `/${workspaceSlug}/agents/${encodeURIComponent(run.agentName)}`;
-  const runHref = `${agentHref}/runs/${run.id}`;
-  const durationMs =
-    run.startedAt && run.completedAt
-      ? new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()
-      : null;
-  return (
-    <tr
-      className="bg-surface-raised hover:bg-interactive-state-hover cursor-pointer"
-      onClick={() => onNavigate(runHref)}
-    >
-      <td className="px-3 py-2 align-top">
-        <Badge variant={STATUS_BADGE[run.status]} size="small">
-          {STATUS_LABELS[run.status]}
-        </Badge>
-      </td>
-      {!agentScoped && (
-        <td className="px-3 py-2 align-top">
-          <Link
-            href={agentHref}
-            onClick={(e) => e.stopPropagation()}
-            className="text-foreground hover:underline"
-          >
-            {run.agentName}
-          </Link>
-        </td>
-      )}
-      <td className="px-3 py-2 align-top">
-        <SourceCell run={run} />
-      </td>
-      {!agentScoped && (
-        <td className="text-foreground max-w-md px-3 py-2 align-top text-sm">
-          {run.userMessagePreview ? (
-            <div className="truncate">{run.userMessagePreview}</div>
-          ) : !run.errorMessagePreview ? (
-            <span className="text-foreground-muted">—</span>
-          ) : null}
-          {run.errorMessagePreview && (
-            // Failed runs surface their error inline so a triager can
-            // scan failures without clicking into each row. Two-line
-            // clamp keeps the column from ballooning on verbose stacks.
-            <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-sm leading-4">
-              {run.errorMessagePreview}
-            </div>
-          )}
-        </td>
-      )}
-      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
-        <QueuedAt iso={run.createdAt} />
-      </td>
-      <td className="text-foreground-weak relative px-3 py-2 align-top text-sm">
-        {durationMs !== null && maxDurationMs > 0 ? (
-          <>
-            <span
-              aria-hidden
-              className="bg-interactive-state-hover absolute inset-y-1 left-1 rounded-sm"
-              style={{
-                width: `calc(${Math.max(2, (durationMs / maxDurationMs) * 100)}% - 8px)`,
-              }}
-            />
-            <span className="relative">{formatDuration(durationMs)}</span>
-          </>
-        ) : run.startedAt ? (
-          <span>Running</span>
-        ) : (
-          <span className="text-foreground-muted">—</span>
-        )}
-      </td>
-      <td className="text-foreground-weak relative px-3 py-2 align-top text-sm">
-        {run.costUsd !== null && maxCostUsd > 0 ? (
-          <>
-            <span
-              aria-hidden
-              className="bg-interactive-state-hover absolute inset-y-1 left-1 rounded-sm"
-              style={{
-                width: `calc(${Math.max(2, (run.costUsd / maxCostUsd) * 100)}% - 8px)`,
-              }}
-            />
-            <span className="relative">{formatCurrency(run.costUsd)}</span>
-          </>
-        ) : (
-          <span className="text-foreground-muted">—</span>
-        )}
-      </td>
-    </tr>
   );
 }
 

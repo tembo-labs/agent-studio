@@ -22,16 +22,32 @@ import "server-only";
 //     last_fired_at floor is advanced anyway so we don't retry-storm
 //     the same broken state on every tick.
 
+import { requestAgentChangeSystem } from "@/lib/api-v1/actions";
 import {
   listEnabledAutomations,
   setAutomationFired,
   setAutomationSkipped,
   type Automation,
 } from "@/lib/automations-api";
+import {
+  listDueLearningConfigs,
+  setAgentLearned,
+  type AgentLearning,
+} from "@/lib/agent-learning-api";
 import { hasFiringInWindow } from "@/lib/cron";
+import {
+  listUnconsumedSignalsForAgent,
+  markSignalsConsumed,
+  type InboxAction,
+  type InboxItem,
+} from "@/lib/inbox-api";
 import { resolveAgentForDispatch } from "@/lib/workspace-agents";
 
 const TICK_MS = 30_000;
+// How many corrected cases to include in one batched learning prompt. Bounds
+// the CAP prompt size; older signals beyond this still get consumed so they
+// don't pile up, they just don't each get spelled out.
+const MAX_LEARNING_CASES = 20;
 
 let started = false;
 let timer: NodeJS.Timeout | null = null;
@@ -42,8 +58,14 @@ export function startScheduler() {
   // Run one tick immediately so a fresh boot doesn't wait 30s before
   // catching up on anything that came due during downtime.
   void tick().catch((e) => console.error("[scheduler] initial tick threw", e));
+  void learningTick().catch((e) =>
+    console.error("[scheduler] initial learning tick threw", e),
+  );
   timer = setInterval(() => {
     void tick().catch((e) => console.error("[scheduler] tick threw", e));
+    void learningTick().catch((e) =>
+      console.error("[scheduler] learning tick threw", e),
+    );
   }, TICK_MS);
   console.log(`[scheduler] started, tick=${TICK_MS}ms`);
 }
@@ -161,4 +183,153 @@ async function recordSkipAndAdvance(
 ): Promise<void> {
   console.warn("[scheduler] skip fire", a.id, error);
   await setAutomationSkipped({ id: a.id, firedAt: now, error });
+}
+
+// ── Batched Tasks Inbox learning pass ─────────────────────────────────
+// For each agent in learning mode whose cadence window has elapsed, gather the
+// inbox signals it produced (resolved items the pass hasn't folded in yet),
+// and — if any were CORRECTED by the human — collapse them into ONE improvement
+// -> CAP PR via the existing requestAgentChange pipeline. Accepted-as-is signals
+// are consumed too (nothing to change) so they don't re-accumulate. One PR per
+// cycle, not per signal.
+
+async function learningTick() {
+  const now = new Date();
+  const due = await listDueLearningConfigs(now);
+  for (const cfg of due) {
+    try {
+      await runLearningCycle(cfg, now);
+    } catch (e) {
+      console.error(
+        "[scheduler] learning cycle threw",
+        cfg.workspaceId,
+        cfg.agentName,
+        e,
+      );
+      // Advance the floor regardless so a broken cycle doesn't re-run every
+      // tick; the signals stay unconsumed and get picked up next window.
+      await setAgentLearned(cfg.workspaceId, cfg.agentName, now);
+    }
+  }
+}
+
+async function runLearningCycle(cfg: AgentLearning, now: Date): Promise<void> {
+  if (!cfg.ownerUserId) {
+    await setAgentLearned(cfg.workspaceId, cfg.agentName, now);
+    return;
+  }
+
+  const signals = await listUnconsumedSignalsForAgent(
+    cfg.workspaceId,
+    cfg.agentName,
+  );
+  if (signals.length === 0) {
+    await setAgentLearned(cfg.workspaceId, cfg.agentName, now);
+    return;
+  }
+
+  const corrected = signals.filter((s) =>
+    actionDiffers(s.proposedAction, s.finalAction),
+  );
+
+  // Nothing was corrected this cycle — the agent's guesses were accepted as-is.
+  // Mark the signals consumed (confirmation, no spec change) and advance.
+  if (corrected.length === 0) {
+    await markSignalsConsumed(signals.map((s) => s.id), null);
+    await setAgentLearned(cfg.workspaceId, cfg.agentName, now);
+    console.log(
+      `[scheduler] learning: ${cfg.agentName} — ${signals.length} signal(s), 0 corrections; no change`,
+    );
+    return;
+  }
+
+  const description = buildLearningDescription(cfg.agentName, corrected);
+  const res = await requestAgentChangeSystem(cfg.workspaceId, cfg.ownerUserId, {
+    agent: cfg.agentName,
+    description,
+  });
+
+  if (!res.ok) {
+    // Leave signals unconsumed so the next due window retries; just advance the
+    // floor so we don't hammer CAP every tick.
+    await setAgentLearned(cfg.workspaceId, cfg.agentName, now);
+    console.warn(
+      `[scheduler] learning: ${cfg.agentName} — requestAgentChange failed: ${res.error}`,
+    );
+    return;
+  }
+
+  // Consume every gathered signal under this batch improvement.
+  await markSignalsConsumed(
+    signals.map((s) => s.id),
+    res.result.improvementId,
+  );
+  await setAgentLearned(cfg.workspaceId, cfg.agentName, now);
+  console.log(
+    `[scheduler] learning: ${cfg.agentName} — batched ${corrected.length} correction(s) into improvement ${res.result.improvementId}`,
+  );
+}
+
+function actionText(a: InboxAction | null): string {
+  return (a?.text ?? "").trim();
+}
+function actionFields(a: InboxAction | null): string {
+  return JSON.stringify(a?.fields ?? null);
+}
+/** A signal is a "correction" when the human's final action differs from the
+ *  agent's proposal (in text or structured fields). */
+function actionDiffers(
+  proposed: InboxAction | null,
+  final: InboxAction | null,
+): boolean {
+  return (
+    actionText(proposed) !== actionText(final) ||
+    actionFields(proposed) !== actionFields(final)
+  );
+}
+
+/** Build one CAP prompt summarizing the corrected cases, grouped by item type,
+ *  asking it to update the agent's instructions so future items match. */
+function buildLearningDescription(
+  agentName: string,
+  corrected: InboxItem[],
+): string {
+  const cases = corrected.slice(0, MAX_LEARNING_CASES);
+  const omitted = corrected.length - cases.length;
+
+  const byType = new Map<string, InboxItem[]>();
+  for (const c of cases) {
+    const arr = byType.get(c.itemType) ?? [];
+    arr.push(c);
+    byType.set(c.itemType, arr);
+  }
+
+  const lines: string[] = [
+    `The agent "${agentName}" proposes actions for Tasks Inbox items that a human reviews before they go out. ` +
+      `Below are recent cases where the human CORRECTED the agent's proposed action. ` +
+      `Update the agent's instructions (its system prompt) — and/or add worked examples — so it would produce the corrected version on its own next time. ` +
+      `Generalize the patterns; don't hard-code these specific names. Keep existing behavior that wasn't corrected.`,
+    "",
+  ];
+
+  for (const [itemType, items] of byType) {
+    lines.push(`## ${itemType} (${items.length} corrected)`);
+    items.forEach((c, i) => {
+      lines.push(
+        `### Case ${i + 1}: ${c.title}`,
+        `Context: ${JSON.stringify(c.context)}`,
+        `Agent proposed: ${actionText(c.proposedAction) || "(nothing)"}`,
+        `Human submitted: ${actionText(c.finalAction) || "(nothing)"}`,
+        "",
+      );
+    });
+  }
+
+  if (omitted > 0) {
+    lines.push(
+      `(${omitted} additional corrected case(s) this cycle are omitted from this summary but follow the same patterns.)`,
+    );
+  }
+
+  return lines.join("\n");
 }

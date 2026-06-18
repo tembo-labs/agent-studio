@@ -5,9 +5,15 @@ import { z } from "zod";
 
 import type { AuthorizeApiSuccess } from "@/lib/api-auth";
 import {
+  claimInboxItemFor,
+  completeInboxItemFor,
   createAutomationFor,
   createSlackAppFor,
   deleteSlackAppFor,
+  getInboxItemFor,
+  listInboxItemsFor,
+  produceInboxItemFor,
+  proposeInboxActionFor,
   requestAgentChange,
   sendSlackMessageFor,
   triggerRun,
@@ -18,6 +24,7 @@ import {
   serializeAgent,
   serializeAutomation,
   serializeConnections,
+  serializeInboxItem,
   serializeRunListItem,
   serializeRunRecord,
   serializeSlackApp,
@@ -224,6 +231,71 @@ export function buildMcpServer(
     },
   );
 
+  server.registerTool(
+    "list_inbox_items",
+    {
+      description:
+        "List/search Tasks Inbox items for this workspace — the shared queue " +
+        "humans and agents work. Filter by status, source, and item type; " +
+        "free-text `search` matches the title + the item's context payload; " +
+        "sort by any column. 'open' items need a proposal or a claim; " +
+        "'awaiting_human' items have a proposed action a person should review; " +
+        "'done'/'dismissed' are resolved.",
+      inputSchema: {
+        status: z
+          .enum(["open", "claimed", "awaiting_human", "done", "dismissed"])
+          .array()
+          .optional()
+          .describe("Only items in these statuses."),
+        source: z.string().optional().describe("Only items from this source (e.g. 'linkedin')."),
+        itemType: z
+          .string()
+          .optional()
+          .describe("Only this item type (e.g. 'connection_request')."),
+        search: z
+          .string()
+          .optional()
+          .describe("Free-text match against the title and context payload."),
+        sort: z
+          .enum(["created_at", "updated_at", "title", "item_type", "source", "status"])
+          .optional()
+          .describe("Sort column (default created_at)."),
+        dir: z.enum(["asc", "desc"]).optional().describe("Sort direction (default desc)."),
+        limit: z.number().int().min(1).max(100).optional().describe("Max rows (default 100)."),
+      },
+    },
+    async ({ status, source, itemType, search, sort, dir, limit }) => {
+      const res = await listInboxItemsFor(
+        ctx,
+        {
+          ...(status?.length ? { statuses: status } : {}),
+          ...(source ? { source } : {}),
+          ...(itemType ? { itemType } : {}),
+          ...(search ? { search } : {}),
+          ...(sort ? { sort } : {}),
+          ...(dir ? { dir } : {}),
+        },
+        limit,
+      );
+      return json({ inboxItems: res.items.map(serializeInboxItem) });
+    },
+  );
+
+  server.registerTool(
+    "get_inbox_item",
+    {
+      description:
+        "Get one Tasks Inbox item by id — its full context payload, the agent's " +
+        "proposed action, and any human final action.",
+      inputSchema: { id: z.string().describe("The inbox item id.") },
+    },
+    async ({ id }) => {
+      const res = await getInboxItemFor(ctx, id);
+      if (!res.ok) return errorResult(res.error);
+      return json({ inboxItem: serializeInboxItem(res.item) });
+    },
+  );
+
   // ── Write tools (operator) ──────────────────────────────────────────
   // Connecting only required viewer; these re-check operator on the resolved
   // role so a viewer key can read but not act.
@@ -336,6 +408,157 @@ export function buildMcpServer(
       const res = await requestAgentChange(ctx, { description, agent, name, framework });
       if (!res.ok) return errorResult(res.error);
       return json(res.result);
+    },
+  );
+
+  server.registerTool(
+    "produce_inbox_item",
+    {
+      description:
+        "Add an item to the Tasks Inbox — the way an agent surfaces something a " +
+        "human should review. Include your best-guess `proposedAction` (text " +
+        "and/or structured fields) so the human reviews-and-edits rather than " +
+        "starts from scratch; the diff between your guess and what they submit " +
+        "trains future autonomy. With a proposal the item is ready for review; " +
+        "without one it sits 'open' for someone to pick up. Returns the item.",
+      inputSchema: {
+        itemType: z
+          .string()
+          .describe("e.g. 'connection_request' | 'message_reply' | 'notification' | 'post_engagement'."),
+        title: z.string().describe("Short label for the triage list row."),
+        source: z.string().optional().describe("Where it came from (default 'agent')."),
+        externalRef: z.string().optional().describe("Producer's id for idempotent re-pushes."),
+        externalTs: z
+          .number()
+          .optional()
+          .describe(
+            "Source's latest-activity time (epoch ms). If a later run reports a " +
+            "NEWER value for the same externalRef, the item reopens + refreshes " +
+            "(e.g. a reply to an archived thread comes back).",
+          ),
+        context: z.record(z.string(), z.unknown()).optional().describe("The raw payload to review (JSON)."),
+        proposedActionText: z.string().optional().describe("Your proposed reply / decision."),
+        proposedActionFields: z.record(z.string(), z.unknown()).optional().describe("Structured proposal params."),
+        options: z
+          .array(
+            z.object({
+              id: z.string().describe("Stable option id, e.g. 'reply' | 'archive' | 'ignore'."),
+              label: z.string().describe("Button label, e.g. 'Send reply'."),
+              kind: z.enum(["reply", "oneclick"]).describe("'reply' shows an editable draft; 'oneclick' is one-tap."),
+              draft: z.string().optional().describe("For kind 'reply': the suggested text (editable)."),
+              recommended: z.boolean().optional().describe("Mark the agent's default pick."),
+              execute: z
+                .object({
+                  provider: z.string().describe("Executor key, e.g. 'linkedin'."),
+                  op: z.string().describe("Operation, e.g. 'send' | 'archive'."),
+                  params: z.record(z.string(), z.unknown()).optional().describe("e.g. { convId }."),
+                })
+                .optional()
+                .describe("How to perform this action on click. Omit for a no-op (e.g. 'Ignore')."),
+            }),
+          )
+          .optional()
+          .describe(
+            "Action menu rendered as buttons for the human — the set of things they might do. " +
+            "Pick one recommended; reply options carry a draft.",
+          ),
+      },
+    },
+    async ({ itemType, title, source, externalRef, externalTs, context, proposedActionText, proposedActionFields, options: actionOptions }) => {
+      if (!isOperator) return operatorOnly();
+      const proposedAction =
+        proposedActionText || proposedActionFields
+          ? {
+              ...(proposedActionText ? { text: proposedActionText } : {}),
+              ...(proposedActionFields ? { fields: proposedActionFields } : {}),
+            }
+          : undefined;
+      const res = await produceInboxItemFor(ctx, {
+        itemType,
+        title,
+        source,
+        externalRef,
+        externalTs,
+        context,
+        proposedAction,
+        options: actionOptions,
+        parentRunId: options.parentRunId,
+      });
+      if (!res.ok) return errorResult(res.error);
+      return json({ inboxItem: serializeInboxItem(res.item) });
+    },
+  );
+
+  server.registerTool(
+    "claim_inbox_item",
+    {
+      description:
+        "Claim an 'open' inbox item to work it — recorded as this agent (when " +
+        "called from inside a run) so humans can see who picked it up. Follow " +
+        "with propose_inbox_action (for human review) or complete_inbox_item " +
+        "(to resolve it autonomously).",
+      inputSchema: { id: z.string().describe("The inbox item id.") },
+    },
+    async ({ id }) => {
+      if (!isOperator) return operatorOnly();
+      const res = await claimInboxItemFor(ctx, { id, parentRunId: options.parentRunId });
+      if (!res.ok) return errorResult(res.error);
+      return json({ inboxItem: serializeInboxItem(res.item) });
+    },
+  );
+
+  server.registerTool(
+    "propose_inbox_action",
+    {
+      description:
+        "Attach your best-guess action to an inbox item and send it for human " +
+        "review (moves it to 'awaiting_human'). Use after claiming a source- " +
+        "pushed 'open' item. The human's edits to your proposal are the signal " +
+        "that trains future autonomy.",
+      inputSchema: {
+        id: z.string().describe("The inbox item id."),
+        text: z.string().optional().describe("Proposed reply / decision."),
+        fields: z.record(z.string(), z.unknown()).optional().describe("Structured proposal params."),
+      },
+    },
+    async ({ id, text, fields }) => {
+      if (!isOperator) return operatorOnly();
+      const res = await proposeInboxActionFor(ctx, {
+        id,
+        proposedAction: {
+          ...(text ? { text } : {}),
+          ...(fields ? { fields } : {}),
+        },
+      });
+      if (!res.ok) return errorResult(res.error);
+      return json({ inboxItem: serializeInboxItem(res.item) });
+    },
+  );
+
+  server.registerTool(
+    "complete_inbox_item",
+    {
+      description:
+        "Resolve an inbox item with the final action taken — use this when an " +
+        "agent handles an item autonomously (no human review needed). Records " +
+        "the (proposed, final) pair as a learning signal.",
+      inputSchema: {
+        id: z.string().describe("The inbox item id."),
+        text: z.string().optional().describe("The final reply / decision taken."),
+        fields: z.record(z.string(), z.unknown()).optional().describe("Structured final params."),
+      },
+    },
+    async ({ id, text, fields }) => {
+      if (!isOperator) return operatorOnly();
+      const res = await completeInboxItemFor(ctx, {
+        id,
+        finalAction: {
+          ...(text ? { text } : {}),
+          ...(fields ? { fields } : {}),
+        },
+      });
+      if (!res.ok) return errorResult(res.error);
+      return json({ inboxItem: serializeInboxItem(res.item) });
     },
   );
 

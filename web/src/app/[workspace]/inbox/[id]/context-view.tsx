@@ -1,0 +1,102 @@
+// Human-friendly rendering of an inbox item's `context` payload. The payload is
+// arbitrary JSON (source-agnostic), so we render it generically as labeled
+// fields — humanized keys, readable values, nested objects/arrays indented —
+// instead of dumping raw JSON at the person triaging it.
+
+import type { ReactNode } from "react";
+
+function humanizeKey(key: string): string {
+  return key
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function Empty() {
+  return <span className="text-foreground-muted">—</span>;
+}
+
+function Value({ value }: { value: unknown }): ReactNode {
+  if (value === null || value === undefined || value === "") return <Empty />;
+  if (typeof value === "string") {
+    // Render a URL as a link; everything else as wrapped text.
+    if (/^https?:\/\/\S+$/.test(value)) {
+      return (
+        <a
+          href={value}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-foreground hover:underline"
+        >
+          {value}
+        </a>
+      );
+    }
+    return <span className="whitespace-pre-wrap">{value}</span>;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return <span>{String(value)}</span>;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <Empty />;
+    // Array of primitives → comma-separated; array of objects → stacked cards.
+    if (value.every((v) => !isPlainObject(v) && !Array.isArray(v))) {
+      return <span>{value.map((v) => String(v)).join(", ")}</span>;
+    }
+    return (
+      <div className="flex flex-col gap-3">
+        {value.map((v, i) => (
+          <div
+            key={i}
+            className="border-[var(--color-border-weak)] border-l-2 pl-3"
+          >
+            <Fields data={v} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (isPlainObject(value)) {
+    return (
+      <div className="border-[var(--color-border-weak)] border-l-2 pl-3">
+        <Fields data={value} />
+      </div>
+    );
+  }
+  return <Empty />;
+}
+
+function Fields({ data }: { data: unknown }): ReactNode {
+  if (!isPlainObject(data)) return <Value value={data} />;
+  const entries = Object.entries(data);
+  if (entries.length === 0) return <Empty />;
+  return (
+    <dl className="flex flex-col gap-3">
+      {entries.map(([key, value]) => (
+        <div key={key} className="flex flex-col gap-0.5">
+          <dt className="text-foreground-muted text-xs font-medium uppercase tracking-wide">
+            {humanizeKey(key)}
+          </dt>
+          <dd className="text-foreground text-sm leading-6">
+            <Value value={value} />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+export function ContextView({ context }: { context: Record<string, unknown> }) {
+  if (!context || Object.keys(context).length === 0) {
+    return (
+      <p className="text-foreground-weak text-sm">No additional detail.</p>
+    );
+  }
+  return <Fields data={context} />;
+}

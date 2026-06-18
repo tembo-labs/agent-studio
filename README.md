@@ -1,13 +1,9 @@
 <div align="center">
-  <a href="https://github.com/tembo/agent-studio">
-    <img alt="Tembo Agent Studio" src=".github/assets/tembo.png" width="340">
-  </a>
-
+  <h1>Tembo Agent Studio</h1>
 <a href="https://tembo.io"><img alt="Made by Tembo" src="https://img.shields.io/badge/MADE%20BY%20TEMBO-0f172a.svg?style=for-the-badge&labelColor=000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB2aWV3Qm94PSIwIDAgMzIgMzIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgZmlsbD0ibm9uZSI%2BPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNi41IDcpIiBmaWxsPSIjZmZmZmZmIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTguMDUyNjggOC4wNTU4NkM4LjUwNDM4IDIuNTUyNjcgMy45ODI0NiAtMC4zOTg3MjYgLTAuMDAwMTM1NDIyIDAuMDQzNDM0NFYzLjg0ODMzQzIuNTkyOTkgMy4yNTg1NiA0Ljg2ODU1IDUuNDg1OTYgNC4yNDAxNSA4LjA1NTg2SDguMDUyNjhaIi8%2BPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xMC4wMjY0IDguMDU1ODZDOS41NzQ3MiAyLjU1MjY3IDE0LjA5NjYgLTAuMzk4NzI2IDE4LjA3OTIgMC4wNDM0MzQ0VjMuODQ4MzNDMTUuNDg2MSAzLjI1ODU2IDEzLjIxMDUgNS40ODU5NiAxMy44MzkgOC4wNTU4NkgxMC4wMjY0WiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNNy4xOTUzNyA5Ljk0NDE0QzYuNzQzNjYgMTUuNDQ3MyAxMS4yNjU2IDE4LjM5ODcgMTUuMjQ4MiAxNy45NTY2VjE0LjE1MTdDMTIuNjU1MSAxNC43NDE0IDEwLjM3OTUgMTIuNTE0IDExLjAwNzkgOS45NDQxNEg3LjE5NTM3WiIvPjwvZz48L3N2Zz4%3D"></a>
 <a href="https://github.com/tembo/agent-studio/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/tembo/agent-studio.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://github.com/tembo/agent-studio/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/tembo/agent-studio.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://github.com/tembo/agent-studio/discussions"><img alt="Join the community on GitHub" src="https://img.shields.io/badge/Join%20the%20community-blueviolet.svg?style=for-the-badge&logo=Github&labelColor=000000&logoWidth=20"></a>
-
 </div>
 
 > Self-hosted control plane for AI agents. Definitions live in Git, every

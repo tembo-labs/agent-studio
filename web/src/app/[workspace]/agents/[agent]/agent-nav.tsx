@@ -16,6 +16,7 @@ const ITEMS: Item[] = [
   { slug: "versions", label: "Versions" },
   { slug: "definition", label: "Definition" },
   { slug: "activity", label: "Activity" },
+  { slug: "learning", label: "Learning" },
   { slug: "settings", label: "Settings" },
 ];
 

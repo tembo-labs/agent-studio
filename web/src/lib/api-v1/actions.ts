@@ -37,10 +37,25 @@ import {
   improvementMarker,
   setImprovementCommitted,
   setImprovementTask,
+  type ImprovementSource,
 } from "@/lib/improvements-api";
-import { createRun } from "@/lib/runs-api";
+import { createRun, getRun } from "@/lib/runs-api";
+import {
+  claimInboxItem,
+  completeInboxItem,
+  createInboxItem,
+  dismissInboxItem,
+  getInboxItem,
+  listInboxItems,
+  setProposedAction,
+  type InboxAction,
+  type InboxItem,
+  type InboxOption,
+  type ListInboxFilters,
+} from "@/lib/inbox-api";
 import { suggestSlug } from "@/lib/slugify";
 import {
+  getWorkspaceById,
   getWorkspaceRepo,
   getWorkspaceSecretPlaintext,
   listWorkspaceMembers,
@@ -250,6 +265,9 @@ export type RequestAgentChangeInput = {
   framework?: Framework;
   /** What to change / what the new agent should do. */
   description: string;
+  /** Where this change originated. Defaults to 'chat'; the scheduler's learning
+   *  pass passes 'learning' so the resulting improvement is tagged. */
+  source?: ImprovementSource;
 };
 
 export type RequestAgentChangeResult = {
@@ -318,6 +336,7 @@ export async function requestAgentChange(
       agentPath,
       improvementText: description,
       delivery: ctx.workspace.commitMode,
+      source: input.source,
       userId: ctx.userId,
     });
     prompt = buildChatEditPrompt({
@@ -366,6 +385,7 @@ export async function requestAgentChange(
     improvementText: description,
     kind: "create",
     delivery: ctx.workspace.commitMode,
+    source: input.source,
     userId: ctx.userId,
   });
 
@@ -441,6 +461,198 @@ async function finishTask(args: {
       agentPath: args.agentPath,
     },
   };
+}
+
+// ── Tasks Inbox ───────────────────────────────────────────────────────
+// Shared inbox actions for the agent-facing surfaces (MCP + REST). Agents
+// PRODUCE items (need a human) and ACT ON them (claim → propose → complete) as
+// peers with humans on one queue. In this slice `completeInboxItemFor` only
+// RECORDS the (proposed, final) signal — the batched learning pass (scheduler)
+// turns accumulated signals into one improvement later, so there's no per-signal
+// PR here. The human-facing in-app submit lives in the /inbox page's server
+// action (session auth), not this programmatic layer.
+
+/** Resolve the agent name of the run calling /mcp, so an agent claiming or
+ *  completing an item is recorded as that agent (not the underlying user). */
+async function actingAgentName(
+  ctx: ApiCtx,
+  parentRunId: string | undefined,
+): Promise<string | null> {
+  if (!parentRunId) return null;
+  try {
+    const run = await getRun(parentRunId, ctx.workspace.id);
+    return run?.agentName ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export type ProduceInboxItemInput = {
+  itemType: string;
+  title: string;
+  source?: string;
+  externalRef?: string;
+  context?: Record<string, unknown>;
+  proposedAction?: InboxAction;
+  /** Action menu rendered as buttons; one may be `recommended`. */
+  options?: InboxOption[];
+  /** Source's latest-activity time (epoch ms); newer than stored reopens the item. */
+  externalTs?: number;
+  /** The run producing this item (set when called from /mcp inside a run). */
+  parentRunId?: string;
+};
+
+export async function produceInboxItemFor(
+  ctx: ApiCtx,
+  input: ProduceInboxItemInput,
+): Promise<{ ok: true; item: InboxItem } | ActionFailure> {
+  const title = input.title?.trim();
+  if (!title) return { ok: false, status: 400, error: "title is required" };
+  const itemType = input.itemType?.trim();
+  if (!itemType) return { ok: false, status: 400, error: "itemType is required" };
+
+  const producedByRunId = input.parentRunId ?? null;
+  const item = await createInboxItem({
+    workspaceId: ctx.workspace.id,
+    source: input.source?.trim() || "agent",
+    externalRef: input.externalRef ?? null,
+    itemType,
+    title,
+    context: input.context ?? {},
+    proposedAction: input.proposedAction ?? null,
+    options: input.options ?? null,
+    externalTs: input.externalTs ?? null,
+    // A proposal (or an action menu) ready for review is awaiting_human;
+    // otherwise it's open for a human or agent to pick up and propose against.
+    status: input.proposedAction || input.options?.length ? "awaiting_human" : "open",
+    producedByRunId,
+    // Provenance lives on produced_by_run_id; created_by is reserved for the
+    // person who filed it (null when an agent did).
+    createdBy: producedByRunId ? null : ctx.userId,
+  });
+  await auditApiMutation(ctx, {
+    kind: "inbox.produced",
+    targetType: "inbox_item",
+    targetId: item.id,
+    payload: { source: item.source, itemType: item.itemType },
+  });
+  return { ok: true, item };
+}
+
+export async function listInboxItemsFor(
+  ctx: ApiCtx,
+  filters: ListInboxFilters = {},
+  limit?: number,
+): Promise<{ ok: true; items: InboxItem[] }> {
+  const items = await listInboxItems(ctx.workspace.id, filters, limit);
+  return { ok: true, items };
+}
+
+export async function getInboxItemFor(
+  ctx: ApiCtx,
+  id: string,
+): Promise<{ ok: true; item: InboxItem } | ActionFailure> {
+  const item = await getInboxItem(id, ctx.workspace.id);
+  if (!item) return { ok: false, status: 404, error: `no inbox item "${id}"` };
+  return { ok: true, item };
+}
+
+export async function claimInboxItemFor(
+  ctx: ApiCtx,
+  input: { id: string; parentRunId?: string },
+): Promise<{ ok: true; item: InboxItem } | ActionFailure> {
+  const agent = await actingAgentName(ctx, input.parentRunId);
+  const ok = agent
+    ? await claimInboxItem(input.id, ctx.workspace.id, "agent", agent)
+    : await claimInboxItem(input.id, ctx.workspace.id, "human", ctx.userId);
+  if (!ok) {
+    return { ok: false, status: 409, error: "item not found or already claimed" };
+  }
+  const item = await getInboxItem(input.id, ctx.workspace.id);
+  return { ok: true, item: item! };
+}
+
+export async function proposeInboxActionFor(
+  ctx: ApiCtx,
+  input: { id: string; proposedAction: InboxAction },
+): Promise<{ ok: true; item: InboxItem } | ActionFailure> {
+  if (!input.proposedAction || (!input.proposedAction.text && !input.proposedAction.fields)) {
+    return { ok: false, status: 400, error: "proposedAction must have text or fields" };
+  }
+  const ok = await setProposedAction(input.id, ctx.workspace.id, input.proposedAction);
+  if (!ok) {
+    return { ok: false, status: 409, error: "item not found or not in a proposable state" };
+  }
+  const item = await getInboxItem(input.id, ctx.workspace.id);
+  return { ok: true, item: item! };
+}
+
+export async function completeInboxItemFor(
+  ctx: ApiCtx,
+  input: { id: string; finalAction: InboxAction },
+): Promise<{ ok: true; item: InboxItem } | ActionFailure> {
+  if (!input.finalAction || (!input.finalAction.text && !input.finalAction.fields)) {
+    return { ok: false, status: 400, error: "finalAction must have text or fields" };
+  }
+  const ok = await completeInboxItem(input.id, ctx.workspace.id, input.finalAction);
+  if (!ok) {
+    return { ok: false, status: 409, error: "item not found or already resolved" };
+  }
+  const item = await getInboxItem(input.id, ctx.workspace.id);
+  // Recorded as a HITL response even when an autonomous agent completes it —
+  // the (proposed, final) pair is the signal the learning pass batches later.
+  await auditApiMutation(ctx, {
+    source: "hitl_response",
+    kind: "inbox.completed",
+    targetType: "inbox_item",
+    targetId: input.id,
+    payload: { itemType: item!.itemType, source: item!.source },
+  });
+  return { ok: true, item: item! };
+}
+
+export async function dismissInboxItemFor(
+  ctx: ApiCtx,
+  input: { id: string },
+): Promise<{ ok: true } | ActionFailure> {
+  const ok = await dismissInboxItem(input.id, ctx.workspace.id);
+  if (!ok) {
+    return { ok: false, status: 409, error: "item not found or already resolved" };
+  }
+  await auditApiMutation(ctx, {
+    kind: "inbox.dismissed",
+    targetType: "inbox_item",
+    targetId: input.id,
+  });
+  return { ok: true };
+}
+
+// ── System-context agent change (scheduler learning pass) ─────────────
+// The batched learning loop runs in the scheduler, which has no authenticated
+// request — but requestAgentChange only reads ctx.workspace (id + commitMode)
+// and ctx.userId (the improvement's created_by). Synthesize a minimal ApiCtx
+// attributed to the learning config's owner so the existing improvement -> CAP
+// pipeline is reused verbatim (one PR per batch). role/apiKeyId/surface are
+// unused by requestAgentChange; we set placeholder-valid values.
+
+export async function requestAgentChangeSystem(
+  workspaceId: string,
+  ownerUserId: string,
+  input: { agent: string; description: string },
+): Promise<{ ok: true; result: RequestAgentChangeResult } | ActionFailure> {
+  const workspace = await getWorkspaceById(workspaceId);
+  if (!workspace) {
+    return { ok: false, status: 404, error: "workspace not found" };
+  }
+  const ctx: ApiCtx = {
+    ok: true,
+    workspace,
+    userId: ownerUserId,
+    role: "operator",
+    apiKeyId: "system:learning",
+    surface: "api",
+  };
+  return requestAgentChange(ctx, { ...input, source: "learning" });
 }
 
 // ── Slack apps (workspace_admin) ──────────────────────────────────────

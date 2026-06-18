@@ -5,7 +5,6 @@
 // renders the first page, this takes over on filter changes / "Load more".
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -17,6 +16,7 @@ import {
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { ToolCallOutcome } from "@/lib/runs-db";
@@ -53,8 +53,6 @@ export function ToolUsesList({
   initial,
   initialFilters,
 }: Props) {
-  const router = useRouter();
-
   const [agentName, setAgentName] = useState(initialFilters?.agentName ?? "");
   const [toolName, setToolName] = useState(initialFilters?.toolName ?? "");
   const [outcomes, setOutcomes] = useState<ToolCallOutcome[]>(
@@ -132,6 +130,60 @@ export function ToolUsesList({
     ...toolNames.map((n) => ({ value: n, label: n })),
   ];
 
+  const columns: Column<LoadedToolCall>[] = [
+    {
+      key: "outcome",
+      header: "Outcome",
+      cell: (t) => <OutcomeBadge ok={t.ok} />,
+    },
+    {
+      key: "tool",
+      header: "Tool",
+      cell: (t) => (
+        <>
+          <code className="text-foreground text-sm">{t.toolName}</code>
+          {t.ok === false && t.errorMessage && (
+            <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-xs leading-4">
+              {t.errorMessage}
+            </div>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "agent",
+      header: "Agent",
+      tdClassName: "whitespace-nowrap",
+      cell: (t) => (
+        <Link
+          href={`/${workspaceSlug}/agents/${encodeURIComponent(t.agentName)}`}
+          className="text-foreground hover:underline"
+        >
+          {t.agentName}
+        </Link>
+      ),
+    },
+    {
+      key: "when",
+      header: "When",
+      tdClassName: "text-foreground-weak whitespace-nowrap text-sm",
+      cell: (t) => <When iso={t.createdAt} />,
+    },
+    {
+      key: "run",
+      header: "Run",
+      tdClassName: "whitespace-nowrap",
+      cell: (t) => (
+        <Link
+          href={`/${workspaceSlug}/agents/${encodeURIComponent(t.agentName)}/runs/${t.runId}`}
+          className="text-foreground-weak hover:text-foreground text-sm"
+        >
+          Open →
+        </Link>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
@@ -205,64 +257,17 @@ export function ToolUsesList({
       </div>
 
       {rows.length > 0 && (
-        <div className="border-border overflow-hidden rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">Outcome</th>
-                <th className="px-3 py-2 text-left font-medium">Tool</th>
-                <th className="px-3 py-2 text-left font-medium">Agent</th>
-                <th className="px-3 py-2 text-left font-medium">When</th>
-                <th className="px-3 py-2 text-left font-medium">Run</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-weak)]">
-              {rows.map((t) => {
-                const runHref = `/${workspaceSlug}/agents/${encodeURIComponent(t.agentName)}/runs/${t.runId}`;
-                return (
-                  <tr
-                    key={t.id}
-                    className="bg-surface-raised hover:bg-interactive-state-hover cursor-pointer"
-                    onClick={() => router.push(runHref)}
-                  >
-                    <td className="px-3 py-2 align-top">
-                      <OutcomeBadge ok={t.ok} />
-                    </td>
-                    <td className="px-3 py-2 align-top">
-                      <code className="text-foreground text-sm">{t.toolName}</code>
-                      {t.ok === false && t.errorMessage && (
-                        <div className="text-sentiment-negative mt-0.5 line-clamp-2 font-mono text-xs leading-4">
-                          {t.errorMessage}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 align-top whitespace-nowrap">
-                      <Link
-                        href={`/${workspaceSlug}/agents/${encodeURIComponent(t.agentName)}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-foreground hover:underline"
-                      >
-                        {t.agentName}
-                      </Link>
-                    </td>
-                    <td className="text-foreground-weak px-3 py-2 align-top whitespace-nowrap text-sm">
-                      <When iso={t.createdAt} />
-                    </td>
-                    <td className="px-3 py-2 align-top whitespace-nowrap">
-                      <Link
-                        href={runHref}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-foreground-weak hover:text-foreground text-sm"
-                      >
-                        Open →
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(t) => t.id}
+          renderExpanded={(t) => (
+            <ExpandedDetail
+              workspaceSlug={workspaceSlug}
+              toolCall={t}
+            />
+          )}
+        />
       )}
 
       {more && rows.length > 0 && (
@@ -277,6 +282,38 @@ export function ToolUsesList({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ExpandedDetail({
+  workspaceSlug,
+  toolCall,
+}: {
+  workspaceSlug: string;
+  toolCall: LoadedToolCall;
+}) {
+  const runHref = `/${workspaceSlug}/agents/${encodeURIComponent(toolCall.agentName)}/runs/${toolCall.runId}`;
+  return (
+    <div className="flex flex-col gap-2 pt-1">
+      {toolCall.ok === false && toolCall.errorMessage && (
+        <div>
+          <span className="text-foreground-weak text-xs font-medium uppercase tracking-wide">
+            Error
+          </span>
+          <pre className="text-sentiment-negative mt-1 whitespace-pre-wrap font-mono text-xs leading-5">
+            {toolCall.errorMessage}
+          </pre>
+        </div>
+      )}
+      <div>
+        <Link
+          href={runHref}
+          className="text-foreground-weak hover:text-foreground text-sm underline"
+        >
+          View run →
+        </Link>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { DocsSidebarLink } from "@/components/docs-sidebar-link";
 import { MissingConnectionCards } from "@/components/missing-connection-cards";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { countActiveInboxItems } from "@/lib/inbox-api";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
@@ -80,6 +81,7 @@ export async function AppShell({
   const instanceName = await getInstanceName();
   const isInstanceAdmin = isInstanceAdminEmail(user.email);
   const home = `/${workspace.slug}`;
+  const inboxCount = await countActiveInboxItems(workspace.id);
 
   // Collapse missing-connection alerts by the connection itself (substrate +
   // toolkit + slot). One HubSpot app needed by three agents is a single card
@@ -124,7 +126,7 @@ export async function AppShell({
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-3 pt-6">
-          <SidebarNav home={home} />
+          <SidebarNav home={home} inboxCount={inboxCount} />
 
           {(!hasLlmProvider ||
             failingAgents.length > 0 ||
@@ -157,7 +159,7 @@ export async function AppShell({
                 return (
                   <div
                     key={`fail:${f.agentName}`}
-                    className="flex items-start gap-2 rounded-md bg-[var(--color-input-error)] px-2 py-2"
+                    className="flex items-start gap-2 rounded-md bg-[var(--color-sentiment-negative-subtle)] px-2 py-2"
                   >
                     <IconExclamationTriangle
                       size={14}
@@ -170,7 +172,7 @@ export async function AppShell({
                         <span className="font-semibold">{f.failures}×</span> in
                         24h
                       </span>
-                      <Button asChild variant="orange" size="small">
+                      <Button asChild variant="destructive" size="small">
                         <Link href={agentHref}>Open</Link>
                       </Button>
                     </div>

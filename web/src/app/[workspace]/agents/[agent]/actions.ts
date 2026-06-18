@@ -26,6 +26,10 @@ import {
   setAgentOwner,
 } from "@/lib/agent-versions";
 import { summarizeSpecDiff } from "@/lib/agent-version-summary";
+import {
+  upsertAgentLearning,
+  type LearningCadence,
+} from "@/lib/agent-learning-api";
 import { diffLines, type TextDiff } from "@/lib/text-diff";
 import {
   deleteTriggerLocal,
@@ -610,5 +614,54 @@ export async function deleteTriggerAction(
 
   revalidatePath(`/${slug}/agents/${encodeURIComponent(trigger.agentName)}`);
   return SIMPLE_EMPTY;
+}
+
+// ── Learning mode (batched Tasks Inbox learning loop) ─────────────────
+
+export type LearningFormState = { error?: string; message?: string };
+
+export async function setAgentLearningAction(
+  _prev: LearningFormState,
+  formData: FormData,
+): Promise<LearningFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const agentName = String(formData.get("agent") ?? "");
+  const enabled = formData.get("enabled") === "on";
+  const cadenceRaw = String(formData.get("cadence") ?? "daily");
+  const cadence: LearningCadence = cadenceRaw === "weekly" ? "weekly" : "daily";
+
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+
+  // Attribute the batched improvement to whoever turned learning on (their
+  // identity owns the resulting CAP task — improvement.created_by is NOT NULL).
+  await upsertAgentLearning({
+    workspaceId: workspace.id,
+    agentName,
+    enabled,
+    cadence,
+    ownerUserId: userId,
+  });
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "agent.learning.changed",
+    targetType: "agent",
+    targetId: agentName,
+    agentName,
+    payload: { enabled, cadence },
+  });
+
+  revalidatePath(`/${slug}/agents/${encodeURIComponent(agentName)}/settings`);
+  return {
+    message: enabled
+      ? `Learning mode on (${cadence}). Corrections you make in the Inbox batch into a PR each cycle.`
+      : "Learning mode off.",
+  };
 }
 
