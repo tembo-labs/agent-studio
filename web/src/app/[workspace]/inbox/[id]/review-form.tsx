@@ -11,6 +11,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import type { InboxOption } from "@/lib/inbox-api";
@@ -21,6 +22,20 @@ import {
   submitInboxItemAction,
   type InboxActionResult,
 } from "../actions";
+
+/** Friendly confirmation copy per option, by what it does. */
+function successFor(opt: InboxOption): string {
+  switch (opt.execute?.op) {
+    case "send_and_archive":
+      return "Reply sent and archived";
+    case "send":
+      return "Reply sent";
+    case "archive":
+      return "Archived";
+    default:
+      return `${opt.label} done`;
+  }
+}
 
 export function ReviewForm({
   workspaceSlug,
@@ -38,7 +53,11 @@ export function ReviewForm({
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
 
-  const run = (key: string, fn: () => Promise<InboxActionResult>) => {
+  const run = (
+    key: string,
+    fn: () => Promise<InboxActionResult>,
+    successMsg?: string,
+  ) => {
     setError(null);
     setBusy(key);
     startTransition(async () => {
@@ -52,11 +71,14 @@ export function ReviewForm({
         );
         return;
       }
-      setBusy(null);
       if (r.ok) {
+        // Confirm, then navigate to the inbox. (No router.refresh() — calling it
+        // right after push races and re-renders this page instead of landing on
+        // the list. force-dynamic on /inbox gives fresh data on navigation.)
+        toast.success(successMsg ?? "Done");
         router.push(`/${workspaceSlug}/inbox`);
-        router.refresh();
       } else {
+        setBusy(null);
         setError(r.error);
       }
     });
@@ -104,7 +126,11 @@ function ActionMenu({
   pending: boolean;
   busy: string | null;
   error: string | null;
-  run: (key: string, fn: () => Promise<InboxActionResult>) => void;
+  run: (
+    key: string,
+    fn: () => Promise<InboxActionResult>,
+    successMsg?: string,
+  ) => void;
 }) {
   // Reply options share ONE editable draft (e.g. "Send" + "Send + Archive");
   // one-click options (Archive / Ignore) are plain buttons. Recommended first.
@@ -138,13 +164,16 @@ function ActionMenu({
                 variant={opt.recommended ? "primary" : "secondary"}
                 disabled={pending || !draft.trim()}
                 onClick={() =>
-                  run(opt.id, () =>
-                    executeInboxOptionAction({
-                      workspaceSlug,
-                      itemId,
-                      optionId: opt.id,
-                      text: draft,
-                    }),
+                  run(
+                    opt.id,
+                    () =>
+                      executeInboxOptionAction({
+                        workspaceSlug,
+                        itemId,
+                        optionId: opt.id,
+                        text: draft,
+                      }),
+                    successFor(opt),
                   )
                 }
               >
@@ -164,12 +193,15 @@ function ActionMenu({
               variant="secondary"
               disabled={pending}
               onClick={() =>
-                run(opt.id, () =>
-                  executeInboxOptionAction({
-                    workspaceSlug,
-                    itemId,
-                    optionId: opt.id,
-                  }),
+                run(
+                  opt.id,
+                  () =>
+                    executeInboxOptionAction({
+                      workspaceSlug,
+                      itemId,
+                      optionId: opt.id,
+                    }),
+                  successFor(opt),
                 )
               }
             >
@@ -199,7 +231,11 @@ function FreeTextForm({
   pending: boolean;
   busy: string | null;
   error: string | null;
-  run: (key: string, fn: () => Promise<InboxActionResult>) => void;
+  run: (
+    key: string,
+    fn: () => Promise<InboxActionResult>,
+    successMsg?: string,
+  ) => void;
 }) {
   const [text, setText] = useState(proposedText);
   return (
@@ -225,8 +261,10 @@ function FreeTextForm({
           type="button"
           disabled={pending || !text.trim()}
           onClick={() =>
-            run("submit", () =>
-              submitInboxItemAction({ workspaceSlug, itemId, text }),
+            run(
+              "submit",
+              () => submitInboxItemAction({ workspaceSlug, itemId, text }),
+              "Saved",
             )
           }
         >
@@ -237,8 +275,10 @@ function FreeTextForm({
           variant="secondary"
           disabled={pending}
           onClick={() =>
-            run("dismiss", () =>
-              dismissInboxItemAction({ workspaceSlug, itemId }),
+            run(
+              "dismiss",
+              () => dismissInboxItemAction({ workspaceSlug, itemId }),
+              "Dismissed",
             )
           }
         >
