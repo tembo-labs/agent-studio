@@ -19,8 +19,15 @@ export const linkedinExecutor: InboxExecutor = async ({ workspaceId, op, params,
       await sendMessage(workspaceId, convId, body);
       return;
     }
+    case "send_and_archive": {
+      const body = (text ?? "").trim();
+      if (!body) throw new Error("Reply text is empty.");
+      await sendMessage(workspaceId, convId, body);
+      await archiveConversation(workspaceId, convId);
+      return;
+    }
     case "archive":
-      await archiveConversation(workspaceId, convId, true);
+      await archiveConversation(workspaceId, convId);
       return;
     default:
       throw new Error(`Unknown linkedin op "${op}".`);

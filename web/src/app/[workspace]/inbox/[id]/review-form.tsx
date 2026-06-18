@@ -106,16 +106,13 @@ function ActionMenu({
   error: string | null;
   run: (key: string, fn: () => Promise<InboxActionResult>) => void;
 }) {
-  // Recommended option(s) first.
-  const ordered = [...options].sort(
-    (a, b) => (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0),
-  );
-  // Editable draft text per reply option.
-  const [drafts, setDrafts] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      options.filter((o) => o.kind === "reply").map((o) => [o.id, o.draft ?? ""]),
-    ),
-  );
+  // Reply options share ONE editable draft (e.g. "Send" + "Send + Archive");
+  // one-click options (Archive / Ignore) are plain buttons. Recommended first.
+  const byRec = (a: InboxOption, b: InboxOption) =>
+    (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0);
+  const replyOpts = options.filter((o) => o.kind === "reply").sort(byRec);
+  const clickOpts = options.filter((o) => o.kind === "oneclick").sort(byRec);
+  const [draft, setDraft] = useState(replyOpts.find((o) => o.draft)?.draft ?? "");
 
   return (
     <section className="flex flex-col gap-4">
@@ -123,66 +120,64 @@ function ActionMenu({
         What do you want to do?
       </h2>
 
-      <div className="flex flex-col gap-4">
-        {ordered.map((opt) =>
-          opt.kind === "reply" ? (
-            <div key={opt.id} className="flex flex-col gap-2">
-              <textarea
-                value={drafts[opt.id] ?? ""}
-                onChange={(e) =>
-                  setDrafts((d) => ({ ...d, [opt.id]: e.target.value }))
-                }
-                rows={5}
-                disabled={pending}
-                placeholder="The reply to send…"
-                className="bg-surface border-border text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)] resize-y rounded-md border px-3 py-2 text-sm leading-6"
-              />
-              <div>
-                <Button
-                  type="button"
-                  disabled={pending || !(drafts[opt.id] ?? "").trim()}
-                  onClick={() =>
-                    run(opt.id, () =>
-                      executeInboxOptionAction({
-                        workspaceSlug,
-                        itemId,
-                        optionId: opt.id,
-                        text: drafts[opt.id],
-                      }),
-                    )
-                  }
-                >
-                  {busy === opt.id ? "Sending…" : opt.label}
-                </Button>
-              </div>
-            </div>
-          ) : null,
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          {ordered
-            .filter((o) => o.kind === "oneclick")
-            .map((opt) => (
+      {replyOpts.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={5}
+            disabled={pending}
+            placeholder="The reply to send…"
+            className="bg-surface border-border text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)] resize-y rounded-md border px-3 py-2 text-sm leading-6"
+          />
+          <div className="flex flex-wrap gap-2">
+            {replyOpts.map((opt) => (
               <Button
                 key={opt.id}
                 type="button"
                 variant={opt.recommended ? "primary" : "secondary"}
-                disabled={pending}
+                disabled={pending || !draft.trim()}
                 onClick={() =>
                   run(opt.id, () =>
                     executeInboxOptionAction({
                       workspaceSlug,
                       itemId,
                       optionId: opt.id,
+                      text: draft,
                     }),
                   )
                 }
               >
-                {busy === opt.id ? "Working…" : opt.label}
+                {busy === opt.id ? "Sending…" : opt.label}
               </Button>
             ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {clickOpts.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {clickOpts.map((opt) => (
+            <Button
+              key={opt.id}
+              type="button"
+              variant="secondary"
+              disabled={pending}
+              onClick={() =>
+                run(opt.id, () =>
+                  executeInboxOptionAction({
+                    workspaceSlug,
+                    itemId,
+                    optionId: opt.id,
+                  }),
+                )
+              }
+            >
+              {busy === opt.id ? "Working…" : opt.label}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {error && <ErrorBanner error={error} />}
     </section>

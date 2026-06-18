@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomBytes, randomUUID } from "node:crypto";
+
 import { getSecretConnectionValue } from "@/lib/secret-connections";
 
 // Minimal LinkedIn Voyager (internal API) client for the WRITE operations the
@@ -85,10 +87,24 @@ async function voyager(
   }
 }
 
+/** The mailbox (your own profile) is embedded in the conversation urn:
+ *  urn:li:msg_conversation:(urn:li:fsd_profile:<ME>,2-…). */
+function mailboxFromConv(convId: string): string {
+  const m = convId.match(/urn:li:fsd_profile:[^,)]+/);
+  if (!m) throw new Error(`Couldn't derive mailbox from conversation urn: ${convId}`);
+  return m[0];
+}
+
+/** LinkedIn's trackingId is 16 random bytes serialized as a (latin-1) string —
+ *  it's just a dedupe token, so any 16-byte value works. */
+function trackingId(): string {
+  return String.fromCharCode(...randomBytes(16));
+}
+
 /**
- * Send a message into an existing conversation. `convId` is LinkedIn's
- * conversation id (the read side / linkedin-api returns it). Classic Voyager
- * messaging "create event" shape.
+ * Send a message into an existing conversation via the Dash messaging API
+ * (createMessage). `convId` is the full conversation urn the read side returns.
+ * Body shape matches the web client exactly (captured from a live session).
  */
 export async function sendMessage(
   workspaceId: string,
@@ -96,34 +112,32 @@ export async function sendMessage(
   text: string,
 ): Promise<void> {
   const s = await loadSession(workspaceId);
-  await voyager(s, `/messaging/conversations/${encodeURIComponent(convId)}/events?action=create`, {
+  await voyager(s, "/voyagerMessagingDashMessengerMessages?action=createMessage", {
     method: "POST",
     body: {
-      eventCreate: {
-        value: {
-          "com.linkedin.voyager.messaging.create.MessageCreate": {
-            body: text,
-            attachments: [],
-            attributedBody: { text, attributes: [] },
-            mediaAttachments: [],
-          },
-        },
+      message: {
+        body: { attributes: [], text },
+        renderContentUnions: [],
+        conversationUrn: convId,
+        originToken: randomUUID(),
       },
+      mailboxUrn: mailboxFromConv(convId),
+      trackingId: trackingId(),
+      dedupeByClientGeneratedToken: false,
     },
   });
 }
 
 /**
- * Archive (or unarchive) a conversation via a Voyager partial update.
+ * Archive a conversation via the Dash conversations API (addCategory ARCHIVE).
  */
 export async function archiveConversation(
   workspaceId: string,
   convId: string,
-  archived = true,
 ): Promise<void> {
   const s = await loadSession(workspaceId);
-  await voyager(s, `/messaging/conversations/${encodeURIComponent(convId)}`, {
+  await voyager(s, "/voyagerMessagingDashMessengerConversations?action=addCategory", {
     method: "POST",
-    body: { patch: { $set: { archived } } },
+    body: { conversationUrns: [convId], category: "ARCHIVE" },
   });
 }
