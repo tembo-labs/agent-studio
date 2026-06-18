@@ -946,6 +946,14 @@ def build_agent(
     # fail agent construction — the agent just runs without compression.
     try:
         sd_mode, sd_rate, sd_min_chars = _scaledown_settings(spec)
+        # Always log the resolved config so a missing/ignored compression is
+        # diagnosable from the run/container logs: did the spec carry the field
+        # (raw), what mode did it resolve to, and is a key present?
+        print(
+            f"[scaledown] config: raw={spec.get('scaledown')!r} "
+            f"mode={sd_mode} key={'set' if _scaledown_key() else 'missing'}",
+            file=sys.stderr,
+        )
         if sd_mode != "off" and _scaledown_key():
             if kwargs.get("instructions"):
                 kwargs["instructions"] = _scaledown_compress(
