@@ -26,6 +26,8 @@ export type AutomationRow = {
   /** Human label: schedule/webhook name, or the trigger event. */
   name: string;
   agentName: string;
+  /** Whose credentials the run uses (display label), or "—" if unknown. */
+  runAs: string;
   enabled: boolean;
   lastFiredAtIso: string | null;
   lastFireError: string | null;
@@ -60,6 +62,7 @@ export function AutomationsTable({
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
   const [agent, setAgent] = useState("");
+  const [runAs, setRunAs] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
 
   const agentOptions = useMemo(
@@ -71,12 +74,22 @@ export function AutomationsTable({
     ],
     [rows],
   );
+  const runAsOptions = useMemo(
+    () => [
+      { value: "", label: "Anyone" },
+      ...[...new Set(rows.map((r) => r.runAs).filter((o) => o && o !== "—"))]
+        .sort()
+        .map((o) => ({ value: o, label: o })),
+    ],
+    [rows],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((r) => {
       if (kind !== "all" && r.kind !== kind) return false;
       if (agent && r.agentName !== agent) return false;
+      if (runAs && r.runAs !== runAs) return false;
       if (status === "enabled" && !(r.enabled && !r.lastFireError)) return false;
       if (status === "disabled" && r.enabled) return false;
       if (status === "error" && !r.lastFireError) return false;
@@ -89,7 +102,7 @@ export function AutomationsTable({
         return false;
       return true;
     });
-  }, [rows, query, kind, agent, status]);
+  }, [rows, query, kind, agent, runAs, status]);
 
   const columns: Column<AutomationRow>[] = [
     {
@@ -138,6 +151,12 @@ export function AutomationsTable({
         ) : (
           <span className="text-foreground-muted">Never</span>
         ),
+    },
+    {
+      key: "runAs",
+      header: "Run as",
+      tdClassName: "text-foreground-weak text-sm",
+      cell: (r) => r.runAs,
     },
     {
       key: "status",
@@ -214,6 +233,13 @@ export function AutomationsTable({
           onValueChange={setAgent}
           options={agentOptions}
           ariaLabel="Filter by agent"
+          className="min-w-[150px]"
+        />
+        <Select
+          value={runAs}
+          onValueChange={setRunAs}
+          options={runAsOptions}
+          ariaLabel="Filter by run-as owner"
           className="min-w-[150px]"
         />
         <Select

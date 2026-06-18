@@ -8,7 +8,7 @@ import { listAutomations } from "@/lib/automations-api";
 import { getServerSession } from "@/lib/session";
 import { listTriggersForWorkspace } from "@/lib/triggers-db";
 import { listWebhooksForWorkspace } from "@/lib/webhooks-db";
-import { getWorkspaceBySlug } from "@/lib/workspace";
+import { getWorkspaceBySlug, listWorkspaceMembers } from "@/lib/workspace";
 
 import { AutomationsTable, type AutomationRow } from "./automations-table";
 
@@ -30,11 +30,17 @@ export default async function AutomationsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const [automations, triggers, webhooks] = await Promise.all([
+  const [automations, triggers, webhooks, members] = await Promise.all([
     listAutomations(workspace.id),
     listTriggersForWorkspace(workspace.id),
     listWebhooksForWorkspace(workspace.id),
+    listWorkspaceMembers(workspace.id),
   ]);
+
+  // Resolve a "run as" user id → display label for triggers/webhooks (schedules
+  // already carry the resolved owner name).
+  const memberLabel = new Map(members.map((m) => [m.userId, m.name ?? m.email]));
+  const runAsOf = (userId: string) => memberLabel.get(userId) ?? "—";
 
   const agentAutomationHref = (agentName: string) =>
     `/${slug}/agents/${encodeURIComponent(agentName)}/automation`;
@@ -45,6 +51,7 @@ export default async function AutomationsPage({
       kind: "schedule",
       name: a.name,
       agentName: a.agentName,
+      runAs: a.ownerUserName ?? a.ownerUserEmail ?? "—",
       enabled: a.enabled,
       lastFiredAtIso: a.lastFiredAt ? a.lastFiredAt.toISOString() : null,
       lastFireError: a.lastFireError,
@@ -56,6 +63,7 @@ export default async function AutomationsPage({
       kind: "trigger",
       name: t.triggerType,
       agentName: t.agentName,
+      runAs: runAsOf(t.userId),
       enabled: t.enabled,
       lastFiredAtIso: t.lastFiredAt ? t.lastFiredAt.toISOString() : null,
       lastFireError: t.lastFireError,
@@ -68,6 +76,7 @@ export default async function AutomationsPage({
       kind: "webhook",
       name: w.name,
       agentName: w.agentName,
+      runAs: runAsOf(w.ownerUserId),
       enabled: w.enabled,
       lastFiredAtIso: w.lastFiredAt ? w.lastFiredAt.toISOString() : null,
       lastFireError: w.lastFireError,
