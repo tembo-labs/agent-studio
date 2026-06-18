@@ -215,6 +215,11 @@ function ActionMenu({
   const replyOpts = options.filter((o) => o.kind === "reply").sort(byRec);
   const clickOpts = options.filter((o) => o.kind === "oneclick").sort(byRec);
   const [draft, setDraft] = useState(replyOpts.find((o) => o.draft)?.draft ?? "");
+  // Always offer a way to clear an item WITHOUT acting on the source (e.g. you
+  // handled the Linear issue by hand — canceled/reassigned it). Skip it only
+  // when the agent already provided a no-op clear/ignore option, so we don't
+  // double up.
+  const hasClearOption = options.some((o) => o.kind === "oneclick" && !o.execute);
 
   return (
     <section className="flex flex-col gap-4">
@@ -284,6 +289,25 @@ function ActionMenu({
               {busy === opt.id ? "Working…" : opt.label}
             </Button>
           ))}
+        </div>
+      )}
+
+      {!hasClearOption && (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={pending}
+            onClick={() =>
+              run(
+                "dismiss",
+                () => dismissInboxItemAction({ workspaceSlug, itemId }),
+                "Dismissed",
+              )
+            }
+          >
+            {busy === "dismiss" ? "Dismissing…" : "Dismiss"}
+          </Button>
         </div>
       )}
 
