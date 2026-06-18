@@ -23,9 +23,10 @@ export default async function ProvidersPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const [anthropicPreview, openaiPreview] = await Promise.all([
+  const [anthropicPreview, openaiPreview, scaledownPreview] = await Promise.all([
     getWorkspaceSecretPreview(workspace.id, "anthropic_api_key"),
     getWorkspaceSecretPreview(workspace.id, "openai_api_key"),
+    getWorkspaceSecretPreview(workspace.id, "scaledown_api_key"),
   ]);
 
   return (
@@ -53,7 +54,7 @@ export default async function ProvidersPage({
         </Section>
       </div>
 
-      <div className="pt-6">
+      <div className="py-6">
         <Section
           title="OpenAI API key"
           description="Required for any agent that uses an openai:* model."
@@ -69,6 +70,29 @@ export default async function ProvidersPage({
                 ? {
                     last4: openaiPreview.last4,
                     updatedAt: openaiPreview.updatedAt.toISOString(),
+                  }
+                : null
+            }
+          />
+        </Section>
+      </div>
+
+      <div className="pt-6">
+        <Section
+          title="ScaleDown API key"
+          description="Optional. Compresses bulky prompt/context through ScaleDown (scaledown.ai) to cut frontier-model tokens. Opt in per agent with scaledown: prompt | aggressive in the agent spec."
+        >
+          <SecretKeyForm
+            workspaceSlug={workspace.slug}
+            kind="scaledown_api_key"
+            label="ScaleDown API key"
+            placeholder="sk-…"
+            maskedPrefix="sk-"
+            preview={
+              scaledownPreview
+                ? {
+                    last4: scaledownPreview.last4,
+                    updatedAt: scaledownPreview.updatedAt.toISOString(),
                   }
                 : null
             }

@@ -163,6 +163,7 @@ runtime is contractually required to ignore.
 | Field | Type | Added | Meaning |
 | --- | --- | --- | --- |
 | `labels` | `string[]` or comma string | v0.4 | Free-form tags. Group the agent in the inventory and **scope which TAS-managed Slack app may launch it** (a Slack app launches only agents whose labels intersect its own). Normalized lowercase + deduped. |
+| `scaledown` | `string`, `bool`, or object | v2026.6 | Opt into [ScaleDown](https://scaledown.ai) prompt compression to cut frontier-model tokens. `off` (default) / `prompt` (compress the static instructions once — cache-friendly) / `aggressive` (also compress bulky history blocks each turn, memoized so prompt caching still hits). Object form `{ mode, rate, min_tokens }` tunes it. No-op unless the workspace set a ScaleDown key under Settings → LLM providers. |
 
 Example:
 

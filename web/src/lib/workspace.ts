@@ -15,6 +15,7 @@ export type WorkspaceSecretKind =
   | "github_pat"
   | "anthropic_api_key"
   | "openai_api_key"
+  | "scaledown_api_key"
   | "composio_api_key"
   | "composio_webhook_secret";
 

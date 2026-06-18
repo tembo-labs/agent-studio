@@ -320,6 +320,18 @@ async fn run_pydantic(
     )
     .await
     .ok();
+    // ScaleDown key is optional — when set (and the agent opts in via its
+    // `scaledown:` spec field), the wrapper compresses bulky prompt/context
+    // through ScaleDown before each frontier-model call to cut tokens. Absent =
+    // no compression. Plumbed for every agent (not gated on a tools module).
+    let scaledown_key = get_workspace_secret_plaintext(
+        &state.db,
+        &state.encryption_key,
+        ctx.workspace_id,
+        SecretKind::ScaleDownApiKey,
+    )
+    .await
+    .ok();
     // Composio user_id we pass through is the composite
     // `${workspace_id}:${acting_user_id}` so Composio's vault stays
     // isolated per (workspace, user) — mirrors what the web side
@@ -473,6 +485,7 @@ async fn run_pydantic(
         openai_api_key: openai_key.as_deref(),
         anthropic_api_key: anthropic_key.as_deref(),
         composio_api_key: composio_key.as_deref(),
+        scaledown_api_key: scaledown_key.as_deref(),
         composio_user_id: composio_key.as_ref().map(|_| composio_user_id.as_str()),
         composio_connected_accounts_json: composio_connected_accounts_json.as_deref(),
         native_mcp_connections_json: native_mcp_connections_json.as_deref(),

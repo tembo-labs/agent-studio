@@ -61,6 +61,7 @@ type SettingsKind = Extract<
   | "tembo_api_key"
   | "anthropic_api_key"
   | "openai_api_key"
+  | "scaledown_api_key"
   | "composio_api_key"
   | "composio_webhook_secret"
 >;
@@ -69,6 +70,7 @@ const SETTINGS_KIND_LABELS: Record<SettingsKind, string> = {
   tembo_api_key: "Tembo API key",
   anthropic_api_key: "Anthropic API key",
   openai_api_key: "OpenAI API key",
+  scaledown_api_key: "ScaleDown API key",
   composio_api_key: "Composio API key",
   composio_webhook_secret: "Composio webhook secret",
 };
@@ -78,6 +80,7 @@ function isSettingsKind(v: string): v is SettingsKind {
     v === "tembo_api_key" ||
     v === "anthropic_api_key" ||
     v === "openai_api_key" ||
+    v === "scaledown_api_key" ||
     v === "composio_api_key" ||
     v === "composio_webhook_secret"
   );

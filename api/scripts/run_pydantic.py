@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
+import hashlib
 import inspect
 import json
 import os
@@ -642,6 +644,151 @@ do other useful work first, then retry that one call later, once, on its own. \
 Never retry the same failing call repeatedly in a tight loop."""
 
 
+# ── ScaleDown prompt compression ─────────────────────────────────────────────
+# Optional: when the workspace set a ScaleDown key (TAS_SCALEDOWN_API_KEY) AND
+# the agent opts in via `scaledown:` in its spec, route bulky prompt/context
+# through ScaleDown (https://scaledown.ai) before frontier-model calls to cut
+# tokens. Best-effort end to end — any error/timeout falls back to the original
+# text so a run never breaks.
+#
+# Modes (spec `scaledown:` — string shorthand, bool, or object):
+#   off (default) — no compression.
+#   prompt        — compress the static instructions ONCE at startup. Safe and
+#                   cache-friendly: identical compressed instructions every turn,
+#                   so Anthropic prompt caching still hits.
+#   aggressive    — also compress large history blocks (tool outputs, user
+#                   context) via a history processor, COMPRESS-ONCE-AND-FREEZE:
+#                   each block is compressed the first time it's seen and the
+#                   result memoized for the rest of the run, so bytes stay stable
+#                   across turns and the prefix re-stabilizes for prompt caching
+#                   instead of thrashing it. The most recent message is left
+#                   verbatim (it's the live prompt and the churning cache tail).
+SCALEDOWN_API_URL = os.environ.get("SCALEDOWN_API_URL", "https://api.scaledown.xyz")
+# Only compress text bigger than this (~4 chars/token) — below it a network
+# round-trip isn't worth the savings.
+SCALEDOWN_DEFAULT_MIN_CHARS = 1600
+# Part kinds whose `content` is free text we can safely compress. We skip the
+# model's own TextParts (its answers/reasoning) and never touch tool-call args
+# or tool_use/tool_result pairing — Anthropic rejects structural mismatches.
+SCALEDOWN_COMPRESSIBLE_PARTS = {"system-prompt", "user-prompt", "tool-return"}
+
+
+def _scaledown_key() -> str | None:
+    k = os.environ.get("TAS_SCALEDOWN_API_KEY")
+    return k if isinstance(k, str) and k.strip() else None
+
+
+def _scaledown_settings(spec: dict) -> tuple[str, str, int]:
+    """(mode, rate, min_chars) from the agent's `scaledown:` field. Default off.
+    Accepts a string ("aggressive"/"prompt"/"off"), a bool, or an object
+    {mode, rate, min_tokens|min_chars}."""
+    raw = spec.get("scaledown")
+    rate, min_chars = "auto", SCALEDOWN_DEFAULT_MIN_CHARS
+    if raw is None or raw is False:
+        return "off", rate, min_chars
+    if raw is True:
+        return "aggressive", rate, min_chars
+    if isinstance(raw, str):
+        mode = raw.strip().lower()
+    elif isinstance(raw, dict):
+        mode = str(raw.get("mode", "aggressive")).strip().lower()
+        if isinstance(raw.get("rate"), (str, int, float)):
+            rate = str(raw["rate"])
+        if isinstance(raw.get("min_chars"), int):
+            min_chars = raw["min_chars"]
+        elif isinstance(raw.get("min_tokens"), int):
+            min_chars = raw["min_tokens"] * 4
+    else:
+        mode = "off"
+    if mode not in ("off", "prompt", "aggressive"):
+        mode = "off"
+    return mode, rate, max(1, min_chars)
+
+
+def _scaledown_compress(text: str, rate: str) -> str:
+    """Compress `text` via ScaleDown's /compress/raw/. Best-effort: returns the
+    original text on any error/timeout/missing key so a run never breaks.
+    Synchronous — call via asyncio.to_thread from async contexts."""
+    key = _scaledown_key()
+    if not key or not isinstance(text, str) or not text.strip():
+        return text
+    try:
+        resp = httpx.post(
+            f"{SCALEDOWN_API_URL}/compress/raw/",
+            headers={"x-api-key": key, "Content-Type": "application/json"},
+            json={"context": text, "prompt": "", "scaledown": {"rate": rate}},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json() or {}
+        # The API has shipped both flat and nested ({results:{...}}) shapes.
+        results = data.get("results") if isinstance(data.get("results"), dict) else data
+        compressed = results.get("compressed_prompt")
+        if isinstance(compressed, str) and compressed.strip():
+            orig = data.get("original_prompt_tokens") or results.get("original_prompt_tokens")
+            comp = data.get("compressed_prompt_tokens") or results.get("compressed_prompt_tokens")
+            if isinstance(orig, int) and isinstance(comp, int) and orig > 0:
+                print(
+                    f"[scaledown] {orig} -> {comp} tokens ({100 * (orig - comp) // orig}% off)",
+                    file=sys.stderr,
+                )
+            return compressed
+    except Exception as e:  # noqa: BLE001 — best-effort, never break a run
+        print(f"[scaledown] compress failed, using original: {e}", file=sys.stderr)
+    return text
+
+
+def _make_scaledown_processor(rate: str, min_chars: int):
+    """A pydantic-ai history processor that compresses large free-text blocks in
+    the conversation history. Leaves message STRUCTURE intact, leaves the most
+    recent message verbatim, and memoizes per original-content hash so repeated
+    turns emit identical bytes (keeps Anthropic prompt caching working)."""
+    memo: dict[str, str] = {}
+
+    async def _shrink(text: str) -> str:
+        if not isinstance(text, str) or len(text) < min_chars:
+            return text
+        h = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        if h not in memo:
+            # Offload the blocking HTTP call so we don't stall the event loop.
+            memo[h] = await asyncio.to_thread(_scaledown_compress, text, rate)
+        return memo[h]
+
+    async def process(messages: list) -> list:
+        if not _scaledown_key() or len(messages) <= 1:
+            return messages
+        out = list(messages)
+        # Leave the LAST message verbatim (live prompt + churning cache tail).
+        for i in range(len(out) - 1):
+            msg = out[i]
+            parts = getattr(msg, "parts", None)
+            if not parts:
+                continue
+            new_parts = list(parts)
+            changed = False
+            for j, part in enumerate(new_parts):
+                if getattr(part, "part_kind", "") not in SCALEDOWN_COMPRESSIBLE_PARTS:
+                    continue
+                content = getattr(part, "content", None)
+                if not isinstance(content, str):
+                    continue  # skip multimodal / structured tool returns
+                shrunk = await _shrink(content)
+                if shrunk != content:
+                    try:
+                        new_parts[j] = dataclasses.replace(part, content=shrunk)
+                        changed = True
+                    except Exception:
+                        pass  # not a dataclass — leave the part untouched
+            if changed:
+                try:
+                    out[i] = dataclasses.replace(msg, parts=new_parts)
+                except Exception:
+                    out[i] = msg
+        return out
+
+    return process
+
+
 def build_agent(
     spec: dict,
     toolsets: list | None = None,
@@ -761,6 +908,19 @@ def build_agent(
     # docstring, so well-documented functions get good tool schemas.
     if tools:
         kwargs["tools"] = tools
+
+    # ScaleDown prompt compression — opt-in per agent via `scaledown:`, and only
+    # when the workspace set a key. `prompt` compresses the static instructions
+    # once (cache-friendly); `aggressive` also compresses bulky history blocks
+    # each turn via a memoizing history processor. See _make_scaledown_processor.
+    sd_mode, sd_rate, sd_min_chars = _scaledown_settings(spec)
+    if sd_mode != "off" and _scaledown_key():
+        if kwargs.get("instructions"):
+            kwargs["instructions"] = _scaledown_compress(kwargs["instructions"], sd_rate)
+        if sd_mode == "aggressive":
+            kwargs["history_processors"] = [
+                _make_scaledown_processor(sd_rate, sd_min_chars)
+            ]
 
     return Agent(model, **kwargs)
 

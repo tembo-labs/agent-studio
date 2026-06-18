@@ -21,6 +21,7 @@ type Props = {
     | "tembo_api_key"
     | "anthropic_api_key"
     | "openai_api_key"
+    | "scaledown_api_key"
     | "composio_api_key"
     | "composio_webhook_secret";
   /** Short label used in the input ("Tembo API key") */

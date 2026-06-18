@@ -144,6 +144,11 @@ pub struct PydanticArgs<'a> {
     /// wrapper as `TAS_COMPOSIO_API_KEY`; the wrapper only uses it
     /// when the agent's spec declares `connections:`.
     pub composio_api_key: Option<&'a str>,
+    /// Workspace's ScaleDown API key, if set. Surfaced as
+    /// `TAS_SCALEDOWN_API_KEY`. The wrapper only uses it when the agent's spec
+    /// opts in via `scaledown:` — it compresses bulky prompt/context through
+    /// ScaleDown before frontier-model calls to cut tokens. None = no key.
+    pub scaledown_api_key: Option<&'a str>,
     /// The Composio `user_id` to scope connections under. We use
     /// the workspace UUID — Composio's per-user isolation is the
     /// boundary between workspaces sharing one Composio key.
@@ -275,6 +280,12 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
     }
     if let Some(k) = args.anthropic_api_key {
         cmd.env("ANTHROPIC_API_KEY", k);
+    }
+    // ScaleDown key — only consumed by the wrapper when the agent's spec opts in
+    // via `scaledown:`. Set whenever the workspace has a key so any agent can
+    // turn compression on.
+    if let Some(k) = args.scaledown_api_key {
+        cmd.env("TAS_SCALEDOWN_API_KEY", k);
     }
     // Composio creds — only used by the wrapper when the agent's
     // spec declares `connections:`. Always set both vars together

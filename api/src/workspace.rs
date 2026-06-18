@@ -11,6 +11,7 @@ pub enum SecretKind {
     AnthropicApiKey,
     OpenAiApiKey,
     ComposioApiKey,
+    ScaleDownApiKey,
 }
 
 impl SecretKind {
@@ -19,6 +20,7 @@ impl SecretKind {
             SecretKind::AnthropicApiKey => "anthropic_api_key",
             SecretKind::OpenAiApiKey => "openai_api_key",
             SecretKind::ComposioApiKey => "composio_api_key",
+            SecretKind::ScaleDownApiKey => "scaledown_api_key",
         }
     }
 }
