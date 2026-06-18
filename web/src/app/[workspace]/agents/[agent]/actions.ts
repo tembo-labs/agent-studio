@@ -657,7 +657,10 @@ export async function setAgentLearningAction(
     payload: { enabled, cadence },
   });
 
-  revalidatePath(`/${slug}/agents/${encodeURIComponent(agentName)}/settings`);
+  // The learning control lives on the /learning tab (not /settings). Revalidate
+  // the agent layout so every tab — and the control's own `enabled` prop — re-
+  // reads the just-saved value instead of a stale cached one.
+  revalidatePath(`/${slug}/agents/${encodeURIComponent(agentName)}`, "layout");
   return {
     message: enabled
       ? `Learning mode on (${cadence}). Corrections you make in the Inbox batch into a PR each cycle.`

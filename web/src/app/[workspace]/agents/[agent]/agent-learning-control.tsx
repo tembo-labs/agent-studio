@@ -34,6 +34,16 @@ export function AgentLearningControl({
 }: Props) {
   const [on, setOn] = useState(enabled);
   const [cad, setCad] = useState<"daily" | "weekly">(cadence);
+  // Re-sync to the server value when it changes (after a save revalidates the
+  // page) — the React "adjust state on prop change" render-phase pattern.
+  // Without this the checkbox keeps its pre-save local state and can look like
+  // it reverted. Keyed on the persisted props, not re-run on every render.
+  const [seen, setSeen] = useState({ enabled, cadence });
+  if (seen.enabled !== enabled || seen.cadence !== cadence) {
+    setSeen({ enabled, cadence });
+    setOn(enabled);
+    setCad(cadence);
+  }
   const [state, formAction, pending] = useActionState(
     setAgentLearningAction,
     INITIAL,
