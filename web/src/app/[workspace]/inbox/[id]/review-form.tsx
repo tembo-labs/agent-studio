@@ -215,11 +215,12 @@ function ActionMenu({
   const replyOpts = options.filter((o) => o.kind === "reply").sort(byRec);
   const clickOpts = options.filter((o) => o.kind === "oneclick").sort(byRec);
   const [draft, setDraft] = useState(replyOpts.find((o) => o.draft)?.draft ?? "");
-  // Always offer a way to clear an item WITHOUT acting on the source (e.g. you
-  // handled the Linear issue by hand — canceled/reassigned it). Skip it only
-  // when the agent already provided a no-op clear/ignore option, so we don't
-  // double up.
-  const hasClearOption = options.some((o) => o.kind === "oneclick" && !o.execute);
+  // Offer a built-in Dismiss only when the agent gave NO one-click action at all
+  // (e.g. a reply-only item) — a safety escape so such an item can still be
+  // cleared without acting. When the agent DID provide one-click buttons
+  // (Archive, Complete, Ignore, an explicit Dismiss…), those define how to clear
+  // the item and we don't add our own.
+  const hasOneClick = options.some((o) => o.kind === "oneclick");
 
   return (
     <section className="flex flex-col gap-4">
@@ -292,7 +293,7 @@ function ActionMenu({
         </div>
       )}
 
-      {!hasClearOption && (
+      {!hasOneClick && (
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
