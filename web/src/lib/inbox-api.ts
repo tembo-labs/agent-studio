@@ -191,6 +191,12 @@ export async function createInboxItem(
   const fresher =
     "(EXCLUDED.external_ts IS NOT NULL AND " +
     "(inbox_item.external_ts IS NULL OR EXCLUDED.external_ts > inbox_item.external_ts))";
+  // Dismiss is a TERMINAL human signal ("I don't want this") — distinct from
+  // done. A re-push must never resurrect a dismissed item, even when the
+  // producer reports newer activity, so an agent re-running can't drag a Linear
+  // issue you dismissed back into the inbox. (done items still reopen on newer
+  // activity — e.g. a new reply on a handled LinkedIn thread.)
+  const reopenable = `(${fresher} AND inbox_item.status <> 'dismissed')`;
   const res = await db.query<Row>(
     `WITH upserted AS (
        INSERT INTO inbox_item (
@@ -202,17 +208,17 @@ export async function createInboxItem(
        ON CONFLICT (workspace_id, source, external_ref) WHERE external_ref IS NOT NULL
        DO UPDATE SET
          updated_at = NOW(),
-         title = CASE WHEN ${fresher} THEN EXCLUDED.title ELSE inbox_item.title END,
+         title = CASE WHEN ${reopenable} THEN EXCLUDED.title ELSE inbox_item.title END,
          external_url = COALESCE(EXCLUDED.external_url, inbox_item.external_url),
-         context = CASE WHEN ${fresher} THEN EXCLUDED.context ELSE inbox_item.context END,
-         proposed_action = CASE WHEN ${fresher} THEN EXCLUDED.proposed_action ELSE inbox_item.proposed_action END,
-         options = CASE WHEN ${fresher} THEN EXCLUDED.options ELSE inbox_item.options END,
-         external_ts = CASE WHEN ${fresher} THEN EXCLUDED.external_ts ELSE inbox_item.external_ts END,
-         status = CASE WHEN ${fresher} THEN 'awaiting_human' ELSE inbox_item.status END,
-         resolved_at = CASE WHEN ${fresher} THEN NULL ELSE inbox_item.resolved_at END,
-         final_action = CASE WHEN ${fresher} THEN NULL ELSE inbox_item.final_action END,
+         context = CASE WHEN ${reopenable} THEN EXCLUDED.context ELSE inbox_item.context END,
+         proposed_action = CASE WHEN ${reopenable} THEN EXCLUDED.proposed_action ELSE inbox_item.proposed_action END,
+         options = CASE WHEN ${reopenable} THEN EXCLUDED.options ELSE inbox_item.options END,
+         external_ts = CASE WHEN ${reopenable} THEN EXCLUDED.external_ts ELSE inbox_item.external_ts END,
+         status = CASE WHEN ${reopenable} THEN 'awaiting_human' ELSE inbox_item.status END,
+         resolved_at = CASE WHEN ${reopenable} THEN NULL ELSE inbox_item.resolved_at END,
+         final_action = CASE WHEN ${reopenable} THEN NULL ELSE inbox_item.final_action END,
          -- A genuinely-new reply un-snoozes: the thing you were waiting for arrived.
-         snoozed_until = CASE WHEN ${fresher} THEN NULL ELSE inbox_item.snoozed_until END
+         snoozed_until = CASE WHEN ${reopenable} THEN NULL ELSE inbox_item.snoozed_until END
        RETURNING *
      )
      SELECT ${COLUMNS}
