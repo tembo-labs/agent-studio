@@ -77,10 +77,12 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
     headers = _session()
     with httpx.Client(timeout=30, headers=headers, follow_redirects=True) as client:
         mailbox = f"urn:li:fsd_profile:{_profile_id(client)}"
-        # RestLi variables format: literal parens, colons percent-encoded — matches
-        # what the browser sends. Build the query string by hand so httpx doesn't
-        # reshape it.
-        variables = f"(mailboxUrn:{mailbox})".replace(":", "%3A")
+        # RestLi variables format, matching the browser EXACTLY: literal parens,
+        # literal `mailboxUrn:` separator colon, but the URN's OWN colons percent-
+        # encoded → (mailboxUrn:urn%3Ali%3Afsd_profile%3AID). Encoding the
+        # separator colon too is a 400. Build the query by hand so httpx keeps it.
+        mailbox_enc = mailbox.replace(":", "%3A")
+        variables = f"(mailboxUrn:{mailbox_enc})"
         url = f"{VOYAGER_BASE}/voyagerMessagingGraphQL/graphql?queryId={CONV_LIST_QUERY_ID}&variables={variables}"
         resp = client.get(url)
         if resp.status_code >= 400:
