@@ -244,27 +244,37 @@ export async function GET(
       `Provider MCP URL is not trusted: ${(e as Error).message}`,
     );
   }
-  const prMetaUrl = `${mcpOrigin}/.well-known/oauth-protected-resource`;
-  let prMeta: ProtectedResourceMetadata;
-  try {
-    const res = await fetch(
-      prMetaUrl,
-      noRedirectFetchInit({ headers: { Accept: "application/json" } }),
+  // RFC 9728 metadata lives at the origin, but some servers (Gmail) only serve
+  // it PATH-SUFFIXED with the resource's path (…/oauth-protected-resource/mcp/v1)
+  // and 404 at the bare origin. Try the origin first (all current providers),
+  // then the path-suffixed form derived from the catalog MCP URL.
+  const resourcePath = new URL(provider.mcpServerUrl).pathname.replace(/\/+$/, "");
+  const prCandidates = [`${mcpOrigin}/.well-known/oauth-protected-resource`];
+  if (resourcePath && resourcePath !== "/") {
+    prCandidates.push(
+      `${mcpOrigin}/.well-known/oauth-protected-resource${resourcePath}`,
     );
-    if (!res.ok) {
-      return back(
-        workspace.slug,
-        provider.slug,
-        `Couldn't discover ${provider.displayName} MCP auth metadata (${res.status}).`,
+  }
+  let prMeta: ProtectedResourceMetadata | null = null;
+  let lastDetail = "";
+  for (const prMetaUrl of prCandidates) {
+    try {
+      const res = await fetch(
+        prMetaUrl,
+        noRedirectFetchInit({ headers: { Accept: "application/json" } }),
       );
+      if (!res.ok) {
+        lastDetail = `Couldn't discover ${provider.displayName} MCP auth metadata (${res.status}).`;
+        continue;
+      }
+      prMeta = (await res.json()) as ProtectedResourceMetadata;
+      break;
+    } catch (e) {
+      lastDetail = `Discovery fetch failed: ${(e as Error).message}`;
     }
-    prMeta = (await res.json()) as ProtectedResourceMetadata;
-  } catch (e) {
-    return back(
-      workspace.slug,
-      provider.slug,
-      `Discovery fetch failed: ${(e as Error).message}`,
-    );
+  }
+  if (!prMeta) {
+    return back(workspace.slug, provider.slug, lastDetail || "Discovery failed.");
   }
   const authServerUrlRaw = prMeta.authorization_servers?.[0];
   if (!authServerUrlRaw) {
@@ -288,7 +298,9 @@ export async function GET(
       `Authorization server URL is not trusted: ${(e as Error).message}`,
     );
   }
-  const scopes = prMeta.scopes_supported ?? [];
+  // A catalog scopeOverride narrows an over-broad advertised set (e.g. Gmail
+  // advertises full-mailbox access; we ask for readonly+compose only).
+  const scopes = provider.scopeOverride ?? prMeta.scopes_supported ?? [];
 
   // ── Step 2: authorization-server discovery ──────────────────────
   const asMetaUrl = new URL(
@@ -502,6 +514,11 @@ export async function GET(
   authorizeUrl.searchParams.set("state", state);
   authorizeUrl.searchParams.set("code_challenge", pkceChallenge);
   authorizeUrl.searchParams.set("code_challenge_method", "S256");
+  // Provider-specific extras (e.g. Google's access_type=offline + prompt=consent
+  // to mint a refresh_token). Applied last; never overrides the params above.
+  for (const [k, v] of Object.entries(provider.authorizeParams ?? {})) {
+    if (!authorizeUrl.searchParams.has(k)) authorizeUrl.searchParams.set(k, v);
+  }
 
   return NextResponse.redirect(authorizeUrl.toString(), 302);
 }

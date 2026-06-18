@@ -23,6 +23,7 @@ export type McpProviderSlug =
   | "fathom"
   | "dialed"
   | "linear"
+  | "gmail"
   | "tembo-agent-studio";
 
 export type McpProvider = {
@@ -52,6 +53,20 @@ export type McpProvider = {
    *    live workspace role) is what /mcp enforces. Tembo is the first.
    */
   authMode?: "dcr" | "manual" | "self-key";
+  /**
+   * Extra static query params appended to the /authorize redirect, verbatim.
+   * Some auth servers need provider-specific params the MCP spec doesn't model
+   * — e.g. Google only returns a refresh_token when the request carries
+   * `access_type=offline` + `prompt=consent`.
+   */
+  authorizeParams?: Record<string, string>;
+  /**
+   * Request these exact scopes instead of the resource's advertised
+   * `scopes_supported`. Lets us NARROW an over-broad advertised set — e.g.
+   * Gmail advertises full-mailbox `https://mail.google.com/`, but we only want
+   * readonly + compose.
+   */
+  scopeOverride?: string[];
 };
 
 export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
@@ -123,6 +138,31 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // per-customer setup, like Attio. Docs: https://linear.app/docs/mcp
     mcpServerUrl: "https://mcp.linear.app/mcp",
     oauthAuthorizationServerOrigins: ["https://mcp.linear.app"],
+  },
+  gmail: {
+    slug: "gmail",
+    displayName: "Gmail",
+    // Google Workspace Gmail MCP. Verified (probe): protected-resource metadata
+    // is served only PATH-SUFFIXED (…/oauth-protected-resource/mcp/v1; the bare
+    // origin 404s — handled by the suffixed-discovery fallback) and advertises
+    // accounts.google.com as the auth server, whose token endpoint sits on a
+    // SEPARATE origin (oauth2.googleapis.com) — both trusted below. Standard
+    // Google OAuth: no DCR; a CONFIDENTIAL client an admin creates in Google
+    // Cloud (authMode "manual", like HubSpot). access_type=offline +
+    // prompt=consent are required for a refresh_token, and scopes are narrowed
+    // to readonly+compose (the resource advertises full-mailbox access too).
+    // Docs: https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server
+    mcpServerUrl: "https://gmailmcp.googleapis.com/mcp/v1",
+    oauthAuthorizationServerOrigins: [
+      "https://accounts.google.com",
+      "https://oauth2.googleapis.com",
+    ],
+    authMode: "manual",
+    authorizeParams: { access_type: "offline", prompt: "consent" },
+    scopeOverride: [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.compose",
+    ],
   },
   "tembo-agent-studio": {
     slug: "tembo-agent-studio",

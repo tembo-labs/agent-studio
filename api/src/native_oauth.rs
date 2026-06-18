@@ -63,6 +63,13 @@ const DIALED_OAUTH_ORIGINS: &[&str] = &["https://dialed.day"];
 // client, read+write scopes). Docs: https://linear.app/docs/mcp
 const LINEAR_MCP_ORIGIN: &str = "https://mcp.linear.app";
 const LINEAR_OAUTH_ORIGINS: &[&str] = &["https://mcp.linear.app"];
+// Gmail (Google Workspace MCP) is a confidential/manual client on standard
+// Google OAuth: the auth server is accounts.google.com but its TOKEN endpoint
+// lives on a separate origin (oauth2.googleapis.com) — both must be trusted so
+// the refresh-before-use sweep can renew the access token.
+const GMAIL_MCP_ORIGIN: &str = "https://gmailmcp.googleapis.com";
+const GMAIL_OAUTH_ORIGINS: &[&str] =
+    &["https://accounts.google.com", "https://oauth2.googleapis.com"];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
@@ -71,6 +78,7 @@ const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (FATHOM_MCP_ORIGIN, FATHOM_OAUTH_ORIGINS),
     (DIALED_MCP_ORIGIN, DIALED_OAUTH_ORIGINS),
     (LINEAR_MCP_ORIGIN, LINEAR_OAUTH_ORIGINS),
+    (GMAIL_MCP_ORIGIN, GMAIL_OAUTH_ORIGINS),
 ];
 
 #[derive(Deserialize)]
@@ -334,20 +342,46 @@ async fn discover_token_endpoint(
         anyhow!("mcp_server_url origin is not in the native-MCP provider allowlist")
     })?;
 
-    // RFC 9728: protected-resource metadata lives at the origin.
-    let pr_url = reqwest::Url::parse(&format!("{origin}/.well-known/oauth-protected-resource"))
-        .context("failed to build protected-resource metadata URL")?;
-    let pr: ProtectedResourceMeta = http
-        .get(pr_url)
-        .header("Accept", "application/json")
-        .send()
-        .await
-        .context("protected-resource discovery failed")?
-        .error_for_status()
-        .context("protected-resource discovery returned an error status")?
-        .json()
-        .await
-        .context("protected-resource metadata not JSON")?;
+    // RFC 9728: protected-resource metadata lives at the origin — but some
+    // servers (Gmail) serve it only PATH-SUFFIXED with the resource path and
+    // 404 at the bare origin. Try the origin first (all DCR providers), then the
+    // suffixed form derived from the MCP URL's path.
+    let mut pr_candidates = vec![format!("{origin}/.well-known/oauth-protected-resource")];
+    let res_path = mcp_url.path().trim_end_matches('/');
+    if !res_path.is_empty() {
+        pr_candidates.push(format!(
+            "{origin}/.well-known/oauth-protected-resource{res_path}"
+        ));
+    }
+    let mut pr: Option<ProtectedResourceMeta> = None;
+    let mut last_err: Option<anyhow::Error> = None;
+    for cand in &pr_candidates {
+        let url = match reqwest::Url::parse(cand) {
+            Ok(u) => u,
+            Err(e) => {
+                last_err = Some(anyhow!(e).context("bad protected-resource metadata URL"));
+                continue;
+            }
+        };
+        match http.get(url).header("Accept", "application/json").send().await {
+            Ok(resp) => match resp.error_for_status() {
+                Ok(ok) => match ok.json::<ProtectedResourceMeta>().await {
+                    Ok(meta) => {
+                        pr = Some(meta);
+                        break;
+                    }
+                    Err(e) => last_err = Some(anyhow!(e).context("protected-resource metadata not JSON")),
+                },
+                Err(e) => {
+                    last_err = Some(anyhow!(e).context("protected-resource discovery error status"))
+                }
+            },
+            Err(e) => last_err = Some(anyhow!(e).context("protected-resource discovery failed")),
+        }
+    }
+    let pr = pr.ok_or_else(|| {
+        last_err.unwrap_or_else(|| anyhow!("protected-resource discovery failed"))
+    })?;
 
     let as_base_raw = pr
         .authorization_servers
