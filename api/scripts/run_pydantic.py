@@ -749,43 +749,57 @@ def _make_scaledown_processor(rate: str, min_chars: int):
     async def _shrink(text: str) -> str:
         if not isinstance(text, str) or len(text) < min_chars:
             return text
-        h = hashlib.sha256(text.encode("utf-8")).hexdigest()
-        if h not in memo:
-            # Offload the blocking HTTP call so we don't stall the event loop.
-            memo[h] = await asyncio.to_thread(_scaledown_compress, text, rate)
-        return memo[h]
+        try:
+            h = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            if h not in memo:
+                # Offload the blocking HTTP call so we don't stall the event loop.
+                memo[h] = await asyncio.to_thread(_scaledown_compress, text, rate)
+            return memo[h]
+        except Exception:  # noqa: BLE001 — optimization, never break a run
+            return text
 
     async def process(messages: list) -> list:
-        if not _scaledown_key() or len(messages) <= 1:
-            return messages
-        out = list(messages)
-        # Leave the LAST message verbatim (live prompt + churning cache tail).
-        for i in range(len(out) - 1):
-            msg = out[i]
-            parts = getattr(msg, "parts", None)
-            if not parts:
-                continue
-            new_parts = list(parts)
-            changed = False
-            for j, part in enumerate(new_parts):
-                if getattr(part, "part_kind", "") not in SCALEDOWN_COMPRESSIBLE_PARTS:
+        # Hard guarantee: ScaleDown is an optimization, never a dependency. Any
+        # failure here (network, API change, an unexpected message shape) falls
+        # back to the original history, so the run continues UNCOMPRESSED rather
+        # than failing.
+        try:
+            if not _scaledown_key() or len(messages) <= 1:
+                return messages
+            out = list(messages)
+            # Leave the LAST message verbatim (live prompt + churning cache tail).
+            for i in range(len(out) - 1):
+                msg = out[i]
+                parts = getattr(msg, "parts", None)
+                if not parts:
                     continue
-                content = getattr(part, "content", None)
-                if not isinstance(content, str):
-                    continue  # skip multimodal / structured tool returns
-                shrunk = await _shrink(content)
-                if shrunk != content:
+                new_parts = list(parts)
+                changed = False
+                for j, part in enumerate(new_parts):
+                    if getattr(part, "part_kind", "") not in SCALEDOWN_COMPRESSIBLE_PARTS:
+                        continue
+                    content = getattr(part, "content", None)
+                    if not isinstance(content, str):
+                        continue  # skip multimodal / structured tool returns
+                    shrunk = await _shrink(content)
+                    if shrunk != content:
+                        try:
+                            new_parts[j] = dataclasses.replace(part, content=shrunk)
+                            changed = True
+                        except Exception:
+                            pass  # not a dataclass — leave the part untouched
+                if changed:
                     try:
-                        new_parts[j] = dataclasses.replace(part, content=shrunk)
-                        changed = True
+                        out[i] = dataclasses.replace(msg, parts=new_parts)
                     except Exception:
-                        pass  # not a dataclass — leave the part untouched
-            if changed:
-                try:
-                    out[i] = dataclasses.replace(msg, parts=new_parts)
-                except Exception:
-                    out[i] = msg
-        return out
+                        out[i] = msg
+            return out
+        except Exception as e:  # noqa: BLE001 — never let compression fail a run
+            print(
+                f"[scaledown] history processor error, using original history: {e}",
+                file=sys.stderr,
+            )
+            return messages
 
     return process
 
@@ -914,14 +928,22 @@ def build_agent(
     # when the workspace set a key. `prompt` compresses the static instructions
     # once (cache-friendly); `aggressive` also compresses bulky history blocks
     # each turn via a memoizing history processor. See _make_scaledown_processor.
-    sd_mode, sd_rate, sd_min_chars = _scaledown_settings(spec)
-    if sd_mode != "off" and _scaledown_key():
-        if kwargs.get("instructions"):
-            kwargs["instructions"] = _scaledown_compress(kwargs["instructions"], sd_rate)
-        if sd_mode == "aggressive":
-            kwargs["history_processors"] = [
-                _make_scaledown_processor(sd_rate, sd_min_chars)
-            ]
+    # Wrapped so a bad `scaledown:` value or a startup compress error can never
+    # fail agent construction — the agent just runs without compression.
+    try:
+        sd_mode, sd_rate, sd_min_chars = _scaledown_settings(spec)
+        if sd_mode != "off" and _scaledown_key():
+            if kwargs.get("instructions"):
+                kwargs["instructions"] = _scaledown_compress(
+                    kwargs["instructions"], sd_rate
+                )
+            if sd_mode == "aggressive":
+                kwargs["history_processors"] = [
+                    _make_scaledown_processor(sd_rate, sd_min_chars)
+                ]
+    except Exception as e:  # noqa: BLE001 — never block a run on compression setup
+        print(f"[scaledown] setup skipped: {e}", file=sys.stderr)
+        kwargs.pop("history_processors", None)
 
     return Agent(model, **kwargs)
 
