@@ -1,18 +1,22 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import { IconPlusLarge } from "central-icons";
 
 import { Button } from "@/components/ui/button";
 import { listAutomations } from "@/lib/automations-api";
 import { getServerSession } from "@/lib/session";
+import { listTriggersForWorkspace } from "@/lib/triggers-db";
+import { listWebhooksForWorkspace } from "@/lib/webhooks-db";
 import { getWorkspaceBySlug } from "@/lib/workspace";
 
-import { AutomationsShell } from "./automations-shell";
-import { SchedulesList } from "./schedules-list";
+import { AutomationsTable, type AutomationRow } from "./automations-table";
 
 export const dynamic = "force-dynamic";
 
+// Every automation in the workspace — schedules, Composio event triggers, and
+// inbound webhooks — in one full-width table. "New automation" opens a type
+// picker (Schedule / Trigger / Webhook), mirroring the New connection flow.
 export default async function AutomationsPage({
   params,
 }: {
@@ -26,20 +30,75 @@ export default async function AutomationsPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const automations = await listAutomations(workspace.id);
+  const [automations, triggers, webhooks] = await Promise.all([
+    listAutomations(workspace.id),
+    listTriggersForWorkspace(workspace.id),
+    listWebhooksForWorkspace(workspace.id),
+  ]);
+
+  const agentAutomationHref = (agentName: string) =>
+    `/${slug}/agents/${encodeURIComponent(agentName)}/automation`;
+
+  const rows: AutomationRow[] = [
+    ...automations.map((a): AutomationRow => ({
+      id: a.id,
+      kind: "schedule",
+      name: a.name,
+      agentName: a.agentName,
+      enabled: a.enabled,
+      lastFiredAtIso: a.lastFiredAt ? a.lastFiredAt.toISOString() : null,
+      lastFireError: a.lastFireError,
+      href: `/${slug}/automations/${a.id}`,
+      cron: a.cron,
+    })),
+    ...triggers.map((t): AutomationRow => ({
+      id: t.id,
+      kind: "trigger",
+      name: t.triggerType,
+      agentName: t.agentName,
+      enabled: t.enabled,
+      lastFiredAtIso: t.lastFiredAt ? t.lastFiredAt.toISOString() : null,
+      lastFireError: t.lastFireError,
+      href: agentAutomationHref(t.agentName),
+      toolkitSlug: t.toolkitSlug,
+      triggerType: t.triggerType,
+    })),
+    ...webhooks.map((w): AutomationRow => ({
+      id: w.id,
+      kind: "webhook",
+      name: w.name,
+      agentName: w.agentName,
+      enabled: w.enabled,
+      lastFiredAtIso: w.lastFiredAt ? w.lastFiredAt.toISOString() : null,
+      lastFireError: w.lastFireError,
+      href: agentAutomationHref(w.agentName),
+      tokenLast4: w.tokenLast4,
+    })),
+  ];
 
   return (
-    <AutomationsShell workspaceSlug={workspace.slug}>
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-foreground-title text-base font-bold">Schedules</h2>
+    <div className="flex w-full flex-col gap-6 px-6 py-8">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
+            Automations
+          </h1>
+          <p className="text-foreground-weak text-base">
+            Every way agents in this workspace fire on their own — schedules,
+            event triggers, and inbound webhooks.
+          </p>
+        </div>
         <Button asChild>
           <Link href={`/${slug}/automations/new`}>
             <IconPlusLarge size={16} />
-            <span>New schedule</span>
+            <span>New automation</span>
           </Link>
         </Button>
       </div>
-      <SchedulesList automations={automations} workspaceSlug={slug} />
-    </AutomationsShell>
+
+      <hr className="border-[var(--color-border-weak)]" />
+
+      <AutomationsTable rows={rows} workspaceSlug={slug} />
+    </div>
   );
 }

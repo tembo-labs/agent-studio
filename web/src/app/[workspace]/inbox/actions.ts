@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
 import { writeAuditEvent } from "@/lib/audit-db";
@@ -64,6 +65,7 @@ export async function submitInboxItemAction(args: {
     payload: { source: item.source, itemType: item.itemType },
   });
 
+  revalidateInbox(args.workspaceSlug);
   return { ok: true };
 }
 
@@ -93,6 +95,7 @@ export async function dismissInboxItemAction(args: {
     agentName: null,
   });
 
+  revalidateInbox(args.workspaceSlug);
   return { ok: true };
 }
 
@@ -152,6 +155,7 @@ export async function executeInboxOptionAction(args: {
     payload: { optionId: option.id, provider: option.execute?.provider ?? null, op: option.execute?.op ?? null },
   });
 
+  revalidateInbox(args.workspaceSlug);
   return { ok: true };
 }
 
@@ -188,5 +192,14 @@ export async function snoozeInboxItemAction(args: {
     payload: { untilIso: until.toISOString() },
   });
 
+  revalidateInbox(args.workspaceSlug);
   return { ok: true };
+}
+
+// Every in-app inbox action changes the active count, which the sidebar badge
+// renders from the workspace layout. Revalidate that layout (+ the inbox list)
+// so the badge + list refresh when the action's router.push lands — the layout
+// is otherwise cached across client navigations and shows a stale count.
+function revalidateInbox(workspaceSlug: string): void {
+  revalidatePath(`/${workspaceSlug}`, "layout");
 }
