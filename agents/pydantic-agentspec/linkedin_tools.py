@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 import httpx
@@ -86,18 +87,24 @@ def _text(v) -> str:
 
 
 def fetch_recent_conversations(limit: int = 3) -> list[dict]:
-    """Up to `limit` recent LinkedIn conversations worth triaging: {convId, name,
+    """Top the Tasks Inbox up to AT MOST `limit` active LinkedIn threads, and
+    return the (possibly empty) set of fresh ones to stage: {convId, name,
     headline, lastMessage, messages}. `convId` is the conversation entity urn the
     reply/archive executor passes back to LinkedIn.
 
+    `limit` is a CAP on inbox real-estate, not a fetch count. Run this on a
+    schedule (e.g. every 6h): it keeps your LinkedIn queue at no more than `limit`
+    open items so you chip away at the backlog without it taking over the inbox.
+
     LinkedIn's list returns the default page (~20 most recent, across categories
-    incl. archived). We skip two kinds of threads so the agent spends its slots
-    on genuinely-fresh ones:
-      • Archived on LinkedIn (you already filed it away).
-      • Already in the Tasks Inbox (snoozed / in-progress / handled) UNLESS a
-        newer reply has landed since we surfaced it — that reopens it.
-    Then we take the `limit` newest survivors and enrich those with thread
-    history.
+    incl. archived). We:
+      • drop threads archived on LinkedIn (you already filed them away);
+      • drop threads already OPEN in the inbox (they still count toward the cap,
+        but we don't re-stage them);
+      • drop threads already handled/snoozed UNLESS a newer reply landed (that
+        reopens them);
+      • then surface only enough of the newest survivors to reach `limit` active
+        items — returning [] when the inbox is already full.
     """
     headers = _session()
     with httpx.Client(timeout=30, headers=headers, follow_redirects=True) as client:
@@ -132,21 +139,27 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
         # Skip archived-on-LinkedIn threads.
         candidates = [c for c in parsed if not c.get("archived")]
 
-        # Skip threads already tracked in the Tasks Inbox, unless a NEWER reply
-        # arrived since we last surfaced them (then they reopen). Best-effort: if
-        # TAS is unreachable the producer still de-dups server-side.
-        tracked = _tracked_linkedin_refs()
+        # Inbox state: which LinkedIn threads are already tracked (+ how fresh),
+        # and which are currently OPEN (occupying a cap slot). Best-effort — if
+        # TAS is unreachable we fall back to staging up to `limit` (the producer
+        # still de-dups server-side).
+        tracked, active_refs = _inbox_state()
 
         def worth_surfacing(c: dict) -> bool:
-            if c["convId"] not in tracked:
-                return True
-            prev = tracked[c["convId"]]
+            cid = c["convId"]
+            if cid in active_refs:
+                return False  # already open in the inbox — counts toward the cap
+            if cid not in tracked:
+                return True  # brand-new thread
+            prev = tracked[cid]
             la = c.get("lastActivityAt")
-            # Reopen only on strictly-newer activity; legacy items (prev is None)
-            # stay suppressed since we can't prove freshness.
+            # Tracked but handled/snoozed: reopen ONLY on strictly-newer activity.
+            # Legacy items (prev is None) stay suppressed — can't prove freshness.
             return prev is not None and isinstance(la, int) and la > prev
 
-        out = [c for c in candidates if worth_surfacing(c)][:limit]
+        # Top up to the cap: only stage enough to bring active items to `limit`.
+        budget = max(0, limit - len(active_refs))
+        out = [c for c in candidates if worth_surfacing(c)][:budget]
 
         # Enrich the survivors with recent thread history (best-effort: the list
         # response only carries the latest message). A failed thread fetch leaves
@@ -157,18 +170,21 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
     return out
 
 
-def _tracked_linkedin_refs() -> dict:
-    """`{convId: externalTs|None}` for LinkedIn items already in the Tasks Inbox
-    (any status). Lets us skip threads we've already surfaced unless a newer reply
-    arrives. Best-effort — returns {} if TAS is unreachable (the producer still
-    de-dups server-side, so this is an optimization, not the correctness gate).
+def _inbox_state() -> tuple[dict, set]:
+    """Read the Tasks Inbox to enforce the cap + de-dup. Returns:
+      • tracked:     {convId: externalTs|None} over LinkedIn items of ANY status
+                     (so we don't re-stage a thread unless a newer reply arrives);
+      • active_refs: convIds currently OPEN (unresolved AND not snoozed) — these
+                     occupy the cap, so `limit - len(active_refs)` is the budget.
 
+    Best-effort — returns ({}, set()) if TAS is unreachable, so the run still
+    proceeds (the producer de-dups server-side; this just can't enforce the cap).
     Reaches TAS over its own REST API using the `tembo-agent-studio` Native-MCP
     connection's token (the mcp_url's origin also serves /api/v1)."""
     try:
         conn = tas_tools.connection("tembo-agent-studio")
     except Exception:
-        return {}
+        return {}, set()
     origin = conn.mcp_url.rsplit("/mcp", 1)[0].rstrip("/")
     try:
         r = httpx.get(
@@ -178,17 +194,37 @@ def _tracked_linkedin_refs() -> dict:
             timeout=20,
         )
         if r.status_code >= 400:
-            return {}
+            return {}, set()
         items = (r.json() or {}).get("inbox_items") or []
     except Exception:
-        return {}
-    refs: dict = {}
+        return {}, set()
+
+    now = datetime.now(timezone.utc)
+    tracked: dict = {}
+    active_refs: set = set()
     for it in items:
         ref = it.get("externalRef")
-        if isinstance(ref, str) and ref:
-            ts = it.get("externalTs")
-            refs[ref] = ts if isinstance(ts, int) else None
-    return refs
+        if not (isinstance(ref, str) and ref):
+            continue
+        ts = it.get("externalTs")
+        tracked[ref] = ts if isinstance(ts, int) else None
+        if it.get("status") not in ("open", "claimed", "awaiting_human"):
+            continue  # done / dismissed — not occupying the inbox
+        if _is_future(it.get("snoozedUntil"), now):
+            continue  # snoozed — hidden, doesn't occupy a cap slot
+        active_refs.add(ref)
+    return tracked, active_refs
+
+
+def _is_future(iso: object, now: datetime) -> bool:
+    """True if `iso` (an ISO-8601 string) is in the future relative to `now`."""
+    if not (isinstance(iso, str) and iso):
+        return False
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return dt > now
 
 
 def _fetch_messages(client: httpx.Client, conv_urn: str, my_id: str) -> list[dict]:
