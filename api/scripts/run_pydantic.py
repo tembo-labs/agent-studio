@@ -39,6 +39,7 @@ import yaml
 from anthropic import AsyncAnthropic
 from pydantic_ai import Agent, capture_run_messages
 from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
 
 
 USAGE_SENTINEL = "__TAS_USAGE__:"
