@@ -50,6 +50,7 @@ import {
   setProposedAction,
   type InboxAction,
   type InboxItem,
+  type InboxOption,
   type ListInboxFilters,
 } from "@/lib/inbox-api";
 import { suggestSlug } from "@/lib/slugify";
@@ -493,6 +494,8 @@ export type ProduceInboxItemInput = {
   externalRef?: string;
   context?: Record<string, unknown>;
   proposedAction?: InboxAction;
+  /** Action menu rendered as buttons; one may be `recommended`. */
+  options?: InboxOption[];
   /** The run producing this item (set when called from /mcp inside a run). */
   parentRunId?: string;
 };
@@ -515,9 +518,10 @@ export async function produceInboxItemFor(
     title,
     context: input.context ?? {},
     proposedAction: input.proposedAction ?? null,
-    // A proposal ready for review is awaiting_human; otherwise it's open for a
-    // human or agent to pick up and propose against.
-    status: input.proposedAction ? "awaiting_human" : "open",
+    options: input.options ?? null,
+    // A proposal (or an action menu) ready for review is awaiting_human;
+    // otherwise it's open for a human or agent to pick up and propose against.
+    status: input.proposedAction || input.options?.length ? "awaiting_human" : "open",
     producedByRunId,
     // Provenance lives on produced_by_run_id; created_by is reserved for the
     // person who filed it (null when an agent did).

@@ -27,6 +27,26 @@ export interface InboxAction {
   fields?: Record<string, unknown>;
 }
 
+// One entry in an item's action menu (rendered as a button). `kind: "reply"`
+// carries an editable `draft`; `kind: "oneclick"` is a one-tap action.
+// `execute` (when present) is the descriptor a synchronous executor uses to
+// actually perform the action — validated server-side against this stored value
+// (never trusted from the client). No `execute` (e.g. "Ignore") just resolves
+// the item.
+export interface InboxOptionExecute {
+  provider: string; // e.g. "linkedin" → the executor registry key
+  op: string; // e.g. "send" | "archive"
+  params?: Record<string, unknown>; // e.g. { convId }
+}
+export interface InboxOption {
+  id: string;
+  label: string;
+  kind: "reply" | "oneclick";
+  draft?: string;
+  recommended?: boolean;
+  execute?: InboxOptionExecute;
+}
+
 export interface InboxItem {
   id: string;
   workspaceId: string;
@@ -37,6 +57,7 @@ export interface InboxItem {
   context: Record<string, unknown>;
   proposedAction: InboxAction | null;
   finalAction: InboxAction | null;
+  options: InboxOption[] | null;
   status: InboxItemStatus;
   assigneeKind: InboxAssigneeKind | null;
   assigneeId: string | null;
@@ -62,6 +83,7 @@ type Row = {
   context: Record<string, unknown> | null;
   proposed_action: InboxAction | null;
   final_action: InboxAction | null;
+  options: InboxOption[] | null;
   status: InboxItemStatus;
   assignee_kind: InboxAssigneeKind | null;
   assignee_id: string | null;
@@ -87,6 +109,7 @@ function rowToInboxItem(r: Row): InboxItem {
     context: r.context ?? {},
     proposedAction: r.proposed_action,
     finalAction: r.final_action,
+    options: r.options,
     status: r.status,
     assigneeKind: r.assignee_kind,
     assigneeId: r.assignee_id,
@@ -107,7 +130,7 @@ function rowToInboxItem(r: Row): InboxItem {
 // rows (created_by IS NULL) visible.
 const COLUMNS = `
   i.id, i.workspace_id, i.source, i.external_ref, i.item_type, i.title,
-  i.context, i.proposed_action, i.final_action, i.status,
+  i.context, i.proposed_action, i.final_action, i.options, i.status,
   i.assignee_kind, i.assignee_id, i.produced_by_run_id, i.improvement_id,
   i.signal_consumed_at, i.created_by,
   u.name AS created_by_name, u.email AS created_by_email,
@@ -123,6 +146,7 @@ export interface CreateInboxItemInput {
   title: string;
   context?: Record<string, unknown>;
   proposedAction?: InboxAction | null;
+  options?: InboxOption[] | null;
   // 'open' = needs a proposal/claim; 'awaiting_human' = has a proposal, ready
   // for review. Caller decides (the produce action sets awaiting_human when it
   // ships a proposedAction).
@@ -147,10 +171,10 @@ export async function createInboxItem(
     `WITH upserted AS (
        INSERT INTO inbox_item (
          workspace_id, source, external_ref, item_type, title, context,
-         proposed_action, status, assignee_kind, assignee_id,
+         proposed_action, options, status, assignee_kind, assignee_id,
          produced_by_run_id, created_by
        )
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13)
        ON CONFLICT (workspace_id, source, external_ref) WHERE external_ref IS NOT NULL
        DO UPDATE SET updated_at = NOW()
        RETURNING *
@@ -166,6 +190,7 @@ export async function createInboxItem(
       input.title,
       JSON.stringify(input.context ?? {}),
       input.proposedAction ? JSON.stringify(input.proposedAction) : null,
+      input.options ? JSON.stringify(input.options) : null,
       input.status ?? "open",
       input.assigneeKind ?? null,
       input.assigneeId ?? null,

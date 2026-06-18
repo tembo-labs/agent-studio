@@ -9,6 +9,7 @@ import {
   dismissInboxItem,
   getInboxItem,
 } from "@/lib/inbox-api";
+import { executeInboxOption } from "@/lib/inbox-executors";
 
 // In-app (session-auth) server actions for the Tasks Inbox triage screen. The
 // human reviews the agent's proposed action, edits it, and submits — we record
@@ -89,6 +90,65 @@ export async function dismissInboxItemAction(args: {
     targetType: "inbox_item",
     targetId: args.itemId,
     agentName: null,
+  });
+
+  return { ok: true };
+}
+
+// The human picked an action-menu button. Look up the chosen option ON THE
+// STORED ITEM (never trust client params), run its executor synchronously
+// (e.g. archive/send on LinkedIn), and only on success resolve the item with
+// final_action = { fields: { optionId }, text? } — which feeds the learning
+// loop (which option + wording I chose vs. the agent's recommendation). On
+// executor failure we surface the error and leave the item unresolved.
+export async function executeInboxOptionAction(args: {
+  workspaceSlug: string;
+  itemId: string;
+  optionId: string;
+  text?: string;
+}): Promise<InboxActionResult> {
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+
+  const item = await getInboxItem(args.itemId, workspace.id);
+  if (!item) notFound();
+
+  const option = item.options?.find((o) => o.id === args.optionId);
+  if (!option) {
+    return { ok: false, error: "That action is no longer available. Refresh the page." };
+  }
+
+  try {
+    await executeInboxOption(workspace.id, option, args.text);
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Couldn't perform that action.",
+    };
+  }
+
+  const finalAction = {
+    fields: { optionId: option.id },
+    ...(option.kind === "reply" && args.text?.trim() ? { text: args.text.trim() } : {}),
+  };
+  const ok = await completeInboxItem(args.itemId, workspace.id, finalAction);
+  if (!ok) {
+    return { ok: false, error: "This item was already resolved. Refresh the page." };
+  }
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "hitl_response",
+    kind: "inbox.option_executed",
+    targetType: "inbox_item",
+    targetId: args.itemId,
+    agentName: null,
+    payload: { optionId: option.id, provider: option.execute?.provider ?? null, op: option.execute?.op ?? null },
   });
 
   return { ok: true };

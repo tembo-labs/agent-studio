@@ -261,6 +261,7 @@ export type SerializedInboxItem = {
   context: Record<string, unknown>;
   proposedAction: InboxItem["proposedAction"];
   finalAction: InboxItem["finalAction"];
+  options: InboxItem["options"];
   status: InboxItem["status"];
   assigneeKind: InboxItem["assigneeKind"];
   assigneeId: string | null;
@@ -283,6 +284,7 @@ export function serializeInboxItem(i: InboxItem): SerializedInboxItem {
     context: i.context,
     proposedAction: i.proposedAction,
     finalAction: i.finalAction,
+    options: i.options,
     status: i.status,
     assigneeKind: i.assigneeKind,
     assigneeId: i.assigneeId,

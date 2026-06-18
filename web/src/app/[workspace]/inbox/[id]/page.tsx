@@ -84,6 +84,7 @@ export default async function InboxItemPage({
           workspaceSlug={workspace.slug}
           itemId={item.id}
           proposedText={item.proposedAction?.text ?? ""}
+          options={item.options}
         />
       )}
     </div>

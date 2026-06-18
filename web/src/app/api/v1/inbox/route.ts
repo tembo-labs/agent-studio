@@ -4,7 +4,7 @@ import { authorizeApiRequest } from "@/lib/api-auth";
 import { listInboxItemsFor, produceInboxItemFor } from "@/lib/api-v1/actions";
 import { apiError, authErrorResponse } from "@/lib/api-v1/http";
 import { serializeInboxItem } from "@/lib/api-v1/serializers";
-import type { InboxItemStatus, InboxSortKey } from "@/lib/inbox-api";
+import type { InboxItemStatus, InboxSortKey, InboxOption } from "@/lib/inbox-api";
 
 // GET  /api/v1/inbox — list/search the Tasks Inbox queue for the workspace.
 //   ?status=open,awaiting_human  ?source=linkedin  ?itemType=connection_request
@@ -86,6 +86,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     externalRef?: unknown;
     context?: unknown;
     proposedAction?: { text?: unknown; fields?: unknown };
+    options?: unknown;
   };
   try {
     body = await request.json();
@@ -120,6 +121,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         ? (body.context as Record<string, unknown>)
         : undefined,
     proposedAction,
+    options: Array.isArray(body.options)
+      ? (body.options as InboxOption[])
+      : undefined,
   });
   if (!res.ok) return apiError(res.status, res.error);
 

@@ -431,9 +431,32 @@ export function buildMcpServer(
         context: z.record(z.string(), z.unknown()).optional().describe("The raw payload to review (JSON)."),
         proposedActionText: z.string().optional().describe("Your proposed reply / decision."),
         proposedActionFields: z.record(z.string(), z.unknown()).optional().describe("Structured proposal params."),
+        options: z
+          .array(
+            z.object({
+              id: z.string().describe("Stable option id, e.g. 'reply' | 'archive' | 'ignore'."),
+              label: z.string().describe("Button label, e.g. 'Send reply'."),
+              kind: z.enum(["reply", "oneclick"]).describe("'reply' shows an editable draft; 'oneclick' is one-tap."),
+              draft: z.string().optional().describe("For kind 'reply': the suggested text (editable)."),
+              recommended: z.boolean().optional().describe("Mark the agent's default pick."),
+              execute: z
+                .object({
+                  provider: z.string().describe("Executor key, e.g. 'linkedin'."),
+                  op: z.string().describe("Operation, e.g. 'send' | 'archive'."),
+                  params: z.record(z.string(), z.unknown()).optional().describe("e.g. { convId }."),
+                })
+                .optional()
+                .describe("How to perform this action on click. Omit for a no-op (e.g. 'Ignore')."),
+            }),
+          )
+          .optional()
+          .describe(
+            "Action menu rendered as buttons for the human — the set of things they might do. " +
+            "Pick one recommended; reply options carry a draft.",
+          ),
       },
     },
-    async ({ itemType, title, source, externalRef, context, proposedActionText, proposedActionFields }) => {
+    async ({ itemType, title, source, externalRef, context, proposedActionText, proposedActionFields, options: actionOptions }) => {
       if (!isOperator) return operatorOnly();
       const proposedAction =
         proposedActionText || proposedActionFields
@@ -449,6 +472,7 @@ export function buildMcpServer(
         externalRef,
         context,
         proposedAction,
+        options: actionOptions,
         parentRunId: options.parentRunId,
       });
       if (!res.ok) return errorResult(res.error);
