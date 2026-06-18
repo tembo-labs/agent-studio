@@ -12,6 +12,12 @@ settings page.
 Add an **Anthropic** and/or **OpenAI** key. At least one is required for agents
 to run; until one is set, the sidebar shows an **"LLM provider needed"** prompt.
 
+A third, optional key lives here too: a **ScaleDown API key**
+([scaledown.ai](https://scaledown.ai)) enables prompt compression to cut
+frontier-model token usage. Setting the key does nothing on its own — each agent
+opts in via the `scaledown:` field in its spec. See
+[ScaleDown prompt compression](/agent-studio/authoring-agents/#scaledown-prompt-compression).
+
 ## Composio
 
 Two fields, both required for [event triggers](/agent-studio/automations-triggers/#composio-event-triggers):

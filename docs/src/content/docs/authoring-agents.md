@@ -48,6 +48,9 @@ Key fields:
   functions; see [Sidecar Python tools](/agent-studio/sidecar-python-tools/).
 - **`labels:`** (optional) — tags used for grouping and for scoping which
   [Slack app](/agent-studio/slack-apps/) may launch the agent.
+- **`scaledown:`** (optional) — opt into [ScaleDown](#scaledown-prompt-compression)
+  prompt compression to cut frontier-model tokens (`off` / `prompt` /
+  `aggressive`).
 
 Your connected repo also carries an authoring guide (`AGENTS.md` and per-framework
 `AGENT_GUIDE.md`) that TAS keeps current — that's the canonical, always-up-to-date
@@ -71,6 +74,60 @@ Model choice is a cost/reliability tradeoff:
   [Runs](/agent-studio/dashboard-and-runs/) page.
 - **No tools? Sonnet is a fine starting point** — the hedging problem only shows
   up with tool use.
+
+## ScaleDown prompt compression
+
+[ScaleDown](https://scaledown.ai) is an optional prompt-compression layer: bulky
+context is routed through a small model that rewrites it to far fewer tokens
+while preserving the query, so you spend fewer tokens on the expensive frontier
+model. It's **opt-in per agent** and a **no-op** unless a workspace
+**ScaleDown API key** is set under
+[Settings → LLM Providers](/agent-studio/settings/#llm-providers).
+
+Enable it with the `scaledown:` field:
+
+```yaml
+name: long-research
+model: anthropic:claude-opus-4-8
+scaledown: prompt          # off (default) | prompt | aggressive
+instructions: |
+  …
+```
+
+Modes:
+
+- **`off`** (default, or field absent) — no compression; runs are byte-identical
+  to having no key.
+- **`prompt`** — compress the static `instructions` **once** at startup. The
+  safe, recommended default: it's lossy only on your own system prompt, adds no
+  per-turn latency, and is **cache-friendly** — the compressed instructions are
+  identical every turn, so Anthropic prompt caching still hits (on a *smaller*
+  prefix).
+- **`aggressive`** — also compress bulky history blocks (large tool outputs,
+  user context) on each turn. Best for long, tool-heavy, cost-sensitive runs.
+  Each block is **compressed once and frozen** (memoized by content), so
+  repeated turns send identical bytes and prompt caching keeps working instead
+  of thrashing. Message structure (tool calls / tool results) and the most
+  recent turn are left untouched.
+
+Object form tunes it:
+
+```yaml
+scaledown:
+  mode: aggressive
+  rate: auto             # ScaleDown compression rate
+  min_tokens: 400        # only compress blocks larger than this
+```
+
+**Notes**
+
+- **Lossy by design.** Compression drops detail to save tokens. Start with
+  `prompt`; move to `aggressive` only where token cost matters and you've
+  confirmed quality holds.
+- **Best-effort.** If ScaleDown is unreachable or errors, the original text is
+  used — a run never fails because of compression.
+- **Where to see it.** Token savings are logged in the instance/container logs
+  (`[scaledown] N → M tokens`); they are not yet surfaced in the run-detail UI.
 
 ## Iterating
 
