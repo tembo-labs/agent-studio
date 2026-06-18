@@ -26,6 +26,15 @@ import {
 const SETUP_URLS: Record<string, string> = {
   hubspot:
     "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/integrate-with-the-remote-hubspot-mcp-server",
+  gmail:
+    "https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server",
+};
+
+// Extra provider-specific setup beyond "create an app + register the redirect
+// URI" — rendered inline so the steps that are easy to miss are in-app.
+const SETUP_NOTES: Record<string, string> = {
+  gmail:
+    "In Google Cloud also enable the Gmail API and the Gmail MCP API, set the OAuth consent screen to Internal with scopes gmail.readonly + gmail.compose, and choose Web application as the client type.",
 };
 
 export const dynamic = "force-dynamic";
@@ -110,6 +119,7 @@ export default async function ManageProvidersPage({
             const instances = instancesByProvider.get(p.slug) ?? [];
             const enabled = isProviderAdminEnabled(p, enableMap);
             const setupUrl = SETUP_URLS[p.slug];
+            const setupNote = SETUP_NOTES[p.slug];
             return (
               <div
                 key={p.slug}
@@ -158,6 +168,12 @@ export default async function ManageProvidersPage({
                   , register this redirect URI on it, then add its credentials
                   below. Add more than one app to give members separate accounts.
                 </p>
+
+                {setupNote && (
+                  <p className="text-foreground-weak border-border-weak bg-surface-secondary rounded-md border px-3 py-2 text-xs leading-5">
+                    {setupNote}
+                  </p>
+                )}
 
                 <CopyableField
                   label="Redirect URI to register"
