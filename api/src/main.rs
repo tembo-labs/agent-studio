@@ -71,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
 
     let internal_routes = Router::new()
         .route("/runs", post(runs::handlers::create_run))
-        .route("/runs/:id", get(runs::handlers::get_run))
+        .route("/runs/{id}", get(runs::handlers::get_run))
         .layer(middleware::from_fn(auth::require_internal_token))
         .layer(axum::Extension(internal_token));
 
