@@ -64,7 +64,15 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
             f"{VOYAGER_BASE}/messaging/conversations",
             params={"keyVersion": "LEGACY_INBOX"},
         )
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            # Surface LinkedIn's actual reason (CSRF check, challenge, etc.) +
+            # which headers we sent, so failures are debuggable.
+            raise RuntimeError(
+                f"LinkedIn {resp.status_code} on /messaging/conversations. "
+                f"Body: {resp.text[:400]!r}. "
+                f"Sent UA={headers.get('user-agent')!r}; "
+                f"csrf-token len={len(headers.get('csrf-token', ''))}."
+            )
         data = resp.json()
 
     out: list[dict] = []
