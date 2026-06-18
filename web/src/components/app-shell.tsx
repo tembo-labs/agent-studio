@@ -172,7 +172,7 @@ export async function AppShell({
                         <span className="font-semibold">{f.failures}×</span> in
                         24h
                       </span>
-                      <Button asChild variant="orange" size="small">
+                      <Button asChild variant="destructive" size="small">
                         <Link href={agentHref}>Open</Link>
                       </Button>
                     </div>
