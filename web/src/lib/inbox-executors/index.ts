@@ -2,6 +2,7 @@ import "server-only";
 
 import type { InboxOption } from "@/lib/inbox-api";
 
+import { composioExecutor } from "./composio";
 import { linkedinExecutor } from "./linkedin";
 import { nativeMcpExecutor } from "./native-mcp";
 
@@ -26,6 +27,7 @@ export type InboxExecutor = (args: InboxExecutorArgs) => Promise<void>;
 const REGISTRY: Record<string, InboxExecutor> = {
   linkedin: linkedinExecutor,
   "native-mcp": nativeMcpExecutor,
+  composio: composioExecutor,
 };
 
 /**
