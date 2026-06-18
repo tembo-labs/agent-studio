@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { getActiveInboxCountAction } from "@/app/[workspace]/inbox/actions";
 import { AgentsIcon } from "@/components/agents-icon";
 import { SidebarNavItem } from "@/components/sidebar-nav-item";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,47 @@ type NavLink = {
 
 type NavGroup = { id: string; label: string; items: NavLink[] };
 
+// Keep the Inbox badge live: agents produce items out-of-band (background runs,
+// not user actions), so the layout-rendered count goes stale until the next
+// navigation. Poll the active count on an interval + whenever the tab regains
+// focus, and re-sync to the server value when the layout re-renders.
+function useLiveInboxCount(home: string, initial?: number): number | undefined {
+  const [count, setCount] = useState(initial);
+  // Re-sync to the server value when the layout re-renders (navigation / in-app
+  // action) — the React-recommended "adjust state on prop change" render-phase
+  // pattern, so an in-app dismiss/snooze reflects immediately, not on next poll.
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (initial !== seenInitial) {
+    setSeenInitial(initial);
+    setCount(initial);
+  }
+  useEffect(() => {
+    const slug = home.replace(/^\//, "");
+    if (!slug) return;
+    let active = true;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const n = await getActiveInboxCountAction(slug);
+        if (active) setCount(n);
+      } catch {
+        // best-effort badge refresh — ignore transient failures
+      }
+    };
+    const id = setInterval(tick, 60_000);
+    const onFocus = () => void tick();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      active = false;
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [home]);
+  return count;
+}
+
 export function SidebarNav({
   home,
   inboxCount,
@@ -44,6 +86,8 @@ export function SidebarNav({
   home: string;
   inboxCount?: number;
 }) {
+  const inboxBadge = useLiveInboxCount(home, inboxCount);
+
   const groups: NavGroup[] = [
     {
       id: "build",
@@ -112,7 +156,7 @@ export function SidebarNav({
         href={`${home}/inbox`}
         label="Inbox"
         icon={<IconInboxChecked />}
-        count={inboxCount}
+        count={inboxBadge}
       />
       <SidebarNavItem
         href={`${home}/dashboard`}

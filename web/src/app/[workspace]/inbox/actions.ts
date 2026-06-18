@@ -7,6 +7,7 @@ import { writeAuditEvent } from "@/lib/audit-db";
 import { authorizeWorkspace, DENIED_MESSAGE } from "@/lib/auth-server";
 import {
   completeInboxItem,
+  countActiveInboxItems,
   dismissInboxItem,
   getInboxItem,
   snoozeInboxItem,
@@ -202,4 +203,17 @@ export async function snoozeInboxItemAction(args: {
 // is otherwise cached across client navigations and shows a stale count.
 function revalidateInbox(workspaceSlug: string): void {
   revalidatePath(`/${workspaceSlug}`, "layout");
+}
+
+// Live active-inbox count for the sidebar badge. Items produced by AGENTS land
+// out-of-band (a background run, not a user action), so the layout-rendered
+// badge would otherwise stay stale until the next navigation/refresh. The
+// sidebar polls this. Returns 0 on any auth failure rather than throwing — a
+// badge poll should never surface an error to the user.
+export async function getActiveInboxCountAction(
+  workspaceSlug: string,
+): Promise<number> {
+  const auth = await authorizeWorkspace(workspaceSlug, "viewer");
+  if (!auth.ok) return 0;
+  return countActiveInboxItems(auth.workspace.id);
 }
