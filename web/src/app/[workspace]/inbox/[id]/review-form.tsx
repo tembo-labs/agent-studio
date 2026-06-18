@@ -42,10 +42,20 @@ function successFor(opt: InboxOption): string {
       return "Reply sent";
     case "archive":
       return "Archived";
-    default:
-      return /complete|done|resolve|close/i.test(opt.execute?.op ?? opt.label)
-        ? "Completed"
-        : `${opt.label} done`;
+    default: {
+      // Reply ops (e.g. Gmail) share one op across Send / Send and Archive —
+      // distinguish by the button label.
+      const label = opt.label.toLowerCase();
+      const replied = /send|reply/.test(label);
+      const archived = /archive/.test(label);
+      if (replied && archived) return "Reply sent and archived";
+      if (replied) return "Reply sent";
+      if (archived) return "Archived";
+      if (/complete|done|resolve|close/i.test(opt.execute?.op ?? opt.label)) {
+        return "Completed";
+      }
+      return `${opt.label} done`;
+    }
   }
 }
 

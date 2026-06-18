@@ -17,6 +17,39 @@ import type { InboxExecutor } from "./index";
 // Mirrors web/scripts/composio-execute.mjs.
 const EXECUTE_URL = "https://backend.composio.dev/api/v3.1/tools/execute";
 
+// One Composio tool call. Throws on transport error or a graceful failure
+// (successful:false) so the caller surfaces it and leaves the item unresolved.
+async function callComposioTool(
+  apiKey: string,
+  composioUid: string,
+  slug: string,
+  args: Record<string, unknown>,
+): Promise<void> {
+  const res = await fetch(`${EXECUTE_URL}/${encodeURIComponent(slug)}`, {
+    method: "POST",
+    headers: { "x-api-key": apiKey, "content-type": "application/json" },
+    body: JSON.stringify({
+      user_id: composioUid,
+      arguments: args,
+      // The tool list hides version specifics; skip the check like the script.
+      dangerously_skip_version_check: true,
+    }),
+  });
+  const json = (await res.json().catch(() => null)) as
+    | { successful?: boolean; error?: unknown }
+    | null;
+  if (!res.ok) {
+    throw new Error(`Composio ${slug} failed (HTTP ${res.status}).`);
+  }
+  if (json && json.successful === false) {
+    const msg =
+      typeof json.error === "string" && json.error
+        ? json.error
+        : "the tool reported a failure";
+    throw new Error(`Composio ${slug} failed: ${msg}`);
+  }
+}
+
 export const composioExecutor: InboxExecutor = async ({
   workspaceId,
   userId,
@@ -46,30 +79,23 @@ export const composioExecutor: InboxExecutor = async ({
     throw new Error("No Composio API key is configured for this workspace.");
   }
 
-  const res = await fetch(`${EXECUTE_URL}/${encodeURIComponent(op)}`, {
-    method: "POST",
-    headers: { "x-api-key": apiKey, "content-type": "application/json" },
-    body: JSON.stringify({
-      user_id: composioUserId(workspaceId, userId),
-      arguments: args,
-      // The tool list hides version specifics; skip the check like the script.
-      dangerously_skip_version_check: true,
-    }),
-  });
+  const composioUid = composioUserId(workspaceId, userId);
+  await callComposioTool(apiKey, composioUid, op, args);
 
-  const json = (await res.json().catch(() => null)) as
-    | { successful?: boolean; error?: unknown }
-    | null;
-  if (!res.ok) {
-    throw new Error(`Composio ${op} failed (HTTP ${res.status}).`);
-  }
-  // Composio returns { successful, data, error? } — a graceful failure (bad arg,
-  // missing connected account) is successful:false, not a non-2xx.
-  if (json && json.successful === false) {
-    const msg =
-      typeof json.error === "string" && json.error
-        ? json.error
-        : "the tool reported a failure";
-    throw new Error(`Composio ${op} failed: ${msg}`);
+  // Optional follow-up calls run in order after the main op — e.g. "Send and
+  // Archive" replies, then removes the INBOX label. Each takes its own fixed
+  // toolArgs (no body text). A failure here surfaces and leaves the item
+  // unresolved, same as the main op.
+  const also = Array.isArray(params?.also) ? params.also : [];
+  for (const step of also) {
+    if (!step || typeof step !== "object") continue;
+    const s = step as { op?: unknown; toolArgs?: unknown };
+    const sop = typeof s.op === "string" ? s.op : null;
+    if (!sop) continue;
+    const sargs =
+      s.toolArgs && typeof s.toolArgs === "object"
+        ? (s.toolArgs as Record<string, unknown>)
+        : {};
+    await callComposioTool(apiKey, composioUid, sop, sargs);
   }
 };
