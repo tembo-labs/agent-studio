@@ -717,31 +717,32 @@ def _scaledown_settings(spec: dict) -> tuple[str, str, int]:
     return mode, rate, max(1, min_chars)
 
 
-def _scaledown_compress(text: str, rate: str) -> str:
-    """Compress `text` via ScaleDown's /compress/raw/. Best-effort: returns the
-    original text on any error/timeout/missing key so a run never breaks.
-    Synchronous — call via asyncio.to_thread from async contexts."""
+def _scaledown_compress(context: str, prompt: str, rate: str) -> str:
+    """Optimize one model-request prompt via ScaleDown's /compress/raw/.
+
+    Per the API ref: `context` is the OLD/background text (conversation history)
+    ScaleDown compresses; `prompt` is the NEW step's input, kept intact to
+    preserve intent. Both required, non-empty. Returns `compressed_prompt` (the
+    optimized prompt). Best-effort: returns `context` unchanged on any
+    error/missing key/empty prompt so a run never breaks. Synchronous — call via
+    asyncio.to_thread from async contexts."""
     key = _scaledown_key()
-    if not key or not isinstance(text, str) or not text.strip():
-        print(
-            f"[scaledown] skip compress (key={'set' if key else 'missing'} "
-            f"len={len(text) if isinstance(text, str) else 'n/a'})",
-            file=sys.stderr,
-        )
-        return text
+    if not key or not isinstance(context, str) or not context.strip():
+        return context
+    if not (isinstance(prompt, str) and prompt.strip()):
+        return context  # ScaleDown requires a non-empty prompt; skip this step
     url = f"{SCALEDOWN_API_URL}/compress/raw/"
     try:
-        print(f"[scaledown] POST {url} ({len(text)} chars)", file=sys.stderr)
+        print(
+            f"[scaledown] POST {url} (context={len(context)}c prompt={len(prompt)}c)",
+            file=sys.stderr,
+        )
         resp = httpx.post(
             url,
             headers={"x-api-key": key, "Content-Type": "application/json"},
             json={
-                # Per the API ref: `context` is the bulky background/instructions
-                # ScaleDown compresses; `prompt` is the query it preserves
-                # relevance to. Both required, non-empty. Returns compressed_prompt.
-                "context": text,
-                "prompt": "Carry out the user's request faithfully, applying "
-                "every instruction, fact, name, ID, number, and step above.",
+                "context": context,
+                "prompt": prompt,
                 "scaledown": {"rate": rate},
             },
             timeout=30,
@@ -764,7 +765,7 @@ def _scaledown_compress(text: str, rate: str) -> str:
             comp = data.get("compressed_prompt_tokens") or results.get("compressed_prompt_tokens")
             print(
                 f"[scaledown] ok orig={orig} comp={comp} "
-                f"in={len(text)}c out={len(compressed)}c head={compressed[:160]!r}",
+                f"context={len(context)}c out={len(compressed)}c head={compressed[:200]!r}",
                 file=sys.stderr,
             )
             if isinstance(orig, int) and isinstance(comp, int) and orig > 0:
@@ -774,67 +775,56 @@ def _scaledown_compress(text: str, rate: str) -> str:
             return compressed
     except Exception as e:  # noqa: BLE001 — best-effort, never break a run
         print(f"[scaledown] compress failed, using original: {e}", file=sys.stderr)
-    return text
+    return context
+
+
+def _msg_text(msg) -> str:
+    """Concatenate the free-text content of one message's parts (system/user/
+    tool-return text + the model's own text). Ignores tool-call args / non-str
+    content. Used to split the conversation into old-context vs new-turn text."""
+    chunks: list[str] = []
+    for part in getattr(msg, "parts", None) or []:
+        content = getattr(part, "content", None)
+        if isinstance(content, str) and content.strip():
+            chunks.append(content)
+    return "\n\n".join(chunks)
 
 
 def _make_scaledown_processor(rate: str, min_chars: int):
-    """A pydantic-ai history processor that compresses large free-text blocks in
-    the conversation history. Leaves message STRUCTURE intact, leaves the most
-    recent message verbatim, and memoizes per original-content hash so repeated
-    turns emit identical bytes (keeps Anthropic prompt caching working)."""
-    memo: dict[str, str] = {}
+    """A pydantic-ai history processor. Per ScaleDown's model, each model request
+    is one prompt to optimize: the OLD conversation history is the `context`
+    (compressed), the NEW turn (the last message) is the `prompt` (kept intact).
 
-    async def _shrink(text: str) -> str:
-        if not isinstance(text, str) or len(text) < min_chars:
-            return text
-        try:
-            h = hashlib.sha256(text.encode("utf-8")).hexdigest()
-            if h not in memo:
-                # Offload the blocking HTTP call so we don't stall the event loop.
-                memo[h] = await asyncio.to_thread(_scaledown_compress, text, rate)
-            return memo[h]
-        except Exception:  # noqa: BLE001 — optimization, never break a run
-            return text
+    OBSERVE-ONLY for now: it makes the real ScaleDown call (so savings register
+    on the dashboard + in the logs) but returns the history UNCHANGED — applying
+    the single returned `compressed_prompt` back into pydantic-ai's structured
+    message list (tool-call/result pairing) needs the verified output shape
+    first. We compress the old context once and memoize, so repeat requests
+    don't re-bill."""
+    memo: dict[str, bool] = {}
 
     async def process(messages: list) -> list:
-        # Hard guarantee: ScaleDown is an optimization, never a dependency. Any
-        # failure here (network, API change, an unexpected message shape) falls
-        # back to the original history, so the run continues UNCOMPRESSED rather
-        # than failing.
+        # Hard guarantee: ScaleDown is an optimization, never a dependency.
         try:
-            if not _scaledown_key() or len(messages) <= 1:
+            if not _scaledown_key() or len(messages) < 2:
                 return messages
-            out = list(messages)
-            # Leave the LAST message verbatim (live prompt + churning cache tail).
-            for i in range(len(out) - 1):
-                msg = out[i]
-                parts = getattr(msg, "parts", None)
-                if not parts:
-                    continue
-                new_parts = list(parts)
-                changed = False
-                for j, part in enumerate(new_parts):
-                    if getattr(part, "part_kind", "") not in SCALEDOWN_COMPRESSIBLE_PARTS:
-                        continue
-                    content = getattr(part, "content", None)
-                    if not isinstance(content, str):
-                        continue  # skip multimodal / structured tool returns
-                    shrunk = await _shrink(content)
-                    if shrunk != content:
-                        try:
-                            new_parts[j] = dataclasses.replace(part, content=shrunk)
-                            changed = True
-                        except Exception:
-                            pass  # not a dataclass — leave the part untouched
-                if changed:
-                    try:
-                        out[i] = dataclasses.replace(msg, parts=new_parts)
-                    except Exception:
-                        out[i] = msg
-            return out
+            # NEW = the latest turn (kept intact); OLD = the prior history.
+            new_text = _msg_text(messages[-1])
+            old_text = "\n\n".join(
+                t for t in (_msg_text(m) for m in messages[:-1]) if t
+            )
+            if len(old_text) >= min_chars and new_text.strip():
+                h = hashlib.sha256(old_text.encode("utf-8")).hexdigest()
+                if h not in memo:
+                    memo[h] = True
+                    # Offload the blocking HTTP call off the event loop.
+                    await asyncio.to_thread(
+                        _scaledown_compress, old_text, new_text, rate
+                    )
+            return messages
         except Exception as e:  # noqa: BLE001 — never let compression fail a run
             print(
-                f"[scaledown] history processor error, using original history: {e}",
+                f"[scaledown] history processor error: {e}",
                 file=sys.stderr,
             )
             return messages
@@ -963,11 +953,10 @@ def build_agent(
         kwargs["tools"] = tools
 
     # ScaleDown prompt compression — opt-in per agent via `scaledown:`, and only
-    # when the workspace set a key. `prompt` compresses the static instructions
-    # once (cache-friendly); `aggressive` also compresses bulky history blocks
-    # each turn via a memoizing history processor. See _make_scaledown_processor.
-    # Wrapped so a bad `scaledown:` value or a startup compress error can never
-    # fail agent construction — the agent just runs without compression.
+    # when the workspace set a key. Any non-`off` mode attaches a history
+    # processor that optimizes each model request (old history = context to
+    # compress, new turn = prompt kept intact). Wrapped so a bad `scaledown:`
+    # value can never fail agent construction — the agent just runs uncompressed.
     try:
         sd_mode, sd_rate, sd_min_chars = _scaledown_settings(spec)
         # Always log the resolved config so a missing/ignored compression is
@@ -979,14 +968,9 @@ def build_agent(
             file=sys.stderr,
         )
         if sd_mode != "off" and _scaledown_key():
-            if kwargs.get("instructions"):
-                kwargs["instructions"] = _scaledown_compress(
-                    kwargs["instructions"], sd_rate
-                )
-            if sd_mode == "aggressive":
-                kwargs["history_processors"] = [
-                    _make_scaledown_processor(sd_rate, sd_min_chars)
-                ]
+            kwargs["history_processors"] = [
+                _make_scaledown_processor(sd_rate, sd_min_chars)
+            ]
     except Exception as e:  # noqa: BLE001 — never block a run on compression setup
         print(f"[scaledown] setup skipped: {e}", file=sys.stderr)
         kwargs.pop("history_processors", None)
