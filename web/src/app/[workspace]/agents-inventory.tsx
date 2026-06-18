@@ -11,6 +11,7 @@ import { DataTable, type Column, type SortDir } from "@/components/ui/data-table
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { mcpLogoUrl } from "@/lib/mcp-logo";
+import { formatCurrency } from "@/lib/pricing";
 
 import { dismissPendingCreateAction } from "./inventory-actions";
 
@@ -51,6 +52,8 @@ export type InventoryAgent =
       runs30d: number;
       succeeded30d: number;
       failed30d: number;
+      /** Avg estimated USD cost over 30d runs that have a cost (null = none). */
+      avgCostUsd30d: number | null;
       /** Latest run regardless of window. Null when never run. */
       lastRun:
         | {
@@ -86,6 +89,7 @@ type SortKey =
   | "status"
   | "name"
   | "runs"
+  | "cost"
   | "success"
   | "last-run";
 
@@ -230,7 +234,7 @@ export function AgentsInventory({
           ? "asc"
           : key === "status"
             ? "asc"
-            : key === "runs" || key === "last-run"
+            : key === "runs" || key === "last-run" || key === "cost"
               ? "desc"
               : "asc",
       );
@@ -349,6 +353,22 @@ export function AgentsInventory({
         return (
           <span className="text-foreground font-mono text-sm">
             {agent.runs30d.toLocaleString("en-US")}
+          </span>
+        );
+      },
+    },
+    {
+      key: "cost",
+      header: "Avg cost/run",
+      sortable: true,
+      align: "right",
+      cell: ({ agent }) => {
+        if (agent.kind !== "live" || agent.avgCostUsd30d === null) {
+          return <span className="text-foreground-muted">—</span>;
+        }
+        return (
+          <span className="text-foreground font-mono text-sm">
+            {formatCurrency(agent.avgCostUsd30d)}
           </span>
         );
       },
@@ -799,6 +819,16 @@ function compareRows(
       if (ra !== rb) return (ra - rb) * sign;
       return compareNames(a, b);
     }
+    case "cost": {
+      const ra = rowAvgCost(a);
+      const rb = rowAvgCost(b);
+      // Nulls last so agents with no costed runs don't crowd the top.
+      if (ra === null && rb === null) return compareNames(a, b);
+      if (ra === null) return 1;
+      if (rb === null) return -1;
+      if (ra !== rb) return (ra - rb) * sign;
+      return compareNames(a, b);
+    }
     case "success": {
       const ra = rowSuccessRate(a);
       const rb = rowSuccessRate(b);
@@ -829,6 +859,9 @@ function rowRuns(a: InventoryAgent): number {
 function rowSuccessRate(a: InventoryAgent): number | null {
   if (a.kind !== "live" || a.runs30d === 0) return null;
   return a.succeeded30d / a.runs30d;
+}
+function rowAvgCost(a: InventoryAgent): number | null {
+  return a.kind === "live" ? a.avgCostUsd30d : null;
 }
 
 function rowLastRunMs(a: InventoryAgent): number | null {

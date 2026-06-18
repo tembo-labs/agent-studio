@@ -179,6 +179,7 @@ export default async function WorkspacePage({
             runs30d: s?.totalRuns30d ?? 0,
             succeeded30d: s?.succeeded30d ?? 0,
             failed30d: s?.failed30d ?? 0,
+            avgCostUsd30d: s?.avgCostUsd30d ?? null,
             lastRun:
               s?.lastRunStatus && s.lastRunAt
                 ? {

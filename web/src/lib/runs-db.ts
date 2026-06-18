@@ -112,6 +112,9 @@ export type AgentSummary = {
   totalRuns30d: number;
   succeeded30d: number;
   failed30d: number;
+  /** Average estimated USD cost over the 30d runs that have a cost (null when
+   *  none — e.g. only cargo-ai runs or unpriced models). */
+  avgCostUsd30d: number | null;
   /** Latest run regardless of age — null when the agent has never run. */
   lastRunStatus: "queued" | "running" | "succeeded" | "failed" | null;
   lastRunAt: Date | null;
@@ -139,6 +142,7 @@ export async function listAgentSummaries30d(
     total_runs_30d: string | null;
     succeeded_30d: string | null;
     failed_30d: string | null;
+    avg_cost_30d: string | null;
     last_run_status: AgentSummary["lastRunStatus"];
     last_run_at: Date | null;
   }>(
@@ -150,7 +154,8 @@ export async function listAgentSummaries30d(
             agent_name,
             COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')                                AS total_runs_30d,
             COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days' AND status = 'succeeded')        AS succeeded_30d,
-            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days' AND status = 'failed')           AS failed_30d
+            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days' AND status = 'failed')           AS failed_30d,
+            AVG(cost_usd) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days' AND cost_usd IS NOT NULL)   AS avg_cost_30d
           FROM run
          WHERE workspace_id = $1 AND agent_name = ANY($2::text[])
          GROUP BY agent_name
@@ -166,6 +171,7 @@ export async function listAgentSummaries30d(
         s.total_runs_30d::TEXT,
         s.succeeded_30d::TEXT,
         s.failed_30d::TEXT,
+        s.avg_cost_30d::TEXT,
         l.status      AS last_run_status,
         l.created_at  AS last_run_at
        FROM agent_names n
@@ -180,6 +186,7 @@ export async function listAgentSummaries30d(
       totalRuns30d: Number(r.total_runs_30d ?? "0"),
       succeeded30d: Number(r.succeeded_30d ?? "0"),
       failed30d: Number(r.failed_30d ?? "0"),
+      avgCostUsd30d: r.avg_cost_30d === null ? null : Number(r.avg_cost_30d),
       lastRunStatus: r.last_run_status,
       lastRunAt: r.last_run_at,
     });
