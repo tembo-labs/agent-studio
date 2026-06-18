@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from datetime import datetime, timezone
 from urllib.parse import quote
 
@@ -130,6 +131,12 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
         # still de-dups server-side).
         tracked, active_refs = _inbox_state()
         budget = max(0, limit - len(active_refs))
+        print(
+            f"[linkedin] cap={limit} active={len(active_refs)} "
+            f"tracked={len(tracked)} budget={budget} "
+            f"active_refs={sorted(active_refs)}",
+            file=sys.stderr,
+        )
         if budget == 0:
             return []  # inbox already full — don't even hit LinkedIn
 
@@ -162,6 +169,11 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
             before = nxt
 
         out = out[:budget]
+        print(
+            f"[linkedin] scanned={len(seen)} surfaced={len(out)} "
+            f"({[c['convId'].rsplit(':', 1)[-1] for c in out]})",
+            file=sys.stderr,
+        )
         # Enrich the survivors with recent thread history (best-effort: the list
         # response only carries the latest message). A failed thread fetch leaves
         # messages empty — the item still has lastMessage.
