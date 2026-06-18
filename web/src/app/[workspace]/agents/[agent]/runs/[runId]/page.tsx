@@ -144,6 +144,18 @@ export default async function RunDetailPage({
     0,
   );
   const hasCache = cacheReadTokens > 0 || cacheWriteTokens > 0;
+  // ScaleDown prompt compression, if this run used it. original/compressed are
+  // the source-block token counts before/after compression.
+  const scaledownOrig = run.scaledownOriginalTokens;
+  const scaledownComp = run.scaledownCompressedTokens;
+  const hasScaledown =
+    scaledownOrig !== null &&
+    scaledownComp !== null &&
+    scaledownOrig > 0 &&
+    scaledownComp <= scaledownOrig;
+  const scaledownPct = hasScaledown
+    ? Math.round((100 * (scaledownOrig - scaledownComp)) / scaledownOrig)
+    : 0;
   // Sub-runs this run spawned via trigger_run. Roll their tokens + cost up so
   // an orchestrator's page shows its true total, not just its own (small) cost.
   const subRunsCost = childRuns.reduce((sum, c) => sum + (c.costUsd ?? 0), 0);
@@ -273,6 +285,20 @@ export default async function RunDetailPage({
                 <span className="text-foreground-weak">
                   {" "}
                   (1.25×)
+                </span>
+              </dd>
+            </div>
+          )}
+          {hasScaledown && (
+            <div className="flex gap-3">
+              <dt className="text-foreground-weak w-24 shrink-0 font-medium">
+                ScaleDown
+              </dt>
+              <dd className="text-foreground">
+                {formatTokens(scaledownOrig)} → {formatTokens(scaledownComp)} tokens
+                <span className="text-foreground-weak">
+                  {" "}
+                  ({scaledownPct}% off compressed context)
                 </span>
               </dd>
             </div>

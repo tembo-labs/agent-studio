@@ -75,6 +75,9 @@ export type RunRecord = {
   completedAt: string | null;
   tokensInput: number | null;
   tokensOutput: number | null;
+  /** ScaleDown prompt-compression totals (null unless the run compressed). */
+  scaledownOriginalTokens: number | null;
+  scaledownCompressedTokens: number | null;
   trigger: RunTrigger;
   automationId: string | null;
   agentVersionId: string | null;
@@ -98,6 +101,8 @@ type ApiRunRecord = {
   completed_at: string | null;
   tokens_input: number | null;
   tokens_output: number | null;
+  scaledown_original_tokens: number | null;
+  scaledown_compressed_tokens: number | null;
   trigger: RunTrigger;
   automation_id: string | null;
   agent_version_id: string | null;
@@ -122,6 +127,8 @@ function fromApi(r: ApiRunRecord): RunRecord {
     completedAt: r.completed_at,
     tokensInput: r.tokens_input,
     tokensOutput: r.tokens_output,
+    scaledownOriginalTokens: r.scaledown_original_tokens,
+    scaledownCompressedTokens: r.scaledown_compressed_tokens,
     trigger: r.trigger,
     automationId: r.automation_id,
     agentVersionId: r.agent_version_id,

@@ -231,6 +231,8 @@ describe("buildMcpServer", () => {
       completedAt: null,
       tokensInput: 10,
       tokensOutput: 5,
+      scaledownOriginalTokens: null,
+      scaledownCompressedTokens: null,
       trigger: "manual",
       automationId: null,
       agentVersionId: null,

@@ -203,6 +203,9 @@ pub struct RunRecord {
     pub completed_at: Option<DateTime<Utc>>,
     pub tokens_input: Option<i32>,
     pub tokens_output: Option<i32>,
+    /// ScaleDown prompt-compression totals (NULL unless the run compressed).
+    pub scaledown_original_tokens: Option<i32>,
+    pub scaledown_compressed_tokens: Option<i32>,
     pub trigger: String,
     pub automation_id: Option<Uuid>,
     pub agent_version_id: Option<Uuid>,
@@ -223,6 +226,7 @@ pub async fn get_run(
         r#"SELECT id, workspace_id, agent_name, agent_path, user_message, model, status,
                   output, streamed_output, error_message, created_by, created_at,
                   started_at, completed_at, tokens_input, tokens_output,
+                  scaledown_original_tokens, scaledown_compressed_tokens,
                   trigger, automation_id, agent_version_id, agent_version_label
              FROM run
              WHERE id = $1 AND workspace_id = $2"#,

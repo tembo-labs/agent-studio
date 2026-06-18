@@ -672,6 +672,17 @@ SCALEDOWN_DEFAULT_MIN_CHARS = 1600
 # model's own TextParts (its answers/reasoning) and never touch tool-call args
 # or tool_use/tool_result pairing — Anthropic rejects structural mismatches.
 SCALEDOWN_COMPRESSIBLE_PARTS = {"system-prompt", "user-prompt", "tool-return"}
+# Emitted once at end of run so the run row can show what compression saved.
+SCALEDOWN_SENTINEL = "__TAS_SCALEDOWN__:"
+# Run-level totals across every compression (each unique block counts once — the
+# processor memoizes — plus the one-time instructions compression).
+_SCALEDOWN_TOTALS = {"original_tokens": 0, "compressed_tokens": 0, "blocks": 0}
+
+
+def _scaledown_payload() -> dict | None:
+    """The run's compression totals for the end-of-run sentinel, or None if
+    nothing was compressed."""
+    return dict(_SCALEDOWN_TOTALS) if _SCALEDOWN_TOTALS["blocks"] > 0 else None
 
 
 def _scaledown_key() -> str | None:
@@ -729,6 +740,9 @@ def _scaledown_compress(text: str, rate: str) -> str:
             orig = data.get("original_prompt_tokens") or results.get("original_prompt_tokens")
             comp = data.get("compressed_prompt_tokens") or results.get("compressed_prompt_tokens")
             if isinstance(orig, int) and isinstance(comp, int) and orig > 0:
+                _SCALEDOWN_TOTALS["original_tokens"] += orig
+                _SCALEDOWN_TOTALS["compressed_tokens"] += comp
+                _SCALEDOWN_TOTALS["blocks"] += 1
                 print(
                     f"[scaledown] {orig} -> {comp} tokens ({100 * (orig - comp) // orig}% off)",
                     file=sys.stderr,
@@ -1373,6 +1387,11 @@ async def run(spec: dict, user_message: str) -> None:
             steps = steps_payload(_messages)
             if steps:
                 sys.stdout.write(f"{STEPS_SENTINEL}{json.dumps(steps)}\n")
+            # ScaleDown compression totals (if any) — emitted on both paths so a
+            # failed run still records what it compressed.
+            sd = _scaledown_payload()
+            if sd:
+                sys.stdout.write(f"{SCALEDOWN_SENTINEL}{json.dumps(sd)}\n")
 
     sys.stdout.write(str(result.output))
     sys.stdout.write("\n")

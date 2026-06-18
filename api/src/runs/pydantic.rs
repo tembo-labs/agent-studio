@@ -37,6 +37,7 @@ const STEPS_SENTINEL: &str = "__TAS_STEPS__:";
 const DELTA_SENTINEL: &str = "__TAS_DELTA__:";
 const PROGRESS_SENTINEL: &str = "__TAS_PROGRESS__:";
 const STALE_CONNECTION_MARKER: &str = "__TAS_STALE_CONNECTION__:";
+const SCALEDOWN_SENTINEL: &str = "__TAS_SCALEDOWN__:";
 // How often (at most) to flush reconstructed live output to the run row.
 const STREAM_FLUSH_INTERVAL: Duration = Duration::from_millis(400);
 
@@ -564,6 +565,12 @@ pub async fn invoke(
 
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    // ScaleDown compression totals, if the wrapper compressed anything. Persist
+    // directly to the run row (best-effort) so the run detail can show what
+    // compression saved — on both success and failure paths.
+    if let Some(sd) = extract_scaledown(&stdout) {
+        persist_scaledown(args.db, args.run_id, sd).await;
+    }
     // Prefer the per-step breakdown (carries token usage + step_ordinal per
     // call); fall back to the flat tool list for output from an older wrapper.
     let steps = extract_steps(&stdout);
@@ -737,6 +744,7 @@ fn parse_output(stdout: &str) -> PydanticResult {
             || line.starts_with(STEPS_SENTINEL)
             || line.starts_with(DELTA_SENTINEL)
             || line.starts_with(PROGRESS_SENTINEL)
+            || line.starts_with(SCALEDOWN_SENTINEL)
         {
             continue;
         }
@@ -749,6 +757,46 @@ fn parse_output(stdout: &str) -> PydanticResult {
         output: joined.trim_end().to_string(),
         usage,
     }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+struct ScaleDownSummary {
+    #[serde(default)]
+    original_tokens: i32,
+    #[serde(default)]
+    compressed_tokens: i32,
+    #[serde(default)]
+    blocks: i32,
+}
+
+/// Pull the `__TAS_SCALEDOWN__:{...}` sentinel (ScaleDown compression totals)
+/// from the wrapper's stdout. Absent or malformed is non-fatal.
+fn extract_scaledown(stdout: &str) -> Option<ScaleDownSummary> {
+    for line in stdout.lines() {
+        if let Some(json_part) = line.strip_prefix(SCALEDOWN_SENTINEL) {
+            if let Ok(parsed) = serde_json::from_str::<ScaleDownSummary>(json_part) {
+                if parsed.blocks > 0 {
+                    return Some(parsed);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Persist the compression totals on the run row. Best-effort — errors are
+/// swallowed (the columns are display-only and must never fail a run).
+async fn persist_scaledown(db: &sqlx::PgPool, run_id: Uuid, sd: ScaleDownSummary) {
+    let _ = sqlx::query(
+        "UPDATE run SET scaledown_original_tokens = $1, \
+                        scaledown_compressed_tokens = $2 \
+                  WHERE id = $3",
+    )
+    .bind(sd.original_tokens)
+    .bind(sd.compressed_tokens)
+    .bind(run_id)
+    .execute(db)
+    .await;
 }
 
 /// Pull the `__TAS_TOOLS__:[...]` sentinel (a JSON array of
