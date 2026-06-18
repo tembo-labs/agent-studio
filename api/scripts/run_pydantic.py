@@ -1117,7 +1117,11 @@ async def run(spec: dict, user_message: str) -> None:
     run_kwargs: dict = {}
     request_limit = spec.get("request_limit")
     run_kwargs["usage_limits"] = UsageLimits(
-        request_limit=request_limit if isinstance(request_limit, int) else 50
+        request_limit=(
+            request_limit
+            if type(request_limit) is int and request_limit > 0
+            else 50
+        )
     )
     try:
         if "event_stream_handler" in inspect.signature(agent.run).parameters:
