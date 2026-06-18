@@ -155,7 +155,7 @@ export async function executeInboxOptionAction(args: {
   return { ok: true };
 }
 
-// "Wait": snooze the item out of the inbox for `hours`, after which it reappears
+// Snooze the item out of the inbox for `hours`, after which it reappears
 // automatically. No external action — just hides it until then.
 export async function snoozeInboxItemAction(args: {
   workspaceSlug: string;

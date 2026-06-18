@@ -40,7 +40,7 @@ const ACTIVE_STATUSES: InboxRow["status"][] = [
   "awaiting_human",
 ];
 
-/** Currently snoozed = a "Wait" set to a future time. */
+/** Currently snoozed = snoozed_until is set to a future time. */
 function isSnoozed(i: InboxRow): boolean {
   return !!i.snoozedUntilIso && new Date(i.snoozedUntilIso).getTime() > Date.now();
 }
@@ -70,7 +70,7 @@ export function InboxList({
       dismissed: 0,
     };
     for (const i of items) {
-      // Snoozed (waiting) items are counted only under "snoozed", out of active.
+      // Snoozed items are counted only under "snoozed", out of active.
       if (isSnoozed(i)) {
         c.snoozed++;
         continue;
@@ -183,7 +183,7 @@ export function InboxList({
     { key: "awaiting_human", label: "Needs review" },
     { key: "open", label: "Open" },
     { key: "claimed", label: "Claimed" },
-    { key: "snoozed", label: "Waiting" },
+    { key: "snoozed", label: "Snoozed" },
     { key: "done", label: "Done" },
     { key: "dismissed", label: "Dismissed" },
   ];

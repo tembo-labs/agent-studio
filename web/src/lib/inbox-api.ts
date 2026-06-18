@@ -73,7 +73,7 @@ export interface InboxItem {
   createdAt: Date;
   updatedAt: Date;
   resolvedAt: Date | null;
-  /** When set + in the future, the item is "Waiting" and hidden from the active
+  /** When set + in the future, the item is snoozed and hidden from the active
    *  inbox until this time passes (then it reappears). */
   snoozedUntil: Date | null;
 }
@@ -314,7 +314,7 @@ export async function countActiveInboxItems(
   return Number(res.rows[0]?.n ?? 0);
 }
 
-/** "Wait": snooze an item out of the active inbox until `until`. It reappears
+/** Snooze an item out of the active inbox until `until`. It reappears
  *  automatically once the time passes (the active views filter on snoozed_until).
  *  Allowed only on unresolved items. */
 export async function snoozeInboxItem(
