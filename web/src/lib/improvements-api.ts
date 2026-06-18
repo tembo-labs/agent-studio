@@ -20,6 +20,11 @@ export type ImprovementStatus =
   | "committed";
 export type ImprovementKind = "edit" | "create";
 
+// Where the improvement originated. 'chat' = a person submitted it; 'learning'
+// = the batched Tasks Inbox learning pass opened it. Free-form (validated here,
+// not a DB CHECK).
+export type ImprovementSource = "chat" | "learning";
+
 // How an improvement's change is delivered. Snapshotted at submit time from the
 // workspace's commit mode so the reconcile scan + UI stay correct even if the
 // workspace later toggles the mode.
@@ -39,6 +44,7 @@ export interface Improvement {
   // "create" = chat-to-create — the agent file doesn't exist yet
   // and lands on PR merge.
   kind: ImprovementKind;
+  source: ImprovementSource;
   temboTaskId: string | null;
   temboTaskHtmlUrl: string | null;
   prUrl: string | null;
@@ -63,6 +69,7 @@ type Row = {
   agent_path: string;
   improvement_text: string;
   kind: ImprovementKind;
+  source: ImprovementSource;
   tembo_task_id: string | null;
   tembo_task_html_url: string | null;
   pr_url: string | null;
@@ -88,6 +95,7 @@ function rowToImprovement(r: Row): Improvement {
     agentPath: r.agent_path,
     improvementText: r.improvement_text,
     kind: r.kind,
+    source: r.source,
     temboTaskId: r.tembo_task_id,
     temboTaskHtmlUrl: r.tembo_task_html_url,
     prUrl: r.pr_url,
@@ -110,7 +118,7 @@ function rowToImprovement(r: Row): Improvement {
 // the row visible if the user has been deleted.
 const COLUMNS = `
   i.id, i.workspace_id, i.run_id, i.agent_name, i.agent_path, i.improvement_text,
-  i.kind, i.tembo_task_id, i.tembo_task_html_url, i.pr_url, i.pr_number, i.pr_state,
+  i.kind, i.source, i.tembo_task_id, i.tembo_task_html_url, i.pr_url, i.pr_number, i.pr_state,
   i.status, i.delivery, i.commit_sha, i.commit_url, i.created_by,
   u.name AS created_by_name, u.email AS created_by_email,
   i.created_at, i.updated_at
@@ -129,14 +137,17 @@ export async function createImprovement(input: {
   // How this change will be delivered. Defaults to PR so callers that
   // predate YOLO keep the prior behavior.
   delivery?: ImprovementDelivery;
+  // Where it came from. Defaults to 'chat' (a person) so legacy callers keep
+  // their meaning; the learning pass passes 'learning'.
+  source?: ImprovementSource;
   userId: string;
 }): Promise<Improvement> {
   // INSERT into a CTE so we can re-SELECT with the user join applied,
   // matching the projection used everywhere else that returns Improvement.
   const res = await db.query<Row>(
     `WITH inserted AS (
-       INSERT INTO improvement (workspace_id, run_id, agent_name, agent_path, improvement_text, kind, delivery, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       INSERT INTO improvement (workspace_id, run_id, agent_name, agent_path, improvement_text, kind, source, delivery, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *
      )
      SELECT ${COLUMNS}
@@ -149,6 +160,7 @@ export async function createImprovement(input: {
       input.agentPath,
       input.improvementText,
       input.kind ?? "edit",
+      input.source ?? "chat",
       input.delivery ?? "pull_request",
       input.userId,
     ],

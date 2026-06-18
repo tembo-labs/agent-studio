@@ -8,6 +8,7 @@ import type { McpTool } from "@/lib/mcp-tools";
 import type { WorkspaceComposioConnection } from "@/lib/composio-connections";
 import type { WorkspaceConnection } from "@/lib/connections";
 import type { SlackApp } from "@/lib/slack-apps";
+import type { InboxItem } from "@/lib/inbox-api";
 
 // Pure mappers from internal service-layer types to the public JSON shapes
 // emitted by BOTH the REST API (/api/v1) and the MCP server (/mcp). Keeping
@@ -248,5 +249,47 @@ export function serializeSlackApp(a: SlackApp): SerializedSlackApp {
     hasBotToken: a.hasBotToken,
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
+  };
+}
+
+export type SerializedInboxItem = {
+  id: string;
+  source: string;
+  externalRef: string | null;
+  itemType: string;
+  title: string;
+  context: Record<string, unknown>;
+  proposedAction: InboxItem["proposedAction"];
+  finalAction: InboxItem["finalAction"];
+  status: InboxItem["status"];
+  assigneeKind: InboxItem["assigneeKind"];
+  assigneeId: string | null;
+  producedByRunId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+};
+
+/** One inbox item — the GET /inbox and GET /inbox/[id] body. The learning
+ *  bookkeeping (improvementId, signalConsumedAt) stays internal. */
+export function serializeInboxItem(i: InboxItem): SerializedInboxItem {
+  return {
+    id: i.id,
+    source: i.source,
+    externalRef: i.externalRef,
+    itemType: i.itemType,
+    title: i.title,
+    context: i.context,
+    proposedAction: i.proposedAction,
+    finalAction: i.finalAction,
+    status: i.status,
+    assigneeKind: i.assigneeKind,
+    assigneeId: i.assigneeId,
+    producedByRunId: i.producedByRunId,
+    createdBy: i.createdBy,
+    createdAt: i.createdAt.toISOString(),
+    updatedAt: i.updatedAt.toISOString(),
+    resolvedAt: i.resolvedAt ? i.resolvedAt.toISOString() : null,
   };
 }
