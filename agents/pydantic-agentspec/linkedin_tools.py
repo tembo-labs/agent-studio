@@ -14,13 +14,12 @@ Auth: cookie (li_at + JSESSIONID) + csrf-token header == JSESSIONID value; the
 User-Agent must be the DESKTOP browser the cookie came from (a mobile UA gets
 403'd by the desktop API).
 
-Pagination: we page back to older conversations with a `lastUpdatedBefore`
-(epoch-ms) cursor variable. That variable name is the common Voyager shape but
-unverified for this queryId — the walk is best-effort and degrades to a single
-page if it's rejected/ignored. If the agent never sees threads past the first
-~20, re-capture it: linkedin.com/messaging → scroll to load OLDER conversations
-→ DevTools Network → the follow-up messengerConversations request shows the real
-cursor variable; update _fetch_conversation_page.
+Pagination: the list query is `messengerConversationsByCategory` with variables
+`(query:(predicateUnions:List((conversationCategoryPredicate:(category:INBOX)))),
+count:20,mailboxUrn:<urn>,nextCursor:<token>)`. The cursor is an OPAQUE token
+returned at `data.messengerConversationsByCategoryQuery.metadata.nextCursor` —
+pass it back as `nextCursor` to get the next (older) page. The `category:INBOX`
+predicate also makes LinkedIn exclude archived threads server-side.
 """
 
 from __future__ import annotations
@@ -38,7 +37,7 @@ import tas_tools
 VOYAGER_BASE = "https://www.linkedin.com/voyager/api"
 # Both rotate per LinkedIn release — see module docstring to re-capture (filter
 # Network by messengerConversations / messengerMessages).
-CONV_LIST_QUERY_ID = "messengerConversations.0d5e6781bbee71c3e51c8843c6519f48"
+CONV_LIST_QUERY_ID = "messengerConversations.9501074288a12f3ae9e3c7ea243bccbf"
 MESSAGES_QUERY_ID = "messengerMessages.5846eeb71c981f11e0134cb6626cc314"
 # How many recent messages of each thread to pull for context.
 THREAD_DEPTH = 15
@@ -133,23 +132,24 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
         budget = max(0, limit - len(active_refs))
         print(
             f"[linkedin] cap={limit} active={len(active_refs)} "
-            f"tracked={len(tracked)} budget={budget} "
-            f"active_refs={sorted(active_refs)}",
+            f"tracked={len(tracked)} budget={budget}",
             file=sys.stderr,
         )
         if budget == 0:
             return []  # inbox already full — don't even hit LinkedIn
 
-        # Walk back through pages, oldest-cursor style, collecting fresh threads
-        # until we reach the budget or run out of conversations.
+        # Walk back through pages via the opaque nextCursor, collecting fresh
+        # threads until we reach the budget or run out of conversations.
         out: list[dict] = []
         seen: set = set()
-        before: int | None = None  # cursor = lastUpdatedBefore (epoch ms)
+        cursor: str | None = None
         for _ in range(MAX_PAGES):
-            page = _fetch_conversation_page(client, mailbox, my_id, before)
+            page, cursor = _fetch_conversation_page(client, mailbox, my_id, cursor)
+            if not page:
+                break  # empty / errored page — stop
             fresh_page = [c for c in page if c["convId"] not in seen]
             if not fresh_page:
-                break  # empty page, or cursor made no progress (end of list)
+                break  # no progress (same convs returned) — stop
             for c in fresh_page:
                 seen.add(c["convId"])
             for c in fresh_page:
@@ -157,16 +157,8 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
                     out.append(c)
                     if len(out) >= budget:
                         break
-            if len(out) >= budget:
-                break
-            # Advance the cursor to the oldest activity on this page.
-            stamps = [c["lastActivityAt"] for c in fresh_page if isinstance(c.get("lastActivityAt"), int)]
-            if not stamps:
-                break  # no timestamps to page on
-            nxt = min(stamps)
-            if before is not None and nxt >= before:
-                break  # cursor not advancing — avoid an infinite loop
-            before = nxt
+            if len(out) >= budget or not cursor:
+                break  # filled the budget, or no more pages
 
         out = out[:budget]
         print(
@@ -198,39 +190,40 @@ def _worth_surfacing(c: dict, tracked: dict, active_refs: set) -> bool:
 
 
 def _fetch_conversation_page(
-    client: httpx.Client, mailbox: str, my_id: str, before: int | None
-) -> list[dict]:
-    """One page of the conversation list, parsed. `before` (epoch ms) pages back
-    to OLDER conversations via the `lastUpdatedBefore` cursor; None is the first
-    (newest) page.
+    client: httpx.Client, mailbox: str, my_id: str, cursor: str | None
+) -> tuple[list[dict], str | None]:
+    """One page of the INBOX conversation list. Returns (parsed, next_cursor).
+    `cursor` is the opaque nextCursor token from the previous page (None for the
+    first / newest page); pass next_cursor back in to page to OLDER threads.
 
     The first page must succeed (raises with diagnostics on failure / empty).
-    Later pages are best-effort: a paginated request that errors or returns
-    nothing just stops the walk (returns []) rather than failing the run — so if
-    this queryId doesn't accept the cursor, we degrade to a single page."""
-    # RestLi variables format, matching the browser EXACTLY: literal parens,
-    # literal separator colons, but each URN's OWN colons percent-encoded →
-    # (mailboxUrn:urn%3Ali%3Afsd_profile%3AID). Encoding a separator colon is a
-    # 400. Build the query by hand so httpx keeps it verbatim.
+    Later pages are best-effort: a request that errors or returns nothing just
+    stops the walk (returns ([], None)) rather than failing the run."""
+    # RestLi variables, matching the browser EXACTLY: literal parens / separator
+    # colons; the URN's OWN colons percent-encoded; the cursor fully encoded
+    # (it's base64 with =,/,+). The category:INBOX predicate excludes archived.
     mailbox_enc = mailbox.replace(":", "%3A")
-    variables = f"(mailboxUrn:{mailbox_enc}"
-    if before is not None:
-        variables += f",lastUpdatedBefore:{before}"
+    variables = (
+        "(query:(predicateUnions:List((conversationCategoryPredicate:(category:INBOX))))"
+        f",count:20,mailboxUrn:{mailbox_enc}"
+    )
+    if cursor:
+        variables += f",nextCursor:{quote(cursor, safe='')}"
     variables += ")"
     url = f"{VOYAGER_BASE}/voyagerMessagingGraphQL/graphql?queryId={CONV_LIST_QUERY_ID}&variables={variables}"
     resp = client.get(url)
     if resp.status_code >= 400:
-        if before is None:
+        if cursor is None:
             raise RuntimeError(
                 f"LinkedIn {resp.status_code} on messengerConversations. "
                 f"Body: {resp.text[:300]!r}. "
                 f"Sent URL: {str(resp.request.url)!r}. "  # reveals any double-encoding
                 f"mailbox: {mailbox!r}."
             )
-        return []  # pagination unsupported / older page failed — stop gracefully
+        return [], None  # older page failed — stop gracefully
     data = resp.json()
     parsed = _parse_conversations(data, my_id)
-    if not parsed and before is None:
+    if not parsed and cursor is None:
         # 200 but parser missed the shape — dump the GraphQL payload so we can
         # fix the paths in one pass.
         gql = data.get("data") or {}
@@ -238,7 +231,21 @@ def _fetch_conversation_page(
             "Parsed 0 conversations. data.data keys=" + repr(list(gql.keys()))
             + " | payload=" + json.dumps(gql)[:1800]
         )
-    return parsed
+    return parsed, _next_cursor(data)
+
+
+def _next_cursor(data: dict) -> str | None:
+    """The opaque pagination token from the conversation-list response, at
+    data.<rootField>.metadata.nextCursor. None when there are no older pages."""
+    gql = data.get("data") or {}
+    for v in gql.values():
+        if isinstance(v, dict):
+            md = v.get("metadata")
+            if isinstance(md, dict):
+                nc = md.get("nextCursor")
+                if isinstance(nc, str) and nc:
+                    return nc
+    return None
 
 
 def _inbox_state() -> tuple[dict, set]:
@@ -273,29 +280,17 @@ def _inbox_state() -> tuple[dict, set]:
     now = datetime.now(timezone.utc)
     tracked: dict = {}
     active_refs: set = set()
-    dbg: list = []
     for it in items:
         ref = it.get("externalRef")
         if not (isinstance(ref, str) and ref):
             continue
         ts = it.get("externalTs")
         tracked[ref] = ts if isinstance(ts, int) else None
-        status = it.get("status")
-        if status not in ("open", "claimed", "awaiting_human"):
+        if it.get("status") not in ("open", "claimed", "awaiting_human"):
             continue  # done / dismissed — not occupying the inbox
-        snoozed = _is_future(it.get("snoozedUntil"), now)
-        dbg.append(
-            {
-                "ref": ref.rsplit(":", 1)[-1],
-                "status": status,
-                "snoozedUntil": it.get("snoozedUntil"),
-                "counted": "snoozed" if snoozed else "ACTIVE",
-            }
-        )
-        if snoozed:
+        if _is_future(it.get("snoozedUntil"), now):
             continue  # snoozed — hidden, doesn't occupy a cap slot
         active_refs.add(ref)
-    print(f"[linkedin] unresolved inbox items: {dbg}", file=sys.stderr)
     return tracked, active_refs
 
 
