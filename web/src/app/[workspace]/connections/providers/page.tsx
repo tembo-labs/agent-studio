@@ -34,7 +34,7 @@ const SETUP_URLS: Record<string, string> = {
 // URI" — rendered inline so the steps that are easy to miss are in-app.
 const SETUP_NOTES: Record<string, string> = {
   gmail:
-    "In Google Cloud also enable the Gmail API and the Gmail MCP API, set the OAuth consent screen to Internal with scopes gmail.readonly + gmail.compose, and choose Web application as the client type.",
+    "In Google Cloud also enable the Gmail API and the Gmail MCP API, set the OAuth consent screen to Internal with the scope https://mail.google.com/ (full Gmail — the MCP tools require it), and choose Web application as the client type.",
 };
 
 export const dynamic = "force-dynamic";

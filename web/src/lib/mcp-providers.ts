@@ -149,8 +149,8 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // SEPARATE origin (oauth2.googleapis.com) — both trusted below. Standard
     // Google OAuth: no DCR; a CONFIDENTIAL client an admin creates in Google
     // Cloud (authMode "manual", like HubSpot). access_type=offline +
-    // prompt=consent are required for a refresh_token, and scopes are narrowed
-    // to readonly+compose (the resource advertises full-mailbox access too).
+    // prompt=consent are required for a refresh_token; scope is the single
+    // full-access mail.google.com (see the scopeOverride note below).
     // Docs: https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server
     mcpServerUrl: "https://gmailmcp.googleapis.com/mcp/v1",
     oauthAuthorizationServerOrigins: [
@@ -159,10 +159,14 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     ],
     authMode: "manual",
     authorizeParams: { access_type: "offline", prompt: "consent" },
-    scopeOverride: [
-      "https://www.googleapis.com/auth/gmail.readonly",
-      "https://www.googleapis.com/auth/gmail.compose",
-    ],
+    // Request the single full-access Gmail scope. readonly+compose yielded
+    // "caller does not have permission" from the gmailmcp tools (the server
+    // gates its tools on a broader grant than the data scope alone), and a
+    // single scope also avoids Google's granular-consent partial grants (one
+    // checkbox, not several the user can half-grant). The token only carries
+    // what WE request here — what's enabled on the consent screen is moot
+    // unless it's in this list.
+    scopeOverride: ["https://mail.google.com/"],
   },
   "tembo-agent-studio": {
     slug: "tembo-agent-studio",
