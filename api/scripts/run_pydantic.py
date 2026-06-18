@@ -735,7 +735,7 @@ def _scaledown_compress(text: str, rate: str) -> str:
         resp = httpx.post(
             url,
             headers={"x-api-key": key, "Content-Type": "application/json"},
-            json={"context": text, "prompt": "", "scaledown": {"rate": rate}},
+            json={"prompt": text, "scaledown": {"rate": rate}},
             timeout=30,
         )
         print(f"[scaledown] -> HTTP {resp.status_code}", file=sys.stderr)
