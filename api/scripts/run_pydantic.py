@@ -723,19 +723,34 @@ def _scaledown_compress(text: str, rate: str) -> str:
     Synchronous — call via asyncio.to_thread from async contexts."""
     key = _scaledown_key()
     if not key or not isinstance(text, str) or not text.strip():
+        print(
+            f"[scaledown] skip compress (key={'set' if key else 'missing'} "
+            f"len={len(text) if isinstance(text, str) else 'n/a'})",
+            file=sys.stderr,
+        )
         return text
+    url = f"{SCALEDOWN_API_URL}/compress/raw/"
     try:
+        print(f"[scaledown] POST {url} ({len(text)} chars)", file=sys.stderr)
         resp = httpx.post(
-            f"{SCALEDOWN_API_URL}/compress/raw/",
+            url,
             headers={"x-api-key": key, "Content-Type": "application/json"},
             json={"context": text, "prompt": "", "scaledown": {"rate": rate}},
             timeout=30,
         )
+        print(f"[scaledown] -> HTTP {resp.status_code}", file=sys.stderr)
         resp.raise_for_status()
         data = resp.json() or {}
         # The API has shipped both flat and nested ({results:{...}}) shapes.
         results = data.get("results") if isinstance(data.get("results"), dict) else data
         compressed = results.get("compressed_prompt")
+        if not (isinstance(compressed, str) and compressed.strip()):
+            print(
+                "[scaledown] no compressed_prompt in response; keys="
+                + repr(list(data.keys())[:10])
+                + " body=" + json.dumps(data)[:400],
+                file=sys.stderr,
+            )
         if isinstance(compressed, str) and compressed.strip():
             orig = data.get("original_prompt_tokens") or results.get("original_prompt_tokens")
             comp = data.get("compressed_prompt_tokens") or results.get("compressed_prompt_tokens")
