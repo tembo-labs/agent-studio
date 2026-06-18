@@ -492,6 +492,8 @@ export type ProduceInboxItemInput = {
   title: string;
   source?: string;
   externalRef?: string;
+  /** Deep link to the source object (issue/ticket/record/task URL). */
+  url?: string;
   context?: Record<string, unknown>;
   proposedAction?: InboxAction;
   /** Action menu rendered as buttons; one may be `recommended`. */
@@ -516,6 +518,7 @@ export async function produceInboxItemFor(
     workspaceId: ctx.workspace.id,
     source: input.source?.trim() || "agent",
     externalRef: input.externalRef ?? null,
+    url: input.url?.trim() || null,
     itemType,
     title,
     context: input.context ?? {},

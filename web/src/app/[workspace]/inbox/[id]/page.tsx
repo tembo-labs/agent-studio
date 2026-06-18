@@ -54,6 +54,16 @@ export default async function InboxItemPage({
         <h1 className="text-foreground-title text-xl font-bold tracking-tight">
           {item.title}
         </h1>
+        {item.url && (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-foreground inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
+          >
+            Open in {item.source} ↗
+          </a>
+        )}
         <p className="text-foreground-weak text-sm">
           Created <LocalTime iso={item.createdAt.toISOString()} style="relative" />
         </p>

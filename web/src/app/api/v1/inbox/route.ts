@@ -84,6 +84,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     title?: unknown;
     source?: unknown;
     externalRef?: unknown;
+    url?: unknown;
     context?: unknown;
     proposedAction?: { text?: unknown; fields?: unknown };
     options?: unknown;
@@ -116,6 +117,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     title: body.title,
     source: typeof body.source === "string" ? body.source : undefined,
     externalRef: typeof body.externalRef === "string" ? body.externalRef : undefined,
+    url: typeof body.url === "string" ? body.url : undefined,
     context:
       body.context && typeof body.context === "object"
         ? (body.context as Record<string, unknown>)

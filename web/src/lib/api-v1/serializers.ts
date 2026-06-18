@@ -256,6 +256,7 @@ export type SerializedInboxItem = {
   id: string;
   source: string;
   externalRef: string | null;
+  url: string | null;
   itemType: string;
   title: string;
   context: Record<string, unknown>;
@@ -284,6 +285,7 @@ export function serializeInboxItem(i: InboxItem): SerializedInboxItem {
     id: i.id,
     source: i.source,
     externalRef: i.externalRef,
+    url: i.url,
     itemType: i.itemType,
     title: i.title,
     context: i.context,

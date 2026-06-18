@@ -428,6 +428,13 @@ export function buildMcpServer(
         title: z.string().describe("Short label for the triage list row."),
         source: z.string().optional().describe("Where it came from (default 'agent')."),
         externalRef: z.string().optional().describe("Producer's id for idempotent re-pushes."),
+        url: z
+          .string()
+          .optional()
+          .describe(
+            "Deep link to the source object (Linear issue / Pylon ticket / " +
+            "Attio record / task URL). Shown as an 'Open in …' link on the item.",
+          ),
         externalTs: z
           .number()
           .optional()
@@ -464,7 +471,7 @@ export function buildMcpServer(
           ),
       },
     },
-    async ({ itemType, title, source, externalRef, externalTs, context, proposedActionText, proposedActionFields, options: actionOptions }) => {
+    async ({ itemType, title, source, externalRef, url, externalTs, context, proposedActionText, proposedActionFields, options: actionOptions }) => {
       if (!isOperator) return operatorOnly();
       const proposedAction =
         proposedActionText || proposedActionFields
@@ -478,6 +485,7 @@ export function buildMcpServer(
         title,
         source,
         externalRef,
+        url,
         externalTs,
         context,
         proposedAction,

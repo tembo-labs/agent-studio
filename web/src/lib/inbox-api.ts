@@ -52,6 +52,8 @@ export interface InboxItem {
   workspaceId: string;
   source: string;
   externalRef: string | null;
+  /** Deep link to the source object (Linear issue, Pylon ticket, …), or null. */
+  url: string | null;
   itemType: string;
   title: string;
   context: Record<string, unknown>;
@@ -83,6 +85,7 @@ type Row = {
   workspace_id: string;
   source: string;
   external_ref: string | null;
+  external_url: string | null;
   item_type: string;
   title: string;
   context: Record<string, unknown> | null;
@@ -111,6 +114,7 @@ function rowToInboxItem(r: Row): InboxItem {
     workspaceId: r.workspace_id,
     source: r.source,
     externalRef: r.external_ref,
+    url: r.external_url,
     itemType: r.item_type,
     title: r.title,
     context: r.context ?? {},
@@ -138,7 +142,7 @@ function rowToInboxItem(r: Row): InboxItem {
 // includes the submitter's name + email. LEFT JOIN keeps agent/source-produced
 // rows (created_by IS NULL) visible.
 const COLUMNS = `
-  i.id, i.workspace_id, i.source, i.external_ref, i.item_type, i.title,
+  i.id, i.workspace_id, i.source, i.external_ref, i.external_url, i.item_type, i.title,
   i.context, i.proposed_action, i.final_action, i.options, i.external_ts, i.status,
   i.assignee_kind, i.assignee_id, i.produced_by_run_id, i.improvement_id,
   i.signal_consumed_at, i.created_by,
@@ -151,6 +155,8 @@ export interface CreateInboxItemInput {
   workspaceId: string;
   source: string;
   externalRef?: string | null;
+  /** Deep link to the source object, surfaced as an "Open in …" link. */
+  url?: string | null;
   itemType: string;
   title: string;
   context?: Record<string, unknown>;
@@ -190,13 +196,14 @@ export async function createInboxItem(
        INSERT INTO inbox_item (
          workspace_id, source, external_ref, item_type, title, context,
          proposed_action, options, status, assignee_kind, assignee_id,
-         produced_by_run_id, created_by, external_ts
+         produced_by_run_id, created_by, external_ts, external_url
        )
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (workspace_id, source, external_ref) WHERE external_ref IS NOT NULL
        DO UPDATE SET
          updated_at = NOW(),
          title = CASE WHEN ${fresher} THEN EXCLUDED.title ELSE inbox_item.title END,
+         external_url = COALESCE(EXCLUDED.external_url, inbox_item.external_url),
          context = CASE WHEN ${fresher} THEN EXCLUDED.context ELSE inbox_item.context END,
          proposed_action = CASE WHEN ${fresher} THEN EXCLUDED.proposed_action ELSE inbox_item.proposed_action END,
          options = CASE WHEN ${fresher} THEN EXCLUDED.options ELSE inbox_item.options END,
@@ -226,6 +233,7 @@ export async function createInboxItem(
       input.producedByRunId ?? null,
       input.createdBy ?? null,
       input.externalTs ?? null,
+      input.url ?? null,
     ],
   );
   return rowToInboxItem(res.rows[0]);
