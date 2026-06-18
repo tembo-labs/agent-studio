@@ -797,14 +797,22 @@ def _scaledown_compress(context: str, prompt: str, rate: str) -> str:
 
 
 def _msg_text(msg) -> str:
-    """Concatenate the free-text content of one message's parts (system/user/
-    tool-return text + the model's own text). Ignores tool-call args / non-str
-    content. Used to split the conversation into old-context vs new-turn text."""
+    """Concatenate one message's content for the old-context vs new-turn split.
+    Includes string parts (system/user/tool-return text + model text) AND
+    stringified structured tool-return content (e.g. a tool that returns a
+    list/dict) — that structured output is usually the bulkiest thing in an
+    agentic history, so it's exactly what's worth compressing."""
     chunks: list[str] = []
     for part in getattr(msg, "parts", None) or []:
         content = getattr(part, "content", None)
-        if isinstance(content, str) and content.strip():
-            chunks.append(content)
+        if isinstance(content, str):
+            if content.strip():
+                chunks.append(content)
+        elif content is not None:
+            try:
+                chunks.append(json.dumps(content, default=str))
+            except Exception:
+                chunks.append(str(content))
     return "\n\n".join(chunks)
 
 
