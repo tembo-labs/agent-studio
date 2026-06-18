@@ -690,31 +690,49 @@ def _scaledown_key() -> str | None:
     return k if isinstance(k, str) and k.strip() else None
 
 
-def _scaledown_settings(spec: dict) -> tuple[str, str, int]:
-    """(mode, rate, min_chars) from the agent's `scaledown:` field. Default off.
-    Accepts a string ("aggressive"/"prompt"/"off"), a bool, or an object
-    {mode, rate, min_tokens|min_chars}."""
+def _scaledown_settings(spec: dict) -> tuple[bool, str, int]:
+    """(enabled, rate, min_chars) from the agent's `scaledown:` field.
+
+    The only real knobs are on/off, the compression `rate` (ScaleDown's lever),
+    and `min_tokens` (how big the history must be before we bother). Accepted:
+      scaledown: off|false        → disabled (default)
+      scaledown: auto|true|on     → enabled, rate=auto
+      scaledown: 0.5              → enabled, rate=0.5 (target ~50% of tokens)
+      scaledown: { rate: auto|0.5, min_tokens: 400 }
+    Lenient: any other non-off string (e.g. legacy "prompt"/"aggressive") enables
+    at rate=auto, so existing specs keep working."""
     raw = spec.get("scaledown")
     rate, min_chars = "auto", SCALEDOWN_DEFAULT_MIN_CHARS
     if raw is None or raw is False:
-        return "off", rate, min_chars
+        return False, rate, min_chars
     if raw is True:
-        return "aggressive", rate, min_chars
+        return True, rate, min_chars
+    if isinstance(raw, (int, float)):  # numeric rate, e.g. 0.5
+        return True, str(raw), min_chars
     if isinstance(raw, str):
-        mode = raw.strip().lower()
-    elif isinstance(raw, dict):
-        mode = str(raw.get("mode", "aggressive")).strip().lower()
-        if isinstance(raw.get("rate"), (str, int, float)):
-            rate = str(raw["rate"])
-        if isinstance(raw.get("min_chars"), int):
-            min_chars = raw["min_chars"]
-        elif isinstance(raw.get("min_tokens"), int):
+        s = raw.strip().lower()
+        if s in ("off", "false", "no", "none", "disabled", ""):
+            return False, rate, min_chars
+        try:
+            float(s)  # numeric string rate
+            rate = s
+        except ValueError:
+            pass  # "auto"/"on"/legacy "prompt"/"aggressive" → enabled at auto
+        return True, rate, min_chars
+    if isinstance(raw, dict):
+        if str(raw.get("mode", "")).strip().lower() in ("off", "false", "disabled"):
+            return False, rate, min_chars
+        if raw.get("enabled") is False:
+            return False, rate, min_chars
+        r = raw.get("rate")
+        if isinstance(r, (str, int, float)) and not isinstance(r, bool):
+            rate = str(r)
+        if isinstance(raw.get("min_tokens"), int):
             min_chars = raw["min_tokens"] * 4
-    else:
-        mode = "off"
-    if mode not in ("off", "prompt", "aggressive"):
-        mode = "off"
-    return mode, rate, max(1, min_chars)
+        elif isinstance(raw.get("min_chars"), int):
+            min_chars = raw["min_chars"]
+        return True, rate, max(1, min_chars)
+    return False, rate, min_chars
 
 
 def _scaledown_compress(context: str, prompt: str, rate: str) -> str:
@@ -958,16 +976,16 @@ def build_agent(
     # compress, new turn = prompt kept intact). Wrapped so a bad `scaledown:`
     # value can never fail agent construction — the agent just runs uncompressed.
     try:
-        sd_mode, sd_rate, sd_min_chars = _scaledown_settings(spec)
+        sd_enabled, sd_rate, sd_min_chars = _scaledown_settings(spec)
         # Always log the resolved config so a missing/ignored compression is
-        # diagnosable from the run/container logs: did the spec carry the field
-        # (raw), what mode did it resolve to, and is a key present?
+        # diagnosable from the run/container logs.
         print(
             f"[scaledown] config: raw={spec.get('scaledown')!r} "
-            f"mode={sd_mode} key={'set' if _scaledown_key() else 'missing'}",
+            f"enabled={sd_enabled} rate={sd_rate} min_chars={sd_min_chars} "
+            f"key={'set' if _scaledown_key() else 'missing'}",
             file=sys.stderr,
         )
-        if sd_mode != "off" and _scaledown_key():
+        if sd_enabled and _scaledown_key():
             kwargs["history_processors"] = [
                 _make_scaledown_processor(sd_rate, sd_min_chars)
             ]
