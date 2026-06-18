@@ -48,6 +48,12 @@ export const MANUAL_CREDENTIAL_PROVIDERS: Record<string, ManualCredentialProvide
       "",
       "⚠️ This rides your real LinkedIn session (same as tools like Unipile, just",
       "unmanaged). Respect LinkedIn's rate limits; aggressive use can flag the account.",
+      "",
+      "**If the LinkedIn agent later fails fetching messages (a 500),** LinkedIn has",
+      "probably rotated its internal API IDs (it does this every few releases).",
+      "Re-capture: linkedin.com/messaging → DevTools → Network → filter",
+      "`messengerConversations` → reload → copy the new `queryId` into the agent's",
+      "`linkedin_tools.py`.",
     ].join("\n"),
     fields: [
       {
