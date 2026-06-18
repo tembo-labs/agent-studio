@@ -55,7 +55,11 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
     prefix).
     """
     headers = _session()
-    with httpx.Client(timeout=30, headers=headers) as client:
+    # follow_redirects: LinkedIn answers the first Voyager call with a 302 to the
+    # same URL while setting a routing cookie (lidc); httpx persists that cookie
+    # across the hop on the same client, so the followed retry succeeds. Without
+    # this you get "302 Found" on raise_for_status.
+    with httpx.Client(timeout=30, headers=headers, follow_redirects=True) as client:
         resp = client.get(
             f"{VOYAGER_BASE}/messaging/conversations",
             params={"keyVersion": "LEGACY_INBOX"},
