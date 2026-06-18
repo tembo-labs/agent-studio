@@ -159,7 +159,7 @@ export async function AppShell({
                 return (
                   <div
                     key={`fail:${f.agentName}`}
-                    className="flex items-start gap-2 rounded-md bg-[var(--color-input-error)] px-2 py-2"
+                    className="flex items-start gap-2 rounded-md bg-[var(--color-sentiment-negative-subtle)] px-2 py-2"
                   >
                     <IconExclamationTriangle
                       size={14}
