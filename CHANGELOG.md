@@ -14,6 +14,53 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.23] — Tasks Inbox actions: act in the source — shipped 2026-06-18
+
+### Added
+- **Act on inbox items in their source system** — option buttons now run the real
+  action on click, not just clear the item:
+  - **Complete** a task in Dialed / Attio / Linear via a generic **native-MCP
+    inbox executor** (the producing agent declares the tool + args; it runs on
+    the clicking user's connection).
+  - **Send / Send and Archive / Archive** for Gmail via a **Composio inbox
+    executor** — Send replies and keeps the thread in your inbox, Send and Archive
+    replies then files it out, Archive files without replying. Replies use an
+    editable suggested draft (the LinkedIn pattern).
+- **Linear native-MCP provider** (`mcp.linear.app`, TAS-managed OAuth) — the
+  Linear tasks agent moved off Composio onto it.
+- **Gmail native-MCP provider** — a manual / bring-your-own Google OAuth app (like
+  HubSpot), with in-app setup guidance on Connections → Manage providers (redirect
+  URI, the Gmail-specific API + scope steps, docs link). Google currently gates the
+  Gmail MCP server behind its Developer Preview program, so Gmail can alternatively
+  run through Composio.
+- **`gmail-tasks` email-triage agent** — surfaces your top starred/important emails
+  into the Inbox (capped, deduped) with a deep link and a suggested reply.
+- **Deep links on inbox items** — an "Open in <source> ↗" link to the underlying
+  Dialed task / Linear issue / Attio record / email thread (new `url` field).
+- **Snooze + Dismiss escapes** on inbox items, with per-agent control over which
+  clear actions appear (e.g. Gmail uses Archive instead of Dismiss).
+
+### Changed
+- **Inbox source shown as a provider logo** in the list + item detail (was the raw
+  lowercase word); the technical Type column/badge is gone.
+- **Sidebar Inbox badge stays live** — polls the active count so items an agent
+  produces in the background appear without a manual refresh.
+- **Task agents surface source content faithfully** — `dialed`/`attio`/`linear`/
+  `gmail` run with ScaleDown off (no lossy compression of data they copy verbatim)
+  and prioritize their queues (Linear: triage → in-review → in-progress → todo →
+  backlog; Gmail: starred first; etc.).
+
+### Fixed
+- **Dismiss is terminal** — a re-running agent can no longer drag a dismissed item
+  back into the Inbox (the reopen-on-new-activity path now skips dismissed rows).
+- **Inbox actions tolerate a connection-name mismatch** — fall back to your sole
+  active connection of the provider type when the agent's declared name differs.
+- **Learning-mode checkbox no longer reverts after Save** — it revalidated the
+  wrong tab and never re-synced to the saved value.
+- **ScaleDown** now treats prior history as context and the new turn as the query
+  (per the API), and safely compresses bulky prior tool outputs.
+- **LinkedIn thread list pagination** uses the provider's real opaque cursor.
+
 ## [v2026.6.22] — ScaleDown prompt compression + agent cost/run — shipped 2026-06-18
 
 ### Added
