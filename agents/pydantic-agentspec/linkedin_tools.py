@@ -57,9 +57,19 @@ def _profile_id(client: httpx.Client) -> str:
     r = client.get(f"{VOYAGER_BASE}/me")
     if r.status_code >= 400:
         raise RuntimeError(f"LinkedIn /me {r.status_code}: {r.text[:300]!r}")
+    # Prefer the user's OWN miniProfile urn from the parsed body (regex-first-match
+    # could grab some other included entity).
+    try:
+        me = r.json()
+    except Exception:
+        me = {}
+    data = me.get("data") if isinstance(me.get("data"), dict) else {}
+    urn = data.get("*miniProfile") or me.get("*miniProfile") or data.get("entityUrn")
+    if isinstance(urn, str) and ":" in urn:
+        return urn.rsplit(":", 1)[-1]
     m = re.search(r"(?:fs_miniProfile|fsd_profile|fs_profile):([A-Za-z0-9_-]{15,})", r.text)
     if not m:
-        raise RuntimeError(f"Couldn't find profile id in /me response: {r.text[:300]!r}")
+        raise RuntimeError(f"Couldn't find profile id in /me response: {r.text[:400]!r}")
     return m.group(1)
 
 
@@ -88,7 +98,9 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
         if resp.status_code >= 400:
             raise RuntimeError(
                 f"LinkedIn {resp.status_code} on messengerConversations. "
-                f"Body: {resp.text[:400]!r}. UA={headers.get('user-agent')!r}"
+                f"Body: {resp.text[:300]!r}. "
+                f"Sent URL: {str(resp.request.url)!r}. "  # reveals any double-encoding
+                f"mailbox: {mailbox!r}."
             )
         data = resp.json()
 
