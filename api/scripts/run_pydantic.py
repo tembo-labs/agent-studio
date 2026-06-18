@@ -40,6 +40,7 @@ import yaml
 
 from anthropic import AsyncAnthropic
 from pydantic_ai import Agent, capture_run_messages
+from pydantic_ai.usage import UsageLimits
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
@@ -1274,6 +1275,14 @@ async def run(spec: dict, user_message: str) -> None:
     # supported (version skew) so an older pydantic-ai still runs — just
     # without streaming, falling back to the end-of-run capture.
     run_kwargs: dict = {}
+    request_limit = spec.get("request_limit")
+    run_kwargs["usage_limits"] = UsageLimits(
+        request_limit=(
+            request_limit
+            if type(request_limit) is int and request_limit > 0
+            else 50
+        )
+    )
     try:
         if "event_stream_handler" in inspect.signature(agent.run).parameters:
             run_kwargs["event_stream_handler"] = make_stream_handler()
