@@ -86,7 +86,8 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
     executor passes back to LinkedIn."""
     headers = _session()
     with httpx.Client(timeout=30, headers=headers, follow_redirects=True) as client:
-        mailbox = f"urn:li:fsd_profile:{_profile_id(client)}"
+        my_id = _profile_id(client)
+        mailbox = f"urn:li:fsd_profile:{my_id}"
         # RestLi variables format, matching the browser EXACTLY: literal parens,
         # literal `mailboxUrn:` separator colon, but the URN's OWN colons percent-
         # encoded → (mailboxUrn:urn%3Ali%3Afsd_profile%3AID). Encoding the
@@ -104,58 +105,62 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
             )
         data = resp.json()
 
-    out = _parse_conversations(data, limit)
+    out = _parse_conversations(data, limit, my_id)
     if not out:
-        # Field paths likely drifted — surface the actual shape so we can fix the
-        # parser in one pass instead of guessing.
-        types = sorted({
-            e.get("$type", "?") for e in data.get("included", []) if isinstance(e, dict)
-        })
+        # 200 but parser missed the shape — dump the GraphQL payload so we can fix
+        # the paths in one pass.
+        gql = data.get("data") or {}
         raise RuntimeError(
-            "Parsed 0 conversations. data keys=" + repr(list(data.keys()))
-            + " | included $types=" + repr(types)
-            + " | sample=" + json.dumps(data.get("included", [])[:1])[:1200]
+            "Parsed 0 conversations. data.data keys=" + repr(list(gql.keys()))
+            + " | payload=" + json.dumps(gql)[:1800]
         )
     return out
 
 
-def _parse_conversations(data: dict, limit: int) -> list[dict]:
-    """Best-effort parse of the messenger GraphQL response. The list lives in
-    `included` as com.linkedin.messenger.* entities cross-referenced by urn."""
-    included = [e for e in data.get("included", []) if isinstance(e, dict)]
-    by_urn = {e.get("entityUrn"): e for e in included if e.get("entityUrn")}
+def _parse_conversations(data: dict, limit: int, my_id: str) -> list[dict]:
+    """Parse the messenger GraphQL response. Conversations are inline at
+    data.data.<rootField>.elements (pure GraphQL — no `included`)."""
+    gql = data.get("data") or {}
+    elements: list = []
+    for v in gql.values():
+        if isinstance(v, dict) and isinstance(v.get("elements"), list):
+            elements = v["elements"]
+            break
+    # Fallback: older normalized shape with com.linkedin.messenger.* in `included`.
+    if not elements:
+        elements = [
+            e
+            for e in data.get("included", [])
+            if isinstance(e, dict) and str(e.get("$type", "")).endswith(".Conversation")
+        ]
 
-    def is_type(e, suffix):
-        return str(e.get("$type", "")).endswith(suffix)
-
-    convs = [e for e in included if is_type(e, ".Conversation")]
     out: list[dict] = []
-    for c in convs[: limit * 3]:  # over-fetch; we slice after sorting
-        urn = c.get("entityUrn", "")
-        # Participants: resolve participant urns → member name/headline.
-        name, headline = "Unknown", ""
-        parts = c.get("conversationParticipants") or c.get("*conversationParticipants") or []
-        for p in parts:
-            pe = by_urn.get(p) if isinstance(p, str) else p
-            if not isinstance(pe, dict):
+    for c in elements:
+        urn = c.get("entityUrn") or c.get("conversationUrn") or ""
+        if not urn:
+            continue
+        # Pick the OTHER participant (skip me). Participants are inline here.
+        name, headline, fallback = "", "", ""
+        for p in c.get("conversationParticipants") or []:
+            member = (p.get("participantType") or {}).get("member") or {}
+            ent = member.get("entityUrn") or p.get("hostIdentityUrn") or ""
+            pid = ent.rsplit(":", 1)[-1] if isinstance(ent, str) else ""
+            nm = (_text(member.get("firstName")) + " " + _text(member.get("lastName"))).strip()
+            if not nm:
                 continue
-            member = (
-                (pe.get("participantType") or {}).get("member")
-                or (pe.get("participantType") or {}).get("organization")
-                or {}
-            )
-            fn, ln = _text(member.get("firstName")), _text(member.get("lastName"))
-            nm = (fn + " " + ln).strip() or _text(member.get("name"))
-            if nm:
-                name = nm
-                headline = _text(member.get("headline"))
-                break
-        # Last message body.
+            if my_id and pid == my_id:
+                fallback = fallback or nm
+                continue
+            name = nm
+            headline = _text(member.get("headline"))
+            break
+        name = name or fallback or "Unknown"
+        # Last message preview, if the list includes it.
         last = ""
         msgs = c.get("messages") or {}
-        elems = msgs.get("elements") if isinstance(msgs, dict) else None
-        if elems:
-            last = _text((elems[-1] or {}).get("body"))
+        melems = msgs.get("elements") if isinstance(msgs, dict) else None
+        if melems:
+            last = _text((melems[-1] or {}).get("body"))
         out.append({"convId": urn, "name": name, "headline": headline, "lastMessage": last})
     return out[:limit]
 
