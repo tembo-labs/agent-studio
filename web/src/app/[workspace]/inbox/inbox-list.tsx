@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { LocalTime } from "@/components/local-time";
+import { McpProviderLogo } from "@/components/mcp-provider-logo";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
@@ -154,14 +155,7 @@ export function InboxList({
       header: "Source",
       sortable: true,
       tdClassName: "text-foreground-weak text-sm",
-      cell: (i) => i.source,
-    },
-    {
-      key: "item_type",
-      header: "Type",
-      sortable: true,
-      tdClassName: "text-foreground-weak text-sm",
-      cell: (i) => i.itemType,
+      cell: (i) => <McpProviderLogo slug={i.source} label={i.source} size={20} />,
     },
     {
       key: "status",

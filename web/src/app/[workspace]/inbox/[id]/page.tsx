@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { LocalTime } from "@/components/local-time";
-import { Badge } from "@/components/ui/badge";
+import { McpProviderLogo } from "@/components/mcp-provider-logo";
 import { getInboxItem } from "@/lib/inbox-api";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
@@ -43,17 +43,12 @@ export default async function InboxItemPage({
         >
           ← Inbox
         </Link>
-        <div className="flex items-center gap-2">
-          <Badge variant="gray" size="small">
-            {item.source}
-          </Badge>
-          <Badge variant="gray" size="small">
-            {item.itemType}
-          </Badge>
+        <div className="flex items-center gap-2.5">
+          <McpProviderLogo slug={item.source} label={item.source} size={24} />
+          <h1 className="text-foreground-title text-xl font-bold tracking-tight">
+            {item.title}
+          </h1>
         </div>
-        <h1 className="text-foreground-title text-xl font-bold tracking-tight">
-          {item.title}
-        </h1>
         {item.url && (
           <a
             href={item.url}
