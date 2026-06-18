@@ -3,6 +3,7 @@ import "server-only";
 import {
   getNativeConnection,
   getNativeConnectionCredentials,
+  listNativeConnectionsForUser,
 } from "@/lib/connections";
 import type { McpProviderSlug } from "@/lib/mcp-providers";
 import { callNativeMcpTool } from "@/lib/native-mcp-tools";
@@ -50,16 +51,33 @@ export const nativeMcpExecutor: InboxExecutor = async ({
   }
   if (!userId) throw new Error("native-mcp action requires a signed-in user.");
 
-  const conn = await getNativeConnection(
+  // Prefer the exact name the agent declared, but tolerate a name mismatch:
+  // the agent hardcodes a name (e.g. "default") while the human may have named
+  // their connection something else ("tembo"). If the exact name misses, fall
+  // back to their sole ACTIVE connection of this provider type — unambiguous
+  // and what they obviously mean. Only bail when there are zero, or several
+  // (then we genuinely can't guess which account to act as).
+  let conn = await getNativeConnection(
     workspaceId,
     userId,
     connectionType as McpProviderSlug,
     connectionName,
   );
   if (!conn) {
-    throw new Error(
-      `No "${connectionType}" connection named "${connectionName}" for you — connect it under Connections, then retry.`,
+    const ofType = (await listNativeConnectionsForUser(workspaceId, userId)).filter(
+      (c) => c.type === connectionType && c.status === "active",
     );
+    if (ofType.length === 1) {
+      conn = ofType[0];
+    } else if (ofType.length === 0) {
+      throw new Error(
+        `No "${connectionType}" connection for you — connect it under Connections, then retry.`,
+      );
+    } else {
+      throw new Error(
+        `You have several "${connectionType}" connections but none named "${connectionName}" — rename one to "${connectionName}" (or reconnect) so this action knows which account to use.`,
+      );
+    }
   }
 
   const creds = await getNativeConnectionCredentials(conn.id);
