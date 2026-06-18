@@ -736,12 +736,12 @@ def _scaledown_compress(text: str, rate: str) -> str:
             url,
             headers={"x-api-key": key, "Content-Type": "application/json"},
             json={
-                # ScaleDown requires BOTH fields non-empty. It compresses
-                # `prompt` (returned as compressed_prompt) using `context` as the
-                # intent to preserve.
-                "context": "Compress losslessly: keep every instruction, fact, "
-                "name, ID, number, and step; drop only redundancy.",
-                "prompt": text,
+                # Per the API ref: `context` is the bulky background/instructions
+                # ScaleDown compresses; `prompt` is the query it preserves
+                # relevance to. Both required, non-empty. Returns compressed_prompt.
+                "context": text,
+                "prompt": "Carry out the user's request faithfully, applying "
+                "every instruction, fact, name, ID, number, and step above.",
                 "scaledown": {"rate": rate},
             },
             timeout=30,
@@ -762,14 +762,15 @@ def _scaledown_compress(text: str, rate: str) -> str:
         if isinstance(compressed, str) and compressed.strip():
             orig = data.get("original_prompt_tokens") or results.get("original_prompt_tokens")
             comp = data.get("compressed_prompt_tokens") or results.get("compressed_prompt_tokens")
+            print(
+                f"[scaledown] ok orig={orig} comp={comp} "
+                f"in={len(text)}c out={len(compressed)}c head={compressed[:160]!r}",
+                file=sys.stderr,
+            )
             if isinstance(orig, int) and isinstance(comp, int) and orig > 0:
                 _SCALEDOWN_TOTALS["original_tokens"] += orig
                 _SCALEDOWN_TOTALS["compressed_tokens"] += comp
                 _SCALEDOWN_TOTALS["blocks"] += 1
-                print(
-                    f"[scaledown] {orig} -> {comp} tokens ({100 * (orig - comp) // orig}% off)",
-                    file=sys.stderr,
-                )
             return compressed
     except Exception as e:  # noqa: BLE001 — best-effort, never break a run
         print(f"[scaledown] compress failed, using original: {e}", file=sys.stderr)
