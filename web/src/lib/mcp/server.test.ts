@@ -96,17 +96,23 @@ describe("buildMcpServer", () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
+      "claim_inbox_item",
+      "complete_inbox_item",
       "create_automation",
       "create_slack_app",
       "delete_slack_app",
       "get_agent",
+      "get_inbox_item",
       "get_run",
       "list_agents",
       "list_automations",
       "list_connections",
+      "list_inbox_items",
       "list_runs",
       "list_slack_apps",
       "list_tools",
+      "produce_inbox_item",
+      "propose_inbox_action",
       "request_agent_change",
       "send_slack_message",
       "trigger_run",
