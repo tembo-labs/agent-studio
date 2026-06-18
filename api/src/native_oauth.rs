@@ -59,6 +59,10 @@ const FATHOM_OAUTH_ORIGINS: &[&str] = &["https://api.fathom.ai", "https://fathom
 // Dialed advertises its auth server as the apex (also the MCP origin).
 const DIALED_MCP_ORIGIN: &str = "https://dialed.day";
 const DIALED_OAUTH_ORIGINS: &[&str] = &["https://dialed.day"];
+// Linear advertises its auth server as the MCP origin itself (DCR, public
+// client, read+write scopes). Docs: https://linear.app/docs/mcp
+const LINEAR_MCP_ORIGIN: &str = "https://mcp.linear.app";
+const LINEAR_OAUTH_ORIGINS: &[&str] = &["https://mcp.linear.app"];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
@@ -66,6 +70,7 @@ const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (HUBSPOT_MCP_ORIGIN, HUBSPOT_OAUTH_ORIGINS),
     (FATHOM_MCP_ORIGIN, FATHOM_OAUTH_ORIGINS),
     (DIALED_MCP_ORIGIN, DIALED_OAUTH_ORIGINS),
+    (LINEAR_MCP_ORIGIN, LINEAR_OAUTH_ORIGINS),
 ];
 
 #[derive(Deserialize)]

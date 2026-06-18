@@ -127,7 +127,7 @@ export async function executeInboxOptionAction(args: {
   }
 
   try {
-    await executeInboxOption(workspace.id, option, args.text);
+    await executeInboxOption(workspace.id, userId, option, args.text);
   } catch (err) {
     return {
       ok: false,

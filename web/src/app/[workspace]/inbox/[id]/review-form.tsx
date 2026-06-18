@@ -43,7 +43,9 @@ function successFor(opt: InboxOption): string {
     case "archive":
       return "Archived";
     default:
-      return `${opt.label} done`;
+      return /complete|done|resolve|close/i.test(opt.execute?.op ?? opt.label)
+        ? "Completed"
+        : `${opt.label} done`;
   }
 }
 

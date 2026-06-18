@@ -59,3 +59,46 @@ export async function fetchNativeMcpTools(
     });
   }
 }
+
+/**
+ * Call one tool on a native MCP server (same transport + handshake as the tool
+ * list). Used by the inbox `native-mcp` executor when a human clicks an option
+ * that maps to a provider tool (e.g. Dialed `complete_task`, Linear issue
+ * update). Throws on a transport/auth error or a tool-reported error so the
+ * caller surfaces it and does NOT resolve the inbox item.
+ */
+export async function callNativeMcpTool(
+  serverUrl: string,
+  accessToken: string,
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<void> {
+  const transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
+    requestInit: {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  });
+  const client = new Client(
+    { name: "Tembo Agent Studio", version: "0.4" },
+    { capabilities: {} },
+  );
+  await client.connect(transport);
+  try {
+    const res = await client.callTool({ name: toolName, arguments: args });
+    if (res.isError) {
+      const msg = Array.isArray(res.content)
+        ? res.content
+            .map((c) =>
+              c && typeof c === "object" && "text" in c
+                ? String((c as { text: unknown }).text)
+                : "",
+            )
+            .filter(Boolean)
+            .join(" ")
+        : "";
+      throw new Error(`MCP tool "${toolName}" failed${msg ? `: ${msg}` : ""}.`);
+    }
+  } finally {
+    await client.close().catch(() => {});
+  }
+}

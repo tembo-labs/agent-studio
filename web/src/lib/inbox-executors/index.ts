@@ -3,6 +3,7 @@ import "server-only";
 import type { InboxOption } from "@/lib/inbox-api";
 
 import { linkedinExecutor } from "./linkedin";
+import { nativeMcpExecutor } from "./native-mcp";
 
 // Registry that turns an inbox option's `execute` descriptor into a real action.
 // Keyed by `execute.provider`. The executor runs SYNCHRONOUSLY when the human
@@ -12,6 +13,8 @@ import { linkedinExecutor } from "./linkedin";
 
 export type InboxExecutorArgs = {
   workspaceId: string;
+  /** The clicking human — needed to resolve their per-user connections. */
+  userId: string;
   op: string;
   params?: Record<string, unknown>;
   /** The human's (possibly edited) reply text, for reply-type options. */
@@ -22,6 +25,7 @@ export type InboxExecutor = (args: InboxExecutorArgs) => Promise<void>;
 
 const REGISTRY: Record<string, InboxExecutor> = {
   linkedin: linkedinExecutor,
+  "native-mcp": nativeMcpExecutor,
 };
 
 /**
@@ -32,6 +36,7 @@ const REGISTRY: Record<string, InboxExecutor> = {
  */
 export async function executeInboxOption(
   workspaceId: string,
+  userId: string,
   option: InboxOption,
   text?: string,
 ): Promise<void> {
@@ -42,6 +47,7 @@ export async function executeInboxOption(
   }
   await handler({
     workspaceId,
+    userId,
     op: option.execute.op,
     params: option.execute.params,
     text,

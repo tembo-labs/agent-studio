@@ -22,6 +22,7 @@ export type McpProviderSlug =
   | "hubspot"
   | "fathom"
   | "dialed"
+  | "linear"
   | "tembo-agent-studio";
 
 export type McpProvider = {
@@ -110,6 +111,18 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // use the apex.)
     mcpServerUrl: "https://dialed.day/mcp",
     oauthAuthorizationServerOrigins: ["https://dialed.day"],
+  },
+  linear: {
+    slug: "linear",
+    displayName: "Linear",
+    // Verified (probe): POST https://mcp.linear.app/mcp → 401 + WWW-Authenticate
+    // Bearer → /.well-known/oauth-protected-resource/mcp advertises the auth
+    // server as https://mcp.linear.app. Auth-server metadata exposes a
+    // registration_endpoint (/register → DCR), PKCE S256, and a public client
+    // (token auth method "none") with read+write scopes — TAS-managed, no
+    // per-customer setup, like Attio. Docs: https://linear.app/docs/mcp
+    mcpServerUrl: "https://mcp.linear.app/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.linear.app"],
   },
   "tembo-agent-studio": {
     slug: "tembo-agent-studio",
