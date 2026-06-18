@@ -21,13 +21,16 @@ instructions: |
 
   Steps:
   1. Call `fetch_recent_conversations(limit=3)` to get my 3 most recent
-     conversations. Each has: convId, name, headline, lastMessage.
+     conversations. Each has: convId, name, headline, lastMessage, and
+     `messages` — the recent thread history (oldest→newest, each {from, text}
+     where from is "me" or the other person). Use the FULL thread for context
+     when drafting, not just the last message.
   2. For each conversation, call `produce_inbox_item` with:
        - itemType: "linkedin_message"
        - source: "linkedin"
        - externalRef: the convId  (so re-runs don't duplicate the item)
        - title: e.g. "Reply to {name}"  (their headline in parens if useful)
-       - context: { from, headline, lastMessage }
+       - context: { from, headline, lastMessage, messages }  # include the thread so I can review it
        - proposedActionText: your drafted reply  (mirrors the recommended option,
          so the learning loop can compare it to what I actually send)
        - options: a menu of buttons, in this order:

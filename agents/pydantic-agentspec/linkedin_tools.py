@@ -19,14 +19,19 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.parse import quote
 
 import httpx
 
 import tas_tools
 
 VOYAGER_BASE = "https://www.linkedin.com/voyager/api"
-# Rotating per LinkedIn release — see module docstring to re-capture.
+# Both rotate per LinkedIn release — see module docstring to re-capture (filter
+# Network by messengerConversations / messengerMessages).
 CONV_LIST_QUERY_ID = "messengerConversations.0d5e6781bbee71c3e51c8843c6519f48"
+MESSAGES_QUERY_ID = "messengerMessages.5846eeb71c981f11e0134cb6626cc314"
+# How many recent messages of each thread to pull for context.
+THREAD_DEPTH = 15
 
 
 def _session() -> dict:
@@ -104,17 +109,59 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
                 f"mailbox: {mailbox!r}."
             )
         data = resp.json()
-
-    out = _parse_conversations(data, limit, my_id)
-    if not out:
-        # 200 but parser missed the shape — dump the GraphQL payload so we can fix
-        # the paths in one pass.
-        gql = data.get("data") or {}
-        raise RuntimeError(
-            "Parsed 0 conversations. data.data keys=" + repr(list(gql.keys()))
-            + " | payload=" + json.dumps(gql)[:1800]
-        )
+        out = _parse_conversations(data, limit, my_id)
+        if not out:
+            # 200 but parser missed the shape — dump the GraphQL payload so we can
+            # fix the paths in one pass.
+            gql = data.get("data") or {}
+            raise RuntimeError(
+                "Parsed 0 conversations. data.data keys=" + repr(list(gql.keys()))
+                + " | payload=" + json.dumps(gql)[:1800]
+            )
+        # Enrich with recent thread history (best-effort: the list response only
+        # carries the latest message). A failed thread fetch leaves messages empty
+        # — the item still has lastMessage.
+        for conv in out:
+            conv["messages"] = _fetch_messages(client, conv["convId"], my_id)
     return out
+
+
+def _fetch_messages(client: httpx.Client, conv_urn: str, my_id: str) -> list[dict]:
+    """Recent messages of one thread, oldest→newest: [{from, text}]. Best-effort
+    — returns [] on any error so it can't break the conversation list."""
+    try:
+        var = f"(conversationUrn:{quote(conv_urn, safe='')})"
+        url = f"{VOYAGER_BASE}/voyagerMessagingGraphQL/graphql?queryId={MESSAGES_QUERY_ID}&variables={var}"
+        r = client.get(url)
+        if r.status_code >= 400:
+            return []
+        gql = (r.json() or {}).get("data") or {}
+    except Exception:
+        return []
+
+    elements: list = []
+    for v in gql.values():
+        if isinstance(v, dict) and isinstance(v.get("elements"), list):
+            elements = v["elements"]
+            break
+
+    rows: list[tuple] = []
+    for m in elements:
+        body = _text(m.get("body"))
+        if not body:
+            continue
+        sender = m.get("sender") or {}
+        member = (sender.get("participantType") or {}).get("member") or {}
+        ent = member.get("entityUrn") or sender.get("hostIdentityUrn") or ""
+        pid = ent.rsplit(":", 1)[-1] if isinstance(ent, str) else ""
+        who = "me" if (my_id and pid == my_id) else (_text(member.get("firstName")) or "them")
+        ts = m.get("deliveredAt") or m.get("createdAt") or 0
+        rows.append((ts if isinstance(ts, int) else 0, who, body))
+
+    # Order oldest→newest when timestamps are present; else keep server order.
+    if any(ts for ts, _, _ in rows):
+        rows.sort(key=lambda r: r[0])
+    return [{"from": who, "text": text} for _, who, text in rows[-THREAD_DEPTH:]]
 
 
 def _parse_conversations(data: dict, limit: int, my_id: str) -> list[dict]:
