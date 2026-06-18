@@ -203,7 +203,9 @@ export async function createInboxItem(
          external_ts = CASE WHEN ${fresher} THEN EXCLUDED.external_ts ELSE inbox_item.external_ts END,
          status = CASE WHEN ${fresher} THEN 'awaiting_human' ELSE inbox_item.status END,
          resolved_at = CASE WHEN ${fresher} THEN NULL ELSE inbox_item.resolved_at END,
-         final_action = CASE WHEN ${fresher} THEN NULL ELSE inbox_item.final_action END
+         final_action = CASE WHEN ${fresher} THEN NULL ELSE inbox_item.final_action END,
+         -- A genuinely-new reply un-snoozes: the thing you were waiting for arrived.
+         snoozed_until = CASE WHEN ${fresher} THEN NULL ELSE inbox_item.snoozed_until END
        RETURNING *
      )
      SELECT ${COLUMNS}

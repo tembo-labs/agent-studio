@@ -86,9 +86,19 @@ def _text(v) -> str:
 
 
 def fetch_recent_conversations(limit: int = 3) -> list[dict]:
-    """Up to `limit` recent LinkedIn conversations: {convId, name, headline,
-    lastMessage}. `convId` is the conversation entity urn the reply/archive
-    executor passes back to LinkedIn."""
+    """Up to `limit` recent LinkedIn conversations worth triaging: {convId, name,
+    headline, lastMessage, messages}. `convId` is the conversation entity urn the
+    reply/archive executor passes back to LinkedIn.
+
+    LinkedIn's list returns the default page (~20 most recent, across categories
+    incl. archived). We skip two kinds of threads so the agent spends its slots
+    on genuinely-fresh ones:
+      • Archived on LinkedIn (you already filed it away).
+      • Already in the Tasks Inbox (snoozed / in-progress / handled) UNLESS a
+        newer reply has landed since we surfaced it — that reopens it.
+    Then we take the `limit` newest survivors and enrich those with thread
+    history.
+    """
     headers = _session()
     with httpx.Client(timeout=30, headers=headers, follow_redirects=True) as client:
         my_id = _profile_id(client)
@@ -109,8 +119,8 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
                 f"mailbox: {mailbox!r}."
             )
         data = resp.json()
-        out = _parse_conversations(data, limit, my_id)
-        if not out:
+        parsed = _parse_conversations(data, my_id)  # ALL conversations on the page
+        if not parsed:
             # 200 but parser missed the shape — dump the GraphQL payload so we can
             # fix the paths in one pass.
             gql = data.get("data") or {}
@@ -118,12 +128,67 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
                 "Parsed 0 conversations. data.data keys=" + repr(list(gql.keys()))
                 + " | payload=" + json.dumps(gql)[:1800]
             )
-        # Enrich with recent thread history (best-effort: the list response only
-        # carries the latest message). A failed thread fetch leaves messages empty
-        # — the item still has lastMessage.
+
+        # Skip archived-on-LinkedIn threads.
+        candidates = [c for c in parsed if not c.get("archived")]
+
+        # Skip threads already tracked in the Tasks Inbox, unless a NEWER reply
+        # arrived since we last surfaced them (then they reopen). Best-effort: if
+        # TAS is unreachable the producer still de-dups server-side.
+        tracked = _tracked_linkedin_refs()
+
+        def worth_surfacing(c: dict) -> bool:
+            if c["convId"] not in tracked:
+                return True
+            prev = tracked[c["convId"]]
+            la = c.get("lastActivityAt")
+            # Reopen only on strictly-newer activity; legacy items (prev is None)
+            # stay suppressed since we can't prove freshness.
+            return prev is not None and isinstance(la, int) and la > prev
+
+        out = [c for c in candidates if worth_surfacing(c)][:limit]
+
+        # Enrich the survivors with recent thread history (best-effort: the list
+        # response only carries the latest message). A failed thread fetch leaves
+        # messages empty — the item still has lastMessage.
         for conv in out:
+            conv.pop("archived", None)
             conv["messages"] = _fetch_messages(client, conv["convId"], my_id)
     return out
+
+
+def _tracked_linkedin_refs() -> dict:
+    """`{convId: externalTs|None}` for LinkedIn items already in the Tasks Inbox
+    (any status). Lets us skip threads we've already surfaced unless a newer reply
+    arrives. Best-effort — returns {} if TAS is unreachable (the producer still
+    de-dups server-side, so this is an optimization, not the correctness gate).
+
+    Reaches TAS over its own REST API using the `tembo-agent-studio` Native-MCP
+    connection's token (the mcp_url's origin also serves /api/v1)."""
+    try:
+        conn = tas_tools.connection("tembo-agent-studio")
+    except Exception:
+        return {}
+    origin = conn.mcp_url.rsplit("/mcp", 1)[0].rstrip("/")
+    try:
+        r = httpx.get(
+            f"{origin}/api/v1/inbox",
+            params={"source": "linkedin", "limit": 200},
+            headers={"Authorization": f"Bearer {conn.access_token}"},
+            timeout=20,
+        )
+        if r.status_code >= 400:
+            return {}
+        items = (r.json() or {}).get("inbox_items") or []
+    except Exception:
+        return {}
+    refs: dict = {}
+    for it in items:
+        ref = it.get("externalRef")
+        if isinstance(ref, str) and ref:
+            ts = it.get("externalTs")
+            refs[ref] = ts if isinstance(ts, int) else None
+    return refs
 
 
 def _fetch_messages(client: httpx.Client, conv_urn: str, my_id: str) -> list[dict]:
@@ -164,9 +229,11 @@ def _fetch_messages(client: httpx.Client, conv_urn: str, my_id: str) -> list[dic
     return [{"from": who, "text": text} for _, who, text in rows[-THREAD_DEPTH:]]
 
 
-def _parse_conversations(data: dict, limit: int, my_id: str) -> list[dict]:
-    """Parse the messenger GraphQL response. Conversations are inline at
-    data.data.<rootField>.elements (pure GraphQL — no `included`)."""
+def _parse_conversations(data: dict, my_id: str) -> list[dict]:
+    """Parse ALL conversations in the messenger GraphQL response (caller filters
+    + slices). Conversations are inline at data.data.<rootField>.elements (pure
+    GraphQL — no `included`). Each carries an `archived` flag derived from its
+    LinkedIn categories so the caller can drop filed-away threads."""
     gql = data.get("data") or {}
     elements: list = []
     for v in gql.values():
@@ -186,6 +253,13 @@ def _parse_conversations(data: dict, limit: int, my_id: str) -> list[dict]:
         urn = c.get("entityUrn") or c.get("conversationUrn") or ""
         if not urn:
             continue
+        # Archived? Voyager tags conversations with category enums; an archived
+        # thread carries "ARCHIVE". Check the list field + a couple of fallbacks
+        # so we drop filed-away threads regardless of the exact shape.
+        cats = c.get("categories") or c.get("category") or []
+        if isinstance(cats, str):
+            cats = [cats]
+        archived = any("ARCHIVE" in str(x).upper() for x in cats) or bool(c.get("archived"))
         # Pick the OTHER participant (skip me). Participants are inline here.
         name, headline, fallback = "", "", ""
         for p in c.get("conversationParticipants") or []:
@@ -216,9 +290,10 @@ def _parse_conversations(data: dict, limit: int, my_id: str) -> list[dict]:
                 "lastMessage": last,
                 # Epoch-ms freshness marker → externalTs (reopen on new activity).
                 "lastActivityAt": c.get("lastActivityAt"),
+                "archived": archived,
             }
         )
-    return out[:limit]
+    return out
 
 
 tools = [fetch_recent_conversations]

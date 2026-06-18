@@ -270,6 +270,11 @@ export type SerializedInboxItem = {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  /** Source freshness marker (e.g. LinkedIn lastActivityAt, epoch ms). Lets a
+   *  producer dedup: skip a thread it already surfaced unless it's newer. */
+  externalTs: number | null;
+  /** When set + future, the item is snoozed (hidden from the active inbox). */
+  snoozedUntil: string | null;
 };
 
 /** One inbox item — the GET /inbox and GET /inbox/[id] body. The learning
@@ -293,5 +298,7 @@ export function serializeInboxItem(i: InboxItem): SerializedInboxItem {
     createdAt: i.createdAt.toISOString(),
     updatedAt: i.updatedAt.toISOString(),
     resolvedAt: i.resolvedAt ? i.resolvedAt.toISOString() : null,
+    externalTs: i.externalTs,
+    snoozedUntil: i.snoozedUntil ? i.snoozedUntil.toISOString() : null,
   };
 }
