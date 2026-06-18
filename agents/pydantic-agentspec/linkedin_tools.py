@@ -13,6 +13,14 @@ queryId from the request URL.
 Auth: cookie (li_at + JSESSIONID) + csrf-token header == JSESSIONID value; the
 User-Agent must be the DESKTOP browser the cookie came from (a mobile UA gets
 403'd by the desktop API).
+
+Pagination: we page back to older conversations with a `lastUpdatedBefore`
+(epoch-ms) cursor variable. That variable name is the common Voyager shape but
+unverified for this queryId — the walk is best-effort and degrades to a single
+page if it's rejected/ignored. If the agent never sees threads past the first
+~20, re-capture it: linkedin.com/messaging → scroll to load OLDER conversations
+→ DevTools Network → the follow-up messengerConversations request shows the real
+cursor variable; update _fetch_conversation_page.
 """
 
 from __future__ import annotations
@@ -33,6 +41,10 @@ CONV_LIST_QUERY_ID = "messengerConversations.0d5e6781bbee71c3e51c8843c6519f48"
 MESSAGES_QUERY_ID = "messengerMessages.5846eeb71c981f11e0134cb6626cc314"
 # How many recent messages of each thread to pull for context.
 THREAD_DEPTH = 15
+# Pagination safety cap: how many pages of the conversation list to walk back
+# while looking for fresh threads (each page ≈ 20 conversations). Bounds the work
+# when most of the recent backlog is already archived/handled.
+MAX_PAGES = 6
 
 
 def _session() -> dict:
@@ -96,71 +108,60 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
     schedule (e.g. every 6h): it keeps your LinkedIn queue at no more than `limit`
     open items so you chip away at the backlog without it taking over the inbox.
 
-    LinkedIn's list returns the default page (~20 most recent, across categories
-    incl. archived). We:
+    LinkedIn returns ~20 conversations per page (across categories incl.
+    archived). We:
       • drop threads archived on LinkedIn (you already filed them away);
       • drop threads already OPEN in the inbox (they still count toward the cap,
         but we don't re-stage them);
       • drop threads already handled/snoozed UNLESS a newer reply landed (that
         reopens them);
-      • then surface only enough of the newest survivors to reach `limit` active
-        items — returning [] when the inbox is already full.
+      • walk back page by page (up to MAX_PAGES) until we've found enough fresh
+        survivors to reach `limit` active items — so an inbox full of archived/
+        handled threads doesn't starve the queue. Returns [] when already full.
     """
     headers = _session()
     with httpx.Client(timeout=30, headers=headers, follow_redirects=True) as client:
         my_id = _profile_id(client)
         mailbox = f"urn:li:fsd_profile:{my_id}"
-        # RestLi variables format, matching the browser EXACTLY: literal parens,
-        # literal `mailboxUrn:` separator colon, but the URN's OWN colons percent-
-        # encoded → (mailboxUrn:urn%3Ali%3Afsd_profile%3AID). Encoding the
-        # separator colon too is a 400. Build the query by hand so httpx keeps it.
-        mailbox_enc = mailbox.replace(":", "%3A")
-        variables = f"(mailboxUrn:{mailbox_enc})"
-        url = f"{VOYAGER_BASE}/voyagerMessagingGraphQL/graphql?queryId={CONV_LIST_QUERY_ID}&variables={variables}"
-        resp = client.get(url)
-        if resp.status_code >= 400:
-            raise RuntimeError(
-                f"LinkedIn {resp.status_code} on messengerConversations. "
-                f"Body: {resp.text[:300]!r}. "
-                f"Sent URL: {str(resp.request.url)!r}. "  # reveals any double-encoding
-                f"mailbox: {mailbox!r}."
-            )
-        data = resp.json()
-        parsed = _parse_conversations(data, my_id)  # ALL conversations on the page
-        if not parsed:
-            # 200 but parser missed the shape — dump the GraphQL payload so we can
-            # fix the paths in one pass.
-            gql = data.get("data") or {}
-            raise RuntimeError(
-                "Parsed 0 conversations. data.data keys=" + repr(list(gql.keys()))
-                + " | payload=" + json.dumps(gql)[:1800]
-            )
-
-        # Skip archived-on-LinkedIn threads.
-        candidates = [c for c in parsed if not c.get("archived")]
 
         # Inbox state: which LinkedIn threads are already tracked (+ how fresh),
         # and which are currently OPEN (occupying a cap slot). Best-effort — if
         # TAS is unreachable we fall back to staging up to `limit` (the producer
         # still de-dups server-side).
         tracked, active_refs = _inbox_state()
-
-        def worth_surfacing(c: dict) -> bool:
-            cid = c["convId"]
-            if cid in active_refs:
-                return False  # already open in the inbox — counts toward the cap
-            if cid not in tracked:
-                return True  # brand-new thread
-            prev = tracked[cid]
-            la = c.get("lastActivityAt")
-            # Tracked but handled/snoozed: reopen ONLY on strictly-newer activity.
-            # Legacy items (prev is None) stay suppressed — can't prove freshness.
-            return prev is not None and isinstance(la, int) and la > prev
-
-        # Top up to the cap: only stage enough to bring active items to `limit`.
         budget = max(0, limit - len(active_refs))
-        out = [c for c in candidates if worth_surfacing(c)][:budget]
+        if budget == 0:
+            return []  # inbox already full — don't even hit LinkedIn
 
+        # Walk back through pages, oldest-cursor style, collecting fresh threads
+        # until we reach the budget or run out of conversations.
+        out: list[dict] = []
+        seen: set = set()
+        before: int | None = None  # cursor = lastUpdatedBefore (epoch ms)
+        for _ in range(MAX_PAGES):
+            page = _fetch_conversation_page(client, mailbox, my_id, before)
+            fresh_page = [c for c in page if c["convId"] not in seen]
+            if not fresh_page:
+                break  # empty page, or cursor made no progress (end of list)
+            for c in fresh_page:
+                seen.add(c["convId"])
+            for c in fresh_page:
+                if not c.get("archived") and _worth_surfacing(c, tracked, active_refs):
+                    out.append(c)
+                    if len(out) >= budget:
+                        break
+            if len(out) >= budget:
+                break
+            # Advance the cursor to the oldest activity on this page.
+            stamps = [c["lastActivityAt"] for c in fresh_page if isinstance(c.get("lastActivityAt"), int)]
+            if not stamps:
+                break  # no timestamps to page on
+            nxt = min(stamps)
+            if before is not None and nxt >= before:
+                break  # cursor not advancing — avoid an infinite loop
+            before = nxt
+
+        out = out[:budget]
         # Enrich the survivors with recent thread history (best-effort: the list
         # response only carries the latest message). A failed thread fetch leaves
         # messages empty — the item still has lastMessage.
@@ -168,6 +169,64 @@ def fetch_recent_conversations(limit: int = 3) -> list[dict]:
             conv.pop("archived", None)
             conv["messages"] = _fetch_messages(client, conv["convId"], my_id)
     return out
+
+
+def _worth_surfacing(c: dict, tracked: dict, active_refs: set) -> bool:
+    """Should this conversation be staged into the inbox?"""
+    cid = c["convId"]
+    if cid in active_refs:
+        return False  # already open in the inbox — counts toward the cap
+    if cid not in tracked:
+        return True  # brand-new thread
+    prev = tracked[cid]
+    la = c.get("lastActivityAt")
+    # Tracked but handled/snoozed: reopen ONLY on strictly-newer activity.
+    # Legacy items (prev is None) stay suppressed — can't prove freshness.
+    return prev is not None and isinstance(la, int) and la > prev
+
+
+def _fetch_conversation_page(
+    client: httpx.Client, mailbox: str, my_id: str, before: int | None
+) -> list[dict]:
+    """One page of the conversation list, parsed. `before` (epoch ms) pages back
+    to OLDER conversations via the `lastUpdatedBefore` cursor; None is the first
+    (newest) page.
+
+    The first page must succeed (raises with diagnostics on failure / empty).
+    Later pages are best-effort: a paginated request that errors or returns
+    nothing just stops the walk (returns []) rather than failing the run — so if
+    this queryId doesn't accept the cursor, we degrade to a single page."""
+    # RestLi variables format, matching the browser EXACTLY: literal parens,
+    # literal separator colons, but each URN's OWN colons percent-encoded →
+    # (mailboxUrn:urn%3Ali%3Afsd_profile%3AID). Encoding a separator colon is a
+    # 400. Build the query by hand so httpx keeps it verbatim.
+    mailbox_enc = mailbox.replace(":", "%3A")
+    variables = f"(mailboxUrn:{mailbox_enc}"
+    if before is not None:
+        variables += f",lastUpdatedBefore:{before}"
+    variables += ")"
+    url = f"{VOYAGER_BASE}/voyagerMessagingGraphQL/graphql?queryId={CONV_LIST_QUERY_ID}&variables={variables}"
+    resp = client.get(url)
+    if resp.status_code >= 400:
+        if before is None:
+            raise RuntimeError(
+                f"LinkedIn {resp.status_code} on messengerConversations. "
+                f"Body: {resp.text[:300]!r}. "
+                f"Sent URL: {str(resp.request.url)!r}. "  # reveals any double-encoding
+                f"mailbox: {mailbox!r}."
+            )
+        return []  # pagination unsupported / older page failed — stop gracefully
+    data = resp.json()
+    parsed = _parse_conversations(data, my_id)
+    if not parsed and before is None:
+        # 200 but parser missed the shape — dump the GraphQL payload so we can
+        # fix the paths in one pass.
+        gql = data.get("data") or {}
+        raise RuntimeError(
+            "Parsed 0 conversations. data.data keys=" + repr(list(gql.keys()))
+            + " | payload=" + json.dumps(gql)[:1800]
+        )
+    return parsed
 
 
 def _inbox_state() -> tuple[dict, set]:
