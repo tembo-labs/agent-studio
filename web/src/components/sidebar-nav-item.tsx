@@ -12,9 +12,17 @@ type Props = {
   icon: ReactNode;
   /** When true, item is active for any sub-path of href (used for /{slug} home). */
   matchPrefix?: boolean;
+  /** Optional count pill on the right (e.g. unresolved Inbox items). Hidden when 0/undefined. */
+  count?: number;
 };
 
-export function SidebarNavItem({ href, label, icon, matchPrefix }: Props) {
+export function SidebarNavItem({
+  href,
+  label,
+  icon,
+  matchPrefix,
+  count,
+}: Props) {
   const pathname = usePathname();
   const active = matchPrefix
     ? pathname === href || pathname.startsWith(`${href}/agents`)
@@ -35,6 +43,11 @@ export function SidebarNavItem({ href, label, icon, matchPrefix }: Props) {
         {icon}
       </span>
       <span>{label}</span>
+      {count !== undefined && count > 0 && (
+        <span className="bg-category-neutral text-foreground-strong ml-auto min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums">
+          {count}
+        </span>
+      )}
     </Link>
   );
 }

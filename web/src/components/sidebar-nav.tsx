@@ -16,6 +16,7 @@ import {
   IconDashboardMiddle,
   IconHammer,
   IconHistory,
+  IconInboxChecked,
   IconSettingsSliderHor,
   IconShield,
   IconSlack,
@@ -36,7 +37,13 @@ type NavLink = {
 
 type NavGroup = { id: string; label: string; items: NavLink[] };
 
-export function SidebarNav({ home }: { home: string }) {
+export function SidebarNav({
+  home,
+  inboxCount,
+}: {
+  home: string;
+  inboxCount?: number;
+}) {
   const groups: NavGroup[] = [
     {
       id: "build",
@@ -101,6 +108,12 @@ export function SidebarNav({ home }: { home: string }) {
 
   return (
     <div className="flex flex-col gap-0.5">
+      <SidebarNavItem
+        href={`${home}/inbox`}
+        label="Inbox"
+        icon={<IconInboxChecked />}
+        count={inboxCount}
+      />
       <SidebarNavItem
         href={`${home}/dashboard`}
         label="Dashboard"

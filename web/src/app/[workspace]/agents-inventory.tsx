@@ -7,6 +7,7 @@ import { IconApiConnection, IconPlusLarge } from "central-icons";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { mcpLogoUrl } from "@/lib/mcp-logo";
@@ -88,7 +89,7 @@ type SortKey =
   | "success"
   | "last-run";
 
-type SortDir = "asc" | "desc";
+type EnrichedRow = { agent: InventoryAgent; bucket: StatusBucket };
 
 type Props = {
   agents: InventoryAgent[];
@@ -236,6 +237,200 @@ export function AgentsInventory({
     }
   }
 
+  function onSort(key: string) {
+    onHeaderClick(key as SortKey);
+  }
+
+  const columns: Column<EnrichedRow>[] = [
+    {
+      key: "name",
+      header: "Name",
+      sortable: true,
+      cell: ({ agent }) => {
+        if (agent.kind === "invalid") {
+          return (
+            <span className="text-foreground font-mono text-sm">
+              {agent.filename}
+            </span>
+          );
+        }
+        if (agent.kind === "pending-create") {
+          return (
+            <span className="text-foreground text-sm font-medium">
+              {agent.name}
+            </span>
+          );
+        }
+        return (
+          <>
+            <Link
+              href={agent.detailHref}
+              className="text-foreground font-medium hover:underline"
+            >
+              {agent.displayName}
+            </Link>
+            {agent.displayName !== agent.name && (
+              <div className="text-foreground-muted font-mono text-xs">
+                {agent.filename}
+              </div>
+            )}
+          </>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      thClassName: "w-[120px]",
+      cell: ({ bucket }) => <StatusCell bucket={bucket} />,
+    },
+    {
+      key: "labels",
+      header: "Labels",
+      cell: ({ agent }) => {
+        if (agent.kind === "invalid") {
+          return (
+            <span className="text-sentiment-negative text-sm">
+              {agent.error}
+              {agent.detail ? ` — ${agent.detail}` : ""}
+            </span>
+          );
+        }
+        if (agent.kind === "pending-create") {
+          return <span className="text-foreground-muted">—</span>;
+        }
+        return agent.labels.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {agent.labels.map((l) => (
+              <Badge key={l} variant="gray" size="small">
+                {l}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <span className="text-foreground-muted">—</span>
+        );
+      },
+    },
+    {
+      key: "model",
+      header: "Model",
+      cell: ({ agent }) => {
+        if (agent.kind !== "live") {
+          return <span className="text-foreground-muted">—</span>;
+        }
+        return (
+          <span className="text-foreground-weak font-mono text-sm">
+            {shortModel(agent.model)}
+          </span>
+        );
+      },
+    },
+    {
+      key: "mcps",
+      header: "MCPs",
+      cell: ({ agent }) => {
+        if (agent.kind !== "live") {
+          return <span className="text-foreground-muted">—</span>;
+        }
+        return <McpCell mcps={agent.mcps} subMcps={agent.subMcps} />;
+      },
+    },
+    {
+      key: "runs",
+      header: "Runs 30d",
+      sortable: true,
+      align: "right",
+      cell: ({ agent }) => {
+        if (agent.kind !== "live") {
+          return <span className="text-foreground-muted">—</span>;
+        }
+        return (
+          <span className="text-foreground font-mono text-sm">
+            {agent.runs30d.toLocaleString("en-US")}
+          </span>
+        );
+      },
+    },
+    {
+      key: "success",
+      header: "Success",
+      sortable: true,
+      align: "right",
+      cell: ({ agent }) => {
+        if (agent.kind !== "live") {
+          return <span className="text-foreground-muted">—</span>;
+        }
+        const successRate =
+          agent.runs30d > 0 ? agent.succeeded30d / agent.runs30d : null;
+        return successRate === null ? (
+          <span className="text-foreground-muted">—</span>
+        ) : (
+          <SuccessCell rate={successRate} failed={agent.failed30d} />
+        );
+      },
+    },
+    {
+      key: "last-run",
+      header: "Last run",
+      sortable: true,
+      align: "right",
+      cell: ({ agent, bucket: rowBucket }) => {
+        if (agent.kind === "invalid") {
+          return <span className="text-foreground-muted">—</span>;
+        }
+        if (agent.kind === "pending-create") {
+          return (
+            <span className="inline-flex flex-wrap items-center justify-end gap-3">
+              <PendingLinks agent={agent} />
+              {canEdit && (
+                <DismissPendingButton
+                  workspaceSlug={workspaceSlug}
+                  improvementId={agent.key}
+                  agentName={agent.name}
+                />
+              )}
+            </span>
+          );
+        }
+        // live
+        void rowBucket;
+        return agent.lastRun ? (
+          <span
+            className="text-foreground-weak text-sm"
+            title={new Date(agent.lastRun.createdAtIso).toLocaleString()}
+            suppressHydrationWarning
+          >
+            {formatRelativeAgo(agent.lastRun.createdAtIso)}
+          </span>
+        ) : (
+          <span className="text-foreground-muted">Never</span>
+        );
+      },
+    },
+  ];
+
+  const emptyState = (
+    <div className="text-foreground-weak flex flex-col items-center gap-2 rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm">
+      {agents.length === 0 ? (
+        <>
+          <p>No agents yet.</p>
+          {canCreate && (
+            <Link
+              href={newAgentHref}
+              className="text-foreground font-medium hover:underline"
+            >
+              Create your first one →
+            </Link>
+          )}
+        </>
+      ) : (
+        "No agents match these filters."
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -288,82 +483,23 @@ export function AgentsInventory({
         )}
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="text-foreground-weak flex flex-col items-center gap-2 rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm">
-          {agents.length === 0 ? (
-            <>
-              <p>No agents yet.</p>
-              {canCreate && (
-                <Link
-                  href={newAgentHref}
-                  className="text-foreground font-medium hover:underline"
-                >
-                  Create your first one →
-                </Link>
-              )}
-            </>
-          ) : (
-            "No agents match these filters."
-          )}
-        </div>
-      ) : (
-        <div className="border-border overflow-hidden rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
-              <tr>
-                <SortableTh
-                  label="Name"
-                  active={sortKey === "name"}
-                  dir={sortDir}
-                  onClick={() => onHeaderClick("name")}
-                />
-                <SortableTh
-                  label="Status"
-                  active={sortKey === "status"}
-                  dir={sortDir}
-                  onClick={() => onHeaderClick("status")}
-                  className="w-[120px]"
-                />
-                <th className="px-3 py-2 text-left font-medium">Labels</th>
-                <th className="px-3 py-2 text-left font-medium">Model</th>
-                <th className="px-3 py-2 text-left font-medium">MCPs</th>
-                <SortableTh
-                  label="Runs 30d"
-                  active={sortKey === "runs"}
-                  dir={sortDir}
-                  onClick={() => onHeaderClick("runs")}
-                  className="text-right"
-                />
-                <SortableTh
-                  label="Success"
-                  active={sortKey === "success"}
-                  dir={sortDir}
-                  onClick={() => onHeaderClick("success")}
-                  className="text-right"
-                />
-                <SortableTh
-                  label="Last run"
-                  active={sortKey === "last-run"}
-                  dir={sortDir}
-                  onClick={() => onHeaderClick("last-run")}
-                  className="text-right"
-                />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-weak)]">
-              {filtered.map(({ agent, bucket }) => (
-                <InventoryRow
-                  key={rowKey(agent)}
-                  agent={agent}
-                  bucket={bucket}
-                  workspaceSlug={workspaceSlug}
-                  canEdit={canEdit}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        getRowKey={({ agent }) => rowKey(agent)}
+        rowHref={({ agent }) =>
+          agent.kind === "live" ? agent.detailHref : null
+        }
+        rowClassName={({ bucket: rowBucket }) =>
+          rowBucket === "invalid"
+            ? "bg-[var(--color-input-error)]/30 hover:bg-[var(--color-input-error)]/50"
+            : ""
+        }
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={onSort}
+        empty={emptyState}
+      />
     </div>
   );
 }
@@ -417,39 +553,6 @@ function FacetPills({
         );
       })}
     </div>
-  );
-}
-
-function SortableTh({
-  label,
-  active,
-  dir,
-  onClick,
-  className,
-}: {
-  label: string;
-  active: boolean;
-  dir: SortDir;
-  onClick: () => void;
-  className?: string;
-}) {
-  return (
-    <th className={`px-3 py-2 text-left font-medium ${className ?? ""}`}>
-      <button
-        type="button"
-        onClick={onClick}
-        className={`inline-flex items-center gap-1 uppercase tracking-wide ${
-          active
-            ? "text-foreground"
-            : "text-foreground-weak hover:text-foreground"
-        }`}
-      >
-        {label}
-        <span className="text-sm" aria-hidden>
-          {active ? (dir === "asc" ? "↑" : "↓") : "↕"}
-        </span>
-      </button>
-    </th>
   );
 }
 
@@ -507,145 +610,6 @@ function McpLogo({ icon, dimmed = false }: { icon: McpIcon; dimmed?: boolean }) 
   );
 }
 
-function InventoryRow({
-  agent,
-  bucket,
-  workspaceSlug,
-  canEdit,
-}: {
-  agent: InventoryAgent;
-  bucket: StatusBucket;
-  workspaceSlug: string;
-  canEdit: boolean;
-}) {
-  if (agent.kind === "invalid") {
-    return (
-      <tr className="bg-[var(--color-input-error)]/30">
-        <td className="px-3 py-2 align-middle">
-          <span className="text-foreground font-mono text-sm">
-            {agent.filename}
-          </span>
-        </td>
-        <td className="px-3 py-2 align-middle">
-          <StatusCell bucket="invalid" />
-        </td>
-        <td
-          className="text-sentiment-negative px-3 py-2 align-middle text-sm"
-          colSpan={6}
-        >
-          {agent.error}
-          {agent.detail ? ` — ${agent.detail}` : ""}
-        </td>
-      </tr>
-    );
-  }
-  if (agent.kind === "pending-create") {
-    return (
-      <tr>
-        <td className="px-3 py-2 align-middle">
-          <span className="text-foreground text-sm font-medium">
-            {agent.name}
-          </span>
-        </td>
-        <td className="px-3 py-2 align-middle">
-          <StatusCell bucket="pending" />
-        </td>
-        <td className="text-foreground-muted px-3 py-2 align-middle text-sm">
-          —
-        </td>
-        <td className="text-foreground-muted px-3 py-2 align-middle text-sm">
-          —
-        </td>
-        <td className="text-foreground-muted px-3 py-2 align-middle text-sm">
-          —
-        </td>
-        <td className="text-foreground-muted px-3 py-2 text-right align-middle text-sm">
-          —
-        </td>
-        <td className="text-foreground-muted px-3 py-2 text-right align-middle text-sm">
-          —
-        </td>
-        <td className="text-foreground-weak px-3 py-2 text-right align-middle text-sm">
-          <span className="inline-flex flex-wrap items-center justify-end gap-3">
-            <PendingLinks agent={agent} />
-            {canEdit && (
-              <DismissPendingButton
-                workspaceSlug={workspaceSlug}
-                improvementId={agent.key}
-                agentName={agent.name}
-              />
-            )}
-          </span>
-        </td>
-      </tr>
-    );
-  }
-
-  const successRate =
-    agent.runs30d > 0 ? agent.succeeded30d / agent.runs30d : null;
-  return (
-    <tr className="hover:bg-surface-secondary transition-colors">
-      <td className="px-3 py-2 align-middle">
-        <Link
-          href={agent.detailHref}
-          className="text-foreground font-medium hover:underline"
-        >
-          {agent.displayName}
-        </Link>
-        {agent.displayName !== agent.name && (
-          <div className="text-foreground-muted font-mono text-xs">
-            {agent.filename}
-          </div>
-        )}
-      </td>
-      <td className="px-3 py-2 align-middle">
-        <StatusCell bucket={bucket} />
-      </td>
-      <td className="px-3 py-2 align-middle">
-        {agent.labels.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {agent.labels.map((l) => (
-              <Badge key={l} variant="gray" size="small">
-                {l}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-          <span className="text-foreground-muted">—</span>
-        )}
-      </td>
-      <td className="text-foreground-weak px-3 py-2 align-middle font-mono text-sm">
-        {shortModel(agent.model)}
-      </td>
-      <td className="px-3 py-2 align-middle">
-        <McpCell mcps={agent.mcps} subMcps={agent.subMcps} />
-      </td>
-      <td className="text-foreground px-3 py-2 text-right align-middle font-mono text-sm">
-        {agent.runs30d.toLocaleString("en-US")}
-      </td>
-      <td className="px-3 py-2 text-right align-middle font-mono text-sm">
-        {successRate === null ? (
-          <span className="text-foreground-muted">—</span>
-        ) : (
-          <SuccessCell rate={successRate} failed={agent.failed30d} />
-        )}
-      </td>
-      <td className="text-foreground-weak px-3 py-2 text-right align-middle text-sm">
-        {agent.lastRun ? (
-          <span
-            title={new Date(agent.lastRun.createdAtIso).toLocaleString()}
-            suppressHydrationWarning
-          >
-            {formatRelativeAgo(agent.lastRun.createdAtIso)}
-          </span>
-        ) : (
-          <span className="text-foreground-muted">Never</span>
-        )}
-      </td>
-    </tr>
-  );
-}
-
 function SuccessCell({ rate, failed }: { rate: number; failed: number }) {
   const pct = Math.round(rate * 100);
   const tone =
@@ -656,7 +620,7 @@ function SuccessCell({ rate, failed }: { rate: number; failed: number }) {
         : rate >= 0.8
           ? "text-foreground-weak"
           : "text-sentiment-negative";
-  return <span className={tone}>{pct}%</span>;
+  return <span className={`font-mono text-sm ${tone}`}>{pct}%</span>;
 }
 
 function StatusCell({ bucket }: { bucket: StatusBucket }) {

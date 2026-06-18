@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Select } from "@/components/ui/select";
 import { type Automation } from "@/lib/automations-api";
 import { nextFireAfter, validateCron } from "@/lib/cron";
@@ -60,6 +61,123 @@ export function SchedulesList({
     return true;
   });
 
+  const columns: Column<Automation>[] = [
+    {
+      key: "name",
+      header: "Name",
+      cell: (a) => {
+        const editHref = `/${workspaceSlug}/automations/${a.id}`;
+        return (
+          <Link href={editHref} className="text-foreground font-medium hover:underline">
+            {a.name}
+          </Link>
+        );
+      },
+    },
+    {
+      key: "agent",
+      header: "Agent",
+      cell: (a) => {
+        const agentHref = `/${workspaceSlug}/agents/${encodeURIComponent(a.agentName)}`;
+        return (
+          <Link href={agentHref} className="text-foreground hover:underline">
+            {a.agentName}
+          </Link>
+        );
+      },
+    },
+    {
+      key: "schedule",
+      header: "Schedule",
+      cell: (a) => {
+        const preview = validateCron(a.cron);
+        return (
+          <div className="flex flex-col gap-0.5">
+            <code className="text-foreground text-sm">{a.cron}</code>
+            {preview.ok && (
+              <span className="text-foreground-weak text-sm">
+                {preview.humanReadable}{" "}
+                <span className="text-foreground-muted">(UTC)</span>
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "nextFire",
+      header: "Next fire",
+      tdClassName: "text-foreground-weak text-sm",
+      cell: (a) => {
+        const nextFire = a.enabled ? nextFireAfter(a.cron, new Date()) : null;
+        return nextFire ? (
+          <LocalTime iso={nextFire.toISOString()} style="relative" />
+        ) : (
+          <span className="text-foreground-muted">—</span>
+        );
+      },
+    },
+    {
+      key: "lastFire",
+      header: "Last fire",
+      tdClassName: "text-foreground-weak text-sm",
+      cell: (a) =>
+        a.lastFiredAt ? (
+          <LocalTime iso={new Date(a.lastFiredAt).toISOString()} style="relative" />
+        ) : (
+          <span className="text-foreground-muted">Never</span>
+        ),
+    },
+    {
+      key: "runAs",
+      header: "Run as",
+      tdClassName: "text-foreground-weak text-sm",
+      cell: (a) => ownerOf(a),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (a) => (
+        <>
+          <StatusBadge automation={a} />
+          {a.lastFireError && (
+            <p className="text-sentiment-negative mt-1 max-w-[220px] text-sm leading-4">
+              {a.lastFireError}
+            </p>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (a) => {
+        const editHref = `/${workspaceSlug}/automations/${a.id}`;
+        return (
+          <div className="flex justify-end gap-2">
+            <ToggleEnabledForm
+              workspaceSlug={workspaceSlug}
+              id={a.id}
+              enabled={a.enabled}
+            />
+            <Link
+              href={editHref}
+              className="text-foreground-weak hover:text-foreground text-sm"
+            >
+              Edit
+            </Link>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const emptyMessage =
+    automations.length === 0
+      ? "No schedules yet. Click New schedule to run an agent on a cron."
+      : "No schedules match these filters.";
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -94,128 +212,21 @@ export function SchedulesList({
         </span>
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
-          {automations.length === 0
-            ? "No schedules yet. Click New schedule to run an agent on a cron."
-            : "No schedules match these filters."}
-        </p>
-      ) : (
-        <div className="border-border overflow-hidden rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">Name</th>
-                <th className="px-3 py-2 text-left font-medium">Agent</th>
-                <th className="px-3 py-2 text-left font-medium">Schedule</th>
-                <th className="px-3 py-2 text-left font-medium">Next fire</th>
-                <th className="px-3 py-2 text-left font-medium">Last fire</th>
-                <th className="px-3 py-2 text-left font-medium">Run as</th>
-                <th className="px-3 py-2 text-left font-medium">Status</th>
-                <th className="px-3 py-2 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-weak)]">
-              {filtered.map((a) => (
-                <ScheduleRow
-                  key={a.id}
-                  automation={a}
-                  workspaceSlug={workspaceSlug}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        getRowKey={(a) => a.id}
+        rowHref={(a) => `/${workspaceSlug}/agents/${encodeURIComponent(a.agentName)}`}
+        empty={
+          <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
+            {emptyMessage}
+          </p>
+        }
+      />
     </div>
   );
 }
 
-function ScheduleRow({
-  automation,
-  workspaceSlug,
-}: {
-  automation: Automation;
-  workspaceSlug: string;
-}) {
-  const preview = validateCron(automation.cron);
-  const nextFire = automation.enabled
-    ? nextFireAfter(automation.cron, new Date())
-    : null;
-  const agentHref = `/${workspaceSlug}/agents/${encodeURIComponent(automation.agentName)}`;
-  const editHref = `/${workspaceSlug}/automations/${automation.id}`;
-  return (
-    <tr className="bg-surface-raised">
-      <td className="px-3 py-2 align-top">
-        <Link
-          href={editHref}
-          className="text-foreground font-medium hover:underline"
-        >
-          {automation.name}
-        </Link>
-      </td>
-      <td className="px-3 py-2 align-top">
-        <Link href={agentHref} className="text-foreground hover:underline">
-          {automation.agentName}
-        </Link>
-      </td>
-      <td className="px-3 py-2 align-top">
-        <div className="flex flex-col gap-0.5">
-          <code className="text-foreground text-sm">{automation.cron}</code>
-          {preview.ok && (
-            <span className="text-foreground-weak text-sm">
-              {preview.humanReadable}{" "}
-              <span className="text-foreground-muted">(UTC)</span>
-            </span>
-          )}
-        </div>
-      </td>
-      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
-        {nextFire ? (
-          <LocalTime iso={nextFire.toISOString()} style="relative" />
-        ) : (
-          <span className="text-foreground-muted">—</span>
-        )}
-      </td>
-      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
-        {automation.lastFiredAt ? (
-          <LocalTime
-            iso={new Date(automation.lastFiredAt).toISOString()}
-            style="relative"
-          />
-        ) : (
-          <span className="text-foreground-muted">Never</span>
-        )}
-      </td>
-      <td className="text-foreground-weak px-3 py-2 align-top text-sm">
-        {ownerOf(automation)}
-      </td>
-      <td className="px-3 py-2 align-top">
-        <StatusBadge automation={automation} />
-        {automation.lastFireError && (
-          <p className="text-sentiment-negative mt-1 max-w-[220px] text-sm leading-4">
-            {automation.lastFireError}
-          </p>
-        )}
-      </td>
-      <td className="px-3 py-2 text-right align-top">
-        <div className="flex justify-end gap-2">
-          <ToggleEnabledForm
-            workspaceSlug={workspaceSlug}
-            id={automation.id}
-            enabled={automation.enabled}
-          />
-          <Link
-            href={editHref}
-            className="text-foreground-weak hover:text-foreground text-sm"
-          >
-            Edit
-          </Link>
-        </div>
-      </td>
-    </tr>
-  );
-}
 
 function StatusBadge({ automation }: { automation: Automation }) {
   if (!automation.enabled) {

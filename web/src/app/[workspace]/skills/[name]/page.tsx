@@ -41,20 +41,20 @@ export default async function SkillDetailPage({
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-2">
-        <BackLink href={`/${workspace.slug}/skills`} label="Skills" />
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
-              <code>{skill.name}</code>
-            </h1>
-            {skill.description && (
-              <p className="text-foreground-weak text-base">
-                {skill.description}
-              </p>
-            )}
-          </div>
+        <div className="flex items-center justify-between gap-3">
+          <BackLink href={`/${workspace.slug}/skills`} label="Skills" />
           {isAdmin && (
             <RemoveSkillForm workspaceSlug={workspace.slug} name={skill.name} />
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
+            <code>{skill.name}</code>
+          </h1>
+          {skill.description && (
+            <p className="text-foreground-weak text-base">
+              {skill.description}
+            </p>
           )}
         </div>
       </div>
@@ -93,7 +93,7 @@ export default async function SkillDetailPage({
         <span className="text-foreground text-sm font-medium">SKILL.md</span>
         <div className="border-border bg-surface-raised rounded-lg border px-4 py-3">
           {skill.skillMd ? (
-            <Markdown>{skill.skillMd}</Markdown>
+            <Markdown>{stripFrontmatter(skill.skillMd)}</Markdown>
           ) : (
             <p className="text-foreground-muted text-sm">
               Couldn&apos;t read SKILL.md for this skill.
@@ -103,6 +103,14 @@ export default async function SkillDetailPage({
       </div>
     </div>
   );
+}
+
+// Strip a leading YAML frontmatter block (--- … ---) so it doesn't render as a
+// bold blob in the markdown body — the name/description it carries are already
+// shown parsed at the top of the page.
+function stripFrontmatter(md: string): string {
+  const m = md.match(/^﻿?\s*---\r?\n[\s\S]*?\r?\n---[ \t]*\r?\n?/);
+  return m ? md.slice(m[0].length) : md;
 }
 
 // Map the stored install source ("github:owner/repo", "skills.sh:slug",

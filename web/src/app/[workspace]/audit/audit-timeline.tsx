@@ -14,6 +14,7 @@ import {
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ALL_AUDIT_SOURCES, type AuditSource } from "@/lib/audit";
@@ -174,6 +175,55 @@ export function AuditTimeline({
     applyFilters({ sources: next });
   }
 
+  const columns: Column<LoadedAuditEntry>[] = [
+    {
+      key: "when",
+      header: "When",
+      thClassName: "w-[140px]",
+      cell: (r) => (
+        <span className="text-foreground-weak whitespace-nowrap text-sm">
+          <LocalTime iso={r.at} style="relative" />
+        </span>
+      ),
+    },
+    {
+      key: "actor",
+      header: "Actor",
+      thClassName: "w-[160px]",
+      cell: (r) => (
+        <span className="text-foreground whitespace-nowrap text-sm">
+          {r.actorDisplayName ?? (
+            <span className="text-foreground-muted italic">System</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "source",
+      header: "Source",
+      thClassName: "w-[140px]",
+      cell: (r) => (
+        <Badge variant={SOURCE_TONE[r.source]} size="small">
+          {SOURCE_LABELS[r.source]}
+        </Badge>
+      ),
+    },
+    {
+      key: "event",
+      header: "Event",
+      cell: (r) => (
+        <div className="flex flex-col gap-0.5">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="font-medium">{humanKind(r.kind)}</span>
+            <TargetLink entry={r} workspaceSlug={workspaceSlug} />
+          </div>
+          <EventSummary entry={r} />
+          <RawPayload payload={r.payload} />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-5">
       {/* Filter row */}
@@ -275,35 +325,12 @@ export function AuditTimeline({
         )}
       </div>
 
-      {rows.length > 0 && (
-        <div className="border-border overflow-hidden rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
-              <tr>
-                <th className="w-[140px] px-3 py-2 text-left font-medium">
-                  When
-                </th>
-                <th className="w-[160px] px-3 py-2 text-left font-medium">
-                  Actor
-                </th>
-                <th className="w-[140px] px-3 py-2 text-left font-medium">
-                  Source
-                </th>
-                <th className="px-3 py-2 text-left font-medium">Event</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-weak)]">
-              {rows.map((r) => (
-                <AuditRow
-                  key={`${r.origin}:${r.id}`}
-                  entry={r}
-                  workspaceSlug={workspaceSlug}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={rows}
+        getRowKey={(r) => `${r.origin}:${r.id}`}
+        empty={null}
+      />
 
       {more && rows.length > 0 && (
         <div className="flex justify-center pt-2">
@@ -318,44 +345,6 @@ export function AuditTimeline({
         </div>
       )}
     </div>
-  );
-}
-
-function AuditRow({
-  entry,
-  workspaceSlug,
-}: {
-  entry: LoadedAuditEntry;
-  workspaceSlug: string;
-}) {
-  const eventLabel = humanKind(entry.kind);
-  const tone = SOURCE_TONE[entry.source];
-  return (
-    <tr className="hover:bg-surface-secondary transition-colors">
-      <td className="text-foreground-weak whitespace-nowrap px-3 py-2 align-top text-sm">
-        <LocalTime iso={entry.at} style="relative" />
-      </td>
-      <td className="text-foreground whitespace-nowrap px-3 py-2 align-top text-sm">
-        {entry.actorDisplayName ?? (
-          <span className="text-foreground-muted italic">System</span>
-        )}
-      </td>
-      <td className="px-3 py-2 align-top">
-        <Badge variant={tone} size="small">
-          {SOURCE_LABELS[entry.source]}
-        </Badge>
-      </td>
-      <td className="text-foreground px-3 py-2 align-top text-sm">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <span className="font-medium">{eventLabel}</span>
-            <TargetLink entry={entry} workspaceSlug={workspaceSlug} />
-          </div>
-          <EventSummary entry={entry} />
-          <RawPayload payload={entry.payload} />
-        </div>
-      </td>
-    </tr>
   );
 }
 

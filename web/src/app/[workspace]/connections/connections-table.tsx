@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { McpProviderLogo } from "@/components/mcp-provider-logo";
 import { Badge } from "@/components/ui/badge";
+import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 
 import type { ConnectionRow } from "./connection-ref";
 
@@ -14,7 +14,6 @@ import type { ConnectionRow } from "./connection-ref";
 // (alphabetical).
 
 type SortKey = "title" | "typeLabel" | "statusLabel";
-type SortDir = "asc" | "desc";
 
 export function ConnectionsTable({
   workspaceSlug,
@@ -25,7 +24,6 @@ export function ConnectionsTable({
   rows: ConnectionRow[];
   viewUserId?: string;
 }) {
-  const router = useRouter();
   const [search, setSearch] = useState("");
   const [type, setType] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("title");
@@ -64,11 +62,59 @@ export function ConnectionsTable({
     }
   }
 
-  function href(r: ConnectionRow): string {
+  function hrefFor(r: ConnectionRow): string {
     return `/${workspaceSlug}/connections/${r.ref}${
       viewUserId ? `?user=${encodeURIComponent(viewUserId)}` : ""
     }`;
   }
+
+  const columns: Column<ConnectionRow>[] = [
+    {
+      key: "title",
+      header: "Name",
+      sortable: true,
+      cell: (r) => (
+        <div className="flex min-w-0 items-center gap-2.5">
+          {r.logoSlug ? (
+            <McpProviderLogo slug={r.logoSlug} label={r.title} size={20} />
+          ) : (
+            <span
+              className="bg-surface-secondary text-foreground-muted inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-xs"
+              aria-hidden
+            >
+              ⚿
+            </span>
+          )}
+          <span className="text-foreground font-medium">{r.title}</span>
+          {r.slot && (
+            <span className="text-foreground-muted truncate text-sm">
+              · {r.slot}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "typeLabel",
+      header: "Type",
+      sortable: true,
+      thClassName: "w-[160px]",
+      cell: (r) => (
+        <span className="text-foreground-muted text-sm">{r.typeLabel}</span>
+      ),
+    },
+    {
+      key: "statusLabel",
+      header: "Status",
+      sortable: true,
+      thClassName: "w-[120px]",
+      cell: (r) => (
+        <Badge variant={r.statusVariant} size="small">
+          {r.statusLabel}
+        </Badge>
+      ),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -112,113 +158,20 @@ export function ConnectionsTable({
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="text-foreground-weak text-base">
-          No connections match the current filters.
-        </p>
-      ) : (
-        <div className="border-border overflow-hidden rounded-lg border">
-          <table className="w-full border-collapse text-base">
-            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
-              <tr>
-                <SortHeader
-                  label="Name"
-                  active={sortKey === "title"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("title")}
-                />
-                <SortHeader
-                  label="Type"
-                  active={sortKey === "typeLabel"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("typeLabel")}
-                  className="w-[160px]"
-                />
-                <SortHeader
-                  label="Status"
-                  active={sortKey === "statusLabel"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("statusLabel")}
-                  className="w-[120px]"
-                />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-weak)]">
-              {filtered.map((r) => (
-                <tr
-                  key={r.ref}
-                  onClick={() => router.push(href(r))}
-                  className="hover:bg-surface cursor-pointer"
-                >
-                  <td className="px-3 py-2.5">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      {r.logoSlug ? (
-                        <McpProviderLogo
-                          slug={r.logoSlug}
-                          label={r.title}
-                          size={20}
-                        />
-                      ) : (
-                        <span
-                          className="bg-surface-secondary text-foreground-muted inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-xs"
-                          aria-hidden
-                        >
-                          ⚿
-                        </span>
-                      )}
-                      <span className="text-foreground font-medium">
-                        {r.title}
-                      </span>
-                      {r.slot && (
-                        <span className="text-foreground-muted truncate text-sm">
-                          · {r.slot}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="text-foreground-muted px-3 py-2.5 text-sm">
-                    {r.typeLabel}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Badge variant={r.statusVariant} size="small">
-                      {r.statusLabel}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        getRowKey={(r) => r.ref}
+        rowHref={(r) => hrefFor(r)}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={(key) => toggleSort(key as SortKey)}
+        empty={
+          <p className="text-foreground-weak text-base">
+            No connections match the current filters.
+          </p>
+        }
+      />
     </div>
-  );
-}
-
-function SortHeader({
-  label,
-  active,
-  dir,
-  onClick,
-  className,
-}: {
-  label: string;
-  active: boolean;
-  dir: SortDir;
-  onClick: () => void;
-  className?: string;
-}) {
-  return (
-    <th className={`px-3 py-2 text-left font-medium ${className ?? ""}`}>
-      <button
-        type="button"
-        onClick={onClick}
-        className="hover:text-foreground inline-flex items-center gap-1"
-      >
-        <span>{label}</span>
-        <span aria-hidden className="text-xs">
-          {active ? (dir === "asc" ? "▲" : "▼") : "↕"}
-        </span>
-      </button>
-    </th>
   );
 }

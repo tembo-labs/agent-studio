@@ -22,7 +22,7 @@ import { listMemberActivity } from "@/lib/member-stats";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, getWorkspaceRole } from "@/lib/workspace";
 
-import { CountCell } from "./count-cell";
+import { DashboardTeamTable, type TeamRow } from "./dashboard-team-table";
 import { WorkspaceDashboard } from "./workspace-dashboard";
 
 export const dynamic = "force-dynamic";
@@ -111,66 +111,24 @@ export default async function DashboardPage({
         title="Team"
         description="Connections, automations, Slack-bot usage, and 30-day run activity per member. Hover a count for details."
       >
-        <div className="border-border overflow-hidden rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">Member</th>
-                <th className="px-3 py-2 text-right font-medium">Connections</th>
-                <th className="px-3 py-2 text-right font-medium">Automations</th>
-                <th className="px-3 py-2 text-right font-medium">Slack (30d)</th>
-                <th className="px-3 py-2 text-right font-medium">30d runs</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-weak)]">
-              {memberActivity.map((m) => (
-                <tr
-                  key={m.userId}
-                  className="hover:bg-surface-secondary transition-colors"
-                >
-                  <td className="px-3 py-2 align-middle">
-                    {isAdmin ? (
-                      <Link
-                        href={`/${workspace.slug}/settings/members/${m.userId}`}
-                        className="text-foreground font-medium hover:underline"
-                      >
-                        {memberLabel(m)}
-                      </Link>
-                    ) : (
-                      <span className="text-foreground font-medium">
-                        {memberLabel(m)}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right align-middle">
-                    <CountCell
-                      value={m.connections}
-                      items={m.connectionLabels}
-                      empty="No connections"
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-right align-middle">
-                    <CountCell
-                      value={m.automations}
-                      items={m.automationAgents}
-                      empty="No automations"
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-right align-middle">
-                    <CountCell
-                      value={m.slackRuns30d}
-                      items={m.slackBots}
-                      empty="No Slack runs"
-                    />
-                  </td>
-                  <td className="text-foreground px-3 py-2 text-right align-middle font-mono">
-                    {m.runs30d.toLocaleString("en-US")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DashboardTeamTable
+          rows={memberActivity.map(
+            (m): TeamRow => ({
+              userId: m.userId,
+              label: memberLabel(m),
+              memberHref: isAdmin
+                ? `/${workspace.slug}/settings/members/${m.userId}`
+                : null,
+              connections: m.connections,
+              connectionLabels: m.connectionLabels,
+              automations: m.automations,
+              automationAgents: m.automationAgents,
+              slackRuns30d: m.slackRuns30d,
+              slackBots: m.slackBots,
+              runs30d: m.runs30d,
+            }),
+          )}
+        />
       </Section>
 
       <Section
@@ -203,7 +161,7 @@ export default async function DashboardPage({
               return (
                 <li
                   key={r.id}
-                  className="hover:bg-surface-secondary relative flex items-start justify-between gap-4 px-3 py-2.5 text-sm transition-colors"
+                  className="hover:bg-interactive-state-hover relative flex items-start justify-between gap-4 px-3 py-2.5 text-sm transition-colors"
                 >
                   {/* Stretched link: the whole row navigates to the run.
                       It sits behind the nested agent link (z-10), so that

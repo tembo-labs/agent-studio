@@ -44,7 +44,7 @@ export function MemberRow({ workspaceSlug, member, canManage, isSelf }: Props) {
   return (
     <li
       className={`relative flex items-start justify-between gap-3 px-3 py-2.5 text-sm ${
-        canManage ? "hover:bg-surface-secondary transition-colors" : ""
+        canManage ? "hover:bg-interactive-state-hover transition-colors" : ""
       }`}
     >
       {/* Stretched link: clicking anywhere on the row opens the member
