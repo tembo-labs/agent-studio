@@ -86,8 +86,8 @@ export default async function ProvidersPage({
             workspaceSlug={workspace.slug}
             kind="scaledown_api_key"
             label="ScaleDown API key"
-            placeholder="sk-…"
-            maskedPrefix="sk-"
+            placeholder="Your ScaleDown API key"
+            maskedPrefix=""
             preview={
               scaledownPreview
                 ? {
