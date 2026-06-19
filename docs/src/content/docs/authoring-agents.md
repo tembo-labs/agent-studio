@@ -15,6 +15,10 @@ writes the agent file and opens a pull request against your repo. Review and
 merge it; the agent then shows up in the **Agents** list. (This requires a Tembo
 API key in **Settings**.)
 
+Not sure what to ask for? [Example Agents](/agent-studio/example-agents/) has
+ready-to-use, copy-paste prompts (email triage, ticket roundups, …) that adapt
+to whatever you've connected.
+
 ## The agent file (Pydantic AgentSpec)
 
 A minimal agent is a YAML file under `agents/pydantic-agentspec/`:

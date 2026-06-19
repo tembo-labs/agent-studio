@@ -49,6 +49,7 @@ when a change needs them.
 - **[Core concepts](/agent-studio/core-concepts/)** — agents-as-code, the PR
   loop, frameworks, and versioning.
 - **Building agents** — [authoring](/agent-studio/authoring-agents/),
+  [example agents](/agent-studio/example-agents/),
   [agent lifecycle](/agent-studio/agent-lifecycle/), and
   [sidecar Python tools](/agent-studio/sidecar-python-tools/).
 - **Running & automating** — [runs](/agent-studio/running-agents/) and

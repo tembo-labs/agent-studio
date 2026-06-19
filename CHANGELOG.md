@@ -28,6 +28,12 @@ they are no longer release versions. Phase scope now lives in
   no repo or PAT. Chat-authoring / improvements (which open PRs) still need a
   connected repo.
 
+### Documentation
+- **Example Agents** — a new docs page of copy-paste, connection-agnostic
+  agent-creation prompts (email triage, ticket/issue roundup, CRM tasks, daily
+  task list). Paste one into chat-to-PR authoring and it adapts to whatever
+  you've connected — generating one agent per matching service.
+
 ## [v2026.6.25] — Email + password quickstart sign-in, docs refresh — shipped 2026-06-19
 
 ### Added
