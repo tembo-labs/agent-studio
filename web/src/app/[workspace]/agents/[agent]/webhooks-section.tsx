@@ -228,7 +228,7 @@ function WebhookRow({
   );
 }
 
-function AddWebhookForm({
+export function AddWebhookForm({
   workspaceSlug,
   agentName,
   owners,
