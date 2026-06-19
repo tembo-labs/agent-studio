@@ -19,7 +19,7 @@ they are no longer release versions. Phase scope now lives in
 
 ## Unreleased
 
-## v2026.6.24 — Email + password quickstart sign-in, docs refresh
+## v2026.6.25 — Email + password quickstart sign-in, docs refresh
 
 ### Added
 - **Email + password quickstart sign-in.** When no OAuth provider (Google /
