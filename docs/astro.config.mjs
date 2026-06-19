@@ -74,6 +74,7 @@ export default defineConfig({
           label: "Observability & governance",
           items: [
             { label: "Dashboard & Runs", slug: "dashboard-and-runs" },
+            { label: "Tasks Inbox", slug: "tasks-inbox" },
             { label: "Improvements", slug: "improvements" },
             { label: "Audit & roles", slug: "audit-and-roles" },
           ],
