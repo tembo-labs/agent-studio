@@ -4,7 +4,7 @@ import { genericOAuth } from "better-auth/plugins";
 import { Pool } from "pg";
 
 import { resolveAuthSecret } from "@/lib/auth-secret";
-import { genericOAuthConfigs } from "@/lib/auth-providers";
+import { genericOAuthConfigs, emailPasswordEnabled } from "@/lib/auth-providers";
 import { writeAuditEvent } from "@/lib/audit-db";
 import { isInstanceAdminEmail } from "@/lib/config";
 import {
@@ -33,7 +33,13 @@ export const auth = betterAuth({
   database: new Pool({ connectionString: databaseUrl }),
   secret,
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-  emailAndPassword: { enabled: false },
+  // Zero-config quickstart: email + password auto-enables when no OAuth provider
+  // is configured (see emailPasswordEnabled). The closed-instance gate below
+  // still governs who may sign up. No email verification — keep first-run
+  // SMTP-free; configure an OAuth provider for production.
+  emailAndPassword: emailPasswordEnabled()
+    ? { enabled: true, requireEmailVerification: false, autoSignIn: true }
+    : { enabled: false },
   socialProviders:
     googleClientId && googleClientSecret
       ? {

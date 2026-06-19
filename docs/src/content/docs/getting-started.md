@@ -12,8 +12,9 @@ everyone in the workspace can use the agents.
 
 Open the instance URL and sign in through your organization's identity provider
 — **Google**, **Microsoft Entra ID**, or a generic **OIDC** provider (Okta,
-Auth0, Keycloak, …), whichever buttons appear on the login screen. If it's your
-first time, an admin may need to add you to a workspace.
+Auth0, Keycloak, …), whichever buttons appear on the login screen. A quickstart
+instance with no OAuth configured shows an **email + password** form instead. If
+it's your first time, an admin may need to add you to a workspace.
 
 ## 2. Find your workspace
 

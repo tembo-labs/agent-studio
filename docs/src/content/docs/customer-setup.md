@@ -80,15 +80,19 @@ Generate each with `openssl rand -base64 32`:
 - [ ] **Set core env** on the web + api services:
   - `DATABASE_URL`, `TAS_ENCRYPTION_KEY`, `INTERNAL_API_TOKEN` — **both** services.
   - `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (= your public origin) — web.
-  - Your auth provider vars — `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, or
-    `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`/`MICROSOFT_TENANT_ID`, or the
-    `OIDC_*` set.
+  - **Sign-in** — *optional for a quickstart.* Leave all OAuth vars blank and the
+    login screen offers **email + password** (no OAuth app to set up). For
+    production, set one OAuth provider instead — `GOOGLE_CLIENT_ID`/
+    `GOOGLE_CLIENT_SECRET`, or `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`/
+    `MICROSOFT_TENANT_ID`, or the `OIDC_*` set — and email/password turns off
+    automatically.
   - **`INSTANCE_ADMIN_EMAILS`** — comma-separated email(s) that bootstrap the
     instance admin. **This is what lets the first person in**; the instance is
-    invite-only otherwise.
+    invite-only otherwise (it gates email/password sign-up too).
   - `TEMBO_API_URL` — leave the default `https://api.tembo.io` unless targeting a
     staging environment.
-- [ ] **Set the auth provider's redirect URI** to match your origin:
+- [ ] **Set the OAuth provider's redirect URI** to match your origin *(skip if
+  using email/password)*:
   - Google: `${BETTER_AUTH_URL}/api/auth/callback/google`
   - Microsoft: `${BETTER_AUTH_URL}/api/auth/oauth2/callback/microsoft`
   - OIDC: `${BETTER_AUTH_URL}/api/auth/oauth2/callback/oidc`

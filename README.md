@@ -76,8 +76,12 @@ Generate each with:
 openssl rand -base64 32
 ```
 
-You will also need at least one configured sign-in provider before anyone can
-log in:
+**Sign-in:** by default (no OAuth configured) the login screen offers
+**email + password** — the zero-setup quickstart. Just sign in with an
+`INSTANCE_ADMIN_EMAILS` address to create the first account.
+
+For production / multi-user, configure an OAuth provider instead (email/password
+turns off automatically when any is set):
 
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, or
 - `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, and

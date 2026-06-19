@@ -14,7 +14,14 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
-## [v2026.6.24] — Docs: Tasks Inbox guide + reference refresh — shipped 2026-06-19
+## [v2026.6.24] — Email + password quickstart sign-in, docs refresh — shipped 2026-06-19
+
+### Added
+- **Email + password quickstart sign-in.** When no OAuth provider (Google /
+  Microsoft / OIDC) is configured, the login screen now offers email + password
+  — so a fresh instance is reachable with zero OAuth-app setup. Sign-up stays
+  gated to `INSTANCE_ADMIN_EMAILS` / invited emails, and configuring any OAuth
+  provider turns email/password off automatically (OAuth becomes the path).
 
 ### Documentation
 - **New Tasks Inbox guide** — how items are produced, the action buttons that

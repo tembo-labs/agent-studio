@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 
 import { AuthSetupGuide } from "@/components/auth-setup-guide";
+import { EmailPasswordForm } from "@/components/email-password-form";
 import { SetupInstanceNameForm } from "@/components/setup-instance-name-form";
 import { SignInButtons } from "@/components/sign-in-buttons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getConfiguredAuthProviders } from "@/lib/auth-providers";
+import {
+  emailPasswordEnabled,
+  getConfiguredAuthProviders,
+} from "@/lib/auth-providers";
 import {
   getAppVersion,
   getInstanceNameFromEnv,
@@ -87,8 +91,10 @@ export default async function Home({
   }
 
   const providers = getConfiguredAuthProviders();
+  const emailPw = emailPasswordEnabled();
   const firstRun = await isFirstRun();
   const version = getAppVersion();
+  const callbackURL = dest ? `/?next=${encodeURIComponent(dest)}` : "/";
 
   const signInCard =
     providers.length > 0 ? (
@@ -99,9 +105,20 @@ export default async function Home({
           </CardTitle>
         </CardHeader>
         <CardContent className="px-1 pb-1">
-          <SignInButtons
-            providers={providers}
-            callbackURL={dest ? `/?next=${encodeURIComponent(dest)}` : "/"}
+          <SignInButtons providers={providers} callbackURL={callbackURL} />
+        </CardContent>
+      </Card>
+    ) : emailPw ? (
+      <Card className="w-full max-w-md p-3">
+        <CardHeader className="px-1 pb-3 pt-1">
+          <CardTitle className="text-foreground-title text-base">
+            {firstRun ? "Create your account" : "Sign in"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-1 pb-1">
+          <EmailPasswordForm
+            callbackURL={callbackURL}
+            initialMode={firstRun ? "signup" : "signin"}
           />
         </CardContent>
       </Card>
@@ -128,8 +145,9 @@ export default async function Home({
         {firstRun ? (
           <div className="flex w-full flex-col gap-4">
             <p className="text-foreground-weak text-center text-sm">
-              First-run setup. Name this instance and configure a sign-in
-              provider, then sign in to create the first workspace.
+              {emailPw
+                ? "First-run setup. Name this instance, then create the first account to set up your workspace."
+                : "First-run setup. Name this instance and configure a sign-in provider, then sign in to create the first workspace."}
             </p>
             <Card className="w-full max-w-md p-3">
               <CardHeader className="px-1 pb-3 pt-1">
