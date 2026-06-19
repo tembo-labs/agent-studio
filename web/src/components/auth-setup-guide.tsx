@@ -4,7 +4,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getConfiguredAuthProviders } from "@/lib/auth-providers";
+import {
+  authProviderRedirectUri,
+  getConfiguredAuthProviders,
+} from "@/lib/auth-providers";
 import { getPublicOrigin } from "@/lib/config";
 
 const code =
@@ -61,12 +64,6 @@ export function AuthSetupGuide() {
   const origin = getPublicOrigin();
   const configured = new Set(getConfiguredAuthProviders().map((p) => p.id));
 
-  function redirectUri(g: ProviderGuide): string {
-    return g.kind === "social"
-      ? `${origin}/api/auth/callback/${g.id}`
-      : `${origin}/api/auth/oauth2/callback/${g.id}`;
-  }
-
   return (
     <Card className="w-full max-w-md p-3">
       <CardHeader className="px-1 pb-2 pt-1">
@@ -93,7 +90,8 @@ export function AuthSetupGuide() {
               )}
             </div>
             <p className="text-foreground-weak text-sm">
-              Redirect URI: <code className={code}>{redirectUri(g)}</code>
+              Redirect URI:{" "}
+              <code className={code}>{authProviderRedirectUri(g, origin)}</code>
             </p>
             <p className="text-foreground-weak text-sm">
               Env:{" "}

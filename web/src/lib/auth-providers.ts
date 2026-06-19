@@ -64,6 +64,16 @@ export function getConfiguredAuthProviders(): AuthProvider[] {
   return out;
 }
 
+export function authProviderRedirectUri(
+  provider: Pick<AuthProvider, "id" | "kind">,
+  origin: string,
+): string {
+  const base = origin.replace(/\/$/, "");
+  return provider.kind === "social"
+    ? `${base}/api/auth/callback/${provider.id}`
+    : `${base}/api/auth/oauth2/callback/${provider.id}`;
+}
+
 export function isAnyAuthConfigured(): boolean {
   return getConfiguredAuthProviders().length > 0;
 }
