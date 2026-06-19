@@ -65,6 +65,10 @@ services:
       NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       TAS_INSTANCE_NAME: ${TAS_INSTANCE_NAME:-Tembo Agent Studio}
       INSTANCE_ADMIN_EMAILS: ${INSTANCE_ADMIN_EMAILS:-}
+      # Dev: when a workspace has no connected GitHub repo, load agents from the
+      # mounted samples dir (repo-shaped: contains agents/<framework>/…). Unset
+      # this (or connect a repo) to use GitHub instead.
+      TAS_LOCAL_AGENTS_DIR: ${TAS_LOCAL_AGENTS_DIR:-/samples}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
@@ -81,6 +85,11 @@ services:
       GOOGLE_CONNECTIONS_CLIENT_SECRET: ${GOOGLE_CONNECTIONS_CLIENT_SECRET:-}
     ports:
       - "${WEB_PORT:-3000}:3000"
+    volumes:
+      # Sample agents for dev: mounted repo-shaped at /samples/agents so the
+      # local agent source (TAS_LOCAL_AGENTS_DIR=/samples) finds
+      # agents/<framework>/…. Read-only; harmless when a real repo is connected.
+      - ./agents:/samples/agents:ro
 
 volumes:
   postgres_data:

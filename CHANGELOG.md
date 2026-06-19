@@ -21,6 +21,12 @@ they are no longer release versions. Phase scope now lives in
   `tembo.nix` (Rust toolchain on top of the sandbox's preinstalled Node/Docker)
   so [Tembo sandboxes](https://docs.tembo.io/features/sandbox/overview) and
   snapshots have what the build needs.
+- **Local sample agents for dev** — when a workspace has no connected GitHub
+  repo and `TAS_LOCAL_AGENTS_DIR` is set, agents load (read-only) from that
+  directory instead of GitHub. `docker-compose.yml` mounts the repo's `./agents`
+  and enables it by default, so the bundled samples list, view, and **run** with
+  no repo or PAT. Chat-authoring / improvements (which open PRs) still need a
+  connected repo.
 
 ## [v2026.6.25] — Email + password quickstart sign-in, docs refresh — shipped 2026-06-19
 

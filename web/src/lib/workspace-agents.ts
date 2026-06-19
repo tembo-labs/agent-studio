@@ -16,10 +16,10 @@ import {
 } from "@/lib/agent-guidance";
 import { getStableVersion } from "@/lib/agent-versions";
 import { db } from "@/lib/db";
+import { resolveAgentReader, type AgentReader } from "@/lib/agent-source";
 import {
   createFile,
   deleteFile,
-  listDirectory,
   readFile,
   updateFile,
   type GitHubFileError,
@@ -110,13 +110,12 @@ function siblingPath(agentPath: string, filename: string): string {
 }
 
 async function readToolsModuleContent(
-  token: string,
-  ref: RepoRef,
+  reader: AgentReader,
   agentPath: string,
   toolsModule: string,
 ): Promise<{ ok: true; content: string } | { ok: false; detail: string }> {
   const path = siblingPath(agentPath, toolsModule);
-  const read = await readFile(token, ref, path);
+  const read = await reader.readFile(path);
   if (!read.ok) {
     return {
       ok: false,
@@ -153,15 +152,9 @@ async function loadDispatchToolsModule(
   toolsModule: string | undefined,
 ): Promise<{ ok: true; content?: string } | { ok: false; detail: string }> {
   if (!toolsModule) return { ok: true };
-  const repo = await getWorkspaceRepo(workspaceId);
-  if (!repo) return { ok: false, detail: "no connected repo" };
-  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
-  const ref: RepoRef = {
-    owner: repo.owner,
-    name: repo.name,
-    branch: repo.defaultBranch,
-  };
-  const res = await readToolsModuleContent(token, ref, agentPath, toolsModule);
+  const reader = await resolveAgentReader(workspaceId);
+  if (!reader) return { ok: false, detail: "no connected repo" };
+  const res = await readToolsModuleContent(reader, agentPath, toolsModule);
   if (!res.ok) return res;
   return { ok: true, content: res.content };
 }
@@ -199,22 +192,15 @@ export type ListAgentsResult =
  * silently filtered (US-0.1-05 explicitly rejects "silent failure").
  */
 export async function listAgents(workspaceId: string): Promise<ListAgentsResult> {
-  const repo = await getWorkspaceRepo(workspaceId);
-  if (!repo) return { ok: false, error: "no-repo" };
-
-  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
-  const ref: RepoRef = {
-    owner: repo.owner,
-    name: repo.name,
-    branch: repo.defaultBranch,
-  };
+  const reader = await resolveAgentReader(workspaceId);
+  if (!reader) return { ok: false, error: "no-repo" };
 
   // Walk each framework subfolder. Missing subfolders are normal (a
   // fresh repo won't have an agents/cargo-ai/ directory yet) — those
   // surface as `entries: []` from listDirectory's `missing: true` path.
   const subfolderListings = await Promise.all(
     FRAMEWORK_DIR_VALUES.map((dir) =>
-      listDirectory(token, ref, `${AGENTS_DIR}/${dir}`),
+      reader.listDirectory(`${AGENTS_DIR}/${dir}`),
     ),
   );
 
@@ -234,7 +220,7 @@ export async function listAgents(workspaceId: string): Promise<ListAgentsResult>
 
   const agents = await Promise.all(
     allEntries.map(async (entry): Promise<ListedAgent> => {
-      const read = await readFile(token, ref, entry.path);
+      const read = await reader.readFile(entry.path);
       if (!read.ok) {
         return {
           filename: entry.name,
@@ -307,21 +293,15 @@ export async function getAgentByName(
   });
   if (!match) return null;
 
-  const repo = await getWorkspaceRepo(workspaceId);
-  if (!repo) return null;
-  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
-  const ref: RepoRef = {
-    owner: repo.owner,
-    name: repo.name,
-    branch: repo.defaultBranch,
-  };
-  const read = await readFile(token, ref, match.path);
+  const reader = await resolveAgentReader(workspaceId);
+  if (!reader) return null;
+  const read = await reader.readFile(match.path);
   if (!read.ok) return null;
 
   let toolsModuleContent: string | undefined;
   const toolsModule = match.ok ? specToolsModule(match.spec) : undefined;
   if (toolsModule) {
-    const mod = await readToolsModuleContent(token, ref, match.path, toolsModule);
+    const mod = await readToolsModuleContent(reader, match.path, toolsModule);
     if (mod.ok) toolsModuleContent = mod.content;
   }
 

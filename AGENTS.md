@@ -31,8 +31,10 @@ a seeded admin login:
 It writes a `.env` (random secrets, **no OAuth → email/password sign-in**), runs
 `docker compose up`, waits for the web app, and seeds an instance-admin account
 (`admin@tembo.local` / `tembo-dev-password` by default; override with
-`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`). Then sign in, create a workspace,
-and connect a GitHub repo (with a PAT) to load its agents. Re-runnable.
+`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`). Sign in and create a workspace —
+the bundled sample agents (`./agents`, mounted via `TAS_LOCAL_AGENTS_DIR`) load
+automatically with no repo connected; connect a GitHub repo (with a PAT) to load
+your own. Re-runnable.
 
 `tembo.nix` (repo root) adds the Rust toolchain on top of the sandbox's
 preinstalled Node 22 / pnpm / Docker, so `cargo build`/`cargo test` work too. It

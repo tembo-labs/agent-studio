@@ -74,6 +74,7 @@ cat <<EOF
    API health: http://localhost:8080/health
    Sign in:    $ADMIN_EMAIL  /  $ADMIN_PASSWORD
 
-Next: sign in → create a workspace → connect a GitHub repo (with a PAT) to load
-its agents. Stop everything with:  docker compose down
+Next: sign in → create a workspace. The bundled sample agents (./agents) show up
+automatically with no repo connected; connect a GitHub repo (with a PAT) to load
+your own. Stop everything with:  docker compose down
 EOF
