@@ -23,6 +23,7 @@ import {
 import { AgentNav } from "./agent-nav";
 import { loadAgentContext } from "./agent-page-context";
 import { DraftChangesBanner } from "./draft-changes-banner";
+import { ForkAgentButton } from "./fork-agent-button";
 import { RunNowButton } from "./run-now-button";
 
 export const dynamic = "force-dynamic";
@@ -173,6 +174,12 @@ export default async function AgentLayout({
                   Chat to edit
                 </Link>
               </Button>
+            )}
+            {agent.ok && canEdit && (
+              <ForkAgentButton
+                workspaceSlug={workspace.slug}
+                agentName={canonicalName}
+              />
             )}
             {agent.ok && canEdit && (
               <RunNowButton

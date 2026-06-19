@@ -20,6 +20,13 @@ they are no longer release versions. Phase scope now lives in
 ## Unreleased
 
 ### Added
+- **Agent visibility — stars + forking.** Star agents (☆ on each row) to curate
+  a personal list; the agents page defaults to **Mine + Starred** (agents you own
+  or starred) with a **View all** toggle, so big teams aren't staring at
+  everyone's agents. And **Fork** any agent into your own editable, owner-prefixed
+  copy (`sales-gen` → `ryw.sales-gen`) — no name collisions, owned by you, shares
+  the original's tools module until you change it. New `agent_star` table; agent
+  names may now carry one optional `<handle>.` owner prefix.
 - **One-command sandbox bring-up** — `./scripts/dev-up.sh` writes a dev `.env`
   (email/password sign-in, random secrets), boots Postgres + api + web via Docker
   Compose, and seeds an instance-admin login you can use immediately. Plus a

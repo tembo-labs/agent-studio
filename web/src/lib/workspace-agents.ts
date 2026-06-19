@@ -1,7 +1,9 @@
 import "server-only";
 
 import {
+  baseAgentSlug,
   detectFormat,
+  ownerHandle,
   parseAgentContent,
   parseAgentFile,
   type AgentConnection,
@@ -14,7 +16,7 @@ import {
   additionalInstructionsFile,
   guidanceFilesFor,
 } from "@/lib/agent-guidance";
-import { getStableVersion } from "@/lib/agent-versions";
+import { getStableVersion, setAgentOwner } from "@/lib/agent-versions";
 import { db } from "@/lib/db";
 import { resolveAgentReader, type AgentReader } from "@/lib/agent-source";
 import {
@@ -777,4 +779,85 @@ export async function restoreAgent(
     commitSha: create.commitSha,
     agentName: row.agent_name,
   };
+}
+
+export type ForkAgentResult =
+  | { ok: true; commitSha: string; agentName: string; agentPath: string }
+  | {
+      ok: false;
+      error: GitHubFileError | "no-repo" | "not-found" | "invalid-source";
+      detail?: string;
+    };
+
+/**
+ * Fork an agent into the current user's owner-namespaced copy. Reads the source
+ * spec, computes a unique `<handle>.<base-slug>` name (deduped), writes the new
+ * file (the source content with only `name:` swapped) via a direct commit —
+ * mirroring restoreAgent — and sets the forker as owner so it lands in their
+ * "Mine + Starred" view. Requires a connected repo (writes are repo-only).
+ *
+ * The fork keeps the same `tools_module:` filename, which resolves to the same
+ * sibling `.py` (both live in agents/<framework>/) — so a tool-using agent forks
+ * and runs without copying the module.
+ */
+export async function forkAgent(
+  workspaceId: string,
+  userId: string,
+  userEmail: string,
+  sourceName: string,
+): Promise<ForkAgentResult> {
+  const repo = await getWorkspaceRepo(workspaceId);
+  if (!repo) return { ok: false, error: "no-repo" };
+
+  const found = await getAgentByName(workspaceId, sourceName);
+  if (!found || !found.agent.ok) return { ok: false, error: "not-found" };
+
+  // dir + ext from the source path (agents/<framework>/<name>.<ext>).
+  const slash = found.agent.path.lastIndexOf("/");
+  const dirPart = slash >= 0 ? found.agent.path.slice(0, slash) : "agents";
+  const ext = (found.agent.path.match(/\.([^./]+)$/)?.[1] ?? "yaml").toLowerCase();
+  const format = detectFormat(found.agent.path);
+  if (!format) return { ok: false, error: "invalid-source" };
+
+  // Unique owner-prefixed name: <handle>.<base>, then -2, -3 … if taken.
+  const handle = ownerHandle(userEmail);
+  const base = baseAgentSlug(found.agent.spec.name);
+  let target = `${handle}.${base}`;
+  for (let n = 2; await getAgentByName(workspaceId, target); n++) {
+    target = `${handle}.${base}-${n}`;
+  }
+
+  const content = renameInSpec(found.raw, format, target);
+  const token = await getWorkspaceSecretPlaintext(workspaceId, "github_pat");
+  const ref: RepoRef = {
+    owner: repo.owner,
+    name: repo.name,
+    branch: repo.defaultBranch,
+  };
+  const targetPath = `${dirPart}/${target}.${ext}`;
+  const create = await createFile(token, ref, targetPath, {
+    content,
+    message: `Fork agent ${sourceName} → ${target}`,
+  });
+  if (!create.ok) return { ok: false, error: create.error, detail: create.detail };
+
+  await setAgentOwner(workspaceId, target, userId, userId);
+  return {
+    ok: true,
+    commitSha: create.commitSha,
+    agentName: target,
+    agentPath: targetPath,
+  };
+}
+
+// Swap the top-level `name:` in a spec's raw text, format-aware (the rest of the
+// source is copied verbatim — comments, tools_module, skills all preserved).
+function renameInSpec(
+  raw: string,
+  format: AgentFileFormat,
+  target: string,
+): string {
+  return format === "json"
+    ? raw.replace(/("name"\s*:\s*)"[^"]*"/, `$1"${target}"`)
+    : raw.replace(/^name:[ \t]*.*$/m, `name: ${target}`);
 }

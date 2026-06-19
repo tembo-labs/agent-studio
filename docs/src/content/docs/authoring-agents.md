@@ -163,3 +163,23 @@ scaledown:
 - **Promote** a draft to a stable version when you're happy with it; automated
   runs serve stable by default. See
   [Agent lifecycle → promoting](/agent-studio/agent-lifecycle/#promoting-to-stable).
+
+## Your agent list, stars, and forking
+
+All members' agents live in one repo, so the agents list can get crowded. To
+keep your day-to-day view tidy:
+
+- **Star** any agent (the ☆ on its row) to add it to your personal list. The
+  list defaults to **Mine + Starred** — agents you own or starred — with a
+  **View all** toggle to see everyone's. Stars are personal; they don't change
+  the shared repo or the `labels:` taxonomy.
+- **Fork** an agent (the **Fork** button on its page) to make your own editable
+  copy. The copy is named with an **owner prefix** — `sales-gen` forked by `ryw`
+  becomes **`ryw.sales-gen`** — so two people can each keep their own without a
+  name collision, and the fork is owned by you (so it shows in your default
+  list). A forked tool-using agent shares the original's `tools_module:` file
+  (same folder) until you change it. Forking copies the spec verbatim; edits go
+  through the usual PR flow.
+
+The optional `<handle>.` prefix is the only place a dot is allowed in an agent
+name — plain names stay kebab-case (`a-z0-9` and hyphens).
