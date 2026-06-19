@@ -92,8 +92,12 @@ affects.
   `authoring-agents.md` / `troubleshooting.md`.
 - **Code structure / conventions** → update the nearest `AGENTS.md` (this file,
   `web/AGENTS.md`, `api/AGENTS.md`).
-- The in-app docs viewer reads the same `docs/` content, so one update covers
-  both the published manual and the in-app version.
+- The in-app docs viewer reads a **generated bundle**
+  (`web/src/lib/docs-content.ts`), not the markdown directly. After editing
+  anything under `docs/src/content/docs/` — including the generated
+  `changelog.md` / `roadmap.md` — run **`cd web && pnpm gen:docs`** and commit
+  the regenerated `docs-content.ts` in the same change. Skip it and the published
+  manual updates but the in-app `/docs` drifts.
 
 CI runs a non-blocking `docs-sync` reminder that flags changes touching
 `web/src/app/**` or `api/src/**` without any `docs/` change. It's a nudge, not
