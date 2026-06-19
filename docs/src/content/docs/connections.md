@@ -25,14 +25,54 @@ with a **Connect** button.
 | **Native MCP** | The provider has an official MCP server — richer, schema-aware tools, fewer round trips, and TAS-managed OAuth. |
 | **Secrets**    | A plain **API key** for a service with no OAuth (e.g. Clay), read by [sidecar Python tools](/agent-studio/sidecar-python-tools/). |
 
-Prefer **Native MCP** when the provider is in TAS's native catalog: it uses the
-provider's official server and TAS-managed OAuth (just click **Connect** — no
-bring-your-own OAuth app). Use **Composio** for providers not in that catalog.
+Prefer **Native MCP** when the provider is in TAS's native catalog (below): it
+uses the provider's official server with richer, schema-aware tools. Most native
+providers use **TAS-managed OAuth** (just click **Connect**); a couple are
+**bring-your-own OAuth app**. Use **Composio** for anything not in the native
+catalog.
 
 :::caution[Slugs differ between substrates]
 The tool slugs for the same provider differ between Composio and Native MCP. If
 you switch a connection's `source:`, update the agent's `tools:` list to match.
 :::
+
+### Native MCP catalog
+
+TAS ships native MCP support for these providers:
+
+| Provider | Auth |
+| --- | --- |
+| Attio, Pylon, Fathom, Dialed, Linear | **TAS-managed** — click **Connect**, authorize, done |
+| HubSpot, Gmail | **Bring-your-own OAuth app** — admin sets up once (below) |
+
+There's also a built-in **Tembo Agent Studio** native connection (TAS's own MCP
+server) that agents use to read/produce [Tasks Inbox](/agent-studio/tasks-inbox/)
+items and trigger other runs.
+
+:::note[Gmail is in Google's Developer Preview]
+The Gmail MCP server (`gmailmcp.googleapis.com`) is gated behind the Google
+Workspace Developer Preview Program — even with the OAuth app + scopes set up,
+tool calls are denied until your Workspace org is enrolled. Until then, connect
+Gmail through **Composio** instead.
+:::
+
+### Bring-your-own OAuth app (Manage providers)
+
+A few native providers (HubSpot, Gmail) need a confidential OAuth app you create
+in *their* console — TAS can't self-register one. A **workspace admin** sets this
+up once, then everyone connects normally:
+
+1. **Connections → Manage providers** → find the provider's card.
+2. Create an OAuth app in the provider's console (the card links to its guide).
+   Register the **redirect URI shown on the card** and grant the scopes it lists
+   (e.g. Gmail needs the Gmail API + Gmail MCP API enabled and the
+   `https://mail.google.com/` scope).
+3. Paste the app's **client ID + secret** into the card, then **enable** the
+   provider with its toggle.
+4. Members can now **Connect** it from the normal connect flow.
+
+Until an admin does this, a bring-your-own provider doesn't appear in the connect
+list — it shows *"needs an OAuth app first."*
 
 ## Declaring connections on an agent
 

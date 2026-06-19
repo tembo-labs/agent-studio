@@ -51,6 +51,26 @@ Key fields:
 - **`scaledown:`** (optional) — opt into [ScaleDown](#scaledown-prompt-compression)
   prompt compression to cut frontier-model tokens (`off` / `prompt` /
   `aggressive`).
+- **`skills:`** (optional) — names of [Skills](/agent-studio/skills/) to load,
+  giving the agent reusable instructions/procedures on top of `instructions`.
+- **`model_settings:`** (optional) — a map of model knobs passed through to the
+  model, e.g. `max_tokens`, `temperature`, `parallel_tool_calls`. TAS defaults
+  `parallel_tool_calls: false` (so tools run one at a time unless you set it
+  `true`) and, for Anthropic models, enables prompt caching — both overridable
+  here.
+
+  ```yaml
+  model_settings:
+    max_tokens: 6144
+    temperature: 0.2
+  ```
+- **`request_limit:`** (optional) — cap the number of model requests in a single
+  run (Pydantic AI `UsageLimits`). Defaults to 50; lower it to bound cost/looping
+  on a tool-heavy agent.
+- **`retries:`** (optional, int) — how many times a failing tool call may be
+  retried within a run.
+- **`instrument:`** (optional, bool) — toggle Pydantic AI run instrumentation
+  (OpenTelemetry spans) for this agent.
 
 Your connected repo also carries an authoring guide (`AGENTS.md` and per-framework
 `AGENT_GUIDE.md`) that TAS keeps current — that's the canonical, always-up-to-date
