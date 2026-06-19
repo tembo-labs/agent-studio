@@ -60,6 +60,7 @@ import {
   getWorkspaceSecretPlaintext,
   listWorkspaceMembers,
 } from "@/lib/workspace";
+import { setAgentOwner } from "@/lib/agent-versions";
 import { getAgentByName, resolveAgentForDispatch } from "@/lib/workspace-agents";
 
 // Shared write-action service layer for BOTH the REST API (/api/v1) and the MCP
@@ -388,6 +389,10 @@ export async function requestAgentChange(
     source: input.source,
     userId: ctx.userId,
   });
+
+  // The creator owns the new agent, so it shows in their "Mine + Starred" view
+  // when it lands. Keyed by agent_name; harmless if the create never merges.
+  await setAgentOwner(ctx.workspace.id, agentSlug, ctx.userId, ctx.userId);
 
   // Surface the user's authorized connection slots (Composio + native MCP) so
   // CAP writes real slot names instead of `default` (it reads the repo, not the

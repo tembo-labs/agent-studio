@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { FRAMEWORK_LABELS } from "@/lib/agent-framework";
 import { agentDisplayName } from "@/lib/agent-format";
+import { listStarredAgentNames } from "@/lib/agent-stars";
+import { listOwnedAgentNames } from "@/lib/agent-versions";
 import { toolkitLabel } from "@/lib/composio-label";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listPendingCreatesForWorkspace } from "@/lib/improvements-api";
@@ -49,13 +51,21 @@ export default async function WorkspacePage({
     redirect(`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`);
   }
 
-  const [apiKeyPreview, agentsResult, pendingStored, currentUserRole] =
-    await Promise.all([
-      getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
-      listAgents(workspace.id),
-      listPendingCreatesForWorkspace(workspace.id),
-      getWorkspaceRole(workspace.id, session.user.id),
-    ]);
+  const [
+    apiKeyPreview,
+    agentsResult,
+    pendingStored,
+    currentUserRole,
+    starredNames,
+    ownedNames,
+  ] = await Promise.all([
+    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
+    listAgents(workspace.id),
+    listPendingCreatesForWorkspace(workspace.id),
+    getWorkspaceRole(workspace.id, session.user.id),
+    listStarredAgentNames(workspace.id, session.user.id),
+    listOwnedAgentNames(workspace.id, session.user.id),
+  ]);
   const canEdit = meetsMinRole(currentUserRole, "operator");
 
   const validNames = agentsResult.ok
@@ -187,6 +197,8 @@ export default async function WorkspacePage({
                     createdAtIso: s.lastRunAt.toISOString(),
                   }
                 : null,
+            isStarred: starredNames.has(a.spec.name),
+            isMine: ownedNames.has(a.spec.name),
           };
         })
     : [];

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
 
-import { IconApiConnection, IconPlusLarge } from "central-icons";
+import { IconApiConnection, IconPlusLarge, IconStar } from "central-icons";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import { mcpLogoUrl } from "@/lib/mcp-logo";
 import { formatCurrency } from "@/lib/pricing";
 
+import { toggleAgentStarAction } from "./agent-stars-actions";
 import { dismissPendingCreateAction } from "./inventory-actions";
 
 // Workspace agent inventory. Replaces the card grid (better for ~10
@@ -61,6 +62,10 @@ export type InventoryAgent =
             createdAtIso: string;
           }
         | null;
+      /** This user starred the agent (a personal visibility flag). */
+      isStarred: boolean;
+      /** This user owns the agent (its agent_owner row). */
+      isMine: boolean;
     }
   | {
       kind: "invalid";
@@ -124,6 +129,14 @@ export function AgentsInventory({
   // column headers.
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  // Default to MY agents (owned or starred) for a tidy day-to-day list; "all"
+  // shows everyone's. Falls back to "all" when I own/star nothing yet, so the
+  // list is never empty.
+  const [view, setView] = useState<"mine" | "all">(
+    agents.some((a) => a.kind === "live" && (a.isMine || a.isStarred))
+      ? "mine"
+      : "all",
+  );
 
   const enriched = useMemo(
     () => agents.map((a) => ({ agent: a, bucket: statusBucket(a) })),
@@ -188,6 +201,11 @@ export function AgentsInventory({
           searchHaystack(agent).toLowerCase().includes(q),
         )
       : enriched;
+    if (view === "mine") {
+      rows = rows.filter(
+        ({ agent }) => agent.kind !== "live" || agent.isMine || agent.isStarred,
+      );
+    }
     if (bucket !== null) rows = rows.filter((e) => e.bucket === bucket);
     if (labelFilter) {
       rows = rows.filter(
@@ -213,6 +231,7 @@ export function AgentsInventory({
   }, [
     enriched,
     query,
+    view,
     bucket,
     labelFilter,
     modelFilter,
@@ -246,6 +265,19 @@ export function AgentsInventory({
   }
 
   const columns: Column<EnrichedRow>[] = [
+    {
+      key: "star",
+      header: "",
+      tdClassName: "w-8 pr-0",
+      cell: ({ agent }) =>
+        agent.kind === "live" ? (
+          <StarButton
+            workspaceSlug={workspaceSlug}
+            agentName={agent.name}
+            starred={agent.isStarred}
+          />
+        ) : null,
+    },
     {
       key: "name",
       header: "Name",
@@ -473,6 +505,30 @@ export function AgentsInventory({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <div className="border-border inline-flex overflow-hidden rounded-md border text-sm">
+          <button
+            type="button"
+            onClick={() => setView("mine")}
+            className={`px-2.5 py-1 ${
+              view === "mine"
+                ? "bg-surface-raised text-foreground"
+                : "text-foreground-weak hover:text-foreground"
+            }`}
+          >
+            Mine + Starred
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("all")}
+            className={`px-2.5 py-1 ${
+              view === "all"
+                ? "bg-surface-raised text-foreground"
+                : "text-foreground-weak hover:text-foreground"
+            }`}
+          >
+            All
+          </button>
+        </div>
         <FacetPills counts={counts} active={bucket} onChange={setBucket} />
         {labelOptions.length > 1 && (
           <Select
@@ -689,6 +745,50 @@ function PendingLinks({
 
 // Inline two-step confirm: "Dismiss" → "Dismiss? Yes / No". Marks the
 // pending create closed so it drops off the inventory. The GitHub PR (if
+// Per-agent star toggle (personal visibility). Optimistic: flips immediately,
+// reverts if the action fails. stopPropagation so it doesn't trigger the row's
+// click-to-navigate.
+function StarButton({
+  workspaceSlug,
+  agentName,
+  starred,
+}: {
+  workspaceSlug: string;
+  agentName: string;
+  starred: boolean;
+}) {
+  const [on, setOn] = useState(starred);
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      aria-label={on ? "Unstar agent" : "Star agent"}
+      title={on ? "Unstar (remove from your list)" : "Star (add to your list)"}
+      disabled={pending}
+      onClick={(e) => {
+        e.stopPropagation();
+        const next = !on;
+        setOn(next);
+        startTransition(async () => {
+          const r = await toggleAgentStarAction({
+            workspaceSlug,
+            agentName,
+            starred: next,
+          });
+          if (!r.ok) setOn(!next);
+        });
+      }}
+      className={
+        on
+          ? "text-foreground-title"
+          : "text-foreground-muted hover:text-foreground"
+      }
+    >
+      <IconStar size={16} />
+    </button>
+  );
+}
+
 // any) is left alone — the links above still reach it.
 function DismissPendingButton({
   workspaceSlug,
