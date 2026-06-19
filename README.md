@@ -58,6 +58,16 @@ See [`CHANGELOG.md`](./CHANGELOG.md) for shipped work and
 
 ## Quickstart
 
+**Fastest path** (Docker host or a [Tembo sandbox](https://docs.tembo.io/features/sandbox/overview)):
+
+```bash
+./scripts/dev-up.sh
+```
+
+This generates a `.env` (random secrets, email/password sign-in), boots the
+stack, and seeds an admin login — then prints the URL and credentials. The
+manual steps below are the same thing, broken out.
+
 ### 1. Prepare `.env`
 
 ```bash

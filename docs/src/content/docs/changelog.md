@@ -19,6 +19,14 @@ they are no longer release versions. Phase scope now lives in
 
 ## Unreleased
 
+### Added
+- **One-command sandbox bring-up** — `./scripts/dev-up.sh` writes a dev `.env`
+  (email/password sign-in, random secrets), boots Postgres + api + web via Docker
+  Compose, and seeds an instance-admin login you can use immediately. Plus a
+  `tembo.nix` (Rust toolchain on top of the sandbox's preinstalled Node/Docker)
+  so [Tembo sandboxes](https://docs.tembo.io/features/sandbox/overview) and
+  snapshots have what the build needs.
+
 ## v2026.6.25 — Email + password quickstart sign-in, docs refresh
 
 ### Added

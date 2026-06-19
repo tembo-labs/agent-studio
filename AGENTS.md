@@ -19,6 +19,26 @@ user stories, demo scripts per phase). The product user manual lives in
 `docs/` (Astro Starlight, published to GitHub Pages) — see
 [`docs/README.md`](./docs/README.md).
 
+## Running the app (one command)
+
+In a Tembo sandbox (or any Docker host), bring up a fully working instance with
+a seeded admin login:
+
+```bash
+./scripts/dev-up.sh
+```
+
+It writes a `.env` (random secrets, **no OAuth → email/password sign-in**), runs
+`docker compose up`, waits for the web app, and seeds an instance-admin account
+(`admin@tembo.local` / `tembo-dev-password` by default; override with
+`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`). Then sign in, create a workspace,
+and connect a GitHub repo (with a PAT) to load its agents. Re-runnable.
+
+`tembo.nix` (repo root) adds the Rust toolchain on top of the sandbox's
+preinstalled Node 22 / pnpm / Docker, so `cargo build`/`cargo test` work too. It
+is also what Tembo snapshots bake in — keep it committed so prebuilt sessions
+include it.
+
 ## Commands
 
 ```bash
