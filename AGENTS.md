@@ -98,6 +98,10 @@ affects.
   `changelog.md` / `roadmap.md` — run **`cd web && pnpm gen:docs`** and commit
   the regenerated `docs-content.ts` in the same change. Skip it and the published
   manual updates but the in-app `/docs` drifts.
+- A **new** doc page needs a sidebar entry in **both** `docs/astro.config.mjs`
+  (published site) **and** `web/src/app/[workspace]/docs/nav.ts` (in-app sidebar +
+  the slug allow-list that rewrites `/agent-studio/<slug>/` cross-links). Miss
+  `nav.ts` and the page is unreachable in-app and its inbound links 404.
 
 CI runs a non-blocking `docs-sync` reminder that flags changes touching
 `web/src/app/**` or `api/src/**` without any `docs/` change. It's a nudge, not

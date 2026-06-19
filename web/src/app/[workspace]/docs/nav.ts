@@ -20,6 +20,7 @@ export const DOC_SECTIONS: DocSection[] = [
           { slug: "running-agents", label: "Running agents" },
           { slug: "connections", label: "Connections" },
           { slug: "dashboard-and-runs", label: "Dashboard & Runs" },
+          { slug: "tasks-inbox", label: "Tasks Inbox" },
           { slug: "automations-triggers", label: "Automations & triggers" },
         ],
       },
@@ -27,6 +28,7 @@ export const DOC_SECTIONS: DocSection[] = [
         label: "Advanced",
         items: [
           { slug: "authoring-agents", label: "Authoring agents" },
+          { slug: "example-agents", label: "Example Agents" },
           { slug: "agent-lifecycle", label: "Agent lifecycle" },
           { slug: "sidecar-python-tools", label: "Sidecar Python tools" },
           { slug: "skills", label: "Skills" },
