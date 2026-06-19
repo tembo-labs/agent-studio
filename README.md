@@ -13,7 +13,9 @@
 Tembo Agent Studio (TAS) treats agents like production software instead of
 editable prompts in a vendor console. Agent definitions live in a repository
 you own. New agents, edits, and "this run was wrong" feedback all produce the
-same reviewable artifact your team already trusts: a pull request.
+same reviewable artifact your team already trusts: a pull request. Those agents
+run on your schedules and triggers, act through your connections, and loop a
+human in through a **Tasks Inbox** when a decision matters.
 
 ## Why TAS
 
@@ -21,6 +23,9 @@ same reviewable artifact your team already trusts: a pull request.
 - **Every change is a PR.** Human or AI author, the output is always a diff.
 - **Runtime stays in your environment.** Runs, audit history, and identity stay
   tied to your stack.
+- **Humans stay in the loop.** When a run needs judgment, agents surface it in
+  the Tasks Inbox to review and act on — reply, complete, archive — instead of
+  acting blindly; your edits feed back as reviewable improvements.
 - **Drift is governed.** Agents can evolve without turning into opaque prompt
   sprawl.
 
@@ -38,8 +43,11 @@ requests into repository changes.
   AI.
 - Open PRs from chat-based authoring and from run feedback.
 - Schedule agents with Automations or trigger them from external events.
-- Manage per-user connections to external systems such as Slack, Gmail, Google
-  Sheets, Notion, and GitHub.
+- Launch agents from Slack apps, and equip them with reusable Skills.
+- Manage per-user connections to external systems — ~1,000 services via Composio
+  plus native MCP servers (Attio, Linear, HubSpot, Gmail, and more).
+- Triage agent output in the Tasks Inbox: review proposed actions and act in the
+  source system (reply, complete, archive), snooze, or dismiss.
 - Inspect operational dashboards, run history, and append-only audit trails.
 - Manage workspace membership with API-enforced roles.
 
@@ -207,6 +215,7 @@ Recommended entry points:
 - [Authoring agents](https://tembo.github.io/agent-studio/authoring-agents/)
 - [Running agents](https://tembo.github.io/agent-studio/running-agents/)
 - [Connections](https://tembo.github.io/agent-studio/connections/)
+- [Tasks Inbox](https://tembo.github.io/agent-studio/tasks-inbox/)
 - [Automations & triggers](https://tembo.github.io/agent-studio/automations-triggers/)
 
 ## License
