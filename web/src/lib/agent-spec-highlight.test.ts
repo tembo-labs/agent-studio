@@ -64,6 +64,26 @@ describe("highlightAgentSpec", () => {
     ]);
   });
 
+  it("highlights quoted YAML keys without regex backtracking", () => {
+    const escaped = "\\!".repeat(2000);
+    const tokens = byKind(
+      [
+        `"display name": "LinkedIn inbox"`,
+        `'owner''s key': support`,
+        `"${escaped}": value`,
+        "",
+      ].join("\n"),
+      "yaml",
+    );
+
+    expect(tokens.key).toEqual([
+      '"display name"',
+      "'owner''s key'",
+      `"${escaped}"`,
+    ]);
+    expect(tokens.string).toEqual(['"LinkedIn inbox"', "support", "value"]);
+  });
+
   it("does not parse block scalar body lines as YAML keys", () => {
     const tokens = byKind(
       [

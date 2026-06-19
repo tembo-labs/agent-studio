@@ -140,12 +140,10 @@ function highlightYaml(source: string): AgentSpecHighlightToken[] {
       blockScalarIndent = null;
     }
 
-    const keyMatch = content.match(
-      /^(\s*(?:-\s*)?)([A-Za-z0-9_.-]+|"(?:\\.|[^"])*"|'(?:''|[^'])*')(\s*:\s*)(.*)$/,
-    );
+    const keyMatch = parseYamlKeyLine(content);
 
     if (keyMatch) {
-      const [, prefix, key, colon, value] = keyMatch;
+      const { prefix, key, colon, value } = keyMatch;
       pushToken(tokens, "plain", prefix);
       pushToken(tokens, "key", key);
       pushToken(tokens, "punctuation", colon);
@@ -178,6 +176,55 @@ function highlightYaml(source: string): AgentSpecHighlightToken[] {
   }
 
   return tokens;
+}
+
+function parseYamlKeyLine(
+  line: string,
+): { prefix: string; key: string; colon: string; value: string } | null {
+  let i = 0;
+
+  while (i < line.length && /\s/.test(line[i])) i += 1;
+  if (line[i] === "-") {
+    i += 1;
+    while (i < line.length && /\s/.test(line[i])) i += 1;
+  }
+
+  const keyStart = i;
+  let keyEnd: number;
+
+  const quote = line[i];
+  if (quote === '"' || quote === "'") {
+    keyEnd = scanYamlQuotedString(line, i, quote);
+  } else {
+    while (i < line.length && isYamlBareKeyChar(line[i])) i += 1;
+    keyEnd = i;
+  }
+
+  if (keyEnd === keyStart) return null;
+
+  i = keyEnd;
+  while (i < line.length && /\s/.test(line[i])) i += 1;
+  if (line[i] !== ":") return null;
+  i += 1;
+  while (i < line.length && /\s/.test(line[i])) i += 1;
+
+  return {
+    prefix: line.slice(0, keyStart),
+    key: line.slice(keyStart, keyEnd),
+    colon: line.slice(keyEnd, i),
+    value: line.slice(i),
+  };
+}
+
+function isYamlBareKeyChar(char: string): boolean {
+  return (
+    (char >= "A" && char <= "Z") ||
+    (char >= "a" && char <= "z") ||
+    (char >= "0" && char <= "9") ||
+    char === "_" ||
+    char === "." ||
+    char === "-"
+  );
 }
 
 function countIndent(line: string): number {
