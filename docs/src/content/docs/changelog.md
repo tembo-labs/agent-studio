@@ -1,6 +1,8 @@
 ---
 title: Changelog
 description: Every notable change to Tembo Agent Studio, by release.
+tableOfContents:
+  maxHeadingLevel: 2
 ---
 
 All notable changes to Tembo Agent Studio. Format loosely follows
@@ -15,9 +17,56 @@ The `0.1`–`0.4` entries below are phase numbers from
 they are no longer release versions. Phase scope now lives in
 [GitHub Issues](https://github.com/tembo/agent-studio/issues?q=is%3Aissue+label%3Aenhancement).
 
-## [Unreleased]
+## Unreleased
 
-## [v2026.6.22] — ScaleDown prompt compression + agent cost/run — shipped 2026-06-18
+## v2026.6.23 — Tasks Inbox actions: act in the source
+
+### Added
+- **Act on inbox items in their source system** — option buttons now run the real
+  action on click, not just clear the item:
+  - **Complete** a task in Dialed / Attio / Linear via a generic **native-MCP
+    inbox executor** (the producing agent declares the tool + args; it runs on
+    the clicking user's connection).
+  - **Send / Send and Archive / Archive** for Gmail via a **Composio inbox
+    executor** — Send replies and keeps the thread in your inbox, Send and Archive
+    replies then files it out, Archive files without replying. Replies use an
+    editable suggested draft (the LinkedIn pattern).
+- **Linear native-MCP provider** (`mcp.linear.app`, TAS-managed OAuth) — the
+  Linear tasks agent moved off Composio onto it.
+- **Gmail native-MCP provider** — a manual / bring-your-own Google OAuth app (like
+  HubSpot), with in-app setup guidance on Connections → Manage providers (redirect
+  URI, the Gmail-specific API + scope steps, docs link). Google currently gates the
+  Gmail MCP server behind its Developer Preview program, so Gmail can alternatively
+  run through Composio.
+- **`gmail-tasks` email-triage agent** — surfaces your top starred/important emails
+  into the Inbox (capped, deduped) with a deep link and a suggested reply.
+- **Deep links on inbox items** — an "Open in <source> ↗" link to the underlying
+  Dialed task / Linear issue / Attio record / email thread (new `url` field).
+- **Snooze + Dismiss escapes** on inbox items, with per-agent control over which
+  clear actions appear (e.g. Gmail uses Archive instead of Dismiss).
+
+### Changed
+- **Inbox source shown as a provider logo** in the list + item detail (was the raw
+  lowercase word); the technical Type column/badge is gone.
+- **Sidebar Inbox badge stays live** — polls the active count so items an agent
+  produces in the background appear without a manual refresh.
+- **Task agents surface source content faithfully** — `dialed`/`attio`/`linear`/
+  `gmail` run with ScaleDown off (no lossy compression of data they copy verbatim)
+  and prioritize their queues (Linear: triage → in-review → in-progress → todo →
+  backlog; Gmail: starred first; etc.).
+
+### Fixed
+- **Dismiss is terminal** — a re-running agent can no longer drag a dismissed item
+  back into the Inbox (the reopen-on-new-activity path now skips dismissed rows).
+- **Inbox actions tolerate a connection-name mismatch** — fall back to your sole
+  active connection of the provider type when the agent's declared name differs.
+- **Learning-mode checkbox no longer reverts after Save** — it revalidated the
+  wrong tab and never re-synced to the saved value.
+- **ScaleDown** now treats prior history as context and the new turn as the query
+  (per the API), and safely compresses bulky prior tool outputs.
+- **LinkedIn thread list pagination** uses the provider's real opaque cursor.
+
+## v2026.6.22 — ScaleDown prompt compression + agent cost/run
 
 ### Added
 - **ScaleDown prompt compression.** Optionally route bulky prompt/context through
@@ -45,7 +94,7 @@ they are no longer release versions. Phase scope now lives in
   `sentiment-negative-subtle` surface (no more muddy brown in dark mode) and a red
   CTA instead of an orange-on-red clash.
 
-## [v2026.6.21] — Tasks Inbox + LinkedIn triage agent — shipped 2026-06-17
+## v2026.6.21 — Tasks Inbox + LinkedIn triage agent
 
 ### Added
 - **Tasks Inbox.** One workspace queue of everything your agents are waiting on
@@ -95,7 +144,7 @@ they are no longer release versions. Phase scope now lives in
   client (#178).
 - **API:** use axum 0.8 path syntax for `/runs/{id}`.
 
-## [v2026.6.20] — Connections index polish, Skills detail, sidebar dismiss — shipped 2026-06-17
+## v2026.6.20 — Connections index polish, Skills detail, sidebar dismiss
 
 ### Changed
 - **Connections index is now searchable, filterable, and sortable.** The list
@@ -131,7 +180,7 @@ they are no longer release versions. Phase scope now lives in
   plus the Astro group, `@tailwindcss/postcss`, `eslint-config-next`, chrono,
   regex, uuid, `@types/node`, and `actions/checkout` v6.
 
-## [v2026.6.19] — Connections & Slack apps reworked into list / view / edit — shipped 2026-06-16
+## v2026.6.19 — Connections & Slack apps reworked into list / view / edit
 
 ### Changed
 - **Connections reworked into an agents-style list.** The tabbed Connections
@@ -156,7 +205,7 @@ they are no longer release versions. Phase scope now lives in
   their own — so they can see what agents across the workspace can reach.
   (API/MCP/agent surfaces stay per-user.)
 
-## [v2026.6.18] — Audit timeline detail + sign-in redirect for deep links — shipped 2026-06-16
+## v2026.6.18 — Audit timeline detail + sign-in redirect for deep links
 
 ### Fixed
 - **Signed-out deep links now go to sign-in, not a 404.** A signed-out visitor
@@ -192,7 +241,7 @@ they are no longer release versions. Phase scope now lives in
   Windows dev server, untrusted-YAML parsing the app doesn't do) don't apply to
   this stack — bumped to keep the security tab clean.
 
-## [v2026.6.17] — Audit coverage for the API/MCP surface, sign-ins, and membership — shipped 2026-06-16
+## v2026.6.17 — Audit coverage for the API/MCP surface, sign-ins, and membership
 
 ### Added
 - **Audit coverage for the public API & MCP surface.** Mutations made through
@@ -224,7 +273,7 @@ they are no longer release versions. Phase scope now lives in
   stack, but bumped to keep the security tab clean. `docs` needed a
   `pnpm.overrides` pin since `astro`/`vite 7` held esbuild at 0.27.x.
 
-## [v2026.6.16] — Public API & MCP server, sub-agent orchestration, prompt caching — shipped 2026-06-15
+## v2026.6.16 — Public API & MCP server, sub-agent orchestration, prompt caching
 
 ### Added
 - **Public REST API + MCP server.** Drive a workspace programmatically — from
@@ -352,7 +401,7 @@ they are no longer release versions. Phase scope now lives in
 - `0049` (per-user, workspace-bound API keys) and `0050` (`run.parent_run_id` for
   sub-run linking) apply on the next Rust api restart.
 
-## [v2026.6.15] — Fathom MCP, free-text agent names — shipped 2026-06-09
+## v2026.6.15 — Fathom MCP, free-text agent names
 
 ### Added
 - **Run input on the run view.** A run started with an optional message now shows
@@ -381,7 +430,7 @@ they are no longer release versions. Phase scope now lives in
   touched; unknown models and already-correct families are left as-is.
   *(migration 0048)*
 
-## [v2026.6.14] — Agent Skills, YOLO mode, Claude Fable 5 — shipped 2026-06-09
+## v2026.6.14 — Agent Skills, YOLO mode, Claude Fable 5
 
 ### Added
 - **Agent Skills.** A workspace **Skills** area to install reusable Agent Skills
@@ -423,7 +472,7 @@ they are no longer release versions. Phase scope now lives in
   `gpt-5` catch-all. gpt-4o / gpt-4.1 / o3 were already correct. Authoring
   guidance now references `openai:gpt-5.5` instead of the older gpt-5.2.
 
-## [v2026.6.13] — In-app docs, workspace rename, Automations area — shipped 2026-06-09
+## v2026.6.13 — In-app docs, workspace rename, Automations area
 
 ### Added
 - **In-app documentation.** The product manual now ships inside the app, pinned
@@ -462,7 +511,7 @@ they are no longer release versions. Phase scope now lives in
   number are now confirmed via a direct PR fetch instead of the search API, so a
   merged improvement no longer lingers as "open".
 
-## [v2026.6.12] — Live run timeline, output discipline, Native MCP admin — shipped 2026-06-08
+## v2026.6.12 — Live run timeline, output discipline, Native MCP admin
 
 ### Added
 - **Run view rebuilt as a live step timeline.** The run-detail page now shows
@@ -511,7 +560,7 @@ they are no longer release versions. Phase scope now lives in
 - `0044_run_streamed_output` — live partial output column.
 - `0045_run_step_summary` — per-step narration text.
 
-## [v2026.6.11] — HubSpot via Native MCP (bring-your-own OAuth app) — shipped 2026-06-08
+## v2026.6.11 — HubSpot via Native MCP (bring-your-own OAuth app)
 
 ### Added
 - **HubSpot as a Native MCP provider** (`https://mcp.hubspot.com`). HubSpot
@@ -540,7 +589,7 @@ they are no longer release versions. Phase scope now lives in
 - `0041_workspace_native_oauth_client` (per-workspace BYO OAuth client for manual
   Native MCP providers). Applied on api boot.
 
-## [v2026.6.10] — Agent view redesign + run-time connection guard — shipped 2026-06-08
+## v2026.6.10 — Agent view redesign + run-time connection guard
 
 The agent page was a long vertical stack; it's now a focused, Settings-style
 view with a left side-nav. Plus a guard that stops a run before it starts when
@@ -580,7 +629,7 @@ the connections aren't set up. Web-only — no new migrations.
   TypeScript 6, and many GitHub Actions (`checkout`, `setup-node`, the docker/*
   actions, codeql, pages) — all verified green.
 
-## [v2026.6.9] — Agent lifecycle, tool observability, and the ETL-agent stack — shipped 2026-06-08
+## v2026.6.9 — Agent lifecycle, tool observability, and the ETL-agent stack
 
 A big release. Agents gain a real **version lifecycle** (draft → stable) and
 **tool-call observability**, and a new **ETL-agent stack** lands: agents can run
@@ -643,7 +692,7 @@ substrate, and be **triggered by external webhooks** (Clay first). The full
 - `0037_agent_version`, `0038_run_tool_call`, `0039_workspace_secret_connection`,
   `0040_workspace_webhook`. The api applies them on boot.
 
-## [v2026.6.8] — Slack apps: launch agents from Slack — shipped 2026-06-04
+## v2026.6.8 — Slack apps: launch agents from Slack
 
 TAS can now host per-team Slack bots that launch a **label-scoped subset** of
 your agents — separating cheap routing from right-sized execution, so dozens of
@@ -689,7 +738,7 @@ mega-agent.
   silently ignore a JSON body, so the acting-user email→member mapping and the
   message permalinks (the "View in Slack" links) work.
 
-## [v2026.6.7] — Team visibility + admin management — shipped 2026-06-04
+## v2026.6.7 — Team visibility + admin management
 
 A batch focused on workspace admins seeing and managing what members own.
 
@@ -715,7 +764,7 @@ A batch focused on workspace admins seeing and managing what members own.
 - The Composio connection-rename action is now gated to owner-or-admin (parity
   with the native-MCP rename).
 
-## [v2026.6.6] — Dismiss pending agents + settings polish — shipped 2026-06-04
+## v2026.6.6 — Dismiss pending agents + settings polish
 
 ### Added
 - **Dismiss pending agents** from the workspace home. In-flight chat-to-PR
@@ -731,7 +780,7 @@ A batch focused on workspace admins seeing and managing what members own.
   without a manual browser refresh when a provider key is added or removed — it
   lives in the workspace layout, which now revalidates at layout level.
 
-## [v2026.6.5] — Tembo authoring fix + favicon fixes — shipped 2026-06-03
+## v2026.6.5 — Tembo authoring fix + favicon fixes
 
 ### Fixed
 - **Tembo Coding Agent authoring (the "Invalid token" 401).** Requests now hit
@@ -760,7 +809,7 @@ A batch focused on workspace admins seeing and managing what members own.
 - Docs: clarified CalVer is year.month + a per-month release counter (not the
   day of the month).
 
-## [v2026.6.4] — Workspace deletion, invite auto-join, LLM-key CTA — shipped 2026-06-03
+## v2026.6.4 — Workspace deletion, invite auto-join, LLM-key CTA
 
 ### Fixed
 - **Invited existing users now join automatically.** Inviting someone who
@@ -779,7 +828,7 @@ A batch focused on workspace admins seeing and managing what members own.
   Anthropic nor OpenAI key now shows an "Action needed" card linking to
   Settings → LLM Providers, since agents can't run without one.
 
-## [v2026.6.3] — Security hardening, dashboard runs, version surfacing — shipped 2026-06-03
+## v2026.6.3 — Security hardening, dashboard runs, version surfacing
 
 A security-focused release (several authorization/tenant-isolation fixes), plus
 dashboard and CI improvements. **Recommended upgrade for all instances.**
@@ -811,7 +860,7 @@ dashboard and CI improvements. **Recommended upgrade for all instances.**
 - **Docs:** Railway guide documents pinning explicit version tags for
   production vs. `:latest` for throwaway instances.
 
-## [v2026.6.2] — Reproducible runtime, setup guide, Microsoft sign-in fix — shipped 2026-06-02
+## v2026.6.2 — Reproducible runtime, setup guide, Microsoft sign-in fix
 
 A small maintenance release: lock the last floating runtime dependency so a
 rebuilt image tag is reproducible, ship a start-here setup guide, and fix
@@ -846,7 +895,7 @@ Microsoft Entra sign-in for self-hosted instances.
   setup, and creating the first agent. Linked from the README as the
   start-here guide.
 
-## [v2026.5.31] — Container image publishing — shipped 2026-05-31
+## v2026.5.31 — Container image publishing
 
 Makes TAS deployable from prebuilt images instead of a source build, and
 hardens the supply chain around them.
@@ -903,7 +952,7 @@ hardens the supply chain around them.
   transitively). Not reachable in TAS — build-time, dev-authored CSS —
   resolved to clear the alert and de-dupe to one postcss.
 
-## [v2026.5.29] — First CalVer release — shipped 2026-05-29
+## v2026.5.29 — First CalVer release
 
 The cutover to date-based releases. Everything through Phase 0.4
 (Governance depth) is captured below; this tag marks the first release
@@ -934,7 +983,7 @@ of v0.4.
 - **Version files adopt CalVer.** `api/Cargo.toml` and
   `web/package.json` move from the long-stale `0.1.0` to `2026.5.29`.
 
-## [v0.4] — Governance depth — shipped May 2026
+## v0.4 — Governance depth
 
 ### Added
 - **Native MCP connections.** Second connection substrate alongside
@@ -1055,7 +1104,7 @@ of v0.4.
   ROADMAP + a couple of source-file comments updated to point at
   the new paths.
 
-## [v0.3] — Operational surface — shipped May 2026
+## v0.3 — Operational surface
 
 The day-two surface. Agents reach external services through a real
 substrate (no more "the model knows how to write Slack messages but
@@ -1225,7 +1274,7 @@ out to make room for Connections, which ate the phase honestly.
   Schema-driven per-trigger config forms (pulled from
   `getTriggerType`'s `config` schema) land in a later iteration.
 
-## [v0.2] — Authoring velocity — shipped May 2026
+## v0.2 — Authoring velocity
 
 The chat-to-PR loop. A non-engineer describes an agent (or a change to one)
 in plain English; Tembo opens a pull request; the team reviews a diff.
@@ -1306,7 +1355,7 @@ in plain English; Tembo opens a pull request; the team reviews a diff.
   Agent Platform shipping a direct-commit mode; today CAP always opens
   a PR, so there's no auto-merge surface to wire.
 
-## [v0.1] — Foundation — shipped May 2026
+## v0.1 — Foundation
 
 The trustworthy floor: self-hosted deploy, identity, repo connection, runs.
 

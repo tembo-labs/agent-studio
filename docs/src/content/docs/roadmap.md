@@ -9,16 +9,6 @@ with a draft **TASIP** (Tembo Agent Studio Improvement Proposal) where you can
 weigh in: tell us your use case, push back, or 👍 the ones you want most. Your
 input is what moves an idea from "maybe" to scheduled work.
 
-## Adaptive corrections loop
-
-When someone marks an agent's output as wrong, TAS bundles the run, the input,
-and the correction, and a Tembo coding agent proposes a targeted pull request to
-fix it. Every fix is still a reviewable diff, so feedback from real usage flows
-back into the agent without an engineering queue — with a one-click "modify &
-re-run" to confirm the change against the original input.
-
-[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/95)
-
 ## Behavior variants
 
 When two teams want an agent to behave differently — terse for support, chatty
@@ -36,22 +26,6 @@ human judgment at a checkpoint — approval, disambiguation, sign-off — withou
 giving up automation everywhere else.
 
 [Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/97)
-
-## Tasks inbox
-
-A single queue of everything agents are waiting on *you* for: paused runs that
-need input, corrections awaiting a decision, PRs to review. One place to triage,
-so the human-in-the-loop parts don't get missed across a dozen screens.
-
-[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/98)
-
-## Direct-commit mode
-
-For low-risk, trusted changes, let a correction apply immediately instead of
-waiting on a pull-request review — configurable per agent and per workspace.
-Speeds up safe, routine updates while keeping full review for everything else.
-
-[Discuss & shape it →](https://github.com/tembo/agent-studio/discussions/99)
 
 ## Cross-deployment learning
 
