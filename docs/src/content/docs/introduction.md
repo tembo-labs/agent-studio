@@ -14,6 +14,15 @@ vendor consoles, with no diff, no review, and no rewind. TAS lets agents inherit
 the discipline you already use for production code — version control, code
 review, audit logs, identity, and RBAC.
 
+And they don't just sit in a repo — they **run**: on demand, on a schedule, or
+from an event, acting through per-user [Connections](/agent-studio/connections/)
+to the services your team already uses. When a run needs a human in the loop, it
+surfaces the work in the **[Tasks Inbox](/agent-studio/tasks-inbox/)** — where you
+review, edit, and approve the action (reply, complete, archive…) instead of the
+agent acting blindly. The corrections you make there feed back into the agent as
+reviewable [Improvements](/agent-studio/improvements/). The whole loop — from
+definition to action to adaptation — stays governed.
+
 ## Principles
 
 - **Git is the system of record.** Agent definitions live in your repo.
@@ -43,10 +52,15 @@ when a change needs them.
   [sidecar Python tools](/agent-studio/sidecar-python-tools/).
 - **Running & automating** — [runs](/agent-studio/running-agents/) and
   [automations & triggers](/agent-studio/automations-triggers/).
-- **Integrations** — [Connections](/agent-studio/connections/) and
-  [Tools & Tool uses](/agent-studio/tools-and-tool-uses/).
-- **Observability** — [Dashboard & Runs](/agent-studio/dashboard-and-runs/) and
-  [Improvements](/agent-studio/improvements/).
+- **Integrations** — [Connections](/agent-studio/connections/),
+  [Skills](/agent-studio/skills/), [Tools & Tool uses](/agent-studio/tools-and-tool-uses/),
+  and [Slack apps](/agent-studio/slack-apps/).
+- **Programmatic access** — the [REST API](/agent-studio/api/) and
+  [MCP server](/agent-studio/mcp/).
+- **Observability & governance** — [Dashboard & Runs](/agent-studio/dashboard-and-runs/),
+  the [Tasks Inbox](/agent-studio/tasks-inbox/),
+  [Improvements](/agent-studio/improvements/), and
+  [Audit & roles](/agent-studio/audit-and-roles/).
 
 Setting up or operating the instance? See the
 [admin introduction](/agent-studio/admin-introduction/).
