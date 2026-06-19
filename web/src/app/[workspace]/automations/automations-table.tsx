@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 
 import { LocalTime } from "@/components/local-time";
 import { Badge } from "@/components/ui/badge";
-import { DataTable, type Column } from "@/components/ui/data-table";
+import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { nextFireAfter, validateCron } from "@/lib/cron";
@@ -42,6 +42,7 @@ export type AutomationRow = {
 
 type KindFilter = "all" | AutomationKind;
 type StatusFilter = "all" | "enabled" | "disabled" | "error";
+type SortKey = "kind" | "name" | "detail" | "lastFired" | "runAs" | "status";
 
 const KIND_META: Record<
   AutomationKind,
@@ -64,6 +65,8 @@ export function AutomationsTable({
   const [agent, setAgent] = useState("");
   const [runAs, setRunAs] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const agentOptions = useMemo(
     () => [
@@ -86,7 +89,7 @@ export function AutomationsTable({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return rows.filter((r) => {
+    const out = rows.filter((r) => {
       if (kind !== "all" && r.kind !== kind) return false;
       if (agent && r.agentName !== agent) return false;
       if (runAs && r.runAs !== runAs) return false;
@@ -102,12 +105,28 @@ export function AutomationsTable({
         return false;
       return true;
     });
-  }, [rows, query, kind, agent, runAs, status]);
+    const dir = sortDir === "asc" ? 1 : -1;
+    return out.sort((a, b) => {
+      const primary =
+        sortValue(a, sortKey).localeCompare(sortValue(b, sortKey)) * dir;
+      return primary !== 0 ? primary : a.name.localeCompare(b.name);
+    });
+  }, [rows, query, kind, agent, runAs, status, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const columns: Column<AutomationRow>[] = [
     {
       key: "kind",
       header: "Type",
+      sortable: true,
       cell: (r) => (
         <Badge variant={KIND_META[r.kind].variant} size="small">
           {KIND_META[r.kind].label}
@@ -117,6 +136,7 @@ export function AutomationsTable({
     {
       key: "name",
       header: "Name",
+      sortable: true,
       tdClassName: "max-w-xs",
       cell: (r) => (
         <Link href={r.href} className="text-foreground font-medium hover:underline">
@@ -125,25 +145,15 @@ export function AutomationsTable({
       ),
     },
     {
-      key: "agent",
-      header: "Agent",
-      cell: (r) => (
-        <Link
-          href={`/${workspaceSlug}/agents/${encodeURIComponent(r.agentName)}`}
-          className="text-foreground hover:underline"
-        >
-          {r.agentName}
-        </Link>
-      ),
-    },
-    {
       key: "detail",
       header: "Trigger",
+      sortable: true,
       cell: (r) => <TriggerDetail row={r} />,
     },
     {
       key: "lastFired",
       header: "Last fired",
+      sortable: true,
       tdClassName: "text-foreground-weak text-sm",
       cell: (r) =>
         r.lastFiredAtIso ? (
@@ -155,12 +165,14 @@ export function AutomationsTable({
     {
       key: "runAs",
       header: "Run as",
+      sortable: true,
       tdClassName: "text-foreground-weak text-sm",
       cell: (r) => r.runAs,
     },
     {
       key: "status",
       header: "Status",
+      sortable: true,
       cell: (r) => (
         <>
           <StatusBadge enabled={r.enabled} error={r.lastFireError} />
@@ -264,6 +276,9 @@ export function AutomationsTable({
         rows={filtered}
         getRowKey={(r) => `${r.kind}:${r.id}`}
         rowHref={(r) => r.href}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={(key) => toggleSort(key as SortKey)}
         empty={
           <p className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-6 text-center text-sm">
             {rows.length === 0
@@ -274,6 +289,29 @@ export function AutomationsTable({
       />
     </div>
   );
+}
+
+function sortValue(row: AutomationRow, key: SortKey): string {
+  switch (key) {
+    case "kind":
+      return KIND_META[row.kind].label;
+    case "name":
+      return row.name;
+    case "detail":
+      if (row.kind === "schedule") return row.cron ?? "";
+      if (row.kind === "trigger") {
+        return `${row.toolkitSlug ?? ""} ${row.triggerType ?? ""}`;
+      }
+      return row.tokenLast4 ? `webhook ${row.tokenLast4}` : "webhook";
+    case "lastFired":
+      return row.lastFiredAtIso ?? "";
+    case "runAs":
+      return row.runAs;
+    case "status":
+      if (row.lastFireError) return "0 Error";
+      if (!row.enabled) return "1 Disabled";
+      return "2 Enabled";
+  }
 }
 
 function TriggerDetail({ row }: { row: AutomationRow }) {
