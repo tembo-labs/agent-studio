@@ -26,8 +26,9 @@ definition to action to adaptation — stays governed.
 ## Principles
 
 - **Git is the system of record.** Agent definitions live in your repo.
-- **Every change is a PR.** Human or AI author — the artifact is always a
-  reviewable diff.
+- **Every change is a commit.** Human or AI author — the artifact is always a
+  reviewable diff in your repo (a pull request by default; a direct commit in
+  YOLO mode).
 - **Adaptation is allowed; drift is governed.** Agents may evolve; they may not
   evolve in ways you can't explain.
 

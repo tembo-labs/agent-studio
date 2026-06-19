@@ -20,7 +20,9 @@ human in through a **Tasks Inbox** when a decision matters.
 ## Why TAS
 
 - **Git is the system of record.** Agent definitions are files in your repo.
-- **Every change is a PR.** Human or AI author, the output is always a diff.
+- **Every change is a commit.** Human or AI author, the output is always a
+  reviewable diff in Git — a pull request by default, or a direct commit in YOLO
+  mode.
 - **Runtime stays in your environment.** Runs, audit history, and identity stay
   tied to your stack.
 - **Humans stay in the loop.** When a run needs judgment, agents surface it in

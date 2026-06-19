@@ -19,6 +19,27 @@ they are no longer release versions. Phase scope now lives in
 
 ## Unreleased
 
+## v2026.6.24 — Docs: Tasks Inbox guide + reference refresh
+
+### Documentation
+- **New Tasks Inbox guide** — how items are produced, the action buttons that
+  act in the source (Complete / Reply / Send and Archive / Archive), snooze,
+  terminal dismiss, the learning loop, and the producer-side fields for agent
+  authors.
+- **Fuller agent-spec reference** (Authoring agents) — documented
+  `model_settings`, `request_limit`, `retries`, `instrument`, and `skills`.
+- **Connections** — the native-MCP catalog (TAS-managed vs bring-your-own OAuth
+  app), the **Manage providers** setup for HubSpot/Gmail, and Gmail's Google
+  Developer Preview gate.
+- **Introduction + README** — now describe the full *definition → run → act
+  (human-in-the-loop Tasks Inbox) → adapt* loop, and correct the principle to
+  **"every change is a commit"** — a pull request by default, or a direct commit
+  in YOLO mode (the old "every change is a PR" predated YOLO delivery).
+- **Changelog page** — cleaner release headers (no brackets / shipped-date) and
+  an H2-only "on this page" TOC.
+- **Roadmap** — pruned ideas that have since shipped (adaptive corrections loop,
+  Tasks inbox, direct-commit / YOLO mode).
+
 ## v2026.6.23 — Tasks Inbox actions: act in the source
 
 ### Added
