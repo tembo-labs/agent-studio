@@ -1,6 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
+import { isAgentLocked } from "@/lib/agent-lock";
 import { agentDisplayName } from "@/lib/agent-format";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listImprovementsForAgent } from "@/lib/improvements-api";
@@ -31,6 +32,10 @@ export default async function AgentChatPage({
   if (!result) notFound();
   const { agent } = result;
   const canonicalName = agent.ok ? agent.spec.name : agentName;
+  // Locked agents (#12) take no in-app edits — chat-to-edit is disabled.
+  if (await isAgentLocked(workspace.id, canonicalName)) {
+    redirect(`/${slug}/agents/${encodeURIComponent(canonicalName)}`);
+  }
   const displayName = agent.ok ? agentDisplayName(agent.spec) : agentName;
 
   const [stored, chatRuns] = await Promise.all([

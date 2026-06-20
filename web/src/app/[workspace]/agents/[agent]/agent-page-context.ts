@@ -2,6 +2,7 @@ import "server-only";
 
 import { notFound, redirect } from "next/navigation";
 
+import { isAgentLocked } from "@/lib/agent-lock";
 import { getServerSession } from "@/lib/session";
 import { getAgentByName, type ListedAgent } from "@/lib/workspace-agents";
 import { getWorkspaceBySlug, getWorkspaceRepo } from "@/lib/workspace";
@@ -23,6 +24,8 @@ export type AgentPageContext = {
   toolsModuleContent: string | undefined;
   /** The agent's declared name (falls back to the URL param for invalid files). */
   canonicalName: string;
+  /** Admin "Locked" flag — hides edit affordances + history tabs (#12). */
+  locked: boolean;
 };
 
 export async function loadAgentContext(
@@ -47,6 +50,7 @@ export async function loadAgentContext(
 
   const { agent, raw, toolsModuleContent } = result;
   const canonicalName = agent.ok ? agent.spec.name : agentName;
+  const locked = await isAgentLocked(workspace.id, canonicalName);
 
   return {
     session,
@@ -56,5 +60,6 @@ export async function loadAgentContext(
     raw,
     toolsModuleContent,
     canonicalName,
+    locked,
   };
 }

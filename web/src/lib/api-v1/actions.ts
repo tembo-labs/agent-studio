@@ -3,6 +3,7 @@ import "server-only";
 import type { AuthorizeApiSuccess } from "@/lib/api-auth";
 import { writeAuditEvent } from "@/lib/audit-db";
 import type { AuditSource } from "@/lib/audit";
+import { isAgentLocked } from "@/lib/agent-lock";
 import {
   detectFormat,
   parseAgentContent,
@@ -325,6 +326,15 @@ export async function requestAgentChange(
         ok: false,
         status: 422,
         error: `agent file failed to parse: ${found.agent.error}`,
+      };
+    }
+    // A locked agent is change-controlled — no in-app edits (chat / improve);
+    // it changes only via direct repo PRs.
+    if (await isAgentLocked(ctx.workspace.id, found.agent.spec.name)) {
+      return {
+        ok: false,
+        status: 409,
+        error: "this agent is locked — changes must go through a repo PR",
       };
     }
     kind = "edit";

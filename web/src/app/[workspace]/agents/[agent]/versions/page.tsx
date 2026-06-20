@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { Section } from "@/components/section";
 import {
   getAgentOwner,
@@ -22,8 +24,12 @@ export default async function AgentVersionsPage({
   params: Promise<{ workspace: string; agent: string }>;
 }) {
   const { workspace: slug, agent: agentName } = await params;
-  const { session, workspace, agent, raw, canonicalName } =
+  const { session, workspace, agent, raw, canonicalName, locked } =
     await loadAgentContext(slug, agentName);
+  // Locked agents hide their history tabs (#12) — block the direct URL too.
+  if (locked) {
+    redirect(`/${slug}/agents/${encodeURIComponent(canonicalName)}`);
+  }
 
   const [versions, stable, owner, allMembers, currentUserRole] =
     await Promise.all([

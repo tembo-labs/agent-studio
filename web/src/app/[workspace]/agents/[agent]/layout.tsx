@@ -41,7 +41,7 @@ export default async function AgentLayout({
   params: Promise<{ workspace: string; agent: string }>;
 }) {
   const { workspace: slug, agent: agentName } = await params;
-  const { session, workspace, repo, agent, raw, canonicalName } =
+  const { session, workspace, repo, agent, raw, canonicalName, locked } =
     await loadAgentContext(slug, agentName);
 
   const [currentUserRole, temboConfigured, stable, owner, allMembers] =
@@ -117,6 +117,11 @@ export default async function AgentLayout({
                     Draft only
                   </Badge>
                 )}
+                {locked && (
+                  <Badge variant="red" size="small">
+                    Locked
+                  </Badge>
+                )}
                 <Badge variant="blue" size="small">
                   {FRAMEWORK_LABELS[agent.spec.framework]}
                 </Badge>
@@ -171,7 +176,7 @@ export default async function AgentLayout({
                 </a>
               </Button>
             )}
-            {agent.ok && canEdit && temboConfigured && (
+            {agent.ok && canEdit && temboConfigured && !locked && (
               <Button asChild variant="secondary">
                 <Link
                   href={`/${workspace.slug}/agents/${encodeURIComponent(canonicalName)}/chat`}
@@ -180,7 +185,7 @@ export default async function AgentLayout({
                 </Link>
               </Button>
             )}
-            {agent.ok && canEdit && (
+            {agent.ok && canEdit && !locked && (
               <ForkAgentButton
                 workspaceSlug={workspace.slug}
                 agentName={canonicalName}
@@ -214,7 +219,11 @@ export default async function AgentLayout({
       <hr className="border-[var(--color-border-weak)]" />
 
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-10">
-        <AgentNav workspaceSlug={workspace.slug} agentName={canonicalName} />
+        <AgentNav
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+          locked={locked}
+        />
         <div className="flex min-w-0 flex-1 flex-col gap-8">{children}</div>
       </div>
     </div>

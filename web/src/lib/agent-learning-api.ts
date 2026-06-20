@@ -90,6 +90,13 @@ export async function listDueLearningConfigs(
     `SELECT ${COLUMNS} FROM agent_learning
       WHERE enabled
         AND owner_user_id IS NOT NULL
+        -- A locked agent (#12) never learns, regardless of its learning row.
+        AND NOT EXISTS (
+          SELECT 1 FROM agent_lock l
+           WHERE l.workspace_id = agent_learning.workspace_id
+             AND l.agent_name = agent_learning.agent_name
+             AND l.locked
+        )
         AND (
           last_learned_at IS NULL
           OR last_learned_at < $1::timestamptz - (

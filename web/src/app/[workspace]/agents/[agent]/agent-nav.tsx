@@ -20,22 +20,30 @@ const ITEMS: Item[] = [
   { slug: "settings", label: "Settings" },
 ];
 
+// Tabs hidden when the agent is Locked — its change/learning history (#12).
+const LOCKED_HIDDEN = new Set(["versions", "activity", "learning"]);
+
 export function AgentNav({
   workspaceSlug,
   agentName,
+  locked,
 }: {
   workspaceSlug: string;
   agentName: string;
+  locked: boolean;
 }) {
   const pathname = usePathname();
   const base = `/${workspaceSlug}/agents/${encodeURIComponent(agentName)}`;
+  const items = locked
+    ? ITEMS.filter((i) => !LOCKED_HIDDEN.has(i.slug))
+    : ITEMS;
 
   return (
     <nav
       aria-label="Agent sections"
       className="flex w-full shrink-0 flex-row gap-1 overflow-x-auto sm:w-36 sm:flex-col"
     >
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const href = item.slug ? `${base}/${item.slug}` : base;
         const isActive = item.slug
           ? pathname === href || pathname.startsWith(`${href}/`)
