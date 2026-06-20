@@ -14,7 +14,19 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.26] — Agent stars + forking, unified Automations, Locked agents — shipped 2026-06-20
+
 ### Added
+- **Per-agent "Locked" toggle.** Workspace admins can lock a governed agent
+  (e.g. regulated drafting): its in-app edits — Chat to edit, Improve, Fork, and
+  correction/learning capture — are removed and its Versions / Activity /
+  Learning history is hidden, so it changes only through direct repo PRs. Set on
+  the agent's Settings tab (admin-only) and audited on change.
+- **Unified agent Automations tab.** An agent's Automation tab now lists its
+  schedules, event triggers, and inbound webhooks in one sortable, filterable
+  table (matching the workspace Automations list), with a **New automation**
+  type picker (Schedule / Event trigger / Webhook) in place of the separate
+  inline forms.
 - **Agent visibility — stars + forking.** Star agents (☆ on each row) to curate
   a personal list; the agents page defaults to **Mine + Starred** (agents you own
   or starred) with a **View all** toggle, so big teams aren't staring at
@@ -34,6 +46,25 @@ they are no longer release versions. Phase scope now lives in
   and enables it by default, so the bundled samples list, view, and **run** with
   no repo or PAT. Chat-authoring / improvements (which open PRs) still need a
   connected repo.
+
+### Fixed
+- **Composio connection name mismatch** no longer triggers a false "Action
+  needed" prompt (or a failed run): when an agent pins a toolkit slot by a name
+  you authorized under a different one, your single active connection for that
+  toolkit is now used regardless of the declared name — matching native-MCP.
+- **Local sample agents** render without a connected repo — the workspace home
+  and agent pages no longer redirect to repo onboarding when
+  `TAS_LOCAL_AGENTS_DIR` is set.
+
+### Security
+- **Encrypted secrets are bound to their row** (AES-GCM AAD), so a ciphertext
+  blob can't be moved to another row and still decrypt. Non-breaking (versioned
+  blob; existing ciphertext keeps decrypting). Covers workspace secrets, native
+  + Composio connection credentials, OAuth client secrets, Slack tokens, and
+  webhook / API-key tokens.
+- **Workspace favicon route** now requires membership — unknown slugs,
+  unauthenticated, and non-member requests all return the generic default,
+  closing a workspace-existence probe.
 
 ### Documentation
 - **Example Agents** — a new docs page of copy-paste, connection-agnostic
