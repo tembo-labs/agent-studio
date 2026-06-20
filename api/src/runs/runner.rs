@@ -750,6 +750,7 @@ struct SlackDeliveryRow {
     channel: String,
     thread_ts: Option<String>,
     bot_token: Vec<u8>,
+    slack_app_id: Uuid,
 }
 
 /// Post a Slack-dispatched run's result back into the thread it came from.
@@ -758,7 +759,7 @@ struct SlackDeliveryRow {
 /// hiccup are all logged and swallowed so the run itself is never affected.
 async fn deliver_slack_result(state: &AppState, run_id: Uuid, body: &str) {
     let row = match sqlx::query_as::<_, SlackDeliveryRow>(
-        "SELECT d.channel, d.thread_ts, a.bot_token \
+        "SELECT d.channel, d.thread_ts, a.bot_token, a.id AS slack_app_id \
            FROM slack_delivery d \
            JOIN workspace_slack_app a ON a.id = d.slack_app_id \
           WHERE d.run_id = $1 AND d.delivered_at IS NULL AND a.bot_token IS NOT NULL",
@@ -775,7 +776,10 @@ async fn deliver_slack_result(state: &AppState, run_id: Uuid, body: &str) {
         }
     };
 
-    let token = match state.encryption_key.decrypt(&row.bot_token) {
+    let token = match state.encryption_key.decrypt_aad(
+        &row.bot_token,
+        crate::crypto::aad::slack_secret(row.slack_app_id, "bot_token").as_bytes(),
+    ) {
         Ok(t) => t,
         Err(e) => {
             tracing::warn!(run_id = %run_id, ?e, "slack bot token decrypt failed");

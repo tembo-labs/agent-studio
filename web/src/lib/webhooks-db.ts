@@ -1,8 +1,9 @@
 import "server-only";
 
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { decryptSecret, encryptSecret, last4 } from "@/lib/crypto";
+import { aadWebhookToken } from "@/lib/crypto-aad";
 import { db } from "@/lib/db";
 
 // External webhook triggers — an inbound HTTP endpoint that fires an agent run.
@@ -132,7 +133,10 @@ export function webhookTokenMatches(
 ): boolean {
   let stored: string;
   try {
-    stored = decryptSecret(row.tokenCiphertext);
+    stored = decryptSecret(
+      row.tokenCiphertext,
+      aadWebhookToken(row.workspaceId, row.id),
+    );
   } catch {
     return false;
   }
@@ -152,18 +156,21 @@ export async function createWebhook(args: {
   createdBy: string;
 }): Promise<{ webhook: WebhookPreview; token: string }> {
   const token = generateToken();
+  // Generate the id up front so the token AAD can bind to it at encrypt time.
+  const id = randomUUID();
   const { rows } = await db.query<PreviewDbRow>(
     `INSERT INTO workspace_webhook
-       (workspace_id, agent_name, owner_user_id, name, token_ciphertext,
+       (id, workspace_id, agent_name, owner_user_id, name, token_ciphertext,
         token_last4, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING ${PREVIEW_COLS}`,
     [
+      id,
       args.workspaceId,
       args.agentName,
       args.ownerUserId,
       args.name,
-      encryptSecret(token),
+      encryptSecret(token, aadWebhookToken(args.workspaceId, id)),
       last4(token),
       args.createdBy,
     ],
@@ -180,7 +187,12 @@ export async function rotateWebhookToken(
     `UPDATE workspace_webhook
         SET token_ciphertext = $3, token_last4 = $4, updated_at = NOW()
       WHERE workspace_id = $1 AND id = $2`,
-    [workspaceId, id, encryptSecret(token), last4(token)],
+    [
+      workspaceId,
+      id,
+      encryptSecret(token, aadWebhookToken(workspaceId, id)),
+      last4(token),
+    ],
   );
   return (rowCount ?? 0) > 0 ? token : null;
 }

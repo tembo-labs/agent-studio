@@ -99,7 +99,8 @@ pub async fn list_active_native_connections(
                 continue;
             }
         };
-        let plaintext = match key.decrypt(&ciphertext) {
+        let aad = crate::crypto::aad::native_connection(workspace_id, user_id, &provider, &name);
+        let plaintext = match key.decrypt_aad(&ciphertext, aad.as_bytes()) {
             Ok(s) => s,
             Err(e) => {
                 tracing::warn!(?e, %provider, %name, "skipping native connection: decrypt failed");

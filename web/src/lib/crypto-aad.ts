@@ -25,3 +25,37 @@ export function aadSecretConnection(
 ): string {
   return `secret_connection${SEP}${workspaceId}${SEP}${slug}`;
 }
+
+/** `workspace_connection` (native-MCP creds), keyed by its unique tuple. */
+export function aadNativeConnection(
+  workspaceId: string,
+  userId: string,
+  type: string,
+  name: string,
+): string {
+  return `workspace_connection${SEP}${workspaceId}${SEP}${userId}${SEP}${type}${SEP}${name}`;
+}
+
+/** `workspace_native_oauth_client` row, keyed by (workspace_id, provider, instance). */
+export function aadNativeOauthClient(
+  workspaceId: string,
+  provider: string,
+  instance: string,
+): string {
+  return `native_oauth_client${SEP}${workspaceId}${SEP}${provider}${SEP}${instance}`;
+}
+
+/** A secret column on a `workspace_slack_app` row, keyed by (id, column). */
+export function aadSlackSecret(slackAppId: string, column: string): string {
+  return `slack_app${SEP}${slackAppId}${SEP}${column}`;
+}
+
+/** `workspace_webhook` token, keyed by (workspace_id, id). */
+export function aadWebhookToken(workspaceId: string, id: string): string {
+  return `webhook${SEP}${workspaceId}${SEP}${id}`;
+}
+
+/** `workspace_api_key` token, keyed by (workspace_id, id). */
+export function aadApiKeyToken(workspaceId: string, id: string): string {
+  return `api_key${SEP}${workspaceId}${SEP}${id}`;
+}

@@ -37,6 +37,23 @@ pub mod aad {
     pub fn secret_connection(workspace_id: uuid::Uuid, slug: &str) -> String {
         format!("secret_connection{SEP}{workspace_id}{SEP}{slug}")
     }
+
+    pub fn native_connection(
+        workspace_id: uuid::Uuid,
+        user_id: &str,
+        conn_type: &str,
+        name: &str,
+    ) -> String {
+        format!("workspace_connection{SEP}{workspace_id}{SEP}{user_id}{SEP}{conn_type}{SEP}{name}")
+    }
+
+    pub fn native_oauth_client(workspace_id: uuid::Uuid, provider: &str, instance: &str) -> String {
+        format!("native_oauth_client{SEP}{workspace_id}{SEP}{provider}{SEP}{instance}")
+    }
+
+    pub fn slack_secret(slack_app_id: uuid::Uuid, column: &str) -> String {
+        format!("slack_app{SEP}{slack_app_id}{SEP}{column}")
+    }
 }
 
 pub struct MasterKey(Key<Aes256Gcm>);
