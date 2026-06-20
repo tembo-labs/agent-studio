@@ -1,6 +1,7 @@
 import "server-only";
 
 import { decryptSecret, encryptSecret, last4 } from "@/lib/crypto";
+import { aadSecretConnection } from "@/lib/crypto-aad";
 import { db } from "@/lib/db";
 
 // Secrets — the 3rd connection substrate. Free-form, per-WORKSPACE API keys
@@ -82,7 +83,7 @@ export async function upsertSecretConnection(args: {
   );
   const existed = existingRows.length > 0;
 
-  const ciphertext = encryptSecret(value);
+  const ciphertext = encryptSecret(value, aadSecretConnection(args.workspaceId, slug));
   await db.query(
     `INSERT INTO workspace_secret_connection
        (workspace_id, slug, description, ciphertext, last4, created_by)
@@ -131,5 +132,5 @@ export async function getSecretConnectionValue(
     [workspaceId, slug],
   );
   if (rows.length === 0) return null;
-  return decryptSecret(rows[0].ciphertext);
+  return decryptSecret(rows[0].ciphertext, aadSecretConnection(workspaceId, slug));
 }

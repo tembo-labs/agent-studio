@@ -1,6 +1,7 @@
 import "server-only";
 
 import { decryptSecret, encryptSecret, last4 } from "@/lib/crypto";
+import { aadWorkspaceSecret } from "@/lib/crypto-aad";
 import { db } from "@/lib/db";
 import {
   parseRepoInput,
@@ -768,7 +769,7 @@ export async function getWorkspaceSecretPlaintext(
   if (!rows[0]) {
     throw new Error(`workspace secret not found: ${kind}`);
   }
-  return decryptSecret(rows[0].ciphertext);
+  return decryptSecret(rows[0].ciphertext, aadWorkspaceSecret(workspaceId, kind));
 }
 
 // ── Commit mode (PR vs direct / YOLO) ────────────────────────────────────
@@ -826,7 +827,7 @@ export async function setWorkspaceSecret(
     return { ok: false, error: "bad-prefix" };
   }
 
-  const ciphertext = encryptSecret(trimmed);
+  const ciphertext = encryptSecret(trimmed, aadWorkspaceSecret(workspaceId, kind));
   await db.query(
     `INSERT INTO workspace_secret (workspace_id, kind, ciphertext, last4)
        VALUES ($1, $2, $3, $4)
@@ -921,7 +922,7 @@ export async function connectWorkspaceRepo(
     return { ok: false, error: validation.error, detail: validation.detail };
   }
 
-  const ciphertext = encryptSecret(token);
+  const ciphertext = encryptSecret(token, aadWorkspaceSecret(workspaceId, "github_pat"));
   const tokenLast4 = last4(token);
 
   const client = await db.connect();
