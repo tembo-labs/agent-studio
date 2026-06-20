@@ -1,8 +1,14 @@
 import "server-only";
 
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 
 import { decryptSecret, encryptSecret, last4 } from "@/lib/crypto";
+import { aadApiKeyToken } from "@/lib/crypto-aad";
 import { db } from "@/lib/db";
 
 // Per-user, workspace-bound API keys — the credential behind the public REST
@@ -109,7 +115,10 @@ export async function getApiKeyByToken(
 export function apiKeyTokenMatches(row: ApiKeyRow, presented: string): boolean {
   let stored: string;
   try {
-    stored = decryptSecret(row.tokenCiphertext);
+    stored = decryptSecret(
+      row.tokenCiphertext,
+      aadApiKeyToken(row.workspaceId, row.id),
+    );
   } catch {
     return false;
   }
@@ -128,18 +137,21 @@ export async function createApiKey(args: {
   createdBy: string;
 }): Promise<{ key: ApiKeyPreview; token: string }> {
   const token = generateApiKey();
+  // Generate the id up front so the token AAD can bind to it at encrypt time.
+  const id = randomUUID();
   const { rows } = await db.query<PreviewDbRow>(
     `INSERT INTO workspace_api_key
-       (workspace_id, user_id, name, token_lookup_hash, token_ciphertext,
+       (id, workspace_id, user_id, name, token_lookup_hash, token_ciphertext,
         token_last4, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING ${PREVIEW_COLS}`,
     [
+      id,
       args.workspaceId,
       args.userId,
       args.name,
       sha256Hex(token),
-      encryptSecret(token),
+      encryptSecret(token, aadApiKeyToken(args.workspaceId, id)),
       last4(token),
       args.createdBy,
     ],

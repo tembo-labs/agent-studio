@@ -143,8 +143,10 @@ pub async fn refresh_expiring_native_connections(
             key,
             http,
             workspace_id,
+            user_id,
             id,
             &provider,
+            &name,
             &mcp_url,
             &ciphertext,
             &metadata,
@@ -168,8 +170,10 @@ async fn refresh_one(
     key: &MasterKey,
     http: &reqwest::Client,
     workspace_id: uuid::Uuid,
+    user_id: &str,
     id: uuid::Uuid,
     provider: &str,
+    name: &str,
     mcp_url: &Option<String>,
     ciphertext: &[u8],
     metadata: &serde_json::Value,
@@ -179,7 +183,10 @@ async fn refresh_one(
         .filter(|u| !u.is_empty())
         .ok_or_else(|| anyhow!("connection has no mcp_server_url"))?;
 
-    let plaintext = key.decrypt(ciphertext).context("decrypt credentials")?;
+    let conn_aad = crate::crypto::aad::native_connection(workspace_id, user_id, provider, name);
+    let plaintext = key
+        .decrypt_aad(ciphertext, conn_aad.as_bytes())
+        .context("decrypt credentials")?;
     let creds: serde_json::Value =
         serde_json::from_str(&plaintext).context("credentials not JSON")?;
     let refresh_token = creds
@@ -281,7 +288,7 @@ async fn refresh_one(
         "token_type": token.token_type,
     });
     let blob = key
-        .encrypt(&new_creds.to_string())
+        .encrypt_aad(&new_creds.to_string(), conn_aad.as_bytes())
         .context("encrypt refreshed credentials")?;
 
     sqlx::query(
@@ -323,7 +330,12 @@ async fn native_oauth_client_secret(
     let (client_id, ciphertext) = row.ok_or_else(|| {
         anyhow!("no OAuth app \"{instance}\" configured for native provider {provider}")
     })?;
-    let secret = key.decrypt(&ciphertext).context("decrypt client_secret")?;
+    let secret = key
+        .decrypt_aad(
+            &ciphertext,
+            crate::crypto::aad::native_oauth_client(workspace_id, provider, instance).as_bytes(),
+        )
+        .context("decrypt client_secret")?;
     Ok((client_id, secret))
 }
 

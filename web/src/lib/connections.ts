@@ -1,6 +1,7 @@
 import "server-only";
 
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
+import { aadNativeConnection } from "@/lib/crypto-aad";
 import { db } from "@/lib/db";
 import { type McpProviderSlug } from "@/lib/mcp-providers";
 
@@ -143,14 +144,27 @@ export async function getNativeConnectionById(
 export async function getNativeConnectionCredentials(
   connectionId: string,
 ): Promise<ConnectionCredentials> {
-  const { rows } = await db.query<{ credentials: Buffer }>(
-    `SELECT credentials FROM workspace_connection WHERE id = $1`,
+  const { rows } = await db.query<{
+    workspace_id: string;
+    user_id: string;
+    type: string;
+    name: string;
+    credentials: Buffer;
+  }>(
+    `SELECT workspace_id, user_id, type, name, credentials
+       FROM workspace_connection WHERE id = $1`,
     [connectionId],
   );
   if (!rows[0]) {
     throw new Error(`workspace_connection ${connectionId} not found`);
   }
-  return JSON.parse(decryptSecret(rows[0].credentials));
+  const r = rows[0];
+  return JSON.parse(
+    decryptSecret(
+      r.credentials,
+      aadNativeConnection(r.workspace_id, r.user_id, r.type, r.name),
+    ),
+  );
 }
 
 export type SaveNativeConnectionArgs = {
@@ -173,7 +187,10 @@ export type SaveNativeConnectionArgs = {
 export async function saveNativeConnection(
   args: SaveNativeConnectionArgs,
 ): Promise<WorkspaceConnection> {
-  const ciphertext = encryptSecret(JSON.stringify(args.credentials));
+  const ciphertext = encryptSecret(
+    JSON.stringify(args.credentials),
+    aadNativeConnection(args.workspaceId, args.userId, args.type, args.name),
+  );
   const expiresAt = args.credentials.expires_at
     ? new Date(args.credentials.expires_at)
     : null;

@@ -99,7 +99,8 @@ pub async fn list_active_native_connections(
                 continue;
             }
         };
-        let plaintext = match key.decrypt(&ciphertext) {
+        let aad = crate::crypto::aad::native_connection(workspace_id, user_id, &provider, &name);
+        let plaintext = match key.decrypt_aad(&ciphertext, aad.as_bytes()) {
             Ok(s) => s,
             Err(e) => {
                 tracing::warn!(?e, %provider, %name, "skipping native connection: decrypt failed");
@@ -156,7 +157,8 @@ pub async fn list_workspace_secret_connections(
 
     let mut out = Vec::with_capacity(rows.len());
     for (slug, ciphertext) in rows {
-        match key.decrypt(&ciphertext) {
+        let aad = crate::crypto::aad::secret_connection(workspace_id, &slug);
+        match key.decrypt_aad(&ciphertext, aad.as_bytes()) {
             Ok(value) => out.push((slug, value)),
             Err(e) => {
                 tracing::warn!(?e, %slug, "skipping secret: decrypt failed")
@@ -188,5 +190,8 @@ pub async fn get_workspace_secret_plaintext(
     let ciphertext = row
         .ok_or_else(|| anyhow!("workspace secret {} not set", kind.as_db_str()))?
         .0;
-    key.decrypt(&ciphertext)
+    key.decrypt_aad(
+        &ciphertext,
+        crate::crypto::aad::workspace_secret(workspace_id, kind.as_db_str()).as_bytes(),
+    )
 }

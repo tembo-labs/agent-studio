@@ -1,6 +1,7 @@
 import "server-only";
 
 import { decryptSecret, encryptSecret, last4 } from "@/lib/crypto";
+import { aadNativeOauthClient } from "@/lib/crypto-aad";
 import { db } from "@/lib/db";
 
 // Bring-your-own OAuth app(s) for Native MCP providers that don't support DCR
@@ -107,7 +108,14 @@ export async function upsertNativeOAuthClient(args: {
       args.instance ?? DEFAULT_INSTANCE,
       args.label?.trim() || null,
       args.clientId.trim(),
-      encryptSecret(args.clientSecret),
+      encryptSecret(
+        args.clientSecret,
+        aadNativeOauthClient(
+          args.workspaceId,
+          args.provider,
+          args.instance ?? DEFAULT_INSTANCE,
+        ),
+      ),
       last4(args.clientSecret),
       args.userId,
     ],
@@ -150,6 +158,9 @@ export async function getNativeOAuthClientSecret(
   if (!r) return null;
   return {
     clientId: r.client_id,
-    clientSecret: decryptSecret(r.client_secret_ciphertext),
+    clientSecret: decryptSecret(
+      r.client_secret_ciphertext,
+      aadNativeOauthClient(workspaceId, provider, instance),
+    ),
   };
 }

@@ -1,6 +1,9 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
+import { aadSlackSecret } from "@/lib/crypto-aad";
 import { db } from "@/lib/db";
 import { listAgents } from "@/lib/workspace-agents";
 
@@ -120,19 +123,27 @@ export async function createSlackApp(
   input: CreateSlackAppInput,
   createdBy: string,
 ): Promise<SlackApp> {
+  // Generate the row id up front so the secret AAD can bind to it at encrypt
+  // time (it isn't known until after INSERT otherwise).
+  const id = randomUUID();
   const { rows } = await db.query<Row>(
     `INSERT INTO workspace_slack_app
-       (workspace_id, name, slack_app_id, signing_secret, client_id,
+       (id, workspace_id, name, slack_app_id, signing_secret, client_id,
         client_secret, default_owner_user_id, agent_labels, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING ${SELECT}`,
     [
+      id,
       workspaceId,
       input.name,
       input.slackAppId ?? null,
-      input.signingSecret ? encryptSecret(input.signingSecret) : null,
+      input.signingSecret
+        ? encryptSecret(input.signingSecret, aadSlackSecret(id, "signing_secret"))
+        : null,
       input.clientId ?? null,
-      input.clientSecret ? encryptSecret(input.clientSecret) : null,
+      input.clientSecret
+        ? encryptSecret(input.clientSecret, aadSlackSecret(id, "client_secret"))
+        : null,
       input.defaultOwnerUserId,
       input.agentLabels,
       createdBy,
@@ -171,9 +182,15 @@ export async function updateSlackApp(
   if (input.slackAppId !== undefined) set("slack_app_id", input.slackAppId);
   if (input.clientId !== undefined) set("client_id", input.clientId);
   if (input.signingSecret)
-    set("signing_secret", encryptSecret(input.signingSecret));
+    set(
+      "signing_secret",
+      encryptSecret(input.signingSecret, aadSlackSecret(id, "signing_secret")),
+    );
   if (input.clientSecret)
-    set("client_secret", encryptSecret(input.clientSecret));
+    set(
+      "client_secret",
+      encryptSecret(input.clientSecret, aadSlackSecret(id, "client_secret")),
+    );
   if (sets.length === 0) return;
   sets.push("updated_at = now()");
   params.push(workspaceId);
@@ -221,9 +238,15 @@ export async function getSlackAppSecrets(
   const r = rows[0];
   if (!r) return null;
   return {
-    signingSecret: r.signing_secret ? decryptSecret(r.signing_secret) : null,
-    clientSecret: r.client_secret ? decryptSecret(r.client_secret) : null,
-    botToken: r.bot_token ? decryptSecret(r.bot_token) : null,
+    signingSecret: r.signing_secret
+      ? decryptSecret(r.signing_secret, aadSlackSecret(id, "signing_secret"))
+      : null,
+    clientSecret: r.client_secret
+      ? decryptSecret(r.client_secret, aadSlackSecret(id, "client_secret"))
+      : null,
+    botToken: r.bot_token
+      ? decryptSecret(r.bot_token, aadSlackSecret(id, "bot_token"))
+      : null,
   };
 }
 
@@ -336,7 +359,7 @@ export async function setSlackAppInstall(
       WHERE id = $1`,
     [
       id,
-      encryptSecret(args.botToken),
+      encryptSecret(args.botToken, aadSlackSecret(id, "bot_token")),
       args.teamId,
       args.botUserId,
       args.slackAppId ?? null,
