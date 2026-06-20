@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
+import { isAgentLocked } from "@/lib/agent-lock";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
 import { listImprovementsForRun } from "@/lib/improvements-api";
 import { estimateRunCost, formatCurrency, formatTokens } from "@/lib/pricing";
@@ -121,8 +122,10 @@ export default async function RunDetailPage({
   const isLive = run.status === "running" || run.status === "queued";
 
   // "Improve the Agent" opens a Tembo CAP task — hide it when no Tembo
-  // API key is set (the run + its output still render).
+  // API key is set (the run + its output still render), or when the agent is
+  // locked (#12: no user-driven edits — changes go through repo PRs).
   const temboConfigured = await isTemboConfigured(workspace.id);
+  const locked = await isAgentLocked(workspace.id, run.agentName);
 
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;
   const totalTokens =
@@ -470,7 +473,8 @@ export default async function RunDetailPage({
           from the streaming output feels wrong. Fade it in two seconds
           after the output settles so the user finishes reading first. */}
       {(run.status === "succeeded" || run.status === "failed") &&
-        temboConfigured && (
+        temboConfigured &&
+        !locked && (
           <>
             <hr className="border-[var(--color-border-weak)]" />
             <ImproveForm

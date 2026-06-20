@@ -26,6 +26,7 @@ import {
   setAgentOwner,
 } from "@/lib/agent-versions";
 import { summarizeSpecDiff } from "@/lib/agent-version-summary";
+import { isAgentLocked, setAgentLock } from "@/lib/agent-lock";
 import {
   upsertAgentLearning,
   type LearningCadence,
@@ -640,6 +641,11 @@ export async function setAgentLearningAction(
   }
   const { workspace, userId } = auth;
 
+  // A locked agent must not capture/adapt — refuse to enable learning on it.
+  if (enabled && (await isAgentLocked(workspace.id, agentName))) {
+    return { error: "This agent is locked — learning is disabled." };
+  }
+
   // Attribute the batched improvement to whoever turned learning on (their
   // identity owns the resulting CAP task — improvement.created_by is NOT NULL).
   await upsertAgentLearning({
@@ -671,6 +677,48 @@ export async function setAgentLearningAction(
   };
 }
 
+export type LockFormState = { error?: string; message?: string };
+
+// Admin-only "Locked" toggle. When locked, the agent's in-app edit affordances
+// (Chat to edit, Improve, learning capture) are removed and its Versions /
+// Activity / Learning tabs are hidden — it changes only via repo PRs. The
+// scheduler skips locked agents, and the edit chokepoint (requestAgentChange)
+// rejects them, so hiding the UI isn't the only line of defense.
+export async function setAgentLockAction(
+  _prev: LockFormState,
+  formData: FormData,
+): Promise<LockFormState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const agentName = String(formData.get("agent") ?? "");
+  const locked = formData.get("locked") === "on";
+
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+
+  await setAgentLock(workspace.id, agentName, locked, userId);
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "policy_change",
+    kind: "agent.lock.changed",
+    targetType: "agent",
+    targetId: agentName,
+    agentName,
+    payload: { locked },
+  });
+
+  revalidatePath(`/${slug}/agents/${encodeURIComponent(agentName)}`, "layout");
+  return {
+    message: locked
+      ? "Agent locked. Users can't edit it and its history is hidden; change it via repo PRs."
+      : "Agent unlocked.",
+  };
+}
+
 const FORK_ERROR_MESSAGE: Partial<
   Record<Extract<ForkAgentResult, { ok: false }>["error"], string>
 > = {
@@ -691,6 +739,12 @@ export async function forkAgentAction(args: {
     notFound();
   }
   const { workspace, userId } = auth;
+
+  // A locked agent is change-controlled — it can't be copied out either.
+  if (await isAgentLocked(workspace.id, args.agentName)) {
+    return { ok: false, error: "This agent is locked and can't be forked." };
+  }
+
   const session = await getServerSession();
   const email = session?.user.email ?? "";
 

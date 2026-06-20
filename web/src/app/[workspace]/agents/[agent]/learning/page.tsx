@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
 import { getAgentLearning } from "@/lib/agent-learning-api";
@@ -21,10 +23,14 @@ export default async function AgentLearningPage({
   params: Promise<{ workspace: string; agent: string }>;
 }) {
   const { workspace: slug, agent: agentName } = await params;
-  const { session, workspace, canonicalName } = await loadAgentContext(
+  const { session, workspace, canonicalName, locked } = await loadAgentContext(
     slug,
     agentName,
   );
+  // Locked agents hide their history tabs (#12) — block the direct URL too.
+  if (locked) {
+    redirect(`/${slug}/agents/${encodeURIComponent(canonicalName)}`);
+  }
 
   const [learning, stats, batches, role] = await Promise.all([
     getAgentLearning(workspace.id, canonicalName),

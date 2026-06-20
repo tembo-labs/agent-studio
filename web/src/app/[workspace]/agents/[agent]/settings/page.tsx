@@ -3,6 +3,7 @@ import { getAgentOwner } from "@/lib/agent-versions";
 import { meetsMinRole } from "@/lib/rbac";
 import { getWorkspaceRole, listWorkspaceMembers } from "@/lib/workspace";
 
+import { AgentLockControl } from "../agent-lock-control";
 import { AgentOwnerControl } from "../agent-owner-control";
 import { loadAgentContext } from "../agent-page-context";
 import { DeleteAgentButton } from "../delete-agent-button";
@@ -18,7 +19,7 @@ export default async function AgentSettingsPage({
   params: Promise<{ workspace: string; agent: string }>;
 }) {
   const { workspace: slug, agent: agentName } = await params;
-  const { session, workspace, canonicalName } = await loadAgentContext(
+  const { session, workspace, canonicalName, locked } = await loadAgentContext(
     slug,
     agentName,
   );
@@ -63,6 +64,18 @@ export default async function AgentSettingsPage({
             name: m.name,
             email: m.email,
           }))}
+        />
+      </Section>
+
+      <Section
+        title="Locked"
+        description="Lock a governed agent (e.g. regulated drafting) so users can't change it in-app and its history is hidden — it then changes only via repo PRs."
+      >
+        <AgentLockControl
+          workspaceSlug={workspace.slug}
+          agentName={canonicalName}
+          locked={locked}
+          canManage={isAdmin}
         />
       </Section>
 

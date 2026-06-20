@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { listAuditTimeline } from "@/lib/audit-db";
 
 import { AgentTimeline } from "../agent-timeline";
@@ -16,7 +18,14 @@ export default async function AgentActivityPage({
   params: Promise<{ workspace: string; agent: string }>;
 }) {
   const { workspace: slug, agent: agentName } = await params;
-  const { workspace, canonicalName } = await loadAgentContext(slug, agentName);
+  const { workspace, canonicalName, locked } = await loadAgentContext(
+    slug,
+    agentName,
+  );
+  // Locked agents hide their history tabs (#12) — block the direct URL too.
+  if (locked) {
+    redirect(`/${slug}/agents/${encodeURIComponent(canonicalName)}`);
+  }
 
   const timeline = await listAuditTimeline(
     workspace.id,
