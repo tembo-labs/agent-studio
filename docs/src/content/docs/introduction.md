@@ -6,8 +6,9 @@ description: What Tembo Agent Studio is and the principles behind it.
 Tembo Agent Studio (TAS) is a **control plane for AI agents**. Agent definitions
 live as files in a Git repository you own. Every change — whether an engineer
 typed it, a PM described it in chat, or an end user clicked "this is wrong" —
-flows through the same pull-request review your team already uses for code. Runs
-and audit logs stay tied to your workspace.
+lands as a diff in your repo, through pull-request review by default or a direct
+commit when YOLO mode is enabled. Runs and audit logs stay tied to your
+workspace.
 
 Agents are software. Most teams treat them as something else: prompts edited in
 vendor consoles, with no diff, no review, and no rewind. TAS lets agents inherit
@@ -37,10 +38,10 @@ definition to action to adaptation — stays governed.
 You don't have to be an engineer to create or evolve an agent. Authoring and
 changes are handled by **Tembo**, an AI software engineering platform: describe
 what you want in plain language — a new agent, a tweak, or "this run was wrong" —
-and Tembo turns it into a reviewable pull request against your repo. It serves
-everyone on the team, from operators to PMs to the people who use the agents, not
-just developers — and it's backed by real human engineers at Tembo who step in
-when a change needs them.
+and Tembo turns it into a pull request by default, or a direct commit when YOLO
+mode is enabled. It serves everyone on the team, from operators to PMs to the
+people who use the agents, not just developers — and it's backed by real human
+engineers at Tembo who step in when a change needs them.
 
 ## What's in this manual
 
