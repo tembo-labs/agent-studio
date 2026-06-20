@@ -14,6 +14,33 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+### Added
+- **Agent visibility — stars + forking.** Star agents (☆ on each row) to curate
+  a personal list; the agents page defaults to **Mine + Starred** (agents you own
+  or starred) with a **View all** toggle, so big teams aren't staring at
+  everyone's agents. And **Fork** any agent into your own editable, owner-prefixed
+  copy (`sales-gen` → `ryw.sales-gen`) — no name collisions, owned by you, shares
+  the original's tools module until you change it. New `agent_star` table; agent
+  names may now carry one optional `<handle>.` owner prefix.
+- **One-command sandbox bring-up** — `./scripts/dev-up.sh` writes a dev `.env`
+  (email/password sign-in, random secrets), boots Postgres + api + web via Docker
+  Compose, and seeds an instance-admin login you can use immediately. Plus a
+  `tembo.nix` (Rust toolchain on top of the sandbox's preinstalled Node/Docker)
+  so [Tembo sandboxes](https://docs.tembo.io/features/sandbox/overview) and
+  snapshots have what the build needs.
+- **Local sample agents for dev** — when a workspace has no connected GitHub
+  repo and `TAS_LOCAL_AGENTS_DIR` is set, agents load (read-only) from that
+  directory instead of GitHub. `docker-compose.yml` mounts the repo's `./agents`
+  and enables it by default, so the bundled samples list, view, and **run** with
+  no repo or PAT. Chat-authoring / improvements (which open PRs) still need a
+  connected repo.
+
+### Documentation
+- **Example Agents** — a new docs page of copy-paste, connection-agnostic
+  agent-creation prompts (email triage, ticket/issue roundup, CRM tasks, daily
+  task list). Paste one into chat-to-PR authoring and it adapts to whatever
+  you've connected — generating one agent per matching service.
+
 ## [v2026.6.25] — Email + password quickstart sign-in, docs refresh — shipped 2026-06-19
 
 ### Added

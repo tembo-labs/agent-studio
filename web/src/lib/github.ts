@@ -157,7 +157,7 @@ export type GitHubFileError =
   | "rate-limited"
   | "network";
 
-type GitHubContentEntry = {
+export type GitHubContentEntry = {
   type: "file" | "dir" | "submodule" | "symlink";
   name: string;
   path: string;

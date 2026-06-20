@@ -229,6 +229,20 @@ export async function getAgentOwner(
     : null;
 }
 
+/** Agent names this user owns in the workspace — for the "owned + starred"
+ *  default in the agents list. */
+export async function listOwnedAgentNames(
+  workspaceId: string,
+  userId: string,
+): Promise<Set<string>> {
+  const { rows } = await db.query<{ agent_name: string }>(
+    `SELECT agent_name FROM agent_owner
+      WHERE workspace_id = $1 AND owner_user_id = $2`,
+    [workspaceId, userId],
+  );
+  return new Set(rows.map((r) => r.agent_name));
+}
+
 export async function setAgentOwner(
   workspaceId: string,
   agentName: string,

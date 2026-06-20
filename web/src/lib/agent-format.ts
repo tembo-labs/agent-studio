@@ -149,11 +149,29 @@ export function detectFormat(filename: string): AgentFileFormat | null {
   return null;
 }
 
-/** Same charset as workspace slugs — the filename will be `{name}.{ext}`. */
-const NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Kebab slug; the filename is `{name}.{ext}`. An optional single `{handle}.`
+ *  prefix is allowed so a fork can be owner-namespaced (e.g. `ryw.sales-gen`)
+ *  without colliding with the original. Plain names still validate. */
+const SLUG = "[a-z0-9]+(?:-[a-z0-9]+)*";
+const NAME_RE = new RegExp(`^(?:${SLUG}\\.)?${SLUG}$`);
 
 export function validateAgentName(name: string): boolean {
   return name.length >= 2 && name.length <= 64 && NAME_RE.test(name);
+}
+
+/** A kebab handle from a user's email local-part (`ryw@tembo.io` → `ryw`), for
+ *  owner-prefixed fork names. */
+export function ownerHandle(email: string): string {
+  const local = (email.split("@")[0] ?? "").toLowerCase();
+  return local.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "user";
+}
+
+/** The base slug with any leading `{handle}.` owner prefix stripped, so forking
+ *  a fork re-prefixes the base rather than nesting (`alice.sales-gen`, not
+ *  `alice.ryw.sales-gen`). */
+export function baseAgentSlug(name: string): string {
+  const dot = name.indexOf(".");
+  return dot > 0 ? name.slice(dot + 1) : name;
 }
 
 /**

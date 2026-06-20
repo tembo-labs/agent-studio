@@ -16,7 +16,8 @@ import { type Workspace } from "@/lib/workspace";
 export type AgentPageContext = {
   session: NonNullable<Awaited<ReturnType<typeof getServerSession>>>;
   workspace: Workspace;
-  repo: NonNullable<Awaited<ReturnType<typeof getWorkspaceRepo>>>;
+  /** Null in local-agents dev mode (no connected repo). */
+  repo: Awaited<ReturnType<typeof getWorkspaceRepo>>;
   agent: ListedAgent;
   raw: string;
   toolsModuleContent: string | undefined;
@@ -34,8 +35,10 @@ export async function loadAgentContext(
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
+  // No repo is fine in local-agents dev mode (TAS_LOCAL_AGENTS_DIR); otherwise
+  // a workspace must connect a repo before its agents resolve.
   const repo = await getWorkspaceRepo(workspace.id);
-  if (!repo) {
+  if (!repo && !process.env.TAS_LOCAL_AGENTS_DIR?.trim()) {
     redirect(`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`);
   }
 

@@ -23,6 +23,7 @@ import {
 import { AgentNav } from "./agent-nav";
 import { loadAgentContext } from "./agent-page-context";
 import { DraftChangesBanner } from "./draft-changes-banner";
+import { ForkAgentButton } from "./fork-agent-button";
 import { RunNowButton } from "./run-now-button";
 
 export const dynamic = "force-dynamic";
@@ -71,7 +72,10 @@ export default async function AgentLayout({
   };
   const ownerLabel = owner ? nameFor(owner.ownerUserId) : null;
   const draftChanged = agent.ok && (!stable || stable.specContent !== raw);
-  const sourceHref = `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`;
+  // No GitHub source URL for local-agents dev mode (no connected repo).
+  const sourceHref = repo
+    ? `https://github.com/${repo.owner}/${repo.name}/blob/${repo.defaultBranch}/${agent.path}`
+    : null;
 
   // External services the agent declares, deduped by slug, for the icon row.
   const connectionIcons: ConnectionIconItem[] = [];
@@ -160,11 +164,13 @@ export default async function AgentLayout({
               )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Button asChild variant="ghost">
-              <a href={sourceHref} target="_blank" rel="noreferrer noopener">
-                View source
-              </a>
-            </Button>
+            {sourceHref && (
+              <Button asChild variant="ghost">
+                <a href={sourceHref} target="_blank" rel="noreferrer noopener">
+                  View source
+                </a>
+              </Button>
+            )}
             {agent.ok && canEdit && temboConfigured && (
               <Button asChild variant="secondary">
                 <Link
@@ -173,6 +179,12 @@ export default async function AgentLayout({
                   Chat to edit
                 </Link>
               </Button>
+            )}
+            {agent.ok && canEdit && (
+              <ForkAgentButton
+                workspaceSlug={workspace.slug}
+                agentName={canonicalName}
+              />
             )}
             {agent.ok && canEdit && (
               <RunNowButton

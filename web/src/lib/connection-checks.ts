@@ -44,6 +44,8 @@ export function labelFor(
 export type ConnectionSlotSets = {
   /** `${toolkit}:${name}` for each ACTIVE Composio connection. */
   composioSlots: Set<string>;
+  /** Active Composio connection count per toolkit (single-slot fallback). */
+  composioCountByToolkit: Map<string, number>;
   /** `${type}:${name}` for each active Native-MCP connection. */
   nativeSlots: Set<string>;
   /** Active Native-MCP connection count per provider (single-slot fallback). */
@@ -57,11 +59,17 @@ export function buildConnectionSlotSets(
   native: { type: string; name: string; status: string }[],
   secrets: { slug: string }[],
 ): ConnectionSlotSets {
+  const activeComposio = composio.filter((c) => c.status === "ACTIVE");
   const composioSlots = new Set(
-    composio
-      .filter((c) => c.status === "ACTIVE")
-      .map((c) => `${c.toolkit}:${c.name}`),
+    activeComposio.map((c) => `${c.toolkit}:${c.name}`),
   );
+  const composioCountByToolkit = new Map<string, number>();
+  for (const c of activeComposio) {
+    composioCountByToolkit.set(
+      c.toolkit,
+      (composioCountByToolkit.get(c.toolkit) ?? 0) + 1,
+    );
+  }
   const activeNative = native.filter((c) => c.status === "active");
   const nativeSlots = new Set(activeNative.map((c) => `${c.type}:${c.name}`));
   const nativeCountByProvider = new Map<string, number>();
@@ -72,7 +80,13 @@ export function buildConnectionSlotSets(
     );
   }
   const secretSlugs = new Set(secrets.map((s) => s.slug));
-  return { composioSlots, nativeSlots, nativeCountByProvider, secretSlugs };
+  return {
+    composioSlots,
+    composioCountByToolkit,
+    nativeSlots,
+    nativeCountByProvider,
+    secretSlugs,
+  };
 }
 
 // Single source of truth for "is this agent connection set up for the user?".
@@ -80,11 +94,13 @@ export function buildConnectionSlotSets(
 // "Action needed" list call this, so they can't drift. `toolkit`/`name` must
 // already be trimmed + lowercased (name defaulted to "default").
 //
-// The native-mcp single-connection fallback (mirrors build_native_mcp_toolsets):
-// an agent pins a slot by name, but users routinely have the provider under a
-// different name (e.g. `tembo` vs `default`); when there's exactly one active
-// connection for the provider, the runtime uses it regardless of the declared
-// name — so it isn't "missing".
+// The single-connection fallback (mirrors build_native_mcp_toolsets and
+// build_composio_toolset): an agent pins a slot by name, but users routinely
+// have the provider under a different name (e.g. an agent declares `gmail`
+// under `tembo` while the user authorized `ry-tembo`); when there's exactly
+// one active connection for that toolkit/provider, the runtime uses it
+// regardless of the declared name — so it isn't "missing". Applies to both
+// Composio and Native-MCP so the sidebar and runtime agree.
 export function isAgentConnectionMissing(
   source: AgentConnectionSource,
   toolkit: string,
@@ -98,7 +114,10 @@ export function isAgentConnectionMissing(
       sets.nativeCountByProvider.get(toolkit) !== 1
     );
   }
-  return !sets.composioSlots.has(`${toolkit}:${name}`);
+  return (
+    !sets.composioSlots.has(`${toolkit}:${name}`) &&
+    sets.composioCountByToolkit.get(toolkit) !== 1
+  );
 }
 
 export async function findMissingConnections(

@@ -42,6 +42,21 @@ whole point of recording, so we keep the safety on.
 - **One outbound HTTP call** → Polly with a recorded cassette.
 - **Multi-page user flow** → Cucumber feature + Playwright.
 
+## Microsoft / OIDC sign-in
+
+Most of the Microsoft Entra ID and generic OIDC sign-in contract is
+testable without a live IdP: provider discovery/client config, redirect
+URI construction, profile email/name mapping, and the invite-only
+`user.create.before` / invite-resolution hooks are covered by Vitest
+with mocked better-auth boundaries.
+
+A live Microsoft/Okta/Auth0/Keycloak app is only needed for final smoke
+coverage of the provider-owned surfaces: tenant/app registration,
+consent/login UI, and the real authorization-code/token exchange. CI
+should use mocks for deterministic coverage; run the live IdP smoke test
+manually when changing provider env or before declaring a deployment's
+external IdP setup verified.
+
 ## Server-only shim
 
 Most `lib/*.ts` files start with `import "server-only"`, which throws

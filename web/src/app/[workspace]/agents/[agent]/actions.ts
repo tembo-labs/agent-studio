@@ -39,10 +39,13 @@ import {
 } from "@/lib/triggers-db";
 import {
   deleteAgent,
+  forkAgent,
   getAgentByName,
   resolveAgentForDispatch,
   type DeleteAgentError,
+  type ForkAgentResult,
 } from "@/lib/workspace-agents";
+import { getServerSession } from "@/lib/session";
 import {
   getWorkspaceRole,
   getWorkspaceSecretPlaintext,
@@ -666,5 +669,49 @@ export async function setAgentLearningAction(
       ? `Learning mode on (${cadence}). Corrections you make in the Inbox batch into a PR each cycle.`
       : "Learning mode off.",
   };
+}
+
+const FORK_ERROR_MESSAGE: Partial<
+  Record<Extract<ForkAgentResult, { ok: false }>["error"], string>
+> = {
+  "no-repo": "Connect a GitHub repo before forking agents.",
+  "not-found": "That agent no longer exists.",
+  "invalid-source": "The source agent file couldn't be read.",
+};
+
+// Fork an agent into the current user's owner-namespaced copy (ryw.<base-slug>).
+// The forker becomes the owner, so it lands in their "Mine + Starred" view.
+export async function forkAgentAction(args: {
+  workspaceSlug: string;
+  agentName: string;
+}): Promise<{ ok: true; agentName: string } | { ok: false; error: string }> {
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+  const session = await getServerSession();
+  const email = session?.user.email ?? "";
+
+  const result = await forkAgent(workspace.id, userId, email, args.agentName);
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: FORK_ERROR_MESSAGE[result.error] ?? "Couldn't fork the agent.",
+    };
+  }
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "agent.forked",
+    targetType: "agent",
+    targetId: result.agentName,
+    agentName: result.agentName,
+    payload: { from: args.agentName },
+  });
+  revalidatePath(`/${args.workspaceSlug}`, "layout");
+  return { ok: true, agentName: result.agentName };
 }
 

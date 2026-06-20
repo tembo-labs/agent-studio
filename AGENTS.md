@@ -19,6 +19,28 @@ user stories, demo scripts per phase). The product user manual lives in
 `docs/` (Astro Starlight, published to GitHub Pages) — see
 [`docs/README.md`](./docs/README.md).
 
+## Running the app (one command)
+
+In a Tembo sandbox (or any Docker host), bring up a fully working instance with
+a seeded admin login:
+
+```bash
+./scripts/dev-up.sh
+```
+
+It writes a `.env` (random secrets, **no OAuth → email/password sign-in**), runs
+`docker compose up`, waits for the web app, and seeds an instance-admin account
+(`admin@tembo.local` / `tembo-dev-password` by default; override with
+`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`). Sign in and create a workspace —
+the bundled sample agents (`./agents`, mounted via `TAS_LOCAL_AGENTS_DIR`) load
+automatically with no repo connected; connect a GitHub repo (with a PAT) to load
+your own. Re-runnable.
+
+`tembo.nix` (repo root) adds the Rust toolchain on top of the sandbox's
+preinstalled Node 22 / pnpm / Docker, so `cargo build`/`cargo test` work too. It
+is also what Tembo snapshots bake in — keep it committed so prebuilt sessions
+include it.
+
 ## Commands
 
 ```bash
@@ -70,8 +92,16 @@ affects.
   `authoring-agents.md` / `troubleshooting.md`.
 - **Code structure / conventions** → update the nearest `AGENTS.md` (this file,
   `web/AGENTS.md`, `api/AGENTS.md`).
-- The in-app docs viewer reads the same `docs/` content, so one update covers
-  both the published manual and the in-app version.
+- The in-app docs viewer reads a **generated bundle**
+  (`web/src/lib/docs-content.ts`), not the markdown directly. After editing
+  anything under `docs/src/content/docs/` — including the generated
+  `changelog.md` / `roadmap.md` — run **`cd web && pnpm gen:docs`** and commit
+  the regenerated `docs-content.ts` in the same change. Skip it and the published
+  manual updates but the in-app `/docs` drifts.
+- A **new** doc page needs a sidebar entry in **both** `docs/astro.config.mjs`
+  (published site) **and** `web/src/app/[workspace]/docs/nav.ts` (in-app sidebar +
+  the slug allow-list that rewrites `/agent-studio/<slug>/` cross-links). Miss
+  `nav.ts` and the page is unreachable in-app and its inbound links 404.
 
 CI runs a non-blocking `docs-sync` reminder that flags changes touching
 `web/src/app/**` or `api/src/**` without any `docs/` change. It's a nudge, not
