@@ -46,8 +46,10 @@ export default async function WorkspacePage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
+  // No repo is fine in local-agents dev mode (agents load from
+  // TAS_LOCAL_AGENTS_DIR); otherwise send the user to connect a repo first.
   const repo = await getWorkspaceRepo(workspace.id);
-  if (!repo) {
+  if (!repo && !process.env.TAS_LOCAL_AGENTS_DIR?.trim()) {
     redirect(`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`);
   }
 
