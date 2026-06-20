@@ -1135,7 +1135,14 @@ def build_composio_toolset(
     resolved: dict[str, str] = {}
     missing: list[str] = []
     for (toolkit, name, _tools, _source) in connections:
-        cid = nested.get(toolkit, {}).get(name)
+        inner = nested.get(toolkit, {})
+        cid = inner.get(name)
+        # Single-connection fallback (mirrors build_native_mcp_toolsets and the
+        # sidebar's isAgentConnectionMissing): the agent pins a slot by name but
+        # the user authorized this toolkit under exactly one differently-named
+        # connection — use it regardless of the declared name.
+        if cid is None and len(inner) == 1:
+            cid = next(iter(inner.values()))
         if cid is None:
             slot_label = toolkit if name == "default" else f"{toolkit}/{name}"
             missing.append(slot_label)
