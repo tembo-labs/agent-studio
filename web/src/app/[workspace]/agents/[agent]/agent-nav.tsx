@@ -33,7 +33,7 @@ export function AgentNav({
   return (
     <nav
       aria-label="Agent sections"
-      className="flex w-full shrink-0 flex-row gap-1 overflow-x-auto sm:w-44 sm:flex-col"
+      className="flex w-full shrink-0 flex-row gap-1 overflow-x-auto sm:w-36 sm:flex-col"
     >
       {ITEMS.map((item) => {
         const href = item.slug ? `${base}/${item.slug}` : base;
