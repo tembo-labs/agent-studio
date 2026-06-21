@@ -53,7 +53,7 @@ jobs:
             context: ./web
             service_var: RAILWAY_WEB_SERVICE_ID
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Short SHA
         id: vars

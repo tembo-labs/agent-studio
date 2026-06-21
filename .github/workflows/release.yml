@@ -48,7 +48,7 @@ jobs:
             context: ./web
     steps:
       - name: Check out the tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
