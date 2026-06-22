@@ -27,7 +27,7 @@ export default async function InboxPage({
 
   // Fetch the whole queue (single-tenant volumes are small); the client table
   // facets/filters/sorts in place. Default view shows active items.
-  const items = await listInboxItems(workspace.id, {}, 1000);
+  const items = await listInboxItems(workspace.id, session.user.id, {}, 1000);
   const rows: InboxRow[] = items.map((i) => ({
     id: i.id,
     title: i.title,

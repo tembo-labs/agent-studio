@@ -547,6 +547,9 @@ export async function produceInboxItemFor(
     // Provenance lives on produced_by_run_id; created_by is reserved for the
     // person who filed it (null when an agent did).
     createdBy: producedByRunId ? null : ctx.userId,
+    // Owner = the acting user (the run's identity for agent pushes, or the
+    // filer). Inboxes are private and scope reads/mutations to this.
+    ownerUserId: ctx.userId,
   });
   await auditApiMutation(ctx, {
     kind: "inbox.produced",
@@ -562,7 +565,7 @@ export async function listInboxItemsFor(
   filters: ListInboxFilters = {},
   limit?: number,
 ): Promise<{ ok: true; items: InboxItem[] }> {
-  const items = await listInboxItems(ctx.workspace.id, filters, limit);
+  const items = await listInboxItems(ctx.workspace.id, ctx.userId, filters, limit);
   return { ok: true, items };
 }
 
@@ -570,7 +573,7 @@ export async function getInboxItemFor(
   ctx: ApiCtx,
   id: string,
 ): Promise<{ ok: true; item: InboxItem } | ActionFailure> {
-  const item = await getInboxItem(id, ctx.workspace.id);
+  const item = await getInboxItem(id, ctx.workspace.id, ctx.userId);
   if (!item) return { ok: false, status: 404, error: `no inbox item "${id}"` };
   return { ok: true, item };
 }
@@ -581,12 +584,12 @@ export async function claimInboxItemFor(
 ): Promise<{ ok: true; item: InboxItem } | ActionFailure> {
   const agent = await actingAgentName(ctx, input.parentRunId);
   const ok = agent
-    ? await claimInboxItem(input.id, ctx.workspace.id, "agent", agent)
-    : await claimInboxItem(input.id, ctx.workspace.id, "human", ctx.userId);
+    ? await claimInboxItem(input.id, ctx.workspace.id, "agent", agent, ctx.userId)
+    : await claimInboxItem(input.id, ctx.workspace.id, "human", ctx.userId, ctx.userId);
   if (!ok) {
     return { ok: false, status: 409, error: "item not found or already claimed" };
   }
-  const item = await getInboxItem(input.id, ctx.workspace.id);
+  const item = await getInboxItem(input.id, ctx.workspace.id, ctx.userId);
   return { ok: true, item: item! };
 }
 
@@ -597,11 +600,16 @@ export async function proposeInboxActionFor(
   if (!input.proposedAction || (!input.proposedAction.text && !input.proposedAction.fields)) {
     return { ok: false, status: 400, error: "proposedAction must have text or fields" };
   }
-  const ok = await setProposedAction(input.id, ctx.workspace.id, input.proposedAction);
+  const ok = await setProposedAction(
+    input.id,
+    ctx.workspace.id,
+    input.proposedAction,
+    ctx.userId,
+  );
   if (!ok) {
     return { ok: false, status: 409, error: "item not found or not in a proposable state" };
   }
-  const item = await getInboxItem(input.id, ctx.workspace.id);
+  const item = await getInboxItem(input.id, ctx.workspace.id, ctx.userId);
   return { ok: true, item: item! };
 }
 
@@ -612,11 +620,16 @@ export async function completeInboxItemFor(
   if (!input.finalAction || (!input.finalAction.text && !input.finalAction.fields)) {
     return { ok: false, status: 400, error: "finalAction must have text or fields" };
   }
-  const ok = await completeInboxItem(input.id, ctx.workspace.id, input.finalAction);
+  const ok = await completeInboxItem(
+    input.id,
+    ctx.workspace.id,
+    input.finalAction,
+    ctx.userId,
+  );
   if (!ok) {
     return { ok: false, status: 409, error: "item not found or already resolved" };
   }
-  const item = await getInboxItem(input.id, ctx.workspace.id);
+  const item = await getInboxItem(input.id, ctx.workspace.id, ctx.userId);
   // Recorded as a HITL response even when an autonomous agent completes it —
   // the (proposed, final) pair is the signal the learning pass batches later.
   await auditApiMutation(ctx, {
@@ -633,7 +646,7 @@ export async function dismissInboxItemFor(
   ctx: ApiCtx,
   input: { id: string },
 ): Promise<{ ok: true } | ActionFailure> {
-  const ok = await dismissInboxItem(input.id, ctx.workspace.id);
+  const ok = await dismissInboxItem(input.id, ctx.workspace.id, ctx.userId);
   if (!ok) {
     return { ok: false, status: 409, error: "item not found or already resolved" };
   }

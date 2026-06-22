@@ -29,7 +29,7 @@ export default async function InboxItemPage({
   const workspace = await getWorkspaceBySlug(slug);
   if (!workspace) notFound();
 
-  const item = await getInboxItem(id, workspace.id);
+  const item = await getInboxItem(id, workspace.id, session.user.id);
   if (!item) notFound();
 
   const resolved = item.status === "done" || item.status === "dismissed";
