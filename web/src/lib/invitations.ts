@@ -165,6 +165,22 @@ export async function resolvePendingInvitesForUser(
   email: string,
 ): Promise<number> {
   const e = email.trim().toLowerCase();
+  // Honor an invite only when the IdP verified the email (#47). better-auth
+  // stores `emailVerified` from the provider's `email_verified` claim (false
+  // when absent); Google/Microsoft verify. Without this, a user who can assert
+  // an unverified / attacker-controlled email at a permissive IdP could
+  // auto-join the invited workspace at the invited role. Central gate — both
+  // user-driven paths (first-sign-in hook + home-page resolve) funnel here.
+  const { rows: verified } = await db.query<{ emailVerified: boolean }>(
+    `SELECT "emailVerified" FROM "user" WHERE id = $1`,
+    [userId],
+  );
+  if (!verified[0]?.emailVerified) {
+    console.warn(
+      `[invites] skipping invite resolve for ${userId}: email not verified by the IdP`,
+    );
+    return 0;
+  }
   const client = await db.connect();
   try {
     await client.query("BEGIN");
