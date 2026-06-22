@@ -31,7 +31,7 @@
     "cron-parser": "^5.5.0",
     "cronstrue": "^3.14.0",
     "fflate": "^0.8.3",
-    "lucide-react": "^1.17.0",
+    "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "pg": "^8.21.0",
     "react": "19.2.7",
