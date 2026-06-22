@@ -1,5 +1,7 @@
 import "server-only";
 
+import { claimAgentOwner } from "@/lib/agent-versions";
+
 // Typed client for the Rust API's /internal/runs surface. Auth is a
 // shared bearer (INTERNAL_API_TOKEN env var); the web container reaches
 // the API service via the docker network at API_INTERNAL_URL.
@@ -167,6 +169,14 @@ export async function createRun(input: CreateRunInput): Promise<CreateRunRespons
     throw new Error(`Run API returned ${res.status}: ${text.slice(0, 400)}`);
   }
   const body = (await res.json()) as { run_id: string };
+  // First run claims ownership if the agent has none yet (chat-created agents
+  // already have an owner; repo-committed ones don't). Best-effort — never let
+  // an ownership write fail a run that was just accepted.
+  try {
+    await claimAgentOwner(input.workspaceId, input.agentName, input.userId);
+  } catch (e) {
+    console.error("claimAgentOwner failed (non-fatal)", e);
+  }
   return { runId: body.run_id };
 }
 
