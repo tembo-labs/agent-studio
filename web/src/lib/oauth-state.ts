@@ -13,6 +13,17 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const SIG_LEN = 32; // sha-256 output
 
+// OAuth / install state is short-lived: reject anything older than this so a
+// leaked callback URL (referer, logs, history) can't be replayed indefinitely
+// (#46). `iat` lives inside the HMAC-signed body, so it can't be forged.
+const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes — flows complete in seconds
+
+function isStateFresh(iat: number): boolean {
+  const now = Date.now();
+  // Reject stale; tolerate small clock skew on the future side.
+  return iat <= now + 60_000 && now - iat <= STATE_TTL_MS;
+}
+
 function getSecret(): Buffer {
   const raw = process.env.BETTER_AUTH_SECRET;
   if (!raw) {
@@ -64,14 +75,17 @@ export type NativeMcpStatePayload = {
   instance?: string;
   /** Short random nonce — defends against state replay across users. */
   nonce: string;
+  /** Issued-at (epoch ms); states older than STATE_TTL_MS are rejected (#46). */
+  iat: number;
 };
 
 export function signNativeMcpState(
-  payload: Omit<NativeMcpStatePayload, "nonce">,
+  payload: Omit<NativeMcpStatePayload, "nonce" | "iat">,
 ): string {
   const full: NativeMcpStatePayload = {
     ...payload,
     nonce: randomBytes(8).toString("base64url"),
+    iat: Date.now(),
   };
   const body = Buffer.from(JSON.stringify(full), "utf8");
   const sig = createHmac("sha256", getSecret()).update(body).digest();
@@ -100,6 +114,7 @@ export function verifyNativeMcpState(
     return null;
   }
   if (!isNativeMcpStatePayload(parsed)) return null;
+  if (!isStateFresh(parsed.iat)) return null;
   return parsed;
 }
 
@@ -115,7 +130,8 @@ function isNativeMcpStatePayload(value: unknown): value is NativeMcpStatePayload
     typeof v.pkceVerifier === "string" &&
     typeof v.clientId === "string" &&
     typeof v.tokenEndpoint === "string" &&
-    typeof v.nonce === "string"
+    typeof v.nonce === "string" &&
+    typeof v.iat === "number"
   );
 }
 
@@ -134,14 +150,17 @@ export type ComposioStatePayload = {
   /** Workspace-scoped name slot for the connection (e.g. "default", "work"). */
   connectionName: string;
   nonce: string;
+  /** Issued-at (epoch ms); states older than STATE_TTL_MS are rejected (#46). */
+  iat: number;
 };
 
 export function signComposioState(
-  payload: Omit<ComposioStatePayload, "nonce">,
+  payload: Omit<ComposioStatePayload, "nonce" | "iat">,
 ): string {
   const full: ComposioStatePayload = {
     ...payload,
     nonce: randomBytes(8).toString("base64url"),
+    iat: Date.now(),
   };
   const body = Buffer.from(JSON.stringify(full), "utf8");
   const sig = createHmac("sha256", getSecret()).update(body).digest();
@@ -168,6 +187,7 @@ export function verifyComposioState(state: string): ComposioStatePayload | null 
     return null;
   }
   if (!isComposioStatePayload(parsed)) return null;
+  if (!isStateFresh(parsed.iat)) return null;
   return parsed;
 }
 
@@ -180,7 +200,8 @@ function isComposioStatePayload(value: unknown): value is ComposioStatePayload {
     typeof v.userId === "string" &&
     typeof v.toolkit === "string" &&
     typeof v.connectionName === "string" &&
-    typeof v.nonce === "string"
+    typeof v.nonce === "string" &&
+    typeof v.iat === "number"
   );
 }
 
@@ -194,14 +215,17 @@ export type SlackInstallStatePayload = {
   workspaceId: string;
   workspaceSlug: string;
   nonce: string;
+  /** Issued-at (epoch ms); states older than STATE_TTL_MS are rejected (#46). */
+  iat: number;
 };
 
 export function signSlackInstallState(
-  payload: Omit<SlackInstallStatePayload, "nonce">,
+  payload: Omit<SlackInstallStatePayload, "nonce" | "iat">,
 ): string {
   const full: SlackInstallStatePayload = {
     ...payload,
     nonce: randomBytes(8).toString("base64url"),
+    iat: Date.now(),
   };
   const body = Buffer.from(JSON.stringify(full), "utf8");
   const sig = createHmac("sha256", getSecret()).update(body).digest();
@@ -230,6 +254,7 @@ export function verifySlackInstallState(
     return null;
   }
   if (!isSlackInstallStatePayload(parsed)) return null;
+  if (!isStateFresh(parsed.iat)) return null;
   return parsed;
 }
 
@@ -242,6 +267,7 @@ function isSlackInstallStatePayload(
     typeof v.slackAppId === "string" &&
     typeof v.workspaceId === "string" &&
     typeof v.workspaceSlug === "string" &&
-    typeof v.nonce === "string"
+    typeof v.nonce === "string" &&
+    typeof v.iat === "number"
   );
 }
