@@ -1,0 +1,78 @@
+---
+title: Tembo Agent Studio
+description: The self-hosted control plane for AI agents — agents as code, every change a pull request, runs and audit in your own environment.
+template: splash
+hero:
+  tagline: The self-hosted control plane for AI agents. Agent definitions live as files in your Git repo, every change ships as a reviewed pull request, and runs, connections, and audit stay in your environment.
+  actions:
+    - text: Get started
+      link: /agent-studio/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/tembo/agent-studio
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Agents as governed production software
+
+TAS treats agents the way you already treat code: defined in files, changed
+through pull requests, owned by your team, and run on your own infrastructure
+with your own model keys.
+
+<CardGrid>
+  <Card title="Agents as code" icon="seti:git">
+    Every agent is a file in a Git repo you own. Author by chat-to-PR or by hand —
+    either way the change is a reviewed pull request, with draft → stable versions
+    and a full audit trail.
+  </Card>
+  <Card title="Self-hosted & multi-model" icon="setting">
+    Runs in your environment on your own Anthropic *and* OpenAI keys. Agent
+    definitions, runs, and secrets never leave your infrastructure.
+  </Card>
+  <Card title="Humans in the loop" icon="approve-check">
+    A shared Tasks Inbox where agents queue work for people to review, correct,
+    and approve — plus a learning loop that folds corrections back into the agent.
+  </Card>
+  <Card title="Schedules, events & Slack" icon="rocket">
+    Cron, event triggers, webhooks, and Slack apps wired to ~1,000 Composio tools,
+    native MCP servers, and your own secrets — with per-user auth and RBAC.
+  </Card>
+</CardGrid>
+
+## Different by design
+
+<CardGrid>
+  <Card title="vs. Claude Managed Agents" icon="puzzle">
+    Managed Agents is an execution *engine* — an API that runs an agent in a
+    sandbox. TAS is the *control plane* above the engine: what agents exist, how
+    they change (Git + PR review), who may run them (RBAC), and how humans stay in
+    the loop. Bring your engine; TAS governs and operates the fleet.
+  </Card>
+  <Card title="vs. Claude Cowork" icon="laptop">
+    Cowork is a personal desktop coworker — single-user, tied to one machine,
+    Claude-only, and its automations can't be shared. TAS is the team platform:
+    named, reusable agents that run server-side, owned by your org, shared across
+    coworkers, and visible in one dashboard.
+  </Card>
+</CardGrid>
+
+## Start here
+
+<CardGrid>
+  <Card title="Introduction" icon="open-book">
+    What TAS is and the ideas behind it.
+    [Read the introduction →](/agent-studio/introduction/)
+  </Card>
+  <Card title="Set up an instance" icon="setting">
+    Stand up TAS on your own infrastructure.
+    [Customer setup →](/agent-studio/customer-setup/)
+  </Card>
+  <Card title="Author an agent" icon="pencil">
+    Write your first agent spec and open a PR.
+    [Authoring agents →](/agent-studio/authoring-agents/)
+  </Card>
+</CardGrid>
