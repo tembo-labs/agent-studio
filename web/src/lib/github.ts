@@ -258,6 +258,72 @@ export async function readFile(
   return { ok: true, content, sha: body.sha };
 }
 
+export type FileCommit = {
+  sha: string;
+  shortSha: string;
+  /** ISO timestamp of the commit (author date). */
+  date: string;
+  /** First line of the commit message. */
+  summary: string;
+  authorName: string | null;
+  /** github.com link to the commit. */
+  htmlUrl: string;
+};
+
+export type ListFileCommitsResult =
+  | { ok: true; commits: FileCommit[] }
+  | { ok: false; error: GitHubFileError; detail?: string };
+
+/**
+ * GET /repos/{o}/{r}/commits?path={path}&sha={branch} — the commit history of
+ * one file on a branch, newest first. Used by the Definition tab to show every
+ * version of an agent spec that landed on GitHub (commit hash + date).
+ */
+export async function listFileCommits(
+  token: string,
+  ref: RepoRef,
+  path: string,
+  limit = 30,
+): Promise<ListFileCommitsResult> {
+  const url =
+    `https://api.github.com/repos/${ref.owner}/${ref.name}/commits` +
+    `?path=${encodePath(path)}&sha=${encodeURIComponent(ref.branch)}` +
+    `&per_page=${Math.min(Math.max(limit, 1), 100)}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: GITHUB_HEADERS(token),
+      next: { revalidate: READ_CACHE_TTL_SECONDS, tags: [repoCacheTag(ref)] },
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: "network",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+  if (res.status === 401) return { ok: false, error: "invalid-token" };
+  if (res.status === 404) return { ok: false, error: "not-found" };
+  if (res.status === 403) return { ok: false, error: "rate-limited" };
+  if (!res.ok) {
+    return { ok: false, error: "network", detail: `GitHub returned ${res.status}` };
+  }
+  const body = (await res.json()) as Array<{
+    sha: string;
+    html_url: string;
+    commit: { message: string; author: { name?: string; date?: string } | null };
+  }>;
+  const commits: FileCommit[] = body.map((c) => ({
+    sha: c.sha,
+    shortSha: c.sha.slice(0, 7),
+    date: c.commit.author?.date ?? "",
+    summary: (c.commit.message ?? "").split("\n")[0],
+    authorName: c.commit.author?.name ?? null,
+    htmlUrl: c.html_url,
+  }));
+  return { ok: true, commits };
+}
+
 export type CreateFileResult =
   | { ok: true; commitSha: string }
   | { ok: false; error: GitHubFileError; detail?: string };

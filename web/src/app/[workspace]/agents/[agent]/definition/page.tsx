@@ -1,3 +1,4 @@
+import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
 import { getStableVersion, listAgentVersions } from "@/lib/agent-versions";
 import {
@@ -5,6 +6,8 @@ import {
   highlightAgentSpec,
   type AgentSpecHighlightKind,
 } from "@/lib/agent-spec-highlight";
+import { listFileCommits, type FileCommit } from "@/lib/github";
+import { getWorkspaceSecretPlaintext } from "@/lib/workspace";
 
 import { loadAgentContext } from "../agent-page-context";
 import {
@@ -24,13 +27,32 @@ export default async function AgentDefinitionPage({
   params: Promise<{ workspace: string; agent: string }>;
 }) {
   const { workspace: slug, agent: agentName } = await params;
-  const { workspace, canonicalName, agent, raw, toolsModuleContent } =
+  const { workspace, canonicalName, repo, agent, raw, toolsModuleContent } =
     await loadAgentContext(slug, agentName);
 
   const [versions, stable] = await Promise.all([
     listAgentVersions(workspace.id, canonicalName),
     getStableVersion(workspace.id, canonicalName),
   ]);
+
+  // Commit history of the spec file on GitHub — every version that landed in
+  // the repo, newest first (distinct from the promoted stable snapshots above).
+  // Skipped in local-agents dev mode (no connected repo).
+  let commits: FileCommit[] = [];
+  if (repo && agent.path) {
+    try {
+      const token = await getWorkspaceSecretPlaintext(workspace.id, "github_pat");
+      const res = await listFileCommits(
+        token,
+        { owner: repo.owner, name: repo.name, branch: repo.defaultBranch },
+        agent.path,
+        50,
+      );
+      if (res.ok) commits = res.commits;
+    } catch {
+      // No token / repo unreachable — just omit the history section.
+    }
+  }
 
   const toolsModule =
     agent.ok && agent.spec.framework === "pydantic-agentspec"
@@ -70,6 +92,42 @@ export default async function AgentDefinitionPage({
       >
         <SpecVersionViewer items={specItems} />
       </Section>
+
+      {commits.length > 0 && repo && (
+        <Section
+          title="History"
+          description="Every version of this spec file that landed on GitHub, newest first. Click a hash to view that version on GitHub."
+        >
+          <ul className="flex flex-col divide-y divide-[var(--color-border-weak)]">
+            {commits.map((c) => (
+              <li
+                key={c.sha}
+                className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2 text-sm"
+              >
+                <a
+                  href={`https://github.com/${repo.owner}/${repo.name}/blob/${c.sha}/${agent.path}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-foreground-category-blue font-mono hover:underline"
+                >
+                  {c.shortSha}
+                </a>
+                {c.date && (
+                  <span className="text-foreground-weak">
+                    <LocalTime iso={c.date} />
+                  </span>
+                )}
+                <span className="text-foreground min-w-0 flex-1 truncate">
+                  {c.summary}
+                </span>
+                {c.authorName && (
+                  <span className="text-foreground-muted">{c.authorName}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
       {toolsModule && (
         <Section
