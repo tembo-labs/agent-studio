@@ -259,3 +259,22 @@ export async function setAgentOwner(
     [workspaceId, agentName, ownerUserId, updatedBy],
   );
 }
+
+/**
+ * Claim ownership of an agent only if it has none yet (first writer wins; a
+ * no-op once owned). Used to auto-assign an owner on first run — chat-created
+ * agents already get an owner at create time, but agents committed straight to
+ * the repo don't, so whoever first runs one becomes its owner.
+ */
+export async function claimAgentOwner(
+  workspaceId: string,
+  agentName: string,
+  userId: string,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO agent_owner (workspace_id, agent_name, owner_user_id, updated_by)
+     VALUES ($1, $2, $3, $3)
+     ON CONFLICT (workspace_id, agent_name) DO NOTHING`,
+    [workspaceId, agentName, userId],
+  );
+}
