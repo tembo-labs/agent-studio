@@ -1,13 +1,17 @@
 ---
 import Default from "@astrojs/starlight/components/SocialIcons.astro";
 
-// Extends Starlight's header social icons with a GitHub star count. The count
-// is fetched at BUILD time (in CI / `pnpm build`), not the client — no runtime
-// dependency, no client-side rate limiting. If the API is unreachable (offline,
-// rate-limited, private repo), we just render the icons without the badge.
+// Extends Starlight's header social icons with a GitHub star count.
+//
+// The site is static (SSG → GitHub Pages), so there's no per-request server
+// render. We do two things: (1) bake a build-time count as a SEED so the badge
+// is correct with no flash and works without JS, and (2) a small client script
+// refreshes it live on each page load (the GitHub API allows unauthenticated
+// CORS GETs). Either source failing is non-fatal — the badge just keeps the
+// other value, or hides if there's neither.
 const REPO = "tembo/agent-studio";
 
-let stars: number | null = null;
+let seed: number | null = null;
 try {
   const res = await fetch(`https://api.github.com/repos/${REPO}`, {
     headers: {
@@ -18,31 +22,57 @@ try {
   if (res.ok) {
     const data = await res.json();
     if (typeof data?.stargazers_count === "number") {
-      stars = data.stargazers_count;
+      seed = data.stargazers_count;
     }
   }
 } catch {
-  // Best-effort: render without the badge.
+  // Best-effort — the client script can still populate it.
 }
 
-const label = stars === null ? null : stars >= 1000 ? `${(stars / 1000).toFixed(1)}k` : String(stars);
+const fmt = (n: number): string =>
+  n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 ---
 
-{
-  label !== null && (
-    <a
-      class="tas-stars"
-      href={`https://github.com/${REPO}`}
-      target="_blank"
-      rel="noreferrer noopener"
-      aria-label={`${stars} GitHub stars`}
-    >
-      <span aria-hidden="true">★</span>
-      <span>{label}</span>
-    </a>
-  )
-}
+<a
+  class="tas-stars"
+  href={`https://github.com/${REPO}`}
+  data-repo={REPO}
+  target="_blank"
+  rel="noreferrer noopener"
+  aria-label={seed === null ? "GitHub stars" : `${seed} GitHub stars`}
+  hidden={seed === null}
+>
+  <span aria-hidden="true">★</span>
+  <span class="tas-star-count">{seed === null ? "" : fmt(seed)}</span>
+</a>
 <Default {...Astro.props}><slot /></Default>
+
+<script>
+  // Live refresh of the build-time seed on each page load.
+  (async () => {
+    const el = document.querySelector<HTMLAnchorElement>(".tas-stars");
+    if (!el) return;
+    const repo = el.dataset.repo;
+    if (!repo) return;
+    try {
+      const res = await fetch(`https://api.github.com/repos/${repo}`, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const n = data?.stargazers_count;
+      if (typeof n !== "number") return;
+      const fmt = (x: number) =>
+        x >= 1000 ? `${(x / 1000).toFixed(1)}k` : String(x);
+      const count = el.querySelector(".tas-star-count");
+      if (count) count.textContent = fmt(n);
+      el.setAttribute("aria-label", `${n} GitHub stars`);
+      el.hidden = false;
+    } catch {
+      // Keep whatever the build-time seed rendered.
+    }
+  })();
+</script>
 
 <style>
   .tas-stars {
@@ -54,6 +84,9 @@ const label = stars === null ? null : stars >= 1000 ? `${(stars / 1000).toFixed(
     color: var(--sl-color-text-accent);
     text-decoration: none;
     white-space: nowrap;
+  }
+  .tas-stars[hidden] {
+    display: none;
   }
   .tas-stars:hover {
     color: var(--sl-color-white);
