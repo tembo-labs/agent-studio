@@ -43,23 +43,6 @@ with your own model keys.
   </Card>
 </CardGrid>
 
-## Different by design
-
-<CardGrid>
-  <Card title="vs. Claude Managed Agents" icon="puzzle">
-    Managed Agents is an execution *engine* — an API that runs an agent in a
-    sandbox. TAS is the *control plane* above the engine: what agents exist, how
-    they change (Git + PR review), who may run them (RBAC), and how humans stay in
-    the loop. Bring your engine; TAS governs and operates the fleet.
-  </Card>
-  <Card title="vs. Claude Cowork" icon="laptop">
-    Cowork is a personal desktop coworker — single-user, tied to one machine,
-    Claude-only, and its automations can't be shared. TAS is the team platform:
-    named, reusable agents that run server-side, owned by your org, shared across
-    coworkers, and visible in one dashboard.
-  </Card>
-</CardGrid>
-
 ## Start here
 
 <CardGrid>
@@ -76,3 +59,22 @@ with your own model keys.
     [Authoring agents →](/agent-studio/authoring-agents/)
   </Card>
 </CardGrid>
+
+## FAQ
+
+### How is this different from Claude Managed Agents?
+
+Claude Managed Agents is an execution *engine* — an API that runs an agent in a
+sandbox. TAS is the *control plane* above the engine: it decides what agents
+exist, how they change (Git + pull-request review), who may run them (RBAC), and
+how humans stay in the loop. They're complementary — bring your execution engine;
+TAS governs and operates the fleet (and is multi-model and self-hosted, not
+tied to one provider).
+
+### How is this different from Claude Cowork?
+
+Cowork is a personal desktop coworker — single-user, tied to one machine,
+Claude-only, and its automations can't be shared with teammates. TAS is the team
+platform: named, reusable agents that run server-side, owned by your
+organization, shared across coworkers, governed by review, and visible to the
+team in one dashboard.
