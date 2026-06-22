@@ -62,10 +62,9 @@ export async function createTemboTask(args: {
   };
 
   const url = `${baseUrl}/public-api/task/create`;
-  // Log the outbound payload so the docker logs make it obvious what
-  // we sent when CAP rejects us. v0.2 integration is brittle by
-  // design until we settle the contract.
-  console.log("[cap] POST", url, "payload=", JSON.stringify(body));
+  // Breadcrumb only — never log `body`: it embeds the prompt (run input/output,
+  // user data) and would leak to plaintext container logs / aggregators (#44).
+  console.log("[cap] POST", url);
 
   let res: Response;
   try {
@@ -90,7 +89,9 @@ export async function createTemboTask(args: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.log("[cap] ←", res.status, text);
+    // Status only — the response body can echo submitted content (#44). The
+    // full body is still returned to the caller for handling, just not logged.
+    console.log("[cap] ←", res.status);
     return { ok: false, error: { kind: "http", status: res.status, body: text, url } };
   }
 
