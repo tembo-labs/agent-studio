@@ -43,14 +43,14 @@ export async function submitInboxItemAction(args: {
   }
   const { workspace, userId } = auth;
 
-  const item = await getInboxItem(args.itemId, workspace.id);
+  const item = await getInboxItem(args.itemId, workspace.id, userId);
   if (!item) notFound();
 
   const finalAction = {
     ...(text ? { text } : {}),
     ...(args.fields ? { fields: args.fields } : {}),
   };
-  const ok = await completeInboxItem(args.itemId, workspace.id, finalAction);
+  const ok = await completeInboxItem(args.itemId, workspace.id, finalAction, userId);
   if (!ok) {
     return { ok: false, error: "This item was already resolved. Refresh the page." };
   }
@@ -81,7 +81,7 @@ export async function dismissInboxItemAction(args: {
   }
   const { workspace, userId } = auth;
 
-  const ok = await dismissInboxItem(args.itemId, workspace.id);
+  const ok = await dismissInboxItem(args.itemId, workspace.id, userId);
   if (!ok) {
     return { ok: false, error: "This item was already resolved. Refresh the page." };
   }
@@ -119,7 +119,7 @@ export async function executeInboxOptionAction(args: {
   }
   const { workspace, userId } = auth;
 
-  const item = await getInboxItem(args.itemId, workspace.id);
+  const item = await getInboxItem(args.itemId, workspace.id, userId);
   if (!item) notFound();
 
   const option = item.options?.find((o) => o.id === args.optionId);
@@ -140,7 +140,7 @@ export async function executeInboxOptionAction(args: {
     fields: { optionId: option.id },
     ...(option.kind === "reply" && args.text?.trim() ? { text: args.text.trim() } : {}),
   };
-  const ok = await completeInboxItem(args.itemId, workspace.id, finalAction);
+  const ok = await completeInboxItem(args.itemId, workspace.id, finalAction, userId);
   if (!ok) {
     return { ok: false, error: "This item was already resolved. Refresh the page." };
   }
@@ -177,7 +177,7 @@ export async function snoozeInboxItemAction(args: {
   const hours = Math.max(1, Math.min(Math.round(args.hours), 24 * 90)); // 1h … 90d
   const until = new Date(Date.now() + hours * 3_600_000);
 
-  const ok = await snoozeInboxItem(args.itemId, workspace.id, until);
+  const ok = await snoozeInboxItem(args.itemId, workspace.id, until, userId);
   if (!ok) {
     return { ok: false, error: "This item was already resolved. Refresh the page." };
   }
@@ -215,5 +215,5 @@ export async function getActiveInboxCountAction(
 ): Promise<number> {
   const auth = await authorizeWorkspace(workspaceSlug, "viewer");
   if (!auth.ok) return 0;
-  return countActiveInboxItems(auth.workspace.id);
+  return countActiveInboxItems(auth.workspace.id, auth.userId);
 }

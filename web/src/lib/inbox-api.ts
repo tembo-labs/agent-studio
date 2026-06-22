@@ -173,6 +173,9 @@ export interface CreateInboxItemInput {
   assigneeId?: string | null;
   producedByRunId?: string | null;
   createdBy?: string | null;
+  /** The user who owns this item (the producing run's acting user, or the
+   *  human filer). Inboxes are private — reads/mutations scope to this. */
+  ownerUserId?: string | null;
 }
 
 /**
@@ -202,9 +205,9 @@ export async function createInboxItem(
        INSERT INTO inbox_item (
          workspace_id, source, external_ref, item_type, title, context,
          proposed_action, options, status, assignee_kind, assignee_id,
-         produced_by_run_id, created_by, external_ts, external_url
+         produced_by_run_id, created_by, external_ts, external_url, owner_user_id
        )
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16)
        ON CONFLICT (workspace_id, source, external_ref) WHERE external_ref IS NOT NULL
        DO UPDATE SET
          updated_at = NOW(),
@@ -218,7 +221,9 @@ export async function createInboxItem(
          resolved_at = CASE WHEN ${reopenable} THEN NULL ELSE inbox_item.resolved_at END,
          final_action = CASE WHEN ${reopenable} THEN NULL ELSE inbox_item.final_action END,
          -- A genuinely-new reply un-snoozes: the thing you were waiting for arrived.
-         snoozed_until = CASE WHEN ${reopenable} THEN NULL ELSE inbox_item.snoozed_until END
+         snoozed_until = CASE WHEN ${reopenable} THEN NULL ELSE inbox_item.snoozed_until END,
+         -- Keep the original owner; only fill it if a prior row had none.
+         owner_user_id = COALESCE(inbox_item.owner_user_id, EXCLUDED.owner_user_id)
        RETURNING *
      )
      SELECT ${COLUMNS}
@@ -240,6 +245,7 @@ export async function createInboxItem(
       input.createdBy ?? null,
       input.externalTs ?? null,
       input.url ?? null,
+      input.ownerUserId ?? null,
     ],
   );
   return rowToInboxItem(res.rows[0]);
@@ -278,11 +284,13 @@ export interface ListInboxFilters {
 
 export async function listInboxItems(
   workspaceId: string,
+  // Inboxes are private — always scope to the viewing user's own items.
+  ownerUserId: string,
   filters: ListInboxFilters = {},
   limit = 100,
 ): Promise<InboxItem[]> {
-  const params: unknown[] = [workspaceId];
-  const where: string[] = [`i.workspace_id = $1`];
+  const params: unknown[] = [workspaceId, ownerUserId];
+  const where: string[] = [`i.workspace_id = $1`, `i.owner_user_id = $2`];
   if (filters.statuses && filters.statuses.length > 0) {
     params.push(filters.statuses);
     where.push(`i.status = ANY($${params.length}::text[])`);
@@ -317,15 +325,18 @@ export async function listInboxItems(
   return res.rows.map(rowToInboxItem);
 }
 
-/** Count of active (unresolved, not snoozed) items — the sidebar badge. */
+/** Count of the viewing user's active (unresolved, not snoozed) items — the
+ *  sidebar badge. Private per user, like the list. */
 export async function countActiveInboxItems(
   workspaceId: string,
+  ownerUserId: string,
 ): Promise<number> {
   const res = await db.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM inbox_item
-      WHERE workspace_id = $1 AND status IN ('open', 'claimed', 'awaiting_human')
+      WHERE workspace_id = $1 AND owner_user_id = $2
+        AND status IN ('open', 'claimed', 'awaiting_human')
         AND (snoozed_until IS NULL OR snoozed_until <= now())`,
-    [workspaceId],
+    [workspaceId, ownerUserId],
   );
   return Number(res.rows[0]?.n ?? 0);
 }
@@ -337,13 +348,14 @@ export async function snoozeInboxItem(
   id: string,
   workspaceId: string,
   until: Date,
+  ownerUserId: string,
 ): Promise<boolean> {
   const res = await db.query(
     `UPDATE inbox_item
         SET snoozed_until = $3, updated_at = NOW()
-      WHERE id = $1 AND workspace_id = $2
+      WHERE id = $1 AND workspace_id = $2 AND owner_user_id = $4
         AND status NOT IN ('done', 'dismissed')`,
-    [id, workspaceId, until],
+    [id, workspaceId, until, ownerUserId],
   );
   return (res.rowCount ?? 0) > 0;
 }
@@ -351,10 +363,13 @@ export async function snoozeInboxItem(
 export async function getInboxItem(
   id: string,
   workspaceId: string,
+  // Inboxes are private — only the owner may read a single item.
+  ownerUserId: string,
 ): Promise<InboxItem | null> {
   const res = await db.query<Row>(
-    `SELECT ${COLUMNS} ${FROM_JOIN} WHERE i.id = $1 AND i.workspace_id = $2`,
-    [id, workspaceId],
+    `SELECT ${COLUMNS} ${FROM_JOIN}
+      WHERE i.id = $1 AND i.workspace_id = $2 AND i.owner_user_id = $3`,
+    [id, workspaceId, ownerUserId],
   );
   return res.rows[0] ? rowToInboxItem(res.rows[0]) : null;
 }
@@ -369,12 +384,13 @@ export async function claimInboxItem(
   workspaceId: string,
   assigneeKind: InboxAssigneeKind,
   assigneeId: string,
+  ownerUserId: string,
 ): Promise<boolean> {
   const res = await db.query(
     `UPDATE inbox_item
         SET status = 'claimed', assignee_kind = $3, assignee_id = $4, updated_at = NOW()
-      WHERE id = $1 AND workspace_id = $2 AND status = 'open'`,
-    [id, workspaceId, assigneeKind, assigneeId],
+      WHERE id = $1 AND workspace_id = $2 AND owner_user_id = $5 AND status = 'open'`,
+    [id, workspaceId, assigneeKind, assigneeId, ownerUserId],
   );
   return (res.rowCount ?? 0) > 0;
 }
@@ -385,12 +401,14 @@ export async function setProposedAction(
   id: string,
   workspaceId: string,
   proposedAction: InboxAction,
+  ownerUserId: string,
 ): Promise<boolean> {
   const res = await db.query(
     `UPDATE inbox_item
         SET proposed_action = $3::jsonb, status = 'awaiting_human', updated_at = NOW()
-      WHERE id = $1 AND workspace_id = $2 AND status IN ('open', 'claimed')`,
-    [id, workspaceId, JSON.stringify(proposedAction)],
+      WHERE id = $1 AND workspace_id = $2 AND owner_user_id = $4
+        AND status IN ('open', 'claimed')`,
+    [id, workspaceId, JSON.stringify(proposedAction), ownerUserId],
   );
   return (res.rowCount ?? 0) > 0;
 }
@@ -401,14 +419,15 @@ export async function completeInboxItem(
   id: string,
   workspaceId: string,
   finalAction: InboxAction,
+  ownerUserId: string,
 ): Promise<boolean> {
   const res = await db.query(
     `UPDATE inbox_item
         SET final_action = $3::jsonb, status = 'done',
             resolved_at = NOW(), updated_at = NOW()
-      WHERE id = $1 AND workspace_id = $2
+      WHERE id = $1 AND workspace_id = $2 AND owner_user_id = $4
         AND status NOT IN ('done', 'dismissed')`,
-    [id, workspaceId, JSON.stringify(finalAction)],
+    [id, workspaceId, JSON.stringify(finalAction), ownerUserId],
   );
   return (res.rowCount ?? 0) > 0;
 }
@@ -417,13 +436,14 @@ export async function completeInboxItem(
 export async function dismissInboxItem(
   id: string,
   workspaceId: string,
+  ownerUserId: string,
 ): Promise<boolean> {
   const res = await db.query(
     `UPDATE inbox_item
         SET status = 'dismissed', resolved_at = NOW(), updated_at = NOW()
-      WHERE id = $1 AND workspace_id = $2
+      WHERE id = $1 AND workspace_id = $2 AND owner_user_id = $3
         AND status NOT IN ('done', 'dismissed')`,
-    [id, workspaceId],
+    [id, workspaceId, ownerUserId],
   );
   return (res.rowCount ?? 0) > 0;
 }

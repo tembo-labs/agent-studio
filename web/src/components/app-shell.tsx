@@ -45,7 +45,7 @@ type FailingAgentAlert = {
 type Props = {
   workspace: Workspace;
   workspaces: { slug: string; name: string }[];
-  user: { name?: string | null; email: string };
+  user: { id: string; name?: string | null; email: string };
   /** The user's role in this workspace, shown as a badge by their name. */
   role?: WorkspaceRole | null;
   /**
@@ -81,7 +81,7 @@ export async function AppShell({
   const instanceName = await getInstanceName();
   const isInstanceAdmin = isInstanceAdminEmail(user.email);
   const home = `/${workspace.slug}`;
-  const inboxCount = await countActiveInboxItems(workspace.id);
+  const inboxCount = await countActiveInboxItems(workspace.id, user.id);
 
   // Collapse missing-connection alerts by the connection itself (substrate +
   // toolkit + slot). One HubSpot app needed by three agents is a single card
