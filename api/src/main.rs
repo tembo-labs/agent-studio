@@ -55,6 +55,32 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to apply database migrations")?;
 
+    // Reconcile orphaned runs on boot. A run executes as an in-memory tokio task
+    // owning a subprocess, so any run still 'queued'/'running' when the api last
+    // stopped (crash, deploy, restart) is orphaned — its task is gone and nothing
+    // will ever finalize it, so the row would hang in 'running' forever and look
+    // like it's still working. Mark them failed with a clear reason. (Durable,
+    // resumable execution is the larger #170 effort.)
+    match sqlx::query(
+        "UPDATE run SET status = 'failed', \
+                completed_at = now(), streamed_output = NULL, \
+                error_message = COALESCE(error_message, \
+                    'Interrupted — the server restarted while this run was in progress.') \
+          WHERE status IN ('queued', 'running')",
+    )
+    .execute(&db)
+    .await
+    {
+        Ok(res) if res.rows_affected() > 0 => {
+            tracing::warn!(
+                count = res.rows_affected(),
+                "marked orphaned in-flight runs as failed on boot"
+            );
+        }
+        Ok(_) => {}
+        Err(e) => tracing::error!(?e, "failed to reconcile orphaned runs on boot"),
+    }
+
     let encryption_key = Arc::new(crypto::MasterKey::from_env()?);
     let internal_token = auth::InternalToken::from_env()?;
     let http = reqwest::Client::builder()
