@@ -1,4 +1,5 @@
 import { Section } from "@/components/section";
+import { getStableVersion, listAgentVersions } from "@/lib/agent-versions";
 import {
   detectAgentSpecLanguage,
   highlightAgentSpec,
@@ -6,11 +7,16 @@ import {
 } from "@/lib/agent-spec-highlight";
 
 import { loadAgentContext } from "../agent-page-context";
+import {
+  SpecVersionViewer,
+  type SpecVersionItem,
+} from "./spec-version-viewer";
 
 export const dynamic = "force-dynamic";
 
-// Definition tab — the raw agent spec and (when declared) its sidecar Python
-// tools module, read-only. Edits go through Git / Chat-to-edit.
+// Definition tab — the agent spec (the live draft plus every stable version's
+// snapshot, switchable) and (when declared) its sidecar Python tools module,
+// read-only. Edits go through Git / Chat-to-edit.
 
 export default async function AgentDefinitionPage({
   params,
@@ -18,10 +24,13 @@ export default async function AgentDefinitionPage({
   params: Promise<{ workspace: string; agent: string }>;
 }) {
   const { workspace: slug, agent: agentName } = await params;
-  const { agent, raw, toolsModuleContent } = await loadAgentContext(
-    slug,
-    agentName,
-  );
+  const { workspace, canonicalName, agent, raw, toolsModuleContent } =
+    await loadAgentContext(slug, agentName);
+
+  const [versions, stable] = await Promise.all([
+    listAgentVersions(workspace.id, canonicalName),
+    getStableVersion(workspace.id, canonicalName),
+  ]);
 
   const toolsModule =
     agent.ok && agent.spec.framework === "pydantic-agentspec"
@@ -32,13 +41,34 @@ export default async function AgentDefinitionPage({
     agent.ok ? agent.spec.framework : undefined,
   );
 
+  // Draft first (the default view), then each version newest-first. Versions
+  // are the same agent/format, so reuse the detected language.
+  const draftDiffers = stable ? stable.specContent !== raw : versions.length > 0;
+  const specItems: SpecVersionItem[] = [
+    {
+      id: "draft",
+      label: draftDiffers ? "Draft (current file)" : "Draft",
+      block: <HighlightedCodeBlock source={raw} language={specLanguage} />,
+    },
+    ...versions.map((v) => ({
+      id: `v${v.versionNumber}`,
+      label:
+        stable?.versionNumber === v.versionNumber
+          ? `v${v.versionNumber} · stable`
+          : `v${v.versionNumber}`,
+      block: (
+        <HighlightedCodeBlock source={v.specContent} language={specLanguage} />
+      ),
+    })),
+  ];
+
   return (
     <>
       <Section
         title="Definition"
-        description="Edits go through Git. Framework and model changes go through the same review path as any other change — never edited in a live console."
+        description="The live draft plus every promoted version. Edits go through Git — framework and model changes take the same review path as any other change, never a live console."
       >
-        <HighlightedCodeBlock source={raw} language={specLanguage} />
+        <SpecVersionViewer items={specItems} />
       </Section>
 
       {toolsModule && (
