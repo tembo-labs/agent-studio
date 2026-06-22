@@ -5,8 +5,7 @@ import {
   type AuditSource,
 } from "@/lib/audit";
 import { listAuditTimeline, writeAuditEvent } from "@/lib/audit-db";
-import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
+import { authorizeWorkspace } from "@/lib/auth-server";
 
 // US-0.4-04 — audit timeline export. JSON-only at v0.4 (streaming to
 // a SIEM is the v0.5 open question per the user story).
@@ -39,22 +38,26 @@ export async function GET(
 ): Promise<NextResponse> {
   const { workspace: slug } = await params;
 
-  const session = await getServerSession();
-  if (!session) {
-    return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  // Bulk export of the full governance trail is an admin capability — gate on
+  // workspace_admin, not bare membership, so a low-trust member can't exfil
+  // every member's actions, connection authorizations, and secret events (#43).
+  const auth = await authorizeWorkspace(slug, "workspace_admin");
+  if (!auth.ok) {
+    const status =
+      auth.reason === "no-session"
+        ? 401
+        : auth.reason === "no-workspace"
+          ? 404
+          : 403;
+    const error =
+      auth.reason === "no-session"
+        ? "not signed in"
+        : auth.reason === "no-workspace"
+          ? "unknown workspace"
+          : "workspace admin required";
+    return NextResponse.json({ error }, { status });
   }
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) {
-    return NextResponse.json({ error: "unknown workspace" }, { status: 404 });
-  }
-  const ok = await userIsMember(workspace.id, session.user.id);
-  if (!ok) {
-    return NextResponse.json({ error: "not a member" }, { status: 403 });
-    // TODO(US-0.4-02): swap to requireWorkspaceRole(>= viewer) once
-    // RBAC lands. The viewer role gets read access (the AC for
-    // US-0.4-04 says exports honor RBAC); membership today is the
-    // closest stand-in.
-  }
+  const { workspace, userId } = auth;
 
   const sp = request.nextUrl.searchParams;
   const sources = parseMulti(sp.getAll("source"), ALL_AUDIT_SOURCES);
@@ -77,7 +80,7 @@ export async function GET(
 
   await writeAuditEvent({
     workspaceId: workspace.id,
-    actorUserId: session.user.id,
+    actorUserId: userId,
     source: "human_action",
     kind: "audit.exported",
     targetType: "workspace",
@@ -101,7 +104,7 @@ export async function GET(
   const envelope = {
     workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
     exportedAt: new Date().toISOString(),
-    exportedByUserId: session.user.id,
+    exportedByUserId: userId,
     filters: {
       sources: sources.length ? sources : null,
       actor: actor ?? null,
