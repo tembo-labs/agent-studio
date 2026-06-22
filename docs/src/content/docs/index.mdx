@@ -68,11 +68,10 @@ with your own model keys.
 ### How is this different from Claude Managed Agents?
 
 Claude Managed Agents is an execution *engine* — an API that runs an agent in a
-sandbox. TAS is the *control plane* above the engine: it decides what agents
+sandbox. TAS is the *control plane* above execution: it decides what agents
 exist, how they change (Git + pull-request review), who may run them (RBAC), and
-how humans stay in the loop. They're complementary — bring your execution engine;
-TAS governs and operates the fleet (and is multi-model and self-hosted, not
-tied to one provider).
+how humans stay in the loop. TAS runs agents on its own bundled runner (Pydantic
+AI today) across Anthropic and OpenAI models, self-hosted in your environment.
 
 ### How is this different from Claude Cowork?
 
