@@ -1,0 +1,61 @@
+---
+import Default from "@astrojs/starlight/components/SocialIcons.astro";
+
+// Extends Starlight's header social icons with a GitHub star count. The count
+// is fetched at BUILD time (in CI / `pnpm build`), not the client — no runtime
+// dependency, no client-side rate limiting. If the API is unreachable (offline,
+// rate-limited, private repo), we just render the icons without the badge.
+const REPO = "tembo/agent-studio";
+
+let stars: number | null = null;
+try {
+  const res = await fetch(`https://api.github.com/repos/${REPO}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "tembo-agent-studio-docs",
+    },
+  });
+  if (res.ok) {
+    const data = await res.json();
+    if (typeof data?.stargazers_count === "number") {
+      stars = data.stargazers_count;
+    }
+  }
+} catch {
+  // Best-effort: render without the badge.
+}
+
+const label = stars === null ? null : stars >= 1000 ? `${(stars / 1000).toFixed(1)}k` : String(stars);
+---
+
+{
+  label !== null && (
+    <a
+      class="tas-stars"
+      href={`https://github.com/${REPO}`}
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label={`${stars} GitHub stars`}
+    >
+      <span aria-hidden="true">★</span>
+      <span>{label}</span>
+    </a>
+  )
+}
+<Default {...Astro.props}><slot /></Default>
+
+<style>
+  .tas-stars {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: var(--sl-text-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--sl-color-text-accent);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .tas-stars:hover {
+    color: var(--sl-color-white);
+  }
+</style>
