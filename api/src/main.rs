@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::{middleware, routing::get, routing::post, Router};
 use sqlx::postgres::PgPoolOptions;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
 mod auth;
@@ -79,8 +79,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(routes::health::health))
         .nest("/internal", internal_routes)
         .with_state(state)
-        .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive());
+        .layer(TraceLayer::new_for_http());
+    // No CORS layer: the api serves only /health and bearer-gated /internal
+    // routes, all server-to-server (the web container over the internal
+    // network) — never browser cross-origin. A permissive layer was needless
+    // attack surface (#48); add a scoped one only if a browser ever calls this.
 
     tracing::info!("tas-api listening on {bind_addr}");
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
