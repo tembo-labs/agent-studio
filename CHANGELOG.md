@@ -14,6 +14,53 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.27] — Stop a run, security hardening, agent owners + Definition history — shipped 2026-06-23
+
+### Added
+- **Stop a running run.** A red **Stop run** button on the run detail page kills
+  an in-flight (queued/running) run: it transitions to a dedicated new
+  `cancelled` status (distinct from `failed`, so killed runs stay out of failure
+  dashboards/badges) and the api SIGKILLs the run's subprocess. Operator+ only.
+- **Definition tab now shows every version.** The agent's Definition tab renders
+  the live draft plus every promoted stable version (switchable), and a
+  **History** section listing every commit of the spec file on GitHub — short
+  hash, date, and author — each linking to that version on GitHub.
+- **Agent ownership.** A repo-committed agent with no owner is auto-assigned to
+  the person who first runs it (chat-created agents already had an owner), so the
+  Mine/Starred views and Locked/Fork rules attribute correctly.
+- **Marketing homepage for the docs site.** The docs root is now a restrained
+  splash landing page (replacing the bare "Redirecting…"), including a FAQ on how
+  TAS differs from Claude Managed Agents and Claude Cowork, and a live GitHub
+  star count in the header.
+
+### Changed
+- **Orphaned runs are reconciled on api boot.** A run executes as an in-memory
+  task owning a subprocess, so any run still `queued`/`running` when the api last
+  stopped (crash, deploy, restart) was orphaned and hung in `running` forever.
+  The api now marks such rows `failed` on startup with a clear reason. (Durable,
+  resumable execution remains the larger [#170](https://github.com/tembo/agent-studio/issues/170) effort.)
+
+### Security
+- **Invites are honored only for IdP-verified emails** ([#47](https://github.com/tembo/agent-studio/issues/47)) — an OAuth sign-in
+  whose provider didn't assert `email_verified` no longer auto-joins a workspace
+  by matching a pending invite.
+- **OAuth state now has a TTL** ([#46](https://github.com/tembo/agent-studio/issues/46)) and the **permissive CORS layer was dropped
+  from the api** ([#48](https://github.com/tembo/agent-studio/issues/48)) — it served only bearer-gated server-to-server routes,
+  so the open CORS was needless attack surface.
+- **Stopped logging CAP prompt payloads** ([#44](https://github.com/tembo/agent-studio/issues/44)) and **gated audit-log export on
+  admin** ([#43](https://github.com/tembo/agent-studio/issues/43)).
+- Overrode `hono` to `>=4.12.25` to clear Dependabot alerts ([#206](https://github.com/tembo/agent-studio/pull/206)).
+
+### Fixed
+- **Inbox privacy** — the Tasks Inbox was showing every member's items to all
+  members. Items are now scoped to their owner (the run's acting user, or the
+  human filer), with reads, the sidebar badge, and mutations all owner-scoped.
+
+### Dependencies
+- Routine Dependabot bumps across web, api, docs, and CI actions
+  (better-auth, lucide-react, cron-parser, tower-http, Astro, `@types/node`,
+  `@tailwindcss/postcss`, actions/checkout).
+
 ## [v2026.6.26] — Agent stars + forking, unified Automations, Locked agents — shipped 2026-06-20
 
 ### Added
