@@ -130,7 +130,7 @@ export function buildMcpServer(
         "cost, previews) — call get_run for full output.",
       inputSchema: {
         status: z
-          .enum(["queued", "running", "succeeded", "failed"])
+          .enum(["queued", "running", "succeeded", "failed", "cancelled"])
           .array()
           .optional()
           .describe("Only runs in these statuses."),

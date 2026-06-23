@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
 import {
@@ -17,7 +18,7 @@ import {
   setImprovementCommitted,
   setImprovementTask,
 } from "@/lib/improvements-api";
-import { getRun } from "@/lib/runs-api";
+import { cancelRun, getRun } from "@/lib/runs-api";
 import {
   getWorkspaceRepo,
   getWorkspaceSecretPlaintext,
@@ -131,6 +132,43 @@ export async function improveAgentAction(args: {
     htmlUrl: res.result.htmlUrl,
     status: res.result.status,
   };
+}
+
+export type CancelRunResult =
+  | { ok: true; cancelled: boolean }
+  | { ok: false; error: string };
+
+/** Kill an in-flight run. Operator+ only. Returns cancelled=false when the run
+ *  had already finished (the page just refreshes to the terminal state). */
+export async function cancelRunAction(args: {
+  workspaceSlug: string;
+  agentName: string;
+  runId: string;
+}): Promise<CancelRunResult> {
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace } = auth;
+
+  const run = await getRun(args.runId, workspace.id);
+  if (!run || run.workspaceId !== workspace.id) notFound();
+
+  let cancelled: boolean;
+  try {
+    cancelled = await cancelRun(run.id, workspace.id);
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Failed to cancel the run.",
+    };
+  }
+
+  revalidatePath(
+    `/${args.workspaceSlug}/agents/${encodeURIComponent(args.agentName)}/runs/${run.id}`,
+  );
+  return { ok: true, cancelled };
 }
 
 function formatCapError(error: CapError): string {

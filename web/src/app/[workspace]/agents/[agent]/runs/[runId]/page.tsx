@@ -21,6 +21,7 @@ import {
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, isTemboConfigured } from "@/lib/workspace";
 
+import { CancelRunButton } from "./cancel-run-button";
 import { CopyOutputButton } from "./copy-output-button";
 import { ImproveForm } from "./improve-form";
 import { RunPoller } from "./run-poller";
@@ -185,8 +186,17 @@ export default async function RunDetailPage({
             <dt className="text-foreground-weak w-24 shrink-0 font-medium">
               Status
             </dt>
-            <dd className={`${STATUS_TEXT_TONE[run.status]} font-medium`}>
-              {STATUS_LABELS[run.status]}
+            <dd className="flex items-center gap-3">
+              <span className={`${STATUS_TEXT_TONE[run.status]} font-medium`}>
+                {STATUS_LABELS[run.status]}
+              </span>
+              {isLive && (
+                <CancelRunButton
+                  workspaceSlug={workspace.slug}
+                  agentName={run.agentName}
+                  runId={run.id}
+                />
+              )}
             </dd>
           </div>
           <div className="flex gap-3">
@@ -554,6 +564,7 @@ const STATUS_LABELS: Record<RunRecord["status"], string> = {
   running: "Running",
   succeeded: "Succeeded",
   failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 // Colored text tone per status, used inline in the meta <dl>. Replaces
@@ -564,6 +575,7 @@ const STATUS_TEXT_TONE: Record<RunRecord["status"], string> = {
   running: "text-[var(--color-blue-600)]",
   succeeded: "text-sentiment-positive",
   failed: "text-sentiment-negative",
+  cancelled: "text-foreground-muted",
 };
 
 // Historical runs (pre-9d5f2dc) have a `\n\n[stop_reason=...]`

@@ -66,7 +66,7 @@ export type RunRecord = {
   /** Optional user input the run started with ("" when none). */
   userMessage: string;
   model: string;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   output: string;
   /** Live partial output while running (null once terminal). */
   streamedOutput: string | null;
@@ -200,4 +200,27 @@ export async function getRun(
   }
   const body = (await res.json()) as ApiRunRecord;
   return fromApi(body);
+}
+
+/** Kill an in-flight run. Returns true if this call transitioned the run to
+ *  'cancelled', false if it was already terminal (nothing to do). */
+export async function cancelRun(
+  runId: string,
+  workspaceId: string,
+): Promise<boolean> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const res = await fetch(
+    `${API_URL}/internal/runs/${encodeURIComponent(runId)}/cancel?${params}`,
+    {
+      method: "POST",
+      headers: { ...authHeader() },
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Run API returned ${res.status}: ${text.slice(0, 400)}`);
+  }
+  const body = (await res.json()) as { cancelled: boolean };
+  return body.cancelled;
 }

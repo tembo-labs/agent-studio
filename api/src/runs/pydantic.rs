@@ -26,6 +26,7 @@ use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 const PYDANTIC_PY: &str = "/opt/pydantic-ai/bin/python3";
@@ -191,6 +192,9 @@ pub struct PydanticArgs<'a> {
     /// The run row to stream partial output into while it's still running.
     pub run_id: Uuid,
     pub db: &'a sqlx::PgPool,
+    /// Fired by the kill-run endpoint to cancel this run. When cancelled, the
+    /// read loop SIGKILLs the wrapper subprocess and bails out.
+    pub cancel: &'a CancellationToken,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -395,10 +399,21 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
 
     loop {
         line_buf.clear();
-        let n = reader
-            .read_until(b'\n', &mut line_buf)
-            .await
-            .context("reading pydantic-ai wrapper stdout")?;
+        let n = tokio::select! {
+            // Check cancellation first so a kill takes effect even under a
+            // steady stream of output.
+            biased;
+            _ = args.cancel.cancelled() => {
+                // User killed the run: SIGKILL the wrapper (and its model/tool
+                // subprocesses via the process group it leads) and bail. The
+                // run row was already written to 'cancelled' by the endpoint.
+                let _ = child.start_kill();
+                anyhow::bail!("run cancelled by user");
+            }
+            res = reader.read_until(b'\n', &mut line_buf) => {
+                res.context("reading pydantic-ai wrapper stdout")?
+            }
+        };
         if n == 0 {
             break;
         }

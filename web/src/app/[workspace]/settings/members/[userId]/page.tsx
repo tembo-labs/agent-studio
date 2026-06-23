@@ -173,6 +173,7 @@ const RUN_BADGE: Record<string, "green" | "red" | "yellow" | "blue" | "gray"> = 
   running: "blue",
   succeeded: "green",
   failed: "red",
+  cancelled: "gray",
 };
 
 function ConnRow({

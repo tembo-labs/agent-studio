@@ -307,7 +307,7 @@ async function fetchRunEvents(
     actor_name: string | null;
     actor_email: string | null;
     at: Date;
-    status: "queued" | "running" | "succeeded" | "failed";
+    status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
     trigger: "manual" | "schedule" | "event";
     agent_name: string;
     duration_ms: string | null;

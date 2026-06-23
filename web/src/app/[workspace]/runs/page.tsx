@@ -19,6 +19,7 @@ const VALID_STATUSES: RunSummary["status"][] = [
   "running",
   "succeeded",
   "failed",
+  "cancelled",
 ];
 const VALID_TRIGGERS: RunTrigger[] = ["manual", "schedule", "event"];
 

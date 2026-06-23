@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::Context;
 use axum::{middleware, routing::get, routing::post, Router};
 use sqlx::postgres::PgPoolOptions;
+use tokio_util::sync::CancellationToken;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
@@ -16,11 +18,18 @@ mod runs;
 mod slack_mrkdwn;
 mod workspace;
 
+/// Cancellation handles for in-flight runs, keyed by run id. Inserted when a run
+/// starts executing and removed when it finishes; the cancel endpoint fires the
+/// token to kill a running run's subprocess. In-process only (runs are
+/// in-memory tasks on this api instance).
+pub type RunCancels = Arc<Mutex<HashMap<uuid::Uuid, CancellationToken>>>;
+
 #[derive(Clone)]
 pub struct AppState {
     pub db: sqlx::PgPool,
     pub http: reqwest::Client,
     pub encryption_key: Arc<crypto::MasterKey>,
+    pub run_cancels: RunCancels,
 }
 
 #[tokio::main]
@@ -93,11 +102,13 @@ async fn main() -> anyhow::Result<()> {
         db,
         http,
         encryption_key,
+        run_cancels: Arc::new(Mutex::new(HashMap::new())),
     };
 
     let internal_routes = Router::new()
         .route("/runs", post(runs::handlers::create_run))
         .route("/runs/{id}", get(runs::handlers::get_run))
+        .route("/runs/{id}/cancel", post(runs::handlers::cancel_run))
         .layer(middleware::from_fn(auth::require_internal_token))
         .layer(axum::Extension(internal_token));
 
