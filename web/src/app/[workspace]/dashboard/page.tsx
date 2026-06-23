@@ -345,6 +345,7 @@ const RUN_STATUS_LABELS: Record<RunStatus, string> = {
   running: "Running",
   succeeded: "Succeeded",
   failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 const RUN_STATUS_BADGE: Record<
@@ -355,6 +356,7 @@ const RUN_STATUS_BADGE: Record<
   running: "blue",
   succeeded: "green",
   failed: "red",
+  cancelled: "gray",
 };
 
 function RunStatusBadge({ status }: { status: RunStatus }) {

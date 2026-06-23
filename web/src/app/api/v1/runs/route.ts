@@ -17,7 +17,13 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const STATUSES = ["queued", "running", "succeeded", "failed"] as const;
+const STATUSES = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+] as const;
 type RunStatus = (typeof STATUSES)[number];
 const TRIGGERS: RunTrigger[] = ["manual", "schedule", "event"];
 

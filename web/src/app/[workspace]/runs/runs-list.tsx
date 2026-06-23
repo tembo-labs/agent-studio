@@ -31,7 +31,13 @@ import type { LoadedRun } from "./shape";
 type RunStatus = LoadedRun["status"];
 type RunTrigger = LoadedRun["trigger"];
 
-const ALL_STATUSES: RunStatus[] = ["queued", "running", "succeeded", "failed"];
+const ALL_STATUSES: RunStatus[] = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+];
 const ALL_TRIGGERS: RunTrigger[] = ["manual", "schedule", "event"];
 const PAGE_SIZE = 50;
 
@@ -530,6 +536,7 @@ const STATUS_LABELS: Record<RunStatus, string> = {
   running: "Running",
   succeeded: "Succeeded",
   failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 const TRIGGER_LABELS: Record<RunTrigger, string> = {
@@ -546,6 +553,7 @@ const STATUS_BADGE: Record<
   running: "blue",
   succeeded: "green",
   failed: "red",
+  cancelled: "gray",
 };
 
 function formatDuration(ms: number): string {

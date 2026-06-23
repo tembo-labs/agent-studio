@@ -12,16 +12,18 @@ const STATUS_LABELS: Record<RunSummary["status"], string> = {
   running: "Running",
   succeeded: "Succeeded",
   failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 const STATUS_TONE: Record<
   RunSummary["status"],
-  { variant: "blue" | "yellow" | "green" | "red" }
+  { variant: "blue" | "yellow" | "green" | "red" | "gray" }
 > = {
   queued: { variant: "yellow" },
   running: { variant: "blue" },
   succeeded: { variant: "green" },
   failed: { variant: "red" },
+  cancelled: { variant: "gray" },
 };
 
 export function RecentRuns({

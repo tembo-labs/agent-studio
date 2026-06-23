@@ -19,7 +19,7 @@ const POLL_START_QUEUED = 3000;
 const POLL_MAX = 15000;
 const POLL_GROWTH = 1.5;
 
-export function RunPoller({ status }: { status: "queued" | "running" | "succeeded" | "failed" }) {
+export function RunPoller({ status }: { status: "queued" | "running" | "succeeded" | "failed" | "cancelled" }) {
   const router = useRouter();
 
   useEffect(() => {

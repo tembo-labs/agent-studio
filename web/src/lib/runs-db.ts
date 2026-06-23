@@ -14,7 +14,7 @@ export type RunTrigger = "manual" | "schedule" | "event";
 export type ChildRun = {
   id: string;
   agentName: string;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   costUsd: number | null;
   tokensInput: number | null;
   tokensOutput: number | null;
@@ -99,7 +99,7 @@ export async function listChildRuns(
 export type RunSummary = {
   id: string;
   agentName: string;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   createdAt: Date;
   completedAt: Date | null;
   trigger: RunTrigger;
@@ -116,7 +116,7 @@ export type AgentSummary = {
    *  none — e.g. only cargo-ai runs or unpriced models). */
   avgCostUsd30d: number | null;
   /** Latest run regardless of age — null when the agent has never run. */
-  lastRunStatus: "queued" | "running" | "succeeded" | "failed" | null;
+  lastRunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled" | null;
   lastRunAt: Date | null;
 };
 
@@ -202,7 +202,7 @@ export async function listAgentSummaries30d(
 export interface ChatRun {
   id: string;
   agentName: string;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   userMessage: string;
   output: string;
   errorMessage: string | null;

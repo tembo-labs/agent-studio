@@ -239,3 +239,50 @@ pub async fn get_run(
 
     row.map(Json).ok_or(StatusCode::NOT_FOUND)
 }
+
+#[derive(Debug, Serialize)]
+pub struct CancelRunResponse {
+    /// True if this call transitioned the run to 'cancelled'; false if it was
+    /// already terminal (succeeded/failed/cancelled) and nothing changed.
+    pub cancelled: bool,
+}
+
+/// Kill an in-flight run. Flips the row to 'cancelled' (only while still
+/// queued/running and owned by this workspace) and fires the in-memory
+/// cancellation token so the runner SIGKILLs the wrapper subprocess. Writing
+/// the row first means the runner's `mark_*` status guards refuse to clobber
+/// the 'cancelled' state as the killed process unwinds.
+pub async fn cancel_run(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(query): Query<GetRunQuery>,
+) -> Result<Json<CancelRunResponse>, StatusCode> {
+    let res = sqlx::query(
+        "UPDATE run SET status = 'cancelled', \
+                error_message = COALESCE(error_message, 'Cancelled by user'), \
+                completed_at = now(), streamed_output = NULL \
+          WHERE id = $1 AND workspace_id = $2 AND status IN ('queued', 'running')",
+    )
+    .bind(id)
+    .bind(query.workspace_id)
+    .execute(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Fire the token if this run is executing on this api instance. (An orphaned
+    // run — e.g. from a prior restart — has no live token; the row flip above is
+    // all that's needed since nothing is actually running to kill.)
+    let token = state
+        .run_cancels
+        .lock()
+        .expect("run_cancels mutex poisoned")
+        .get(&id)
+        .cloned();
+    if let Some(token) = token {
+        token.cancel();
+    }
+
+    Ok(Json(CancelRunResponse {
+        cancelled: res.rows_affected() > 0,
+    }))
+}

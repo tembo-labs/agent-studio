@@ -7,6 +7,7 @@
 
 use anyhow::{anyhow, Context};
 use chrono::Utc;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::runs::{cargo_ai, pydantic};
@@ -90,6 +91,23 @@ struct Usage {
 /// updates the run row even on error so the UI never sees a row stuck
 /// in `running` forever.
 pub async fn execute_run(state: &AppState, ctx: RunContext) {
+    // Register a cancellation token so the kill-run endpoint can SIGKILL this
+    // run's subprocess. Always removed on exit, so the registry only ever holds
+    // genuinely in-flight runs.
+    let run_id = ctx.run_id;
+    let cancel = CancellationToken::new();
+    {
+        let mut cancels = state.run_cancels.lock().expect("run_cancels mutex poisoned");
+        cancels.insert(run_id, cancel.clone());
+    }
+
+    execute_run_inner(state, ctx, &cancel).await;
+
+    let mut cancels = state.run_cancels.lock().expect("run_cancels mutex poisoned");
+    cancels.remove(&run_id);
+}
+
+async fn execute_run_inner(state: &AppState, ctx: RunContext, cancel: &CancellationToken) {
     if let Err(e) = mark_running(state, ctx.run_id).await {
         tracing::error!(run_id = %ctx.run_id, ?e, "mark_running failed");
         // Best-effort write the failure to the run row so the UI sees it.
@@ -97,7 +115,7 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
         return;
     }
 
-    let (result, tool_calls, steps) = run_inner(state, &ctx).await;
+    let (result, tool_calls, steps) = run_inner(state, &ctx, cancel).await;
     // Persist per-step usage + what the agent called (success or failure)
     // before we mark the terminal state. Best-effort — a logging hiccup must
     // not fail the run.
@@ -129,6 +147,14 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
             deliver_slack_result(state, ctx.run_id, &body).await;
         }
         Err(e) => {
+            // A user-cancelled run already had its row written to 'cancelled' by
+            // the cancel endpoint; the error here is just the killed subprocess
+            // unwinding. Don't overwrite it with 'failed' or send a Slack
+            // "failed" message — the cancellation was intentional.
+            if cancel.is_cancelled() {
+                tracing::info!(run_id = %ctx.run_id, "run cancelled by user");
+                return;
+            }
             let reason = format!("{e:#}");
             tracing::warn!(run_id = %ctx.run_id, ?e, "run failed");
             if let Err(db_err) = mark_failed(state, ctx.run_id, &reason).await {
@@ -150,6 +176,7 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
 async fn run_inner(
     state: &AppState,
     ctx: &RunContext,
+    cancel: &CancellationToken,
 ) -> (
     anyhow::Result<RunOutcome>,
     Vec<pydantic::ToolCall>,
@@ -180,7 +207,7 @@ async fn run_inner(
                 Vec::new(),
             )
         }
-        Framework::Pydantic => run_pydantic(state, ctx).await,
+        Framework::Pydantic => run_pydantic(state, ctx, cancel).await,
     }
 }
 
@@ -267,6 +294,7 @@ async fn run_cargo_ai(
 async fn run_pydantic(
     state: &AppState,
     ctx: &RunContext,
+    cancel: &CancellationToken,
 ) -> (
     anyhow::Result<RunOutcome>,
     Vec<pydantic::ToolCall>,
@@ -496,6 +524,7 @@ async fn run_pydantic(
         acting_user_id: ctx.acting_user_id.as_str(),
         run_id: ctx.run_id,
         db: &state.db,
+        cancel,
     })
     .await;
 
@@ -569,11 +598,16 @@ fn render_output(user_message: &str, text: &str) -> String {
 }
 
 async fn mark_running(state: &AppState, run_id: Uuid) -> anyhow::Result<()> {
-    sqlx::query("UPDATE run SET status = 'running', started_at = $1 WHERE id = $2")
-        .bind(Utc::now())
-        .bind(run_id)
-        .execute(&state.db)
-        .await?;
+    // Guard on 'queued': if the run was cancelled in the gap between being
+    // queued and starting, leave the 'cancelled' status alone.
+    sqlx::query(
+        "UPDATE run SET status = 'running', started_at = $1 \
+              WHERE id = $2 AND status = 'queued'",
+    )
+    .bind(Utc::now())
+    .bind(run_id)
+    .execute(&state.db)
+    .await?;
     Ok(())
 }
 
@@ -606,7 +640,7 @@ async fn mark_succeeded(
         "UPDATE run SET status = 'succeeded', output = $1, completed_at = $2, \
                         tokens_input = $3, tokens_output = $4, cost_usd = $5, \
                         streamed_output = NULL \
-                  WHERE id = $6",
+                  WHERE id = $6 AND status = 'running'",
     )
     .bind(output)
     .bind(Utc::now())
@@ -671,7 +705,8 @@ Run complete · 3.7s total
 async fn mark_failed(state: &AppState, run_id: Uuid, reason: &str) -> anyhow::Result<()> {
     sqlx::query(
         "UPDATE run SET status = 'failed', error_message = $1, completed_at = $2, \
-                        streamed_output = NULL WHERE id = $3",
+                        streamed_output = NULL \
+                  WHERE id = $3 AND status IN ('queued', 'running')",
     )
     .bind(reason)
     .bind(Utc::now())

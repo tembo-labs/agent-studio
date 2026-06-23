@@ -58,7 +58,7 @@ export type InventoryAgent =
       /** Latest run regardless of window. Null when never run. */
       lastRun:
         | {
-            status: "queued" | "running" | "succeeded" | "failed";
+            status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
             createdAtIso: string;
           }
         | null;
