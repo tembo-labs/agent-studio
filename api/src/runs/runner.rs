@@ -97,13 +97,19 @@ pub async fn execute_run(state: &AppState, ctx: RunContext) {
     let run_id = ctx.run_id;
     let cancel = CancellationToken::new();
     {
-        let mut cancels = state.run_cancels.lock().expect("run_cancels mutex poisoned");
+        let mut cancels = state
+            .run_cancels
+            .lock()
+            .expect("run_cancels mutex poisoned");
         cancels.insert(run_id, cancel.clone());
     }
 
     execute_run_inner(state, ctx, &cancel).await;
 
-    let mut cancels = state.run_cancels.lock().expect("run_cancels mutex poisoned");
+    let mut cancels = state
+        .run_cancels
+        .lock()
+        .expect("run_cancels mutex poisoned");
     cancels.remove(&run_id);
 }
 
