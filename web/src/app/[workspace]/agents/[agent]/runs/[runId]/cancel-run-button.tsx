@@ -40,7 +40,7 @@ export function CancelRunButton({
     <span className="inline-flex items-center gap-2">
       <Button
         size="small"
-        variant="secondary"
+        variant="destructive"
         onClick={onClick}
         disabled={pending}
       >
