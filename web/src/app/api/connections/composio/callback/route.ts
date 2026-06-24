@@ -185,8 +185,11 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (e) {
+    // Pass the user-influenced toolkit as an argument, not interpolated into
+    // the format string, so a `%s`-style value can't garble the log line.
     console.error(
-      `[composio/${payload.toolkit}] tool-cache prime failed:`,
+      "[composio/%s] tool-cache prime failed:",
+      payload.toolkit,
       (e as Error).message,
     );
   }

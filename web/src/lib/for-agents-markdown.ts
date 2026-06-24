@@ -10,9 +10,15 @@ export type ForAgentsTool = {
   description: string | null;
 };
 
-// Escape a cell for a GitHub-flavored markdown table (pipes + newlines).
+// Escape a cell for a GitHub-flavored markdown table (backslashes + pipes +
+// newlines). Backslashes are escaped first so an input backslash can't combine
+// with the pipe-escaping we add (or escape the trailing cell boundary).
 function cell(s: string | null): string {
-  return (s ?? "").replace(/\|/g, "\\|").replace(/\r?\n+/g, " ").trim();
+  return (s ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n+/g, " ")
+    .trim();
 }
 
 /** One provider's tool reference. `tools` is the workspace's cached catalog
