@@ -28,6 +28,12 @@ concurrency:
   group: deploy-internal
   cancel-in-progress: true
 
+# Least-privilege default for GITHUB_TOKEN. The build-and-deploy job widens its
+# own scope (packages: write) where it needs to; every other job inherits this
+# read-only default.
+permissions:
+  contents: read
+
 jobs:
   checks:
     if: github.repository == 'tembo/agent-studio'
