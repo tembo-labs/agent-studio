@@ -12,6 +12,16 @@ export function isGoogleConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
+// When set, the /for-agents tool reference is served WITHOUT a token for every
+// provider (not just TAS's own self-key MCP), rendering the instance's
+// workspace-agnostic tool catalog. Off by default so customer instances keep
+// the reference token-gated (it reveals which integrations are connected); we
+// enable it on the internal dogfood instance for easy inspection.
+export function isForAgentsPublic(): boolean {
+  const v = process.env.TAS_FOR_AGENTS_PUBLIC?.trim().toLowerCase();
+  return v === "1" || v === "true";
+}
+
 // Instance admins, by env allowlist. Pure (no DB/session) so the auth
 // account-creation gate can import it without a cycle through
 // lib/session → lib/auth. lib/instance re-exports these alongside the
