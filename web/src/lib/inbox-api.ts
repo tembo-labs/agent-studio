@@ -468,6 +468,27 @@ export async function dismissInboxItem(
   return (res.rowCount ?? 0) > 0;
 }
 
+/** Bulk-dismiss several of the owner's items in one statement (the inbox
+ *  multi-select). Owner-scoped and skips already-resolved rows, like the
+ *  single dismiss. Returns the ids actually dismissed (so the caller can audit
+ *  + report an accurate count). */
+export async function dismissInboxItems(
+  ids: string[],
+  workspaceId: string,
+  ownerUserId: string,
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const res = await db.query<{ id: string }>(
+    `UPDATE inbox_item
+        SET status = 'dismissed', resolved_at = NOW(), updated_at = NOW()
+      WHERE id = ANY($1::uuid[]) AND workspace_id = $2 AND owner_user_id = $3
+        AND status NOT IN ('done', 'dismissed')
+      RETURNING id`,
+    [ids, workspaceId, ownerUserId],
+  );
+  return res.rows.map((r) => r.id);
+}
+
 // ── Learning-loop signal gathering (scheduler) ────────────────────────
 
 /**

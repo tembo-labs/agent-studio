@@ -52,6 +52,17 @@ export type DataTableProps<T> = {
   rowClassName?: (row: T) => string;
   /** Shown in place of the table body when there are no rows. */
   empty?: ReactNode;
+  // ── Row selection (opt-in: pass both selectedKeys + onToggleRow) ──
+  /** The currently-selected row keys. Presence enables a leading checkbox
+   *  column. Selection state is owned by the caller. */
+  selectedKeys?: Set<string>;
+  /** Toggle one row's selection. The checkbox stops click propagation so it
+   *  never triggers rowHref/onRowClick navigation. */
+  onToggleRow?: (key: string) => void;
+  /** Whether every current row is selected (drives the header checkbox). */
+  allSelected?: boolean;
+  /** Toggle select-all / clear-all over the current rows. */
+  onToggleAll?: () => void;
 };
 
 export function DataTable<T>({
@@ -66,7 +77,12 @@ export function DataTable<T>({
   onSort,
   rowClassName,
   empty,
+  selectedKeys,
+  onToggleRow,
+  allSelected = false,
+  onToggleAll,
 }: DataTableProps<T>) {
+  const selectable = !!selectedKeys && !!onToggleRow;
   const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -87,6 +103,17 @@ export function DataTable<T>({
       <table className="w-full text-sm">
         <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
           <tr>
+            {selectable && (
+              <th className="w-9 px-3 py-2">
+                <input
+                  type="checkbox"
+                  aria-label="Select all rows"
+                  checked={allSelected}
+                  onChange={() => onToggleAll?.()}
+                  className="cursor-pointer align-middle"
+                />
+              </th>
+            )}
             {columns.map((col) => {
               const isSorted = sortKey === col.key;
               const align = col.align === "right" ? "text-right" : "text-left";
@@ -144,6 +171,20 @@ export function DataTable<T>({
                     rowClassName?.(row),
                   )}
                 >
+                  {selectable && (
+                    <td className="w-9 px-3 py-2 align-top">
+                      <input
+                        type="checkbox"
+                        aria-label="Select row"
+                        checked={selectedKeys!.has(key)}
+                        // Stop propagation so toggling selection never triggers
+                        // the row's navigation/expand handler.
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => onToggleRow!(key)}
+                        className="cursor-pointer align-middle"
+                      />
+                    </td>
+                  )}
                   {columns.map((col) => (
                     <td
                       key={col.key}
@@ -159,7 +200,10 @@ export function DataTable<T>({
                 </tr>
                 {canExpand && expanded.has(key) && (
                   <tr className="bg-surface-raised">
-                    <td colSpan={columns.length} className="px-3 pb-3">
+                    <td
+                      colSpan={columns.length + (selectable ? 1 : 0)}
+                      className="px-3 pb-3"
+                    >
                       {renderExpanded!(row)}
                     </td>
                   </tr>

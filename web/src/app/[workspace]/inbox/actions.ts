@@ -9,6 +9,7 @@ import {
   completeInboxItem,
   countActiveInboxItems,
   dismissInboxItem,
+  dismissInboxItems,
   getInboxItem,
   snoozeInboxItem,
 } from "@/lib/inbox-api";
@@ -98,6 +99,46 @@ export async function dismissInboxItemAction(args: {
 
   revalidateInbox(args.workspaceSlug);
   return { ok: true };
+}
+
+export type BulkDismissResult =
+  | { ok: true; dismissed: number }
+  | { ok: false; error: string };
+
+/** Mass-dismiss the selected inbox items (the index multi-select). Operator+;
+ *  owner-scoped (you can only dismiss your own items). Already-resolved ids are
+ *  skipped. Audits each actually-dismissed item. */
+export async function bulkDismissInboxItemsAction(args: {
+  workspaceSlug: string;
+  itemIds: string[];
+}): Promise<BulkDismissResult> {
+  const ids = Array.from(new Set(args.itemIds)).filter(Boolean);
+  if (ids.length === 0) return { ok: true, dismissed: 0 };
+
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+
+  const dismissed = await dismissInboxItems(ids, workspace.id, userId);
+  await Promise.all(
+    dismissed.map((id) =>
+      writeAuditEvent({
+        workspaceId: workspace.id,
+        actorUserId: userId,
+        source: "hitl_response",
+        kind: "inbox.dismissed",
+        targetType: "inbox_item",
+        targetId: id,
+        agentName: null,
+      }),
+    ),
+  );
+
+  revalidateInbox(args.workspaceSlug);
+  return { ok: true, dismissed: dismissed.length };
 }
 
 // The human picked an action-menu button. Look up the chosen option ON THE
