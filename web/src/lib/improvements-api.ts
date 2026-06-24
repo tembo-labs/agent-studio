@@ -224,6 +224,49 @@ export async function dismissPendingCreate(
   return (res.rowCount ?? 0) > 0;
 }
 
+/**
+ * Presence-based reconcile: close out pending agent-creates whose agent has
+ * already landed in the repo, independent of commit-message markers.
+ *
+ * The marker-based commit scan (improvement-scan Path 3) can only attach a
+ * commit_url when the landed commit's message carries the per-improvement
+ * marker — which isn't guaranteed (CAP may reword/squash, or the file was
+ * committed outside that flow). When it can't, a direct-commit create sits in
+ * 'committed' with a null commit_url forever and shows as a ghost Pending card.
+ *
+ * This closes that gap by the more reliable signal — the agent file actually
+ * exists. A create is "landed" when a live agent now exists at its path
+ * (covers files that don't parse / whose name diverged) or under its name.
+ * Such rows are marked 'merged' (terminal success), distinct from a user
+ * Dismiss ('closed'). Only the workspace's own non-terminal create rows are
+ * touched. Returns the ids closed so the caller can drop them from the
+ * already-fetched pending list without a re-query.
+ *
+ * Pass live paths/names only when the repo was actually read — an empty repo
+ * listing (e.g. GitHub down) must NOT be read as "nothing landed".
+ */
+export async function reconcileLandedCreates(
+  workspaceId: string,
+  livePaths: string[],
+  liveNames: string[],
+): Promise<string[]> {
+  if (livePaths.length === 0 && liveNames.length === 0) return [];
+  const res = await db.query<{ id: string }>(
+    `UPDATE improvement
+        SET status = 'merged', updated_at = now()
+      WHERE workspace_id = $1
+        AND kind = 'create'
+        AND (
+          status IN ('submitted', 'pr_opened')
+          OR (delivery = 'direct' AND status = 'committed' AND commit_url IS NULL)
+        )
+        AND (agent_path = ANY($2::text[]) OR agent_name = ANY($3::text[]))
+      RETURNING id`,
+    [workspaceId, livePaths, liveNames],
+  );
+  return res.rows.map((r) => r.id);
+}
+
 export async function setImprovementTask(input: {
   id: string;
   temboTaskId: string | null;

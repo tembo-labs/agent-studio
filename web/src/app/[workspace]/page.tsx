@@ -7,7 +7,10 @@ import { listStarredAgentNames } from "@/lib/agent-stars";
 import { listOwnedAgentNames } from "@/lib/agent-versions";
 import { toolkitLabel } from "@/lib/composio-label";
 import { scanImprovementsForPRs } from "@/lib/improvement-scan";
-import { listPendingCreatesForWorkspace } from "@/lib/improvements-api";
+import {
+  listPendingCreatesForWorkspace,
+  reconcileLandedCreates,
+} from "@/lib/improvements-api";
 import { getMcpProvider } from "@/lib/mcp-providers";
 import { meetsMinRole } from "@/lib/rbac";
 import { listAgentSubAgentEdges, listAgentSummaries30d } from "@/lib/runs-db";
@@ -73,6 +76,23 @@ export default async function WorkspacePage({
   const validNames = agentsResult.ok
     ? agentsResult.agents.filter((a) => a.ok).map((a) => a.spec.name)
     : [];
+
+  // Auto-reconcile ghost Pending cards: if a create's agent has already landed
+  // in the repo (file present at its path, or a live agent under its name),
+  // close the row now — the marker-based commit scan can't always attach a
+  // commit_url, which otherwise leaves a direct-commit create stuck Pending
+  // forever. All repo files (parsing or not) count as "landed" via path; only
+  // run when the repo was actually read (agentsResult.ok) so a failed listing
+  // isn't misread as "nothing landed". Drop the closed ids from the in-memory
+  // pending list so they don't render this pass.
+  const livePaths = agentsResult.ok
+    ? agentsResult.agents.map((a) => a.path)
+    : [];
+  const reconciledIds = new Set(
+    await reconcileLandedCreates(workspace.id, livePaths, validNames),
+  );
+  const pendingActive = pendingStored.filter((p) => !reconciledIds.has(p.id));
+
   const [summaries, subAgentEdges] = await Promise.all([
     listAgentSummaries30d(workspace.id, validNames),
     listAgentSubAgentEdges(workspace.id),
@@ -137,7 +157,7 @@ export default async function WorkspacePage({
   // drop rows that have moved past the non-terminal window.
   const pendingScanned = await scanImprovementsForPRs(
     workspace.id,
-    pendingStored,
+    pendingActive,
   );
   const pending = pendingScanned.filter(
     (p) =>
