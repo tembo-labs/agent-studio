@@ -205,13 +205,20 @@ export async function dismissPendingCreate(
   workspaceId: string,
   improvementId: string,
 ): Promise<boolean> {
+  // Match the SAME predicate listPendingCreatesForWorkspace uses to render a
+  // card — including the direct-commit (YOLO) case that's optimistically
+  // 'committed' but has no commit_url yet. Otherwise a direct-commit ghost card
+  // shows as Pending but Dismiss matches 0 rows and silently does nothing.
   const res = await db.query(
     `UPDATE improvement
         SET status = 'closed', updated_at = now()
       WHERE id = $1
         AND workspace_id = $2
         AND kind = 'create'
-        AND status IN ('submitted', 'pr_opened')`,
+        AND (
+          status IN ('submitted', 'pr_opened')
+          OR (delivery = 'direct' AND status = 'committed' AND commit_url IS NULL)
+        )`,
     [improvementId, workspaceId],
   );
   return (res.rowCount ?? 0) > 0;
