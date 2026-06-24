@@ -106,6 +106,20 @@ export async function listNativeConnectionsForUser(
   return rows.map(rowToConnection);
 }
 
+/** Every active native-MCP connection across all workspaces/users — for the
+ *  deploy/scheduled tool-cache reconcile (not a per-user view). */
+export async function listAllActiveNativeConnections(): Promise<
+  WorkspaceConnection[]
+> {
+  const { rows } = await db.query<ConnectionRow>(
+    `SELECT ${COLUMNS}
+       FROM workspace_connection
+      WHERE status = 'active'
+      ORDER BY workspace_id ASC, user_id ASC, type ASC, name ASC`,
+  );
+  return rows.map(rowToConnection);
+}
+
 export async function getNativeConnection(
   workspaceId: string,
   userId: string,

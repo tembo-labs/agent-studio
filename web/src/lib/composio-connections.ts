@@ -86,6 +86,20 @@ export async function listConnectionsForUser(
   return rows.map(rowToConnection);
 }
 
+/** Every ACTIVE Composio connection across all workspaces/users — for the
+ *  deploy/scheduled tool-cache reconcile (not a per-user view). */
+export async function listAllActiveComposioConnections(): Promise<
+  WorkspaceComposioConnection[]
+> {
+  const { rows } = await db.query<Row>(
+    `SELECT ${COLUMNS}
+       FROM workspace_composio_connection
+      WHERE status = 'ACTIVE'
+      ORDER BY workspace_id ASC, user_id ASC, toolkit_slug ASC, name ASC`,
+  );
+  return rows.map(rowToConnection);
+}
+
 /**
  * Lookup a specific (user, toolkit, name) tuple. Used by the
  * runner to resolve which Composio connection an agent's declared
