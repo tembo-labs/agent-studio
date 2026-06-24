@@ -64,6 +64,28 @@ export default async function InboxItemPage({
         </p>
       </div>
 
+      {item.links && item.links.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-foreground text-sm font-semibold uppercase tracking-wide">
+            Links
+          </h2>
+          <ul className="bg-surface-secondary flex flex-col gap-1 rounded-lg border border-[var(--color-border-weak)] p-4">
+            {item.links.map((link, i) => (
+              <li key={`${link.url}-${i}`}>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
+                >
+                  {link.label ?? link.url} ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="flex flex-col gap-2">
         <h2 className="text-foreground text-sm font-semibold uppercase tracking-wide">
           Context
