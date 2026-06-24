@@ -153,6 +153,39 @@ export async function listToolsForWorkspace(
 }
 
 /**
+ * Workspace-agnostic tool catalog for a native-MCP provider — newest-refreshed
+ * cached row per slug, across all workspaces. Used by the tokenless /for-agents
+ * reference: always for the self-key (TAS-own) provider, and for any provider
+ * when the instance opts into a public reference (isForAgentsPublic). Not
+ * scoped to a workspace/user, so don't use it where per-workspace isolation
+ * matters.
+ */
+export async function listProviderToolCatalog(
+  provider: string,
+): Promise<McpTool[]> {
+  const { rows } = await db.query<Row>(
+    `SELECT DISTINCT ON (slug) ${COLUMNS}
+       FROM workspace_mcp_tool
+      WHERE source = 'native-mcp' AND provider = $1
+      ORDER BY slug ASC, refreshed_at DESC`,
+    [provider],
+  );
+  return rows.map(rowToTool);
+}
+
+/** Every native-MCP provider that has any cached tools across the instance —
+ *  the workspace-agnostic "which providers are connected" set for the tokenless
+ *  /for-agents index. */
+export async function listCachedNativeProviders(): Promise<string[]> {
+  const { rows } = await db.query<{ provider: string }>(
+    `SELECT DISTINCT provider
+       FROM workspace_mcp_tool
+      WHERE source = 'native-mcp'`,
+  );
+  return rows.map((r) => r.provider);
+}
+
+/**
  * Distinct tool-slug → (source, provider) across the whole workspace's tool
  * cache, for resolving a run's recorded tool_name to the provider whose logo
  * to show. Workspace-wide (not per-user) because a tool slug maps to the same
