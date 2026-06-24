@@ -42,8 +42,16 @@ import {
   type InboxItem,
 } from "@/lib/inbox-api";
 import { resolveAgentForDispatch } from "@/lib/workspace-agents";
+import { maybeReconcileToolCaches } from "@/lib/tool-reconcile";
 
 const TICK_MS = 30_000;
+// Boot reconcile floor — a fresh process re-syncs tool caches unless one ran in
+// the last 10 min. Deploys (minutes+ apart) always run; a crash-looping restart
+// within 10 min doesn't re-storm provider APIs.
+const RECONCILE_BOOT_FLOOR_MS = 10 * 60_000;
+// Daily reconcile for long-running instances with no deploys — catches external
+// (Composio / native provider) tools that change server-side.
+const RECONCILE_DAILY_MS = 24 * 60 * 60_000;
 // How many corrected cases to include in one batched learning prompt. Bounds
 // the CAP prompt size; older signals beyond this still get consumed so they
 // don't pile up, they just don't each get spelled out.
@@ -61,10 +69,20 @@ export function startScheduler() {
   void learningTick().catch((e) =>
     console.error("[scheduler] initial learning tick threw", e),
   );
+  // Refresh every connection's cached tool catalog on boot (i.e. each deploy),
+  // throttled so restarts don't re-storm provider APIs. Background — must not
+  // block the scheduler from starting.
+  void maybeReconcileToolCaches(RECONCILE_BOOT_FLOOR_MS).catch((e) =>
+    console.error("[scheduler] initial tool reconcile threw", e),
+  );
   timer = setInterval(() => {
     void tick().catch((e) => console.error("[scheduler] tick threw", e));
     void learningTick().catch((e) =>
       console.error("[scheduler] learning tick threw", e),
+    );
+    // Daily drift catch-up; the throttle makes this a cheap no-op most ticks.
+    void maybeReconcileToolCaches(RECONCILE_DAILY_MS).catch((e) =>
+      console.error("[scheduler] tool reconcile threw", e),
     );
   }, TICK_MS);
   console.log(`[scheduler] started, tick=${TICK_MS}ms`);

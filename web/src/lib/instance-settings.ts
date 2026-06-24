@@ -47,6 +47,32 @@ export async function getStoredInstanceName(): Promise<string | null> {
 }
 
 /**
+ * When the tool-cache reconcile last completed (null if never / table missing).
+ * Used to throttle the boot + scheduled reconcile so restarts don't re-run it
+ * within a short window.
+ */
+export async function getLastToolReconcileAt(): Promise<Date | null> {
+  try {
+    const { rows } = await db.query<{ last_tool_reconcile_at: Date | null }>(
+      "SELECT last_tool_reconcile_at FROM instance_settings WHERE id = TRUE LIMIT 1",
+    );
+    return rows[0]?.last_tool_reconcile_at ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Stamp the tool-cache reconcile time (upserts the singleton row). */
+export async function markToolReconcile(at: Date): Promise<void> {
+  await db.query(
+    `INSERT INTO instance_settings (id, last_tool_reconcile_at)
+          VALUES (TRUE, $1)
+     ON CONFLICT (id) DO UPDATE SET last_tool_reconcile_at = $1`,
+    [at],
+  );
+}
+
+/**
  * First run = no user accounts exist yet. While true, the pre-sign-in
  * setup screen may set the instance name (no admin to gate on yet). On a
  * DB error we return false — fail closed, don't open anonymous setup.
