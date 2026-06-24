@@ -67,3 +67,34 @@ tools = [echo]
     )
 
     assert isinstance(agent, Agent)
+
+
+def test_build_capabilities_maps_websearch() -> None:
+    from pydantic_ai.capabilities import WebSearch
+
+    # Bare-name form and single-key-map form both map to the WebSearch capability.
+    for caps in (["WebSearch"], [{"WebSearch": {}}], ["web_search"]):
+        built = run_pydantic._build_capabilities({"capabilities": caps})
+        assert len(built) == 1
+        assert isinstance(built[0], WebSearch)
+
+
+def test_build_capabilities_ignores_unknown_and_empty() -> None:
+    # Unwired capabilities (handled elsewhere) and absent/empty lists yield none,
+    # and never raise — a typo must not break agent construction.
+    assert run_pydantic._build_capabilities({}) == []
+    assert run_pydantic._build_capabilities({"capabilities": []}) == []
+    assert run_pydantic._build_capabilities({"capabilities": ["Thinking"]}) == []
+    assert run_pydantic._build_capabilities({"capabilities": "WebSearch"}) == []
+
+
+def test_build_agent_attaches_websearch_capability() -> None:
+    agent = run_pydantic.build_agent(
+        {
+            "name": "searcher",
+            "model": "anthropic:claude-sonnet-4-5",
+            "instructions": "Search the web when current info is needed.",
+            "capabilities": ["WebSearch"],
+        }
+    )
+    assert isinstance(agent, Agent)

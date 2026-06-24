@@ -908,6 +908,67 @@ def _make_scaledown_processor(rate: str, min_chars: int):
     return process
 
 
+def _build_capabilities(spec: dict) -> list:
+    """Translate the AgentSpec `capabilities:` list into pydantic-ai capability
+    objects, passed to `Agent(capabilities=[...])`.
+
+    Today this wires `WebSearch` -> pydantic-ai's provider-adaptive WebSearch
+    capability: it uses the provider's native web search where available (e.g.
+    Anthropic's `web_search` on Claude, OpenAI's), with a local fallback
+    otherwise. Each entry is either a bare name (`WebSearch`) or a single-key map
+    (`WebSearch: { ...config }`) — the map's config is forwarded to the
+    capability when it accepts those kwargs. Unknown/uninwired capabilities
+    (e.g. `Thinking`, handled via model_settings) are logged and skipped — a typo
+    or an unsupported capability must never break agent construction.
+    """
+    caps = spec.get("capabilities")
+    if not isinstance(caps, list) or not caps:
+        return []
+    out: list = []
+    for entry in caps:
+        if isinstance(entry, str):
+            name, cfg = entry, {}
+        elif isinstance(entry, dict) and len(entry) == 1:
+            name, cfg = next(iter(entry.items()))
+            if not isinstance(cfg, dict):
+                cfg = {}
+        else:
+            print(
+                f"[capabilities] skipping unrecognized entry: {entry!r}",
+                file=sys.stderr,
+            )
+            continue
+        key = name.strip().lower() if isinstance(name, str) else ""
+        if key in ("websearch", "web_search"):
+            try:
+                from pydantic_ai.capabilities import WebSearch
+            except Exception as e:  # noqa: BLE001 — version skew must not be fatal
+                print(
+                    f"[capabilities] WebSearch unavailable in this pydantic-ai "
+                    f"build: {e}",
+                    file=sys.stderr,
+                )
+                continue
+            try:
+                out.append(WebSearch(**cfg) if cfg else WebSearch())
+            except TypeError as e:
+                # A config key the capability doesn't accept — fall back to the
+                # default rather than failing the whole run.
+                print(
+                    f"[capabilities] WebSearch config {cfg!r} rejected ({e}); "
+                    f"using defaults",
+                    file=sys.stderr,
+                )
+                out.append(WebSearch())
+            print("[capabilities] enabled WebSearch", file=sys.stderr)
+        else:
+            print(
+                f"[capabilities] '{name}' is not wired as a capability; ignoring",
+                file=sys.stderr,
+            )
+    return out
+
+
 def build_agent(
     spec: dict,
     toolsets: list | None = None,
@@ -940,10 +1001,14 @@ def build_agent(
     instructions reference services in natural language and the
     model can't connect them to the tool surface.
 
+    `capabilities:` is translated to pydantic-ai capabilities by
+    `_build_capabilities` — currently `WebSearch` -> the provider-adaptive
+    WebSearch capability. Other capabilities (e.g. `Thinking`) aren't wired here
+    yet.
+
     Out of scope for this MVP path:
       - output_schema (would need to dynamically build a Pydantic
         model from the JSON schema; defaulting to str output)
-      - capabilities (no general translation to builtin_tools yet)
       - deps_schema (deps come from the caller; runtime supplies none)
     """
     model = spec.get("model")
@@ -1027,6 +1092,13 @@ def build_agent(
     # docstring, so well-documented functions get good tool schemas.
     if tools:
         kwargs["tools"] = tools
+
+    # Provider-adaptive capabilities from `capabilities:` (e.g. WebSearch).
+    # These are model-side abilities (not MCP/sidecar) — pydantic-ai uses the
+    # provider's native implementation where available, with a local fallback.
+    capabilities = _build_capabilities(spec)
+    if capabilities:
+        kwargs["capabilities"] = capabilities
 
     # ScaleDown prompt compression — opt-in per agent via `scaledown:`, and only
     # when the workspace set a key. Any non-`off` mode attaches a history
