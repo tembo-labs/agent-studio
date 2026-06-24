@@ -469,9 +469,22 @@ export function buildMcpServer(
             "Action menu rendered as buttons for the human — the set of things they might do. " +
             "Pick one recommended; reply options carry a draft.",
           ),
+        links: z
+          .array(
+            z.object({
+              label: z.string().optional().describe("Row text (falls back to the url)."),
+              url: z.string().describe("http(s) link to open."),
+            }),
+          )
+          .optional()
+          .describe(
+            "Deep links for the human to open, one row each — e.g. the Linear tickets " +
+            "behind a single triage item. Rendered as a clickable 'Links' list on the " +
+            "item (separate from the single `url` source link). Non-http(s) urls are dropped.",
+          ),
       },
     },
-    async ({ itemType, title, source, externalRef, url, externalTs, context, proposedActionText, proposedActionFields, options: actionOptions }) => {
+    async ({ itemType, title, source, externalRef, url, externalTs, context, proposedActionText, proposedActionFields, options: actionOptions, links }) => {
       if (!isOperator) return operatorOnly();
       const proposedAction =
         proposedActionText || proposedActionFields
@@ -490,6 +503,7 @@ export function buildMcpServer(
         context,
         proposedAction,
         options: actionOptions,
+        links,
         parentRunId: options.parentRunId,
       });
       if (!res.ok) return errorResult(res.error);

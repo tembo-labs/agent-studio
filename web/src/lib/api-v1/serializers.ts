@@ -263,6 +263,8 @@ export type SerializedInboxItem = {
   proposedAction: InboxItem["proposedAction"];
   finalAction: InboxItem["finalAction"];
   options: InboxItem["options"];
+  /** Deep links to render as a "Links" list, beyond the single `url`. */
+  links: InboxItem["links"];
   status: InboxItem["status"];
   assigneeKind: InboxItem["assigneeKind"];
   assigneeId: string | null;
@@ -292,6 +294,7 @@ export function serializeInboxItem(i: InboxItem): SerializedInboxItem {
     proposedAction: i.proposedAction,
     finalAction: i.finalAction,
     options: i.options,
+    links: i.links,
     status: i.status,
     assigneeKind: i.assigneeKind,
     assigneeId: i.assigneeId,

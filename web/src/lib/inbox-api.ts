@@ -47,6 +47,15 @@ export interface InboxOption {
   execute?: InboxOptionExecute;
 }
 
+// One deep link the producer wants the human to open. Lets a single item point
+// at several things to review (e.g. the 10 Linear tickets behind one triage
+// task). `url` is always a validated http(s) link (sanitized at produce time);
+// `label` is the row text (falls back to the url when absent).
+export interface InboxLink {
+  label?: string;
+  url: string;
+}
+
 export interface InboxItem {
   id: string;
   workspaceId: string;
@@ -60,6 +69,9 @@ export interface InboxItem {
   proposedAction: InboxAction | null;
   finalAction: InboxAction | null;
   options: InboxOption[] | null;
+  /** Deep links the producer wants the human to open, beyond the single `url`
+   *  source link — rendered as a "Links" list. Null when none. */
+  links: InboxLink[] | null;
   /** Source's latest-activity time (epoch ms). Drives reopen-on-new-activity. */
   externalTs: number | null;
   status: InboxItemStatus;
@@ -92,6 +104,7 @@ type Row = {
   proposed_action: InboxAction | null;
   final_action: InboxAction | null;
   options: InboxOption[] | null;
+  links: InboxLink[] | null;
   external_ts: string | null;
   status: InboxItemStatus;
   assignee_kind: InboxAssigneeKind | null;
@@ -121,6 +134,7 @@ function rowToInboxItem(r: Row): InboxItem {
     proposedAction: r.proposed_action,
     finalAction: r.final_action,
     options: r.options,
+    links: r.links,
     externalTs: r.external_ts == null ? null : Number(r.external_ts),
     status: r.status,
     assigneeKind: r.assignee_kind,
@@ -143,7 +157,7 @@ function rowToInboxItem(r: Row): InboxItem {
 // rows (created_by IS NULL) visible.
 const COLUMNS = `
   i.id, i.workspace_id, i.source, i.external_ref, i.external_url, i.item_type, i.title,
-  i.context, i.proposed_action, i.final_action, i.options, i.external_ts, i.status,
+  i.context, i.proposed_action, i.final_action, i.options, i.links, i.external_ts, i.status,
   i.assignee_kind, i.assignee_id, i.produced_by_run_id, i.improvement_id,
   i.signal_consumed_at, i.created_by,
   u.name AS created_by_name, u.email AS created_by_email,
@@ -162,6 +176,9 @@ export interface CreateInboxItemInput {
   context?: Record<string, unknown>;
   proposedAction?: InboxAction | null;
   options?: InboxOption[] | null;
+  /** Deep links to render as a "Links" list. Sanitized (http(s) only) by the
+   *  produce path before it reaches here. */
+  links?: InboxLink[] | null;
   /** Source's latest-activity time (epoch ms) — newer than the stored value
    *  reopens + refreshes the item. */
   externalTs?: number | null;
@@ -205,9 +222,10 @@ export async function createInboxItem(
        INSERT INTO inbox_item (
          workspace_id, source, external_ref, item_type, title, context,
          proposed_action, options, status, assignee_kind, assignee_id,
-         produced_by_run_id, created_by, external_ts, external_url, owner_user_id
+         produced_by_run_id, created_by, external_ts, external_url, owner_user_id,
+         links
        )
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb)
        ON CONFLICT (workspace_id, source, external_ref) WHERE external_ref IS NOT NULL
        DO UPDATE SET
          updated_at = NOW(),
@@ -216,6 +234,7 @@ export async function createInboxItem(
          context = CASE WHEN ${reopenable} THEN EXCLUDED.context ELSE inbox_item.context END,
          proposed_action = CASE WHEN ${reopenable} THEN EXCLUDED.proposed_action ELSE inbox_item.proposed_action END,
          options = CASE WHEN ${reopenable} THEN EXCLUDED.options ELSE inbox_item.options END,
+         links = CASE WHEN ${reopenable} THEN EXCLUDED.links ELSE inbox_item.links END,
          external_ts = CASE WHEN ${reopenable} THEN EXCLUDED.external_ts ELSE inbox_item.external_ts END,
          status = CASE WHEN ${reopenable} THEN 'awaiting_human' ELSE inbox_item.status END,
          resolved_at = CASE WHEN ${reopenable} THEN NULL ELSE inbox_item.resolved_at END,
@@ -246,6 +265,7 @@ export async function createInboxItem(
       input.externalTs ?? null,
       input.url ?? null,
       input.ownerUserId ?? null,
+      input.links ? JSON.stringify(input.links) : null,
     ],
   );
   return rowToInboxItem(res.rows[0]);

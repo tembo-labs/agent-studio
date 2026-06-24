@@ -51,6 +51,7 @@ import {
   setProposedAction,
   type InboxAction,
   type InboxItem,
+  type InboxLink,
   type InboxOption,
   type ListInboxFilters,
 } from "@/lib/inbox-api";
@@ -513,11 +514,40 @@ export type ProduceInboxItemInput = {
   proposedAction?: InboxAction;
   /** Action menu rendered as buttons; one may be `recommended`. */
   options?: InboxOption[];
+  /** Deep links to render as a clickable "Links" list (e.g. the tickets behind
+   *  one triage item). Sanitized to http(s) before persisting. */
+  links?: InboxLink[];
   /** Source's latest-activity time (epoch ms); newer than stored reopens the item. */
   externalTs?: number;
   /** The run producing this item (set when called from /mcp inside a run). */
   parentRunId?: string;
 };
+
+// Keep only well-formed http(s) links, drop the rest, and cap the count. The
+// url reaches an <a href> directly, so a non-http(s) scheme (javascript:,
+// data:) must never be stored. Returns null when nothing survives so the column
+// stays clean.
+const MAX_INBOX_LINKS = 50;
+export function sanitizeInboxLinks(
+  links: InboxLink[] | undefined,
+): InboxLink[] | null {
+  if (!Array.isArray(links) || links.length === 0) return null;
+  const clean: InboxLink[] = [];
+  for (const l of links) {
+    const url = typeof l?.url === "string" ? l.url.trim() : "";
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      continue;
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") continue;
+    const label = typeof l?.label === "string" ? l.label.trim() : "";
+    clean.push(label ? { label, url } : { url });
+    if (clean.length >= MAX_INBOX_LINKS) break;
+  }
+  return clean.length > 0 ? clean : null;
+}
 
 export async function produceInboxItemFor(
   ctx: ApiCtx,
@@ -539,6 +569,7 @@ export async function produceInboxItemFor(
     context: input.context ?? {},
     proposedAction: input.proposedAction ?? null,
     options: input.options ?? null,
+    links: sanitizeInboxLinks(input.links),
     externalTs: input.externalTs ?? null,
     // A proposal (or an action menu) ready for review is awaiting_human;
     // otherwise it's open for a human or agent to pick up and propose against.

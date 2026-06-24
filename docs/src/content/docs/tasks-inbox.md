@@ -101,6 +101,10 @@ MCP connection with the `produce_inbox_item` and `list_inbox_items` tools, then:
    items.
 3. For each new item, `produce_inbox_item` with `itemType`, `source`,
    `externalRef`, a deep-link `url`, a `title`, the `context`, and `options`.
+   To point one item at several things to review (e.g. the top 10 Linear
+   tickets behind a single triage task), pass `links: [{ label, url }]` — they
+   render as a clickable **Links** list, separate from the single `url` source
+   link. Non-`http(s)` urls are dropped.
 
 An option that runs a source action carries an `execute` descriptor, e.g. a
 one-click Complete backed by a native-MCP tool:

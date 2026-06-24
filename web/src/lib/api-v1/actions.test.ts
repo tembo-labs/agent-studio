@@ -14,7 +14,10 @@ vi.mock("@/lib/workspace-agents", () => ({
 }));
 vi.mock("@/lib/audit-db", () => ({ writeAuditEvent: vi.fn() }));
 
-import { createAutomationFor } from "@/lib/api-v1/actions";
+import {
+  createAutomationFor,
+  sanitizeInboxLinks,
+} from "@/lib/api-v1/actions";
 import { createAutomation } from "@/lib/automations-api";
 import { writeAuditEvent } from "@/lib/audit-db";
 import { getAgentByName } from "@/lib/workspace-agents";
@@ -92,5 +95,47 @@ describe("createAutomationFor", () => {
     expect(res.ok).toBe(false);
     expect(mockCreate).not.toHaveBeenCalled();
     expect(mockAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe("sanitizeInboxLinks", () => {
+  it("keeps http(s) links and carries label + url through", () => {
+    expect(
+      sanitizeInboxLinks([
+        { label: "ENG-1", url: "https://linear.app/a" },
+        { url: "http://example.com/b" },
+      ]),
+    ).toEqual([
+      { label: "ENG-1", url: "https://linear.app/a" },
+      { url: "http://example.com/b" },
+    ]);
+  });
+
+  it("drops non-http(s) schemes (javascript:, data:, mailto:) and malformed urls", () => {
+    expect(
+      sanitizeInboxLinks([
+        { label: "xss", url: "javascript:alert(1)" },
+        { url: "data:text/html,<script>1</script>" },
+        { url: "mailto:a@b.com" },
+        { url: "not a url" },
+        { label: "ok", url: "https://ok.example/x" },
+      ]),
+    ).toEqual([{ label: "ok", url: "https://ok.example/x" }]);
+  });
+
+  it("trims, drops empty labels, and returns null when nothing survives", () => {
+    expect(
+      sanitizeInboxLinks([{ label: "  spaced  ", url: "  https://t.co/x  " }]),
+    ).toEqual([{ label: "spaced", url: "https://t.co/x" }]);
+    expect(sanitizeInboxLinks([])).toBeNull();
+    expect(sanitizeInboxLinks(undefined)).toBeNull();
+    expect(sanitizeInboxLinks([{ url: "ftp://nope" }])).toBeNull();
+  });
+
+  it("caps the list at 50 entries", () => {
+    const many = Array.from({ length: 60 }, (_, i) => ({
+      url: `https://example.com/${i}`,
+    }));
+    expect(sanitizeInboxLinks(many)).toHaveLength(50);
   });
 });
