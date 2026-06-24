@@ -58,7 +58,12 @@ export async function GET(
     if (t.source !== "native-mcp" || t.provider !== slug) continue;
     if (seen.has(t.slug)) continue; // same tool can be cached under many slots
     seen.add(t.slug);
-    tools.push({ slug: t.slug, name: t.displayName, description: t.description });
+    tools.push({
+      slug: t.slug,
+      name: t.displayName,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    });
   }
   tools.sort((a, b) => a.slug.localeCompare(b.slug));
 

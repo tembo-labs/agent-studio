@@ -28,6 +28,10 @@ export type McpTool = {
   slug: string;
   displayName: string | null;
   description: string | null;
+  /** The tool's input JSON Schema (MCP `tool.inputSchema`), surfaced in the
+   *  /for-agents reference so agent authors can see each tool's parameters.
+   *  Null for rows cached before this was captured (re-sync to populate). */
+  inputSchema: Record<string, unknown> | null;
   refreshedAt: Date;
   createdAt: Date;
 };
@@ -42,6 +46,7 @@ type Row = {
   slug: string;
   display_name: string | null;
   description: string | null;
+  input_schema: Record<string, unknown> | null;
   refreshed_at: Date;
   created_at: Date;
 };
@@ -57,13 +62,14 @@ function rowToTool(r: Row): McpTool {
     slug: r.slug,
     displayName: r.display_name,
     description: r.description,
+    inputSchema: r.input_schema,
     refreshedAt: r.refreshed_at,
     createdAt: r.created_at,
   };
 }
 
 const COLUMNS = `id, workspace_id, user_id, source, provider,
-  connection_name, slug, display_name, description, refreshed_at, created_at`;
+  connection_name, slug, display_name, description, input_schema, refreshed_at, created_at`;
 
 /**
  * Every tool the user has across both substrates, in one query.
@@ -201,6 +207,7 @@ export type NewTool = {
   slug: string;
   displayName?: string | null;
   description?: string | null;
+  inputSchema?: Record<string, unknown> | null;
 };
 
 /**
@@ -244,7 +251,7 @@ export async function replaceToolsForConnection(args: {
       let i = 1;
       for (const t of args.tools) {
         values.push(
-          `($${i}, $${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}, $${i + 5}, $${i + 6}, $${i + 7})`,
+          `($${i}, $${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}, $${i + 5}, $${i + 6}, $${i + 7}, $${i + 8}::jsonb)`,
         );
         params.push(
           args.workspaceId,
@@ -255,17 +262,19 @@ export async function replaceToolsForConnection(args: {
           t.slug,
           t.displayName ?? null,
           t.description ?? null,
+          t.inputSchema ? JSON.stringify(t.inputSchema) : null,
         );
-        i += 8;
+        i += 9;
       }
       await client.query(
         `INSERT INTO workspace_mcp_tool
            (workspace_id, user_id, source, provider, connection_name,
-            slug, display_name, description)
+            slug, display_name, description, input_schema)
            VALUES ${values.join(", ")}
          ON CONFLICT (workspace_id, user_id, source, provider, connection_name, slug)
          DO UPDATE SET display_name = EXCLUDED.display_name,
                        description  = EXCLUDED.description,
+                       input_schema = EXCLUDED.input_schema,
                        refreshed_at = NOW()`,
         params,
       );

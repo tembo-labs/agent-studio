@@ -149,6 +149,7 @@ export async function refreshNativeMcpToolsAction(
         slug: t.slug,
         displayName: t.name,
         description: t.description,
+        inputSchema: t.inputSchema,
       })),
     });
   } catch (e) {
