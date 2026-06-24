@@ -3,7 +3,7 @@ title: Tembo Agent Studio
 description: The self-hosted control plane for AI agents — agents as code, every change a pull request, runs and audit in your own environment.
 template: splash
 hero:
-  tagline: The self-hosted control plane for AI agents. Agent definitions live as files in your Git repo, every change lands as a reviewable Git diff, and runs, connections, and audit stay in your environment.
+  tagline: The self-hosted control plane for AI agents. Agents draft the work; your team signs it — every change a reviewable Git diff, every run auditable, all in your own environment.
   actions:
     - text: Get started
       link: /agent-studio/introduction/
@@ -19,9 +19,10 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ## Agents as governed production software
 
-TAS treats agents the way you already treat code: defined in files, changed
-through pull requests, owned by your team, and run on your own infrastructure
-with your own model keys.
+You delegate the decision, not the accountability. TAS treats agents the way you
+already treat code — defined in files, changed through pull requests, owned by
+your team, run on your own infrastructure with your own model keys — so you get
+outcomes you can trust and explain, not automation you have to take on faith.
 
 <CardGrid>
   <Card title="Agents as code" icon="seti:git">
@@ -33,9 +34,10 @@ with your own model keys.
     Runs in your environment with your own Anthropic and OpenAI keys. Agent
     definitions, run history, and TAS-managed secrets stay in your infrastructure.
   </Card>
-  <Card title="Humans in the loop" icon="approve-check">
-    A shared Tasks Inbox where agents queue work for people to review, correct,
-    and approve — plus a learning loop that folds corrections back into the agent.
+  <Card title="Humans sign the work" icon="approve-check">
+    Match the standard to the stakes: low-stakes work runs on its own, high-stakes
+    work routes to a shared Tasks Inbox for a person to review, correct, and
+    approve — and every correction folds back into the agent, so the loop compounds.
   </Card>
   <Card title="Schedules, events & Slack" icon="rocket">
     Cron, event triggers, webhooks, and Slack apps wired to ~1,000 Composio tools,
