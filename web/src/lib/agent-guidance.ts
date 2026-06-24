@@ -750,6 +750,17 @@ Make the orchestrator resilient to the user's actual setup: call
 source is connected — don't assume every source exists, and don't
 hard-code a slot name the user may not have authorized.
 
+### Surfacing review items to the Tasks Inbox
+
+To stage work a human should review, an agent calls \`produce_inbox_item\`
+(on the \`tembo-agent-studio\` Native MCP connection). To point one item at
+several things — e.g. "the top 10 Linear triage tickets" as a single task —
+pass \`links: [{ label, url }]\`; they render as a clickable list on the item,
+separate from the single source \`url\`. Prefer this over hand-rolling a
+Markdown link list in \`proposedActionText\`. The exact parameter list for any
+\`tembo-agent-studio\` tool is in its \`/for-agents\` reference — fetch it when
+you need a tool's full schema.
+
 ### retries
 
 Integer or struct. Default behavior is provider-determined. Set

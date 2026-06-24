@@ -420,7 +420,10 @@ export function buildMcpServer(
         "and/or structured fields) so the human reviews-and-edits rather than " +
         "starts from scratch; the diff between your guess and what they submit " +
         "trains future autonomy. With a proposal the item is ready for review; " +
-        "without one it sits 'open' for someone to pick up. Returns the item.",
+        "without one it sits 'open' for someone to pick up. To point one item at " +
+        "several things to review (e.g. the top 10 Linear triage tickets as one " +
+        "task), pass `links: [{ label, url }]` — they render as a clickable list, " +
+        "preferable to a Markdown link list in proposedActionText. Returns the item.",
       inputSchema: {
         itemType: z
           .string()

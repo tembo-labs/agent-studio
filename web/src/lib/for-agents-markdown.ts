@@ -8,7 +8,57 @@ export type ForAgentsTool = {
   slug: string;
   name: string | null;
   description: string | null;
+  /** The tool's input JSON Schema (MCP `tool.inputSchema`), rendered as a
+   *  per-tool parameter table so authors see the exact fields. Null/absent for
+   *  tools cached before schemas were captured (re-sync to populate). */
+  inputSchema?: Record<string, unknown> | null;
 };
+
+// A minimal JSON-Schema property node — only the bits we render.
+type SchemaNode = {
+  type?: string | string[];
+  description?: string;
+  enum?: unknown[];
+  items?: SchemaNode;
+  anyOf?: SchemaNode[];
+  oneOf?: SchemaNode[];
+};
+
+// A one-line, human-readable type label for a JSON-Schema property node.
+// Defensive: any unknown shape falls back to "any".
+function schemaType(node: SchemaNode | undefined): string {
+  if (!node || typeof node !== "object") return "any";
+  if (Array.isArray(node.enum) && node.enum.length > 0) {
+    return `enum(${node.enum.map((v) => String(v)).join(" | ")})`;
+  }
+  const variants = node.anyOf ?? node.oneOf;
+  if (Array.isArray(variants) && variants.length > 0) {
+    return variants.map(schemaType).join(" | ");
+  }
+  const t = Array.isArray(node.type) ? node.type.join(" | ") : node.type;
+  if (t === "array") return `array<${schemaType(node.items)}>`;
+  return t ?? "object";
+}
+
+// Render a tool's input JSON Schema as a `| param | type | required | description |`
+// table. Returns "" when the schema declares no properties.
+function renderParams(schema: Record<string, unknown> | null | undefined): string {
+  if (!schema || typeof schema !== "object") return "";
+  const props = schema.properties;
+  if (!props || typeof props !== "object") return "";
+  const required = new Set(
+    Array.isArray(schema.required) ? (schema.required as string[]) : [],
+  );
+  const entries = Object.entries(props as Record<string, SchemaNode>);
+  if (entries.length === 0) return "";
+  const lines = ["| param | type | required | description |", "| --- | --- | --- | --- |"];
+  for (const [name, node] of entries) {
+    lines.push(
+      `| \`${cell(name)}\` | ${cell(schemaType(node))} | ${required.has(name) ? "yes" : "no"} | ${cell(node?.description ?? null)} |`,
+    );
+  }
+  return lines.join("\n");
+}
 
 // Escape a cell for a GitHub-flavored markdown table (backslashes + pipes +
 // newlines). Backslashes are escaped first so an input backslash can't combine
@@ -61,6 +111,19 @@ export function renderProviderMarkdown(
       lines.push(`| \`${cell(t.slug)}\` | ${cell(t.name)} | ${cell(t.description)} |`);
     }
     lines.push("");
+
+    // Per-tool parameter tables, for the tools whose schema declared fields.
+    // Lets an author see the exact arguments (names, types, required) instead
+    // of guessing from the description.
+    const withParams = tools
+      .map((t) => ({ tool: t, params: renderParams(t.inputSchema) }))
+      .filter((x) => x.params !== "");
+    if (withParams.length > 0) {
+      lines.push("## Parameters", "");
+      for (const { tool, params } of withParams) {
+        lines.push(`### \`${tool.slug}\``, "", params, "");
+      }
+    }
   }
   return lines.join("\n");
 }

@@ -26,6 +26,10 @@ export type FetchedMcpTool = {
   slug: string;
   name: string;
   description: string | undefined;
+  /** The tool's input JSON Schema (MCP `tool.inputSchema`), so the /for-agents
+   *  reference can publish each tool's parameters. Undefined if the server
+   *  omitted it. */
+  inputSchema: Record<string, unknown> | undefined;
 };
 
 export async function fetchNativeMcpTools(
@@ -51,6 +55,10 @@ export async function fetchNativeMcpTools(
       name: typeof t.title === "string" ? t.title : t.name,
       description:
         typeof t.description === "string" ? t.description : undefined,
+      inputSchema:
+        t.inputSchema && typeof t.inputSchema === "object"
+          ? (t.inputSchema as Record<string, unknown>)
+          : undefined,
     }));
   } finally {
     await client.close().catch(() => {
