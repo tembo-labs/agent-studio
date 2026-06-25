@@ -464,13 +464,21 @@ export function buildMcpServer(
                   params: z.record(z.string(), z.unknown()).optional().describe("e.g. { convId }."),
                 })
                 .optional()
-                .describe("How to perform this action on click. Omit for a no-op (e.g. 'Ignore')."),
+                .describe(
+                  "How to perform this action on click. Omit ONLY when clicking " +
+                  "should just resolve the item with no side effect (e.g. 'Ignore') " +
+                  "— an option with no execute still COMPLETES the item.",
+                ),
             }),
           )
           .optional()
           .describe(
-            "Action menu rendered as buttons for the human — the set of things they might do. " +
-            "Pick one recommended; reply options carry a draft.",
+            "Action menu rendered as buttons. EVERY option RESOLVES (completes) " +
+            "the item when clicked — options are for acting on the item (reply, " +
+            "archive, complete, ignore), NOT for navigation. To let the human " +
+            "OPEN a record/link without closing the task, use `url` (the 'Open " +
+            "in …' link) or `links` — never an option. Pick one recommended; " +
+            "reply options carry a draft.",
           ),
         links: z
           .array(

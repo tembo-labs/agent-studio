@@ -761,6 +761,16 @@ Markdown link list in \`proposedActionText\`. The exact parameter list for any
 \`tembo-agent-studio\` tool is in its \`/for-agents\` reference — fetch it when
 you need a tool's full schema.
 
+**Links vs. options — don't confuse them.** \`options\` are action BUTTONS and
+every one RESOLVES (completes) the item when clicked — they're for acting on it
+(reply / archive / complete / ignore), never for navigation. To let the human
+**open a record or link without closing the task**, use \`url\` (the "Open in …"
+link) or \`links\` — NOT an option. An "Open in X" option will just mark the item
+done and navigate nowhere. Build deep links from the provider's own record
+permalink where one is returned, rather than hand-templating an ID into a URL
+path (a wrong slug/id form silently resolves to the provider's default list
+view).
+
 ### retries
 
 Integer or struct. Default behavior is provider-determined. Set
