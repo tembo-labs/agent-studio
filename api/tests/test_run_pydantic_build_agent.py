@@ -98,3 +98,24 @@ def test_build_agent_attaches_websearch_capability() -> None:
         }
     )
     assert isinstance(agent, Agent)
+
+
+def test_uncached_input_excludes_cache_halves() -> None:
+    from types import SimpleNamespace
+
+    # The real run that overstated cost ~6x: input_tokens is the TOTAL incl. cache.
+    u = SimpleNamespace(
+        input_tokens=940477, cache_read_tokens=938547, cache_write_tokens=1929
+    )
+    assert run_pydantic._uncached_input(u) == 940477 - 938547 - 1929  # == 1
+
+    # No caching reported → uncached == input.
+    assert run_pydantic._uncached_input(
+        SimpleNamespace(input_tokens=5000)
+    ) == 5000
+
+    # Clamp at 0; None input → None.
+    assert run_pydantic._uncached_input(
+        SimpleNamespace(input_tokens=100, cache_read_tokens=200)
+    ) == 0
+    assert run_pydantic._uncached_input(SimpleNamespace()) is None

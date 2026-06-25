@@ -216,6 +216,26 @@ def _usage_field(usage_obj, *names):
     return None
 
 
+def _uncached_input(usage_obj):
+    """Genuinely-new (uncached) input tokens.
+
+    pydantic-ai's `input_tokens` is the TOTAL input — it INCLUDES the prompt-cache
+    halves (cache reads + cache writes). The cost estimate prices cache reads at
+    0.1x and writes at 1.25x SEPARATELY, so the recorded `input_tokens` must
+    EXCLUDE them; otherwise every cached token is billed twice — once at the full
+    input rate (inside input_tokens) and once at the cache rate. (For a long
+    agentic run the cached prefix is re-sent every step, so this otherwise
+    inflates the cost several-fold.) Returns None when no input is reported;
+    clamps at 0.
+    """
+    total = _usage_field(usage_obj, "input_tokens", "request_tokens")
+    if total is None:
+        return None
+    cr = _usage_field(usage_obj, "cache_read_tokens") or 0
+    cw = _usage_field(usage_obj, "cache_write_tokens") or 0
+    return max(0, total - cr - cw)
+
+
 def steps_payload(messages) -> list[dict]:
     """Per model-request usage + the tool calls that request emitted.
 
@@ -281,7 +301,7 @@ def steps_payload(messages) -> list[dict]:
             {
                 "step": idx,
                 "summary": summary,
-                "input_tokens": _usage_field(usage_obj, "input_tokens", "request_tokens"),
+                "input_tokens": _uncached_input(usage_obj),
                 "output_tokens": _usage_field(usage_obj, "output_tokens", "response_tokens"),
                 "cache_read_tokens": _usage_field(usage_obj, "cache_read_tokens"),
                 "cache_write_tokens": _usage_field(usage_obj, "cache_write_tokens"),
@@ -380,7 +400,7 @@ def make_stream_handler():
         if node_counted:
             try:
                 usage = getattr(_ctx, "usage", None)
-                in_cum = _usage_field(usage, "input_tokens", "request_tokens")
+                in_cum = _uncached_input(usage)
                 out_cum = _usage_field(usage, "output_tokens", "response_tokens")
                 if in_cum is not None or out_cum is not None:
                     in_cum = in_cum or 0
@@ -432,16 +452,22 @@ def usage_payload(usage_obj) -> dict:
         "response_tokens",
         "total_tokens",
         "requests",
-        # Anthropic prompt-cache counters — uncached input is in input_tokens;
-        # these are the cache write (creation) and read halves, priced
-        # separately (~1.25x / ~0.1x of input). The Rust side uses them for the
-        # run's cost estimate.
+        # Anthropic/OpenAI prompt-cache counters — the cache write (creation) and
+        # read halves, priced separately (~1.25x / ~0.1x of input). The Rust side
+        # uses them for the run's cost estimate.
         "cache_read_tokens",
         "cache_write_tokens",
     ):
         val = getattr(usage_obj, attr, None)
         if val is not None:
             out[attr] = val
+    # pydantic-ai's input_tokens is the TOTAL input (incl. the cache halves above).
+    # Record the UNCACHED input so the cost estimate, which prices cache reads/
+    # writes separately, doesn't double-charge cached tokens. See _uncached_input.
+    uncached = _uncached_input(usage_obj)
+    if uncached is not None:
+        out["input_tokens"] = uncached
+        out.pop("request_tokens", None)  # old-name fallback is also cache-inclusive
     return out
 
 
