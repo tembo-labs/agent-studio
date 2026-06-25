@@ -137,13 +137,65 @@ export function ReviewForm({
   return (
     <div className="flex flex-col gap-5">
       {section}
-      <SnoozeControl
-        workspaceSlug={workspaceSlug}
-        itemId={itemId}
-        pending={pending}
-        busy={busy}
-        run={run}
-      />
+      {/* "Not acting on it" escapes, always available regardless of the agent's
+          options: dismiss (drop, no learning signal, won't reopen) + snooze. */}
+      <div className="border-border-weak flex flex-col gap-3 border-t pt-4">
+        <DismissControl
+          workspaceSlug={workspaceSlug}
+          itemId={itemId}
+          pending={pending}
+          busy={busy}
+          run={run}
+        />
+        <SnoozeControl
+          workspaceSlug={workspaceSlug}
+          itemId={itemId}
+          pending={pending}
+          busy={busy}
+          run={run}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Always-available Dismiss: drop the item without acting on it (no learning
+// signal, and a re-push won't bring it back). Distinct from the agent's options
+// (Archive/Reply/Ignore), which resolve the item as 'done' + train the agent.
+function DismissControl({
+  workspaceSlug,
+  itemId,
+  pending,
+  busy,
+  run,
+}: {
+  workspaceSlug: string;
+  itemId: string;
+  pending: boolean;
+  busy: string | null;
+  run: (
+    key: string,
+    fn: () => Promise<InboxActionResult>,
+    successMsg?: string,
+  ) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-foreground-weak text-sm">Not relevant?</span>
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={pending}
+        onClick={() =>
+          run(
+            "dismiss",
+            () => dismissInboxItemAction({ workspaceSlug, itemId }),
+            "Dismissed",
+          )
+        }
+      >
+        {busy === "dismiss" ? "Dismissing…" : "Dismiss"}
+      </Button>
     </div>
   );
 }
@@ -170,7 +222,7 @@ function SnoozeControl({
   const [hours, setHours] = useState(72);
   const label = SNOOZE_OPTIONS.find((o) => o.hours === hours)?.label ?? "a while";
   return (
-    <div className="border-border-weak flex flex-wrap items-center gap-2 border-t pt-4">
+    <div className="flex flex-wrap items-center gap-2">
       <span className="text-foreground-weak text-sm">Not now — snooze for</span>
       <select
         value={hours}
@@ -230,12 +282,6 @@ function ActionMenu({
   const replyOpts = options.filter((o) => o.kind === "reply").sort(byRec);
   const clickOpts = options.filter((o) => o.kind === "oneclick").sort(byRec);
   const [draft, setDraft] = useState(replyOpts.find((o) => o.draft)?.draft ?? "");
-  // Offer a built-in Dismiss only when the agent gave NO one-click action at all
-  // (e.g. a reply-only item) — a safety escape so such an item can still be
-  // cleared without acting. When the agent DID provide one-click buttons
-  // (Archive, Complete, Ignore, an explicit Dismiss…), those define how to clear
-  // the item and we don't add our own.
-  const hasOneClick = options.some((o) => o.kind === "oneclick");
 
   return (
     <section className="flex flex-col gap-4">
@@ -308,25 +354,6 @@ function ActionMenu({
         </div>
       )}
 
-      {!hasOneClick && (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={pending}
-            onClick={() =>
-              run(
-                "dismiss",
-                () => dismissInboxItemAction({ workspaceSlug, itemId }),
-                "Dismissed",
-              )
-            }
-          >
-            {busy === "dismiss" ? "Dismissing…" : "Dismiss"}
-          </Button>
-        </div>
-      )}
-
       {error && <ErrorBanner error={error} />}
     </section>
   );
@@ -385,20 +412,6 @@ function FreeTextForm({
           }
         >
           {busy === "submit" ? "Submitting…" : "Submit"}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={pending}
-          onClick={() =>
-            run(
-              "dismiss",
-              () => dismissInboxItemAction({ workspaceSlug, itemId }),
-              "Dismissed",
-            )
-          }
-        >
-          Dismiss
         </Button>
       </div>
       {error && <ErrorBanner error={error} />}
