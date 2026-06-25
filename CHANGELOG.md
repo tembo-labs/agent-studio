@@ -14,6 +14,51 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.28] — Agent web search, inbox triage + links, self-documenting tool reference — shipped 2026-06-25
+
+### Added
+- **Agent web search.** Agents can now actually search the web by declaring
+  `capabilities: [WebSearch]` — it maps to pydantic-ai's provider-adaptive web
+  search (native on Anthropic/OpenAI, local fallback otherwise). The capability
+  was documented but silently ignored by the runner before.
+- **Self-documenting tool reference.** The `/for-agents` reference now publishes
+  each native-MCP tool's full **parameter schema** (name / type / required /
+  description), not just a one-line description — so an agent author (and Tembo
+  CAP) can discover a tool's exact arguments. The `tembo-agent-studio` reference
+  is served without a token (its tools are TAS's own public API), and an instance
+  can opt the whole reference public via `TAS_FOR_AGENTS_PUBLIC`.
+- **Inbox links.** An agent can attach a clickable **Links** list to one inbox
+  item via `links: [{ label, url }]` on `produce_inbox_item` — e.g. the top 10
+  Linear tickets behind a single triage task. Links are also **auto-extracted**
+  from an item's proposed text (Markdown + bare URLs) and context payload, so the
+  list populates even when the agent didn't set the field. http(s)-only, deduped,
+  capped.
+- **Faster inbox triage.** Resolving an item now **advances to the next** one to
+  review (with an "N more in your inbox" counter); the index gains **multi-select
+  mass-dismiss**; and **Dismiss** is now always available on the item detail page
+  (previously hidden when the agent supplied one-click options).
+
+### Changed
+- **Tool caches auto-refresh.** Every native-MCP + Composio connection's cached
+  tool catalog now re-syncs on each deploy (and daily) instead of requiring a
+  manual Connections → Refresh — so new/changed tools (and their schemas) appear
+  on their own. Throttled so restarts don't re-storm provider APIs.
+- **Agent ownership on first run** and the marketing landing copy refresh.
+
+### Fixed
+- **Pending agent-create ghost cards.** A chat-to-create whose commit didn't
+  carry the reconcile marker could sit "Pending" forever and couldn't be
+  dismissed; creates now auto-reconcile once the agent file lands in the repo,
+  and Dismiss clears direct-commit creates too.
+- **Inbox checkbox hit area** — a near-miss on the row checkbox no longer opens
+  the item instead of toggling selection.
+
+### Security
+- **CodeQL batch** — least-privilege workflow `GITHUB_TOKEN`, complete
+  markdown-table escaping, and log-injection hardening.
+- **ReDoS fix** — the inbox link-extraction trailing-punctuation trim no longer
+  uses a backtracking-prone anchored regex on agent-supplied URLs.
+
 ## [v2026.6.27] — Stop a run, security hardening, agent owners + Definition history — shipped 2026-06-23
 
 ### Added
