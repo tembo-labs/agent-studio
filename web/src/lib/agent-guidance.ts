@@ -374,6 +374,18 @@ runs in Python at **no token cost** and the LLM just *supervises* which
 function to call. This is the cost + speed lever versus making the model
 do everything through MCP/Composio tool calls.
 
+**Keep the bulk inside the function; return only the small result.** The
+saving is largest when one function does the whole heavy pass — enumerate
+hundreds of records, normalize, match, aggregate — *internally* and returns a
+**compact** result (a handful of candidates/rows + counts), NOT the raw
+dataset. Records the function fetched then never enter the model's context, so a
+job that would be dozens of growing-context MCP tool-call steps collapses to one
+cheap call. E.g. a weekly duplicate scan: the function pulls every company +
+deal (via \`tas_tools.connection\`, below), groups by normalized domain, and
+returns just the duplicate pairs — the model only judges the few ambiguous ones
+and writes the summary. Build any deep links (record URLs) in the function too,
+so they're correct and consistent.
+
 \`\`\`yaml
 name: revenue-rollup
 model: anthropic:claude-sonnet-4-6
@@ -789,10 +801,12 @@ for production agents.
   \`model:\` provider.
 - **YAML or JSON both work.** Pick whichever the team finds easier
   to review. YAML's strength is multi-line \`instructions:\`.
-- **Tools** declared declaratively in AgentSpec require their
-  Python function definitions to live elsewhere — not supported by
-  TAS yet. Stick to \`capabilities:\` for tool-like behavior in
-  declarative agents.
+- **Custom Python tools go in a \`tools_module:\`**, not inline. TAS doesn't
+  support pydantic-ai's declarative inline \`tools:\` field (function bodies
+  can't live in the YAML) — instead point \`tools_module:\` at a sibling \`.py\`
+  file (see the tools_module section above). Use \`capabilities:\` for
+  provider-native abilities (web search), \`tools_module:\` for your own
+  deterministic Python.
 - **\`instructions\` is non-optional in TAS.** Even if pydantic-ai
   allows omitting it, TAS's parser rejects files without
   \`instructions\` to keep the diff-review experience honest
