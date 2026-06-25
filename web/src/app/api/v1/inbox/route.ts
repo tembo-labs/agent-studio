@@ -119,9 +119,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     externalRef: typeof body.externalRef === "string" ? body.externalRef : undefined,
     url: typeof body.url === "string" ? body.url : undefined,
     context:
-      body.context && typeof body.context === "object"
-        ? (body.context as Record<string, unknown>)
-        : undefined,
+      typeof body.context === "string"
+        ? body.context
+        : body.context && typeof body.context === "object"
+          ? (body.context as Record<string, unknown>)
+          : undefined,
     proposedAction,
     options: Array.isArray(body.options)
       ? (body.options as InboxOption[])

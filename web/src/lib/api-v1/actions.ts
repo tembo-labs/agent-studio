@@ -510,7 +510,7 @@ export type ProduceInboxItemInput = {
   externalRef?: string;
   /** Deep link to the source object (issue/ticket/record/task URL). */
   url?: string;
-  context?: Record<string, unknown>;
+  context?: Record<string, unknown> | string;
   proposedAction?: InboxAction;
   /** Action menu rendered as buttons; one may be `recommended`. */
   options?: InboxOption[];
@@ -602,7 +602,12 @@ export async function produceInboxItemFor(
     url: input.url?.trim() || null,
     itemType,
     title,
-    context: input.context ?? {},
+    // Accept a plain-string context (a common model mistake — the field is a
+    // JSON object) by wrapping it as { text } instead of rejecting the call.
+    context:
+      typeof input.context === "string"
+        ? { text: input.context }
+        : (input.context ?? {}),
     proposedAction: input.proposedAction ?? null,
     options: input.options ?? null,
     // Explicit links first (they win de-duping + keep their labels), then every

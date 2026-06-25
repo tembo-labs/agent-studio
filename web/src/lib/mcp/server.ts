@@ -446,7 +446,10 @@ export function buildMcpServer(
             "NEWER value for the same externalRef, the item reopens + refreshes " +
             "(e.g. a reply to an archived thread comes back).",
           ),
-        context: z.record(z.string(), z.unknown()).optional().describe("The raw payload to review (JSON)."),
+        context: z
+          .union([z.record(z.string(), z.unknown()), z.string()])
+          .optional()
+          .describe("The raw payload to review — a JSON object, or a plain string (stored as { text })."),
         proposedActionText: z.string().optional().describe("Your proposed reply / decision."),
         proposedActionFields: z.record(z.string(), z.unknown()).optional().describe("Structured proposal params."),
         options: z
