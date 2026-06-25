@@ -16,6 +16,7 @@ vi.mock("@/lib/audit-db", () => ({ writeAuditEvent: vi.fn() }));
 
 import {
   createAutomationFor,
+  extractInboxLinks,
   sanitizeInboxLinks,
 } from "@/lib/api-v1/actions";
 import { createAutomation } from "@/lib/automations-api";
@@ -137,5 +138,53 @@ describe("sanitizeInboxLinks", () => {
       url: `https://example.com/${i}`,
     }));
     expect(sanitizeInboxLinks(many)).toHaveLength(50);
+  });
+
+  it("de-dupes by url, keeping the first (labelled) occurrence", () => {
+    expect(
+      sanitizeInboxLinks([
+        { label: "First", url: "https://x.com/a" },
+        { url: "https://x.com/a" },
+        { label: "Other", url: "https://x.com/b" },
+      ]),
+    ).toEqual([
+      { label: "First", url: "https://x.com/a" },
+      { label: "Other", url: "https://x.com/b" },
+    ]);
+  });
+});
+
+describe("extractInboxLinks", () => {
+  const base = { itemType: "t", title: "t" };
+
+  it("pulls Markdown links (with labels) and bare urls from the proposed text", () => {
+    const links = extractInboxLinks({
+      ...base,
+      proposedAction: {
+        text: "See [ENG-1](https://linear.app/a) and https://example.com/b.",
+      },
+    });
+    expect(links).toContainEqual({ label: "ENG-1", url: "https://linear.app/a" });
+    // Bare url with trailing sentence punctuation trimmed.
+    expect(links).toContainEqual({ url: "https://example.com/b" });
+  });
+
+  it("pulls bare urls out of the context payload", () => {
+    const links = extractInboxLinks({
+      ...base,
+      context: { stories: [{ url: "https://news.site/x" }] },
+    });
+    expect(links).toContainEqual({ url: "https://news.site/x" });
+  });
+
+  it("merges + de-dupes through sanitizeInboxLinks (Markdown label wins over a bare dupe)", () => {
+    const input = {
+      ...base,
+      proposedAction: { text: "[ENG-1](https://linear.app/a)" },
+      context: { ref: "https://linear.app/a" },
+    };
+    expect(sanitizeInboxLinks(extractInboxLinks(input))).toEqual([
+      { label: "ENG-1", url: "https://linear.app/a" },
+    ]);
   });
 });

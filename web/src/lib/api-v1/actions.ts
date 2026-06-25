@@ -523,7 +523,8 @@ export type ProduceInboxItemInput = {
   parentRunId?: string;
 };
 
-// Keep only well-formed http(s) links, drop the rest, and cap the count. The
+// Keep only well-formed http(s) links, de-dupe by url (first occurrence wins, so
+// an explicit or labelled link beats a later bare one), and cap the count. The
 // url reaches an <a href> directly, so a non-http(s) scheme (javascript:,
 // data:) must never be stored. Returns null when nothing survives so the column
 // stays clean.
@@ -533,6 +534,7 @@ export function sanitizeInboxLinks(
 ): InboxLink[] | null {
   if (!Array.isArray(links) || links.length === 0) return null;
   const clean: InboxLink[] = [];
+  const seen = new Set<string>();
   for (const l of links) {
     const url = typeof l?.url === "string" ? l.url.trim() : "";
     let parsed: URL;
@@ -542,11 +544,35 @@ export function sanitizeInboxLinks(
       continue;
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
     const label = typeof l?.label === "string" ? l.label.trim() : "";
     clean.push(label ? { label, url } : { url });
     if (clean.length >= MAX_INBOX_LINKS) break;
   }
   return clean.length > 0 ? clean : null;
+}
+
+// Pull every link out of an item's content so the human gets a clickable Links
+// list even when the agent didn't populate `links` explicitly. Sources: the
+// proposed-action text (Markdown `[label](url)` keeps its label; bare urls too)
+// and the raw context payload (bare urls). De-duping + http(s)-only filtering
+// happens in sanitizeInboxLinks once these are merged with any explicit links.
+const MARKDOWN_LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+const BARE_URL_RE = /https?:\/\/[^\s)"'<>\]]+/g;
+export function extractInboxLinks(input: ProduceInboxItemInput): InboxLink[] {
+  const out: InboxLink[] = [];
+  const text = input.proposedAction?.text ?? "";
+  // Markdown links first so their label is what survives de-duping.
+  for (const m of text.matchAll(MARKDOWN_LINK_RE)) {
+    out.push({ label: m[1].trim(), url: m[2] });
+  }
+  // Bare urls across the proposed text + the raw context payload.
+  const haystack = `${text} ${JSON.stringify(input.context ?? {})}`;
+  for (const m of haystack.matchAll(BARE_URL_RE)) {
+    out.push({ url: m[0].replace(/[.,;:!?]+$/, "") }); // trim trailing punctuation
+  }
+  return out;
 }
 
 export async function produceInboxItemFor(
@@ -569,7 +595,12 @@ export async function produceInboxItemFor(
     context: input.context ?? {},
     proposedAction: input.proposedAction ?? null,
     options: input.options ?? null,
-    links: sanitizeInboxLinks(input.links),
+    // Explicit links first (they win de-duping + keep their labels), then every
+    // link auto-extracted from the item's text + context.
+    links: sanitizeInboxLinks([
+      ...(input.links ?? []),
+      ...extractInboxLinks(input),
+    ]),
     externalTs: input.externalTs ?? null,
     // A proposal (or an action menu) ready for review is awaiting_human;
     // otherwise it's open for a human or agent to pick up and propose against.
