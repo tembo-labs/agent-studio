@@ -560,6 +560,16 @@ export function sanitizeInboxLinks(
 // happens in sanitizeInboxLinks once these are merged with any explicit links.
 const MARKDOWN_LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
 const BARE_URL_RE = /https?:\/\/[^\s)"'<>\]]+/g;
+// Sentence punctuation to strip off the tail of a bare URL (e.g. "see
+// https://x/foo."). Done with a linear scan rather than an anchored
+// `/[.,;:!?]+$/` regex, whose greedy `+` backtracks quadratically on a long run
+// of these chars not at end-of-string — a ReDoS on agent-supplied content.
+const TRAILING_PUNCT = new Set([".", ",", ";", ":", "!", "?"]);
+function trimTrailingPunct(s: string): string {
+  let end = s.length;
+  while (end > 0 && TRAILING_PUNCT.has(s[end - 1])) end--;
+  return s.slice(0, end);
+}
 export function extractInboxLinks(input: ProduceInboxItemInput): InboxLink[] {
   const out: InboxLink[] = [];
   const text = input.proposedAction?.text ?? "";
@@ -570,7 +580,7 @@ export function extractInboxLinks(input: ProduceInboxItemInput): InboxLink[] {
   // Bare urls across the proposed text + the raw context payload.
   const haystack = `${text} ${JSON.stringify(input.context ?? {})}`;
   for (const m of haystack.matchAll(BARE_URL_RE)) {
-    out.push({ url: m[0].replace(/[.,;:!?]+$/, "") }); // trim trailing punctuation
+    out.push({ url: trimTrailingPunct(m[0]) });
   }
   return out;
 }

@@ -169,6 +169,20 @@ describe("extractInboxLinks", () => {
     expect(links).toContainEqual({ url: "https://example.com/b" });
   });
 
+  it("trims only TRAILING sentence punctuation, fast (no ReDoS) on a long run", () => {
+    // A long internal run of punctuation chars not at end-of-string was the
+    // quadratic-backtracking case for the old /[.,;:!?]+$/ regex (alert #74).
+    const url = `https://example.com/${"!".repeat(50_000)}x`;
+    const started = performance.now();
+    const links = extractInboxLinks({
+      ...base,
+      proposedAction: { text: `${url}... trailing` },
+    });
+    // Trailing dots stripped; the internal "!!!…x" is left intact.
+    expect(links).toContainEqual({ url });
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it("pulls bare urls out of the context payload", () => {
     const links = extractInboxLinks({
       ...base,
