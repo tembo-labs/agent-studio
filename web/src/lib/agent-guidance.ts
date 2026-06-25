@@ -413,8 +413,9 @@ Rules:
 **Auth flows through Connections — never hardcode a key.** When a tool
 needs to reach an external system, import the bundled \`tas_tools\`
 helper and ask for a connection the agent already declares under
-\`connections:\` (Native MCP only — its OAuth token also works against
-the provider's REST API):
+\`connections:\` (Native MCP only). Its OAuth token can double as a REST
+Bearer token for the provider's API — **when the MCP grant carries the
+scopes that REST endpoint needs** (see the scope caveat below):
 
 \`\`\`python
 # agents/pydantic-agentspec/revenue_tools.py
@@ -437,6 +438,13 @@ def summarize_arr(records: list[dict]) -> dict:
 
 tools = [list_companies, summarize_arr]
 \`\`\`
+
+**Scope caveat:** a provider's MCP OAuth grant doesn't always carry the REST
+scopes a given endpoint needs — the token may authenticate (an identity call
+like \`/self\`) yet 401/403 on record reads. Probe with the ACTUAL endpoint you
+need (not a generic "who am I"), and **fall back to a Secret API key** (below)
+when the connection token can't do the job — a provider API key with the right
+scopes is the reliable credential for heavy REST use.
 
 For a service that authenticates with a **plain API key** (e.g. Clay)
 rather than OAuth — i.e. not a Composio or Native-MCP provider — use a

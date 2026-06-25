@@ -25,10 +25,14 @@ so the tool can do deterministic I/O (e.g. with httpx) over it.
 
 Two kinds of credential flow through here:
 
-- `connection(provider)` — a **Native-MCP** connection's OAuth access token,
-  which is a real provider token that also works against the provider's REST
-  API. (Composio brokers auth for LLM tool-calling and doesn't hand out raw
-  downstream tokens, so Composio-only services stay LLM-driven.)
+- `connection(provider)` — a **Native-MCP** connection's OAuth access token. It
+  is a real provider token and CAN double as a REST Bearer token — but only when
+  the MCP grant carries the scopes that REST endpoint needs. Some providers'
+  grants cover identity yet not record reads (you'll get 401/403), so probe with
+  the actual endpoint you need and fall back to a `secret()` API key when the
+  connection token can't do the job. (Composio brokers auth for LLM tool-calling
+  and doesn't hand out raw downstream tokens, so Composio-only services stay
+  LLM-driven.)
 - `secret(name)` — a **Secret**: a free-form, workspace-level API key an admin
   set under Connections → Secrets (e.g. Clay), for services that authenticate
   with a plain key:
