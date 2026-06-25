@@ -1,13 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { LocalTime } from "@/components/local-time";
 import { McpProviderLogo } from "@/components/mcp-provider-logo";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+
+import { bulkDismissInboxItemsAction } from "./actions";
 
 // Search / filter / facet for the Tasks Inbox. The table chrome, row hover,
 // whole-row click, and sortable headers all come from the shared DataTable.
@@ -59,6 +64,12 @@ export function InboxList({
   const [typeFilter, setTypeFilter] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const router = useRouter();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [dismissing, startDismiss] = useTransition();
+  // Terminal facets aren't dismissable, so selection is disabled there.
+  const selectionEnabled = facet !== "done" && facet !== "dismissed";
 
   const counts = useMemo(() => {
     const c = {
@@ -140,6 +151,41 @@ export function InboxList({
       setSortKey(k);
       setSortDir(k === "created" ? "desc" : "asc");
     }
+  }
+
+  // Selection acts on the CURRENT view: derive the visible subset so switching
+  // facet/filter/search naturally drops out-of-view selections (and never
+  // dismisses a row the user can't see).
+  const effectiveSelected = useMemo(() => {
+    const visible = new Set(filtered.map((i) => i.id));
+    return new Set([...selected].filter((id) => visible.has(id)));
+  }, [selected, filtered]);
+  const allSelected =
+    filtered.length > 0 && filtered.every((i) => effectiveSelected.has(i.id));
+  function toggleRow(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(filtered.map((i) => i.id)));
+  }
+  function bulkDismiss() {
+    const itemIds = [...effectiveSelected];
+    if (itemIds.length === 0) return;
+    startDismiss(async () => {
+      const r = await bulkDismissInboxItemsAction({ workspaceSlug, itemIds });
+      if (r.ok) {
+        toast.success(`Dismissed ${r.dismissed} item${r.dismissed === 1 ? "" : "s"}`);
+        setSelected(new Set());
+        router.refresh();
+      } else {
+        toast.error(r.error);
+      }
+    });
   }
 
   const columns: Column<InboxRow>[] = [
@@ -244,6 +290,29 @@ export function InboxList({
         })}
       </div>
 
+      {selectionEnabled && effectiveSelected.size > 0 && (
+        <div className="bg-surface-raised border-border flex items-center gap-3 rounded-lg border px-3 py-2">
+          <span className="text-foreground text-sm font-medium">
+            {effectiveSelected.size} selected
+          </span>
+          <Button
+            size="small"
+            variant="destructive"
+            disabled={dismissing}
+            onClick={bulkDismiss}
+          >
+            {dismissing ? "Dismissing…" : "Dismiss"}
+          </Button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="text-foreground-weak hover:text-foreground text-sm"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       <DataTable
         columns={columns}
         rows={filtered}
@@ -252,6 +321,10 @@ export function InboxList({
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={onSort}
+        selectedKeys={selectionEnabled ? effectiveSelected : undefined}
+        onToggleRow={selectionEnabled ? toggleRow : undefined}
+        allSelected={allSelected}
+        onToggleAll={toggleAll}
         empty={
           <div className="text-foreground-weak rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm">
             No items match these filters.

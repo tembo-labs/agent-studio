@@ -64,11 +64,15 @@ export function ReviewForm({
   itemId,
   proposedText,
   options,
+  nextHref,
 }: {
   workspaceSlug: string;
   itemId: string;
   proposedText: string;
   options?: InboxOption[] | null;
+  /** Where to go after resolving this item — the next item to triage, or the
+   *  inbox index when none remain. */
+  nextHref: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -94,11 +98,12 @@ export function ReviewForm({
         return;
       }
       if (r.ok) {
-        // Confirm, then navigate to the inbox. (No router.refresh() — calling it
+        // Confirm, then advance to the next item to triage (or the index when
+        // none remain — nextHref handles both). No router.refresh() — calling it
         // right after push races and re-renders this page instead of landing on
-        // the list. force-dynamic on /inbox gives fresh data on navigation.)
+        // the target. force-dynamic gives fresh data on navigation.
         toast.success(successMsg ?? "Done");
-        router.push(`/${workspaceSlug}/inbox`);
+        router.push(nextHref);
       } else {
         setBusy(null);
         setError(r.error);
