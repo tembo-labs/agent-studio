@@ -104,14 +104,18 @@ export function DataTable<T>({
         <thead className="bg-surface-secondary text-foreground-weak text-sm uppercase tracking-wide">
           <tr>
             {selectable && (
-              <th className="w-9 px-3 py-2">
-                <input
-                  type="checkbox"
-                  aria-label="Select all rows"
-                  checked={allSelected}
-                  onChange={() => onToggleAll?.()}
-                  className="cursor-pointer align-middle"
-                />
+              <th className="w-9 p-0">
+                {/* Pad the whole cell as the click target so a near-miss toggles
+                    the box instead of doing nothing. */}
+                <label className="flex cursor-pointer items-center justify-center px-3 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all rows"
+                    checked={allSelected}
+                    onChange={() => onToggleAll?.()}
+                    className="cursor-pointer align-middle"
+                  />
+                </label>
               </th>
             )}
             {columns.map((col) => {
@@ -172,17 +176,22 @@ export function DataTable<T>({
                   )}
                 >
                   {selectable && (
-                    <td className="w-9 px-3 py-2 align-top">
-                      <input
-                        type="checkbox"
-                        aria-label="Select row"
-                        checked={selectedKeys!.has(key)}
-                        // Stop propagation so toggling selection never triggers
-                        // the row's navigation/expand handler.
+                    <td className="w-9 p-0 align-top">
+                      {/* The label fills the cell's padding so a click anywhere
+                          near the box toggles it; stopping propagation keeps that
+                          click from triggering the row's navigation. */}
+                      <label
+                        className="flex cursor-pointer items-center px-3 py-2"
                         onClick={(e) => e.stopPropagation()}
-                        onChange={() => onToggleRow!(key)}
-                        className="cursor-pointer align-middle"
-                      />
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label="Select row"
+                          checked={selectedKeys!.has(key)}
+                          onChange={() => onToggleRow!(key)}
+                          className="cursor-pointer align-middle"
+                        />
+                      </label>
                     </td>
                   )}
                   {columns.map((col) => (
