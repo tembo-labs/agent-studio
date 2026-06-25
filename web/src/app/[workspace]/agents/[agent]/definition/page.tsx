@@ -71,6 +71,7 @@ export default async function AgentDefinitionPage({
       id: "draft",
       label: draftDiffers ? "Draft (current file)" : "Draft",
       block: <HighlightedCodeBlock source={raw} language={specLanguage} />,
+      source: raw,
     },
     ...versions.map((v) => ({
       id: `v${v.versionNumber}`,
@@ -81,6 +82,7 @@ export default async function AgentDefinitionPage({
       block: (
         <HighlightedCodeBlock source={v.specContent} language={specLanguage} />
       ),
+      source: v.specContent,
     })),
   ];
 
