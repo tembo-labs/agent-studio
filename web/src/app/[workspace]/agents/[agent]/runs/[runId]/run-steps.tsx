@@ -10,6 +10,7 @@ import {
 } from "@/lib/pricing";
 import type { RunStep, RunToolCall } from "@/lib/runs-db";
 
+import { ExpandableError } from "./expandable-error";
 import { RevealText } from "./reveal-text";
 import { ToolProviderLogo } from "./tool-provider-logo";
 
@@ -117,9 +118,7 @@ export function RunSteps({
                       )}
                     </div>
                     {c.ok === false && c.errorMessage && (
-                      <p className="text-sentiment-negative line-clamp-2 pl-[1.375rem] font-mono text-xs leading-4">
-                        {c.errorMessage}
-                      </p>
+                      <ExpandableError text={c.errorMessage} />
                     )}
                   </Fragment>
                 );
