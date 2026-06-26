@@ -7,8 +7,8 @@
 </div>
 
 > Self-hosted control plane for AI agents. Definitions live in Git, every
-> change becomes a PR, and runs, audit logs, and identity stay in your
-> environment.
+> change is a commit (PR by default, or direct commit in YOLO mode), and runs,
+> audit logs, and identity stay in your environment.
 
 Tembo Agent Studio (TAS) treats agents like production software instead of
 editable prompts in a vendor console. Agent definitions live in a repository
@@ -40,17 +40,15 @@ requests into repository changes.
 - Self-host the full stack with Docker Compose, from source or from published
   GHCR images.
 - Sign in with Google, Microsoft Entra ID, or a generic OIDC provider.
-- Connect a GitHub repository as the source of truth for agent definitions.
-- Create, edit, and run agents in two frameworks: Pydantic AgentSpec and Cargo
-  AI.
-- Open PRs from chat-based authoring and from run feedback.
-- Schedule agents with Automations or trigger them from external events.
+- Connect a GitHub repository as the source of truth for agent definitions, supporting both PR-based workflows and direct commits.
+- Create, edit, and run agents in two frameworks: Pydantic AgentSpec (with native WebSearch capability) and Cargo AI.
+- Open PRs or commit directly from chat-based authoring and run feedback.
+- Schedule agents with Automations, trigger them from external events, or create inbound webhooks (with bearer token or Svix signature verification).
 - Launch agents from Slack apps, and equip them with reusable Skills.
-- Manage per-user connections to external systems — ~1,000 services via Composio
-  plus native MCP servers (Attio, Linear, HubSpot, Gmail, and more).
-- Triage agent output in the Tasks Inbox: review proposed actions and act in the
-  source system (reply, complete, archive), snooze, or dismiss.
-- Inspect operational dashboards, run history, and append-only audit trails.
+- Manage per-user connections to external systems — ~1,000 services via Composio plus native MCP servers (Attio, Linear, HubSpot, Gmail, Clay, Amplemarket, and more).
+- Triage agent output in the Tasks Inbox: review proposed actions and act in the source system (reply, complete, archive), snooze, or dismiss — complete with structured links lists and auto-extracted links.
+- Organize and govern agents: toggle agent lock, fork or star agents, and inspect draft/stable version history and git commits.
+- Inspect operational dashboards, run history (with cancellation support), and append-only audit trails.
 - Manage workspace membership with API-enforced roles.
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for shipped work and
@@ -231,8 +229,13 @@ Recommended entry points:
 - [Authoring agents](https://tembo.github.io/agent-studio/authoring-agents/)
 - [Running agents](https://tembo.github.io/agent-studio/running-agents/)
 - [Connections](https://tembo.github.io/agent-studio/connections/)
+- [Model Context Protocol (MCP)](https://tembo.github.io/agent-studio/mcp/)
+- [Slack Apps](https://tembo.github.io/agent-studio/slack-apps/)
+- [Skills](https://tembo.github.io/agent-studio/skills/)
 - [Tasks Inbox](https://tembo.github.io/agent-studio/tasks-inbox/)
 - [Automations & triggers](https://tembo.github.io/agent-studio/automations-triggers/)
+- [Example Agents](https://tembo.github.io/agent-studio/example-agents/)
+- [API Reference](https://tembo.github.io/agent-studio/api/)
 
 ## License
 
