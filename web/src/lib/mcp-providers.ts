@@ -232,6 +232,22 @@ export function getMcpProvider(slug: string): McpProvider | null {
 }
 
 /**
+ * Whether a provider uses the TAS-managed DCR path — `authMode` "dcr" OR unset,
+ * since "dcr" is the documented default and most catalog entries omit it.
+ * Excludes "manual" (BYO confidential app) and "self-key" (Tembo). This is the
+ * "is this connection editable / can it hold a supplementary API key" predicate;
+ * checking `authMode === "dcr"` literally is a bug — it misses every default-DCR
+ * provider (Attio, Pylon, Fathom, Dialed, Linear, Amplemarket).
+ */
+export function isDcrProvider(provider: McpProvider | null | undefined): boolean {
+  return (
+    !!provider &&
+    provider.authMode !== "manual" &&
+    provider.authMode !== "self-key"
+  );
+}
+
+/**
  * The MCP server URL for the "self-key" Tembo provider — TAS's own /mcp
  * endpoint. Computed from the request/env-derived public origin rather than
  * baked into the catalog, then stored per-row in workspace_connection so it

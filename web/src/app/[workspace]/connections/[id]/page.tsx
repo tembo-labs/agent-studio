@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toolkitLabel } from "@/lib/composio-label";
 import { resolveConnectionsView } from "@/lib/connections-view";
-import { getMcpProvider } from "@/lib/mcp-providers";
+import { getMcpProvider, isDcrProvider } from "@/lib/mcp-providers";
 import { listToolsForConnection } from "@/lib/mcp-tools";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
@@ -97,7 +97,7 @@ export default async function ConnectionDetailPage({
       c.name,
     );
     const isManual = provider?.authMode === "manual";
-    editable = provider?.authMode === "dcr";
+    editable = isDcrProvider(provider);
     title = provider?.displayName ?? c.type;
     logoSlug = c.type;
     const reconnect = `/api/connections/native/${c.type}/authorize?workspace=${encodeURIComponent(
