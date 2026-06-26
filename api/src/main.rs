@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use axum::{middleware, routing::get, routing::post, Router};
@@ -30,6 +32,10 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub encryption_key: Arc<crypto::MasterKey>,
     pub run_cancels: RunCancels,
+    /// Set once a shutdown signal (SIGTERM from a deploy/restart) arrives, so the
+    /// run endpoint refuses new work while in-flight runs drain. See main()'s
+    /// graceful-shutdown path.
+    pub draining: Arc<AtomicBool>,
 }
 
 #[tokio::main]
@@ -103,6 +109,7 @@ async fn main() -> anyhow::Result<()> {
         http,
         encryption_key,
         run_cancels: Arc::new(Mutex::new(HashMap::new())),
+        draining: Arc::new(AtomicBool::new(false)),
     };
 
     let internal_routes = Router::new()
@@ -111,6 +118,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/runs/{id}/cancel", post(runs::handlers::cancel_run))
         .layer(middleware::from_fn(auth::require_internal_token))
         .layer(axum::Extension(internal_token));
+
+    // Handles for the graceful-shutdown path, cloned before `state` moves into
+    // the router.
+    let draining = state.draining.clone();
+    let run_cancels = state.run_cancels.clone();
 
     let app = Router::new()
         .route("/health", get(routes::health::health))
@@ -124,7 +136,87 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("tas-api listening on {bind_addr}");
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal(draining))
+        .await?;
+
+    // The HTTP server has stopped accepting connections. Runs execute as detached
+    // tokio tasks owning a Python subprocess, so wait for the in-flight ones to
+    // finish before exiting — a deploy/restart no longer guillotines a run
+    // mid-flight (which the boot reconciler would otherwise mark 'failed'). Bounded
+    // by API_DRAIN_TIMEOUT_SECS: the platform SIGKILLs after its own grace window
+    // regardless, and runs that outlast the window fall back to the reconciler,
+    // exactly as before this change.
+    drain_runs(&run_cancels, drain_timeout()).await;
 
     Ok(())
+}
+
+/// Seconds to wait for in-flight runs to drain on shutdown. Keep at/under the
+/// platform's pre-SIGKILL grace window (raise both together to protect longer
+/// runs). Overridable via `API_DRAIN_TIMEOUT_SECS`.
+const DEFAULT_DRAIN_TIMEOUT_SECS: u64 = 25;
+
+fn drain_timeout() -> Duration {
+    let secs = std::env::var("API_DRAIN_TIMEOUT_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_DRAIN_TIMEOUT_SECS);
+    Duration::from_secs(secs)
+}
+
+/// Resolves when the process is asked to stop — SIGTERM (a deploy/restart) or
+/// Ctrl-C locally. Flips `draining` so `create_run` starts refusing new work,
+/// then returns, which tells axum to stop accepting connections.
+async fn shutdown_signal(draining: Arc<AtomicBool>) {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => {
+                tracing::error!(?e, "failed to install SIGTERM handler");
+                std::future::pending::<()>().await;
+            }
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
+    }
+    draining.store(true, Ordering::SeqCst);
+    tracing::info!("shutdown signal received — refusing new runs, draining in-flight ones");
+}
+
+/// Wait for in-flight runs (tracked in `run_cancels`) to finish, up to `timeout`.
+/// Runs still executing when the timeout hits are left to the boot reconciler on
+/// the next start (same as an unclean stop), so shutdown never blocks forever.
+async fn drain_runs(run_cancels: &RunCancels, timeout: Duration) {
+    let start = Instant::now();
+    loop {
+        let remaining = run_cancels.lock().map(|m| m.len()).unwrap_or(0);
+        if remaining == 0 {
+            tracing::info!("all in-flight runs drained; exiting");
+            return;
+        }
+        if start.elapsed() >= timeout {
+            tracing::warn!(
+                remaining,
+                "drain timeout reached; remaining runs will be reconciled as interrupted on next boot"
+            );
+            return;
+        }
+        tracing::info!(
+            remaining,
+            "waiting for in-flight runs to finish before exit…"
+        );
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
 }
