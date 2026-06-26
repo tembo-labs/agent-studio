@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { toolkitLabel } from "@/lib/composio-label";
 import { resolveConnectionsView } from "@/lib/connections-view";
-import { getMcpProvider } from "@/lib/mcp-providers";
+import { getMcpProvider, isDcrProvider } from "@/lib/mcp-providers";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug } from "@/lib/workspace";
 
@@ -48,9 +48,10 @@ export default async function EditConnectionPage({
 
   // Native manual / self-key connections have nothing to edit (name is fixed) —
   // the detail view hides their Edit button, so reaching here is a stray URL.
+  // DCR providers (incl. the unset default — Attio etc.) are editable.
   if (
     loaded.kind === "native" &&
-    getMcpProvider(loaded.conn.type)?.authMode !== "dcr"
+    !isDcrProvider(getMcpProvider(loaded.conn.type))
   ) {
     notFound();
   }
