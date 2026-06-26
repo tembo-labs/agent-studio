@@ -10,17 +10,15 @@ agents/
     └── hello-world.json   ← starter sample
 ```
 
-One subfolder per framework. The v0.1 create-agent UI writes new files
+One subfolder per framework. The create-agent UI writes new files
 into the right subfolder automatically based on the parsed shape.
 
-**Supported frameworks in v0.1:**
+**Supported frameworks:**
 
 - **Pydantic AI `AgentSpec`** (YAML or JSON) — the canonical, primary
-  format. Parsed, listed, and **runnable** end-to-end against Anthropic.
+  format. Parsed, listed, and **runnable** end-to-end against Anthropic and OpenAI.
 - **Cargo AI** (JSON) — single-file definitions with `agent_schema` and
-  `actions`. Parsed and listed in v0.1; runtime support is wired
-  separately (see `context/shipped/0.3/README.md` for the broader multi-framework
-  direction).
+  `actions`. Parsed and listed; runtime support is wired separately.
 
 **Layout is required.** Agents must live in the right framework
 subfolder. Files placed directly at `agents/foo.yaml` (no subfolder)
