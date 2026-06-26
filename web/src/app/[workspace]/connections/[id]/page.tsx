@@ -64,6 +64,8 @@ export default async function ConnectionDetailPage({
   let title: string;
   let logoSlug: string | null;
   let editable = false;
+  // Provider-specific "you need an API key with these scopes" note (Attio etc.).
+  let auxKeyNote: string | null = null;
   const rows: { label: string; value: ReactNode }[] = [];
   const actions: ReactNode[] = [];
 
@@ -98,6 +100,7 @@ export default async function ConnectionDetailPage({
     );
     const isManual = provider?.authMode === "manual";
     editable = isDcrProvider(provider);
+    if (editable) auxKeyNote = provider?.auxKeyHint ?? null;
     title = provider?.displayName ?? c.type;
     logoSlug = c.type;
     const reconnect = `/api/connections/native/${c.type}/authorize?workspace=${encodeURIComponent(
@@ -286,6 +289,20 @@ export default async function ConnectionDetailPage({
           </div>
         ))}
       </dl>
+
+      {auxKeyNote && (
+        <div className="border-sentiment-caution rounded-lg border bg-[var(--color-sentiment-caution-subtle)] px-3 py-2.5 text-sm">
+          <p className="text-foreground-weak leading-5">{auxKeyNote}</p>
+          {editable && !view.viewingOther && (
+            <Link
+              href={editHref}
+              className="text-foreground mt-1 inline-block underline underline-offset-2"
+            >
+              Add API key
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }
