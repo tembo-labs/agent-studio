@@ -143,7 +143,10 @@ export async function rotateWebhookAction(
   revalidateAgent(slug, existing.agentName);
   return {
     message: `Rotated "${existing.name}". The old token no longer works.`,
-    secret: { id, url: urlFor(id), token, signed: false },
+    // Render the reveal in the webhook's actual mode — a signed (Clerk) webhook
+    // authenticates by signature, so never hand back a rotated bearer token the
+    // receiver won't check. (The UI also hides Rotate for signed webhooks.)
+    secret: { id, url: urlFor(id), token, signed: existing.hasSigningSecret },
   };
 }
 

@@ -363,18 +363,22 @@ function WebhookActions({
             {row.enabled ? "Disable" : "Enable"}
           </Button>
         </form>
-        <form action={rotateAction}>
-          <input type="hidden" name="workspace" value={workspaceSlug} />
-          <input type="hidden" name="id" value={row.id} />
-          <Button
-            type="submit"
-            variant="ghost"
-            size="small"
-            disabled={rotatePending}
-          >
-            Rotate
-          </Button>
-        </form>
+        {/* Signed (Clerk) webhooks authenticate by signature, not the bearer
+            token, so there's nothing to rotate — hide it. */}
+        {!row.signed && (
+          <form action={rotateAction}>
+            <input type="hidden" name="workspace" value={workspaceSlug} />
+            <input type="hidden" name="id" value={row.id} />
+            <Button
+              type="submit"
+              variant="ghost"
+              size="small"
+              disabled={rotatePending}
+            >
+              Rotate
+            </Button>
+          </form>
+        )}
         <form action={deleteAction}>
           <input type="hidden" name="workspace" value={workspaceSlug} />
           <input type="hidden" name="id" value={row.id} />
