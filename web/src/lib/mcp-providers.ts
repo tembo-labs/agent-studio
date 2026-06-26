@@ -23,6 +23,7 @@ export type McpProviderSlug =
   | "fathom"
   | "dialed"
   | "linear"
+  | "amplemarket"
   | "gmail"
   | "tembo-agent-studio";
 
@@ -138,6 +139,17 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // per-customer setup, like Attio. Docs: https://linear.app/docs/mcp
     mcpServerUrl: "https://mcp.linear.app/mcp",
     oauthAuthorizationServerOrigins: ["https://mcp.linear.app"],
+  },
+  amplemarket: {
+    slug: "amplemarket",
+    displayName: "Amplemarket",
+    // Verified (probe): POST https://mcp.amplemarket.com/mcp → 401 + WWW-Authenticate
+    // Bearer → /.well-known/oauth-protected-resource advertises the auth server as
+    // https://app.amplemarket.com (scopes mcp:read, mcp:write). Auth-server metadata
+    // exposes a registration_endpoint (/oauth/register → DCR), PKCE S256, and a public
+    // client (token auth method "none") — TAS-managed, no per-customer setup, like Attio.
+    mcpServerUrl: "https://mcp.amplemarket.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://app.amplemarket.com"],
   },
   gmail: {
     slug: "gmail",
