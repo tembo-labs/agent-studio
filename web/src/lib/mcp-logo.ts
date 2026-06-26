@@ -14,6 +14,7 @@ const LOCAL_LOGOS: Record<string, string> = {
   "tembo-agent-studio": "/favicons/default-tembo.svg",
   pylon: "/mcp-logos/pylon.svg",
   dialed: "/mcp-logos/dialed.svg",
+  amplemarket: "/mcp-logos/amplemarket.svg",
 };
 
 export function mcpLogoUrl(slug: string): string {
