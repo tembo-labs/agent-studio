@@ -90,19 +90,12 @@ struct Usage {
 /// Drive a single run from queued through to terminal state. Always
 /// updates the run row even on error so the UI never sees a row stuck
 /// in `running` forever.
-pub async fn execute_run(state: &AppState, ctx: RunContext) {
-    // Register a cancellation token so the kill-run endpoint can SIGKILL this
-    // run's subprocess. Always removed on exit, so the registry only ever holds
-    // genuinely in-flight runs.
+pub async fn execute_run(state: &AppState, ctx: RunContext, cancel: CancellationToken) {
+    // The handler registered this token synchronously before spawning so
+    // shutdown draining cannot miss a queued-but-not-yet-polled run. Always
+    // remove it on exit, so the registry only ever holds genuinely in-flight
+    // runs.
     let run_id = ctx.run_id;
-    let cancel = CancellationToken::new();
-    {
-        let mut cancels = state
-            .run_cancels
-            .lock()
-            .expect("run_cancels mutex poisoned");
-        cancels.insert(run_id, cancel.clone());
-    }
 
     execute_run_inner(state, ctx, &cancel).await;
 

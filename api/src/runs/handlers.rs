@@ -12,6 +12,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::runs::runner;
@@ -162,6 +163,13 @@ pub async fn create_run(
         }
     };
 
+    let cancel = CancellationToken::new();
+    state
+        .run_cancels
+        .lock()
+        .expect("run_cancels mutex poisoned")
+        .insert(run_id, cancel.clone());
+
     tokio::spawn(async move {
         runner::execute_run(
             &task_state,
@@ -177,6 +185,7 @@ pub async fn create_run(
                 tools_module_content,
                 skills_content,
             },
+            cancel,
         )
         .await;
     });
