@@ -44,6 +44,9 @@ export type WorkspaceConnection = {
   status: NativeConnectionStatus;
   tokenExpiresAt: Date | null;
   metadata: Record<string, unknown>;
+  /** Whether a supplementary API key is attached (never the value — that's
+   *  decrypted only in the runtime, never exposed to the UI). */
+  hasApiKey: boolean;
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
@@ -60,6 +63,7 @@ type ConnectionRow = {
   status: string;
   token_expires_at: Date | null;
   metadata: Record<string, unknown> | null;
+  has_api_key: boolean;
   created_by: string;
   created_at: Date;
   updated_at: Date;
@@ -67,6 +71,7 @@ type ConnectionRow = {
 
 const COLUMNS = `id, workspace_id, user_id, type, name, mcp_server_url,
   auth_type, status, token_expires_at, metadata,
+  (aux_secret_ciphertext IS NOT NULL) AS has_api_key,
   created_by, created_at, updated_at`;
 
 function rowToConnection(r: ConnectionRow): WorkspaceConnection {
@@ -81,6 +86,7 @@ function rowToConnection(r: ConnectionRow): WorkspaceConnection {
     status: (r.status as NativeConnectionStatus) ?? "active",
     tokenExpiresAt: r.token_expires_at,
     metadata: r.metadata ?? {},
+    hasApiKey: r.has_api_key ?? false,
     createdBy: r.created_by,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -321,5 +327,34 @@ export async function setNativeConnectionStatus(
       WHERE id = $1`,
     [connectionId, status],
   );
+}
+
+/**
+ * Set (or clear, when `apiKey` is null/blank) the supplementary API key on a
+ * native-MCP connection. Encrypted under the SAME AAD as the credentials blob,
+ * stored in `aux_secret_ciphertext` — independent of the OAuth token, so a token
+ * refresh never disturbs it. Returns false when the row isn't in the workspace.
+ */
+export async function setNativeConnectionAuxSecret(
+  workspaceId: string,
+  connectionId: string,
+  apiKey: string | null,
+): Promise<boolean> {
+  const conn = await getNativeConnectionById(workspaceId, connectionId);
+  if (!conn) return false;
+  const trimmed = apiKey?.trim() || null;
+  const ciphertext = trimmed
+    ? encryptSecret(
+        trimmed,
+        aadNativeConnection(workspaceId, conn.userId, conn.type, conn.name),
+      )
+    : null;
+  const { rowCount } = await db.query(
+    `UPDATE workspace_connection
+        SET aux_secret_ciphertext = $3, updated_at = NOW()
+      WHERE id = $1 AND workspace_id = $2`,
+    [connectionId, workspaceId, ciphertext],
+  );
+  return (rowCount ?? 0) > 0;
 }
 

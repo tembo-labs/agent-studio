@@ -9,7 +9,11 @@ import { getWorkspaceBySlug } from "@/lib/workspace";
 
 import { renameComposioConnectionAction } from "../../../settings/actions";
 import { loadConnection, parseConnectionRef } from "../../connection-ref";
-import { renameNativeMcpConnectionAction } from "../../native-mcp-actions";
+import {
+  renameNativeMcpConnectionAction,
+  setNativeMcpApiKeyAction,
+} from "../../native-mcp-actions";
+import { ConnectionApiKeyField } from "./connection-api-key-field";
 import { ConnectionRenameField } from "./connection-rename-field";
 import { SecretEditForm } from "./secret-edit-form";
 
@@ -91,12 +95,22 @@ export default async function EditConnectionPage({
           currentName={loaded.conn.name}
         />
       ) : (
-        <ConnectionRenameField
-          action={renameNativeMcpConnectionAction}
-          workspaceSlug={workspace.slug}
-          connectionId={loaded.conn.id}
-          currentName={loaded.conn.name}
-        />
+        <>
+          <ConnectionRenameField
+            action={renameNativeMcpConnectionAction}
+            workspaceSlug={workspace.slug}
+            connectionId={loaded.conn.id}
+            currentName={loaded.conn.name}
+          />
+          <hr className="border-[var(--color-border-weak)]" />
+          <ConnectionApiKeyField
+            action={setNativeMcpApiKeyAction}
+            workspaceSlug={workspace.slug}
+            connectionId={loaded.conn.id}
+            providerLabel={title}
+            isSet={loaded.conn.hasApiKey}
+          />
+        </>
       )}
     </div>
   );

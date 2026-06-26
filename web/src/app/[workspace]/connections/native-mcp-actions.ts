@@ -12,6 +12,7 @@ import {
   getNativeConnectionCredentials,
   listNativeConnectionsForUser,
   renameNativeConnection,
+  setNativeConnectionAuxSecret,
 } from "@/lib/connections";
 import {
   deleteToolsForConnection,
@@ -98,6 +99,61 @@ export async function disconnectNativeMcpConnectionAction(
   revalidatePath(`/${slug}/connections`, "layout");
   // The detail page this was triggered from no longer resolves — go to the list.
   redirect(`/${slug}/connections`);
+}
+
+/**
+ * Set (or, with `clear=true`, remove) the optional supplementary API key on a
+ * native-MCP connection — a granular provider access token for privileged REST
+ * ops the MCP OAuth token can't do (e.g. Attio note/delete). Same owner/admin
+ * mutate model as disconnect. The value is encrypted at rest and never read
+ * back to the UI; we never log it.
+ */
+export async function setNativeMcpApiKeyAction(
+  _prev: SimpleConnectionActionState,
+  formData: FormData,
+): Promise<SimpleConnectionActionState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const connectionId = String(formData.get("connectionId") ?? "");
+  const clear = formData.get("clear") === "true";
+  const apiKey = String(formData.get("apiKey") ?? "");
+  if (!connectionId) return { error: "Missing connection id." };
+
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId, role } = auth;
+
+  const row = await getNativeConnectionById(workspace.id, connectionId);
+  if (!row) return { error: "Connection not found." };
+  if (role !== "workspace_admin" && row.userId !== userId) {
+    return { error: DENIED_MESSAGE };
+  }
+  if (!clear && !apiKey.trim()) {
+    return { error: "Paste an API key, or use Remove to clear it." };
+  }
+
+  const ok = await setNativeConnectionAuxSecret(
+    workspace.id,
+    connectionId,
+    clear ? null : apiKey,
+  );
+  if (!ok) return { error: "Connection no longer exists." };
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: clear ? "connection.api_key_cleared" : "connection.api_key_set",
+    targetType: "connection",
+    targetId: connectionId,
+    agentName: null,
+    payload: { provider: row.type, name: row.name },
+  });
+
+  revalidatePath(`/${slug}/connections`, "layout");
+  return { message: clear ? "API key removed." : "API key saved." };
 }
 
 /**

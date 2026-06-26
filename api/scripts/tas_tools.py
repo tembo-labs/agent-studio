@@ -80,6 +80,10 @@ class Connection:
     access_token: str
     #: The provider's MCP endpoint URL (for talking MCP directly).
     mcp_url: str
+    #: Optional supplementary API key the user attached to this connection, for
+    #: privileged REST ops the OAuth token can't do (e.g. an Attio access token
+    #: with note/delete scope). `None` when unset.
+    api_key: str | None = None
 
 
 def _load() -> dict:
@@ -122,8 +126,13 @@ def connection(provider: str, name: str = "default") -> Connection:
             f'the "{provider}"/"{name}" connection is missing credentials '
             f"for this run"
         )
+    api_key = entry.get("api_key") or None
     return Connection(
-        provider=provider, name=name, access_token=token, mcp_url=url
+        provider=provider,
+        name=name,
+        access_token=token,
+        mcp_url=url,
+        api_key=api_key,
     )
 
 
