@@ -5,6 +5,7 @@ import {
   countRecentEventRuns,
   getWebhookForInbound,
   recordWebhookFire,
+  webhookSvixMatches,
   webhookTokenMatches,
 } from "@/lib/webhooks-db";
 import { resolveAgentForDispatch } from "@/lib/workspace-agents";
@@ -13,12 +14,15 @@ import { resolveAgentForDispatch } from "@/lib/workspace-agents";
 // fire an agent run:
 //
 //   POST /api/hooks/webhook/<id>
-//   Authorization: Bearer <token>
+//   Authorization: Bearer <token>        (bearer mode — Clay)
 //   { ...arbitrary JSON the agent interprets... }
 //
-// Auth is the per-webhook bearer token (constant-time compared in
-// webhookTokenMatches), not a TAS session — the caller has no session. The row
-// id in the URL is the public selector; the token is the secret.
+// Auth is per-webhook, not a TAS session (the caller has no session). The row
+// id in the URL is the public selector. Two modes: a bearer token
+// (constant-time compared in webhookTokenMatches), or — for senders that can't
+// set a custom header, notably Clerk — Svix request signing, verified against
+// the webhook's stored signing secret (webhookSvixMatches) using the
+// svix-id/svix-timestamp/svix-signature headers.
 //
 // Fire-and-forget: we queue the run via /internal/runs (trigger='event') and
 // ack 202 immediately. The agent receives the request body as its input; its
@@ -57,9 +61,23 @@ export async function POST(
     return NextResponse.json({ error: "webhook disabled" }, { status: 403 });
   }
 
-  const presented = bearer(request);
-  if (!presented || !webhookTokenMatches(webhook, presented)) {
-    return NextResponse.json({ error: "invalid token" }, { status: 401 });
+  // Signed webhooks (Clerk) verify the Svix signature; everything else uses the
+  // bearer token. The signing secret's presence picks the mode.
+  if (webhook.signingSecretCiphertext) {
+    const ok = webhookSvixMatches(webhook, {
+      rawBody,
+      svixId: request.headers.get("svix-id"),
+      svixTimestamp: request.headers.get("svix-timestamp"),
+      svixSignature: request.headers.get("svix-signature"),
+    });
+    if (!ok) {
+      return NextResponse.json({ error: "invalid signature" }, { status: 401 });
+    }
+  } else {
+    const presented = bearer(request);
+    if (!presented || !webhookTokenMatches(webhook, presented)) {
+      return NextResponse.json({ error: "invalid token" }, { status: 401 });
+    }
   }
 
   const recent = await countRecentEventRuns(

@@ -39,6 +39,8 @@ export type AgentAutomationRow = {
   triggerType?: string;
   tokenLast4?: string | null;
   webhookUrl?: string;
+  /** Webhook authenticates by Svix signature (Clerk) rather than a bearer token. */
+  signed?: boolean;
 };
 
 type KindFilter = "all" | AgentAutomationKind;
@@ -464,7 +466,9 @@ function TriggerDetail({ row }: { row: AgentAutomationRow }) {
     <div className="flex flex-col gap-0.5">
       <span className="text-foreground-weak text-sm">
         Inbound POST{" "}
-        {row.tokenLast4 ? (
+        {row.signed ? (
+          <span className="text-foreground-muted">signed (Clerk)</span>
+        ) : row.tokenLast4 ? (
           <code className="text-foreground-muted">...{row.tokenLast4}</code>
         ) : null}
       </span>

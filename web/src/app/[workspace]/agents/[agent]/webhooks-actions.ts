@@ -22,8 +22,10 @@ import { listWorkspaceMembers } from "@/lib/workspace";
 export type WebhookActionState = {
   message?: string;
   error?: string;
-  /** Present right after create/rotate — the UI reveals it once, then it's gone. */
-  secret?: { id: string; url: string; token: string };
+  /** Present right after create/rotate — the UI reveals it once, then it's gone.
+   *  `signed` webhooks (Clerk/Svix) authenticate by signature, so the bearer
+   *  token is irrelevant and the reveal shows setup for the signing secret. */
+  secret?: { id: string; url: string; token: string; signed: boolean };
 };
 
 function urlFor(id: string): string {
@@ -42,6 +44,7 @@ export async function createWebhookAction(
   const agentName = String(formData.get("agent") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const ownerRaw = String(formData.get("owner") ?? "").trim();
+  const signingSecret = String(formData.get("signingSecret") ?? "").trim();
 
   const auth = await authorizeWorkspace(slug, "operator");
   if (!auth.ok) {
@@ -52,6 +55,14 @@ export async function createWebhookAction(
 
   if (!name) return { error: "Give the webhook a name." };
   if (name.length > 64) return { error: "Name must be 64 characters or fewer." };
+  // A signing secret is optional (bearer mode if absent). When present it's a
+  // Svix/Clerk endpoint secret — sanity-check the shape so a paste error fails
+  // here rather than silently never verifying.
+  if (signingSecret && !/^whsec_[A-Za-z0-9+/=]{16,}$/.test(signingSecret)) {
+    return {
+      error: "Signing secret should look like `whsec_…` (from Clerk's webhook endpoint).",
+    };
+  }
 
   // Owner defaults to the creating user; an admin may run it as another member.
   let ownerUserId = userId;
@@ -72,6 +83,7 @@ export async function createWebhookAction(
     ownerUserId,
     name,
     createdBy: userId,
+    signingSecret: signingSecret || null,
   });
 
   await writeAuditEvent({
@@ -82,13 +94,18 @@ export async function createWebhookAction(
     targetType: "webhook",
     targetId: webhook.id,
     agentName,
-    payload: { name, ownerUserId },
+    payload: { name, ownerUserId, signed: Boolean(signingSecret) },
   });
 
   revalidateAgent(slug, agentName);
   return {
     message: `Created "${name}".`,
-    secret: { id: webhook.id, url: urlFor(webhook.id), token },
+    secret: {
+      id: webhook.id,
+      url: urlFor(webhook.id),
+      token,
+      signed: Boolean(signingSecret),
+    },
   };
 }
 
@@ -126,7 +143,7 @@ export async function rotateWebhookAction(
   revalidateAgent(slug, existing.agentName);
   return {
     message: `Rotated "${existing.name}". The old token no longer works.`,
-    secret: { id, url: urlFor(id), token },
+    secret: { id, url: urlFor(id), token, signed: false },
   };
 }
 

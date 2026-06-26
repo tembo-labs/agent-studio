@@ -86,6 +86,7 @@ export default async function AgentAutomationPage({
       href: null,
       tokenLast4: w.tokenLast4,
       webhookUrl: `${baseUrl}/api/hooks/webhook/${w.id}`,
+      signed: w.hasSigningSecret,
     })),
   ];
 

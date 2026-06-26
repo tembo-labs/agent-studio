@@ -3,19 +3,23 @@ import "server-only";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { decryptSecret, encryptSecret, last4 } from "@/lib/crypto";
-import { aadWebhookToken } from "@/lib/crypto-aad";
+import { aadWebhookSigningSecret, aadWebhookToken } from "@/lib/crypto-aad";
 import { db } from "@/lib/db";
+import { verifySvixRequest } from "@/lib/svix-verify";
 
 // External webhook triggers — an inbound HTTP endpoint that fires an agent run.
-// An outside system (Clay first) POSTs JSON to /api/hooks/webhook/<id> with an
-// `Authorization: Bearer <token>` header; TAS queues a run of the bound agent
-// acting as the webhook's owner. The row `id` is the public URL selector; the
-// bearer token is the secret (encrypted at rest, shown once on creation).
+// An outside system POSTs JSON to /api/hooks/webhook/<id>; TAS queues a run of
+// the bound agent acting as the webhook's owner. The row `id` is the public URL
+// selector. Auth is one of two modes:
+//   - bearer (default): caller sends `Authorization: Bearer <token>` (Clay).
+//   - signed (Svix): caller signs each delivery and we verify it against the
+//     stored signing secret (Clerk, which can't set a custom header).
+// Both secrets are encrypted at rest; the bearer token is shown once on create.
 //
 // Modeled on lib/triggers-db.ts (Composio event triggers), minus the Composio
 // integration — these are TAS-owned endpoints with no third party.
 
-/** Masked, client-safe view — never carries the plaintext token. */
+/** Masked, client-safe view — never carries a plaintext secret. */
 export type WebhookPreview = {
   id: string;
   workspaceId: string;
@@ -23,17 +27,24 @@ export type WebhookPreview = {
   ownerUserId: string;
   name: string;
   tokenLast4: string;
+  /** True when this webhook authenticates by Svix signature (Clerk) rather than
+   *  a bearer token. */
+  hasSigningSecret: boolean;
   enabled: boolean;
   lastFiredAt: Date | null;
   lastFireError: string | null;
   createdAt: Date;
 };
 
-/** Full row including the ciphertext — server-only, for token verification. */
-export type WebhookRow = WebhookPreview & { tokenCiphertext: Buffer };
+/** Full row including the ciphertexts — server-only, for inbound verification. */
+export type WebhookRow = WebhookPreview & {
+  tokenCiphertext: Buffer;
+  signingSecretCiphertext: Buffer | null;
+};
 
 const PREVIEW_COLS = `id, workspace_id, agent_name, owner_user_id, name,
-  token_last4, enabled, last_fired_at, last_fire_error, created_at`;
+  token_last4, (signing_secret_ciphertext IS NOT NULL) AS has_signing_secret,
+  enabled, last_fired_at, last_fire_error, created_at`;
 
 type PreviewDbRow = {
   id: string;
@@ -42,6 +53,7 @@ type PreviewDbRow = {
   owner_user_id: string;
   name: string;
   token_last4: string;
+  has_signing_secret: boolean;
   enabled: boolean;
   last_fired_at: Date | null;
   last_fire_error: string | null;
@@ -56,6 +68,7 @@ function toPreview(r: PreviewDbRow): WebhookPreview {
     ownerUserId: r.owner_user_id,
     name: r.name,
     tokenLast4: r.token_last4,
+    hasSigningSecret: r.has_signing_secret,
     enabled: r.enabled,
     lastFiredAt: r.last_fired_at,
     lastFireError: r.last_fire_error,
@@ -116,14 +129,24 @@ export async function getWebhookPreview(
 export async function getWebhookForInbound(
   id: string,
 ): Promise<WebhookRow | null> {
-  const { rows } = await db.query<PreviewDbRow & { token_ciphertext: Buffer }>(
-    `SELECT ${PREVIEW_COLS}, token_ciphertext FROM workspace_webhook
+  const { rows } = await db.query<
+    PreviewDbRow & {
+      token_ciphertext: Buffer;
+      signing_secret_ciphertext: Buffer | null;
+    }
+  >(
+    `SELECT ${PREVIEW_COLS}, token_ciphertext, signing_secret_ciphertext
+       FROM workspace_webhook
       WHERE id = $1`,
     [id],
   );
   const r = rows[0];
   if (!r) return null;
-  return { ...toPreview(r), tokenCiphertext: r.token_ciphertext };
+  return {
+    ...toPreview(r),
+    tokenCiphertext: r.token_ciphertext,
+    signingSecretCiphertext: r.signing_secret_ciphertext,
+  };
 }
 
 /** Constant-time check that a presented token matches the stored one. */
@@ -148,21 +171,52 @@ export function webhookTokenMatches(
   return timingSafeEqual(a, b);
 }
 
+/**
+ * Verify a Svix-signed inbound (Clerk) against the webhook's stored signing
+ * secret. Returns false if this webhook isn't a signed one or the signature
+ * doesn't verify. The raw body must be the exact bytes the sender signed.
+ */
+export function webhookSvixMatches(
+  row: WebhookRow,
+  args: {
+    rawBody: string;
+    svixId: string | null;
+    svixTimestamp: string | null;
+    svixSignature: string | null;
+  },
+): boolean {
+  if (!row.signingSecretCiphertext) return false;
+  let secret: string;
+  try {
+    secret = decryptSecret(
+      row.signingSecretCiphertext,
+      aadWebhookSigningSecret(row.workspaceId, row.id),
+    );
+  } catch {
+    return false;
+  }
+  return verifySvixRequest({ signingSecret: secret, ...args }).ok;
+}
+
 export async function createWebhook(args: {
   workspaceId: string;
   agentName: string;
   ownerUserId: string;
   name: string;
   createdBy: string;
+  /** Optional Svix signing secret (`whsec_...`). When set, the webhook
+   *  authenticates by signature (Clerk) instead of the bearer token. */
+  signingSecret?: string | null;
 }): Promise<{ webhook: WebhookPreview; token: string }> {
   const token = generateToken();
-  // Generate the id up front so the token AAD can bind to it at encrypt time.
+  // Generate the id up front so the secret AADs can bind to it at encrypt time.
   const id = randomUUID();
+  const signing = args.signingSecret?.trim() || null;
   const { rows } = await db.query<PreviewDbRow>(
     `INSERT INTO workspace_webhook
        (id, workspace_id, agent_name, owner_user_id, name, token_ciphertext,
-        token_last4, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        token_last4, signing_secret_ciphertext, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING ${PREVIEW_COLS}`,
     [
       id,
@@ -172,6 +226,9 @@ export async function createWebhook(args: {
       args.name,
       encryptSecret(token, aadWebhookToken(args.workspaceId, id)),
       last4(token),
+      signing
+        ? encryptSecret(signing, aadWebhookSigningSecret(args.workspaceId, id))
+        : null,
       args.createdBy,
     ],
   );
