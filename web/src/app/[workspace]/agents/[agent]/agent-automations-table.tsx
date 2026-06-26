@@ -471,7 +471,7 @@ function TriggerDetail({ row }: { row: AgentAutomationRow }) {
       <span className="text-foreground-weak text-sm">
         Inbound POST{" "}
         {row.signed ? (
-          <span className="text-foreground-muted">signed (Clerk)</span>
+          <span className="text-foreground-muted">signed (Svix)</span>
         ) : row.tokenLast4 ? (
           <code className="text-foreground-muted">...{row.tokenLast4}</code>
         ) : null}

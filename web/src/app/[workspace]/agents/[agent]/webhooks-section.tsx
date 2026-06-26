@@ -292,7 +292,7 @@ export function AddWebhookForm({
       )}
       <div className="grid gap-1.5">
         <Label htmlFor="webhook-signing-secret" className="text-sm">
-          Clerk signing secret{" "}
+          Signing secret{" "}
           <span className="text-foreground-muted">(optional)</span>
         </Label>
         <Input
@@ -304,9 +304,10 @@ export function AddWebhookForm({
           className="max-w-sm font-mono"
         />
         <p className="text-foreground-muted text-sm">
-          Paste this to verify <strong>Clerk</strong> (Svix-signed) webhooks by
-          signature instead of a bearer token — Clerk can&apos;t send a custom
-          auth header. Leave blank for bearer-token senders like Clay.
+          Paste this to verify <strong>Svix-signed</strong> webhooks (e.g. Clerk)
+          by signature instead of a bearer token — useful when the sender
+          can&apos;t add a custom auth header. Leave blank for bearer-token
+          senders like Clay.
         </p>
       </div>
       {state.error && (
@@ -343,7 +344,7 @@ function SecretReveal({
     <div className="border-sentiment-caution bg-[var(--color-sentiment-caution-subtle)] flex flex-col gap-2 rounded-lg border p-3">
       <span className="text-foreground text-sm font-medium">
         {signed
-          ? "Point Clerk at this URL."
+          ? "Point your provider at this URL."
           : "Copy these now — the token is shown only once."}
       </span>
       <Field label="Endpoint URL" value={url} />
@@ -351,10 +352,10 @@ function SecretReveal({
       <p className="text-foreground-weak text-sm leading-5">
         {signed ? (
           <>
-            In Clerk, add a webhook endpoint with this URL and subscribe to the
-            events you want. TAS verifies each delivery&apos;s signature against
-            the signing secret you pasted above; the agent receives the Clerk
-            event as its input.
+            In your provider (e.g. Clerk), add a webhook endpoint with this URL
+            and subscribe to the events you want. TAS verifies each
+            delivery&apos;s signature against the signing secret you pasted
+            above; the agent receives the event as its input.
           </>
         ) : (
           <>
