@@ -60,7 +60,7 @@ export async function createWebhookAction(
   // here rather than silently never verifying.
   if (signingSecret && !/^whsec_[A-Za-z0-9+/=]{16,}$/.test(signingSecret)) {
     return {
-      error: "Signing secret should look like `whsec_…` (from Clerk's webhook endpoint).",
+      error: "Signing secret should look like `whsec_…` (the Svix signing secret from your webhook provider).",
     };
   }
 
