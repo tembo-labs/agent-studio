@@ -24,6 +24,7 @@ export type McpProviderSlug =
   | "dialed"
   | "linear"
   | "amplemarket"
+  | "clay"
   | "gmail"
   | "tembo-agent-studio";
 
@@ -164,6 +165,25 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // Strictly validates scope against scopes_supported (mcp:read/mcp:write) and
     // rejects the auto-appended offline_access with "invalid scope" — suppress it.
     omitOfflineAccess: true,
+  },
+  clay: {
+    slug: "clay",
+    displayName: "Clay",
+    // Verified (probe): POST https://api.clay.com/v3/mcp → 401; protected-resource
+    // metadata is served PATH-SUFFIXED (/.well-known/oauth-protected-resource/v3/mcp;
+    // the bare origin 404s — handled by the suffixed-discovery fallback) and advertises
+    // the auth server as https://api.clay.com (scope "mcp"). Auth-server metadata exposes
+    // a registration_endpoint (/oauth/register → DCR), PKCE S256, and a public client
+    // (token auth method "none") — TAS-managed, no per-customer setup, like Attio. The
+    // authorize endpoint lives on a SEPARATE origin (app.clay.com) from token/registration
+    // (api.clay.com) — both origins are allowed, like Fathom. offline_access kept (default):
+    // the authorize endpoint is a client-rendered app that doesn't reject unknown scopes at
+    // the GET, unlike Amplemarket.
+    mcpServerUrl: "https://api.clay.com/v3/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.clay.com",
+      "https://app.clay.com",
+    ],
   },
   gmail: {
     slug: "gmail",
