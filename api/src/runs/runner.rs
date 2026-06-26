@@ -453,6 +453,9 @@ async fn run_pydantic(
                     "access_token".to_string(),
                     serde_json::Value::String(row.access_token),
                 );
+                if let Some(api_key) = row.api_key {
+                    entry.insert("api_key".to_string(), serde_json::Value::String(api_key));
+                }
                 by_provider
                     .entry(row.provider)
                     .or_default()

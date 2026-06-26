@@ -108,6 +108,22 @@ export default async function ConnectionDetailPage({
       { label: "Connection", value: <code className="text-foreground">{c.name}</code> },
       { label: "Status", value: <Badge variant={nativeVariant(c.status)} size="small">{c.status}</Badge> },
       { label: "Auth", value: c.authType === "pat" ? "API key" : "OAuth" },
+      // The optional supplementary API key (set via Edit) — only meaningful for
+      // editable (DCR) connections, where the aux-key field lives.
+      ...(editable
+        ? [
+            {
+              label: "API key",
+              value: c.hasApiKey ? (
+                <Badge variant="green" size="small">
+                  Set
+                </Badge>
+              ) : (
+                <span className="text-foreground-muted">Not set</span>
+              ),
+            },
+          ]
+        : []),
       { label: "Connected", value: <LocalTime iso={c.createdAt.toISOString()} /> },
       ...(c.tokenExpiresAt
         ? [{ label: "Token expires", value: <LocalTime iso={c.tokenExpiresAt.toISOString()} /> }]

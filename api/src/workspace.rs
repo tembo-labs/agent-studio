@@ -59,6 +59,10 @@ pub struct NativeMcpRow {
     pub name: String,
     pub mcp_url: String,
     pub access_token: String,
+    /// Optional supplementary API key the user attached to this connection (for
+    /// privileged REST ops the MCP OAuth token can't do, e.g. Attio note/delete).
+    /// `None` when unset; surfaced to the runtime as `tas_tools.connection().api_key`.
+    pub api_key: Option<String>,
 }
 
 /// Decrypted native-MCP connections owned by a specific user in a
@@ -79,8 +83,8 @@ pub async fn list_active_native_connections(
     workspace_id: uuid::Uuid,
     user_id: &str,
 ) -> anyhow::Result<Vec<NativeMcpRow>> {
-    let rows: Vec<(String, String, Option<String>, Vec<u8>)> = sqlx::query_as(
-        "SELECT type, name, mcp_server_url, credentials \
+    let rows: Vec<(String, String, Option<String>, Vec<u8>, Option<Vec<u8>>)> = sqlx::query_as(
+        "SELECT type, name, mcp_server_url, credentials, aux_secret_ciphertext \
            FROM workspace_connection \
           WHERE workspace_id = $1 AND user_id = $2 AND status = 'active'",
     )
@@ -91,7 +95,7 @@ pub async fn list_active_native_connections(
     .context("failed to list workspace_connection")?;
 
     let mut out = Vec::with_capacity(rows.len());
-    for (provider, name, mcp_url, ciphertext) in rows {
+    for (provider, name, mcp_url, ciphertext, aux_ciphertext) in rows {
         let mcp_url = match mcp_url {
             Some(u) if !u.is_empty() => u,
             _ => {
@@ -121,11 +125,25 @@ pub async fn list_active_native_connections(
                 continue;
             }
         };
+        // Optional supplementary API key, encrypted under the SAME AAD as
+        // credentials. A decrypt failure is non-fatal: drop just the aux key (the
+        // connection still works for everything the OAuth token covers).
+        let api_key = aux_ciphertext.and_then(|ct| {
+            match key.decrypt_aad(&ct, aad.as_bytes()) {
+                Ok(s) if !s.is_empty() => Some(s),
+                Ok(_) => None,
+                Err(e) => {
+                    tracing::warn!(?e, %provider, %name, "native connection aux key failed to decrypt; ignoring");
+                    None
+                }
+            }
+        });
         out.push(NativeMcpRow {
             provider,
             name,
             mcp_url,
             access_token,
+            api_key,
         });
     }
     Ok(out)

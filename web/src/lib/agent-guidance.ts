@@ -441,10 +441,29 @@ tools = [list_companies, summarize_arr]
 
 **Scope caveat:** a provider's MCP OAuth grant doesn't always carry the REST
 scopes a given endpoint needs — the token may authenticate (an identity call
-like \`/self\`) yet 401/403 on record reads. Probe with the ACTUAL endpoint you
-need (not a generic "who am I"), and **fall back to a Secret API key** (below)
-when the connection token can't do the job — a provider API key with the right
-scopes is the reliable credential for heavy REST use.
+like \`/self\`) yet 401/403 on record reads/writes. Some providers (e.g. Attio)
+only expose coarse MCP scopes with no record/note/delete granularity at all.
+Probe with the ACTUAL endpoint you need (not a generic "who am I").
+
+When the OAuth token can't do the job, use the connection's **optional
+supplementary API key** — a granular provider access token the user attaches to
+the connection (Connections → the connection → Edit → API key). It's read off
+the same connection object and is the reliable credential for privileged REST:
+
+\`\`\`python
+c = tas_tools.connection("attio")
+key = c.api_key or c.access_token        # prefer the attached API key when set
+r = httpx.post(
+    "https://api.attio.com/v2/notes",
+    headers={"Authorization": f"Bearer {key}"},
+    json=note_payload,
+)
+\`\`\`
+
+Prefer this over a workspace **Secret** (below): the key is bundled with the
+connection it belongs to and **per-user** (other members can't use it), whereas
+a Secret is workspace-shared. Fall back to a Secret only for a service with no
+connection to attach to.
 
 For a service that authenticates with a **plain API key** (e.g. Clay)
 rather than OAuth — i.e. not a Composio or Native-MCP provider — use a
