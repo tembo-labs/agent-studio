@@ -15,6 +15,7 @@ const LOCAL_LOGOS: Record<string, string> = {
   pylon: "/mcp-logos/pylon.svg",
   dialed: "/mcp-logos/dialed.svg",
   amplemarket: "/mcp-logos/amplemarket.svg",
+  avoma: "/mcp-logos/avoma.png",
 };
 
 export function mcpLogoUrl(slug: string): string {

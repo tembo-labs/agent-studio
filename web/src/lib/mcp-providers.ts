@@ -25,6 +25,7 @@ export type McpProviderSlug =
   | "linear"
   | "amplemarket"
   | "clay"
+  | "avoma"
   | "gmail"
   | "tembo-agent-studio";
 
@@ -194,6 +195,37 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     oauthAuthorizationServerOrigins: [
       "https://api.clay.com",
       "https://app.clay.com",
+    ],
+  },
+  avoma: {
+    slug: "avoma",
+    displayName: "Avoma",
+    // Verified (probe): POST https://mcp.avoma.com/mcp → 401 → protected-resource
+    // advertises the auth server https://prod-api.avoma.com. Auth-server metadata
+    // exposes a registration_endpoint (/oauth/register → DCR), PKCE S256, and the
+    // refresh_token grant — TAS-managed, like Attio.
+    // The protected-resource does NOT advertise scopes_supported, so the
+    // external_api scopes (which live on the auth-server metadata) must be
+    // requested explicitly via scopeOverride. offline_access is kept (the
+    // authorize endpoint doesn't reject it). NOTE: Avoma's DCR issues a
+    // client_secret; TAS's DCR exchange is public/PKCE-only — if Avoma requires
+    // the secret at /oauth/token, connect will need DCR-confidential support.
+    mcpServerUrl: "https://mcp.avoma.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://prod-api.avoma.com"],
+    scopeOverride: [
+      "external_api:meetings-list",
+      "external_api:meetings-detail",
+      "external_api:meetings-set-purpose",
+      "external_api:meetings-set-outcome",
+      "external_api:meetings-set-privacy",
+      "external_api:meeting_type-list",
+      "external_api:meeting_outcome-list",
+      "external_api:teams-list",
+      "external_api:deal_stages-list",
+      "external_api:transcriptions-list",
+      "external_api:notes-list",
+      "external_api:scorecard_evaluations-list",
+      "external_api:engagement-list",
     ],
   },
   gmail: {

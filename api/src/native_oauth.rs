@@ -72,6 +72,10 @@ const AMPLEMARKET_OAUTH_ORIGINS: &[&str] = &["https://app.amplemarket.com"];
 // token/registration sit on api.clay.com — both origins allowed (like Fathom).
 const CLAY_MCP_ORIGIN: &str = "https://api.clay.com";
 const CLAY_OAUTH_ORIGINS: &[&str] = &["https://api.clay.com", "https://app.clay.com"];
+// Avoma advertises its auth server as https://prod-api.avoma.com (DCR, PKCE S256,
+// refresh_token grant; external_api:* scopes via the catalog scopeOverride).
+const AVOMA_MCP_ORIGIN: &str = "https://mcp.avoma.com";
+const AVOMA_OAUTH_ORIGINS: &[&str] = &["https://prod-api.avoma.com"];
 // Gmail (Google Workspace MCP) is a confidential/manual client on standard
 // Google OAuth: the auth server is accounts.google.com but its TOKEN endpoint
 // lives on a separate origin (oauth2.googleapis.com) — both must be trusted so
@@ -91,6 +95,7 @@ const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (LINEAR_MCP_ORIGIN, LINEAR_OAUTH_ORIGINS),
     (AMPLEMARKET_MCP_ORIGIN, AMPLEMARKET_OAUTH_ORIGINS),
     (CLAY_MCP_ORIGIN, CLAY_OAUTH_ORIGINS),
+    (AVOMA_MCP_ORIGIN, AVOMA_OAUTH_ORIGINS),
     (GMAIL_MCP_ORIGIN, GMAIL_OAUTH_ORIGINS),
 ];
 
