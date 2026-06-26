@@ -55,6 +55,13 @@ STEPS_SENTINEL = "__TAS_STEPS__:"
 DELTA_SENTINEL = "__TAS_DELTA__:"
 PROGRESS_SENTINEL = "__TAS_PROGRESS__:"
 
+# Cap on a tool-call error message we persist for the run-step timeline. Long
+# enough to keep a real error useful (API bodies, validation dumps, short
+# tracebacks) now that the UI shows it expandably; bounded so one giant tool
+# error can't bloat the row. Only the stored/displayed copy is capped — the
+# model still sees the full retry-prompt content.
+MAX_TOOL_ERROR_CHARS = 4000
+
 # Sidecar Python tools: the agent's `tools_module:` sibling source, read
 # from the repo by the web layer and handed to us via env. We exec it and
 # expose its `tools = [...]` export to the agent as callable functions —
@@ -188,7 +195,7 @@ def tool_calls_payload(messages) -> list[dict]:
                 calls.append((cid, name))
             elif kind == "retry-prompt":
                 content = getattr(part, "content", "")
-                outcomes[cid] = {"ok": False, "error": str(content)[:200]}
+                outcomes[cid] = {"ok": False, "error": str(content)[:MAX_TOOL_ERROR_CHARS]}
             elif kind.endswith("tool-return"):
                 outcomes.setdefault(cid, {"ok": True, "error": None})
     out: list[dict] = []
@@ -257,7 +264,7 @@ def steps_payload(messages) -> list[dict]:
                 continue
             if kind == "retry-prompt":
                 content = getattr(part, "content", "")
-                outcomes[cid] = {"ok": False, "error": str(content)[:200]}
+                outcomes[cid] = {"ok": False, "error": str(content)[:MAX_TOOL_ERROR_CHARS]}
             elif kind.endswith("tool-return"):
                 outcomes.setdefault(cid, {"ok": True, "error": None})
 
@@ -381,7 +388,7 @@ def make_stream_handler():
                     rkind = getattr(res, "part_kind", "") or ""
                     ok = rkind.endswith("tool-return")
                     err = (
-                        str(getattr(res, "content", ""))[:200]
+                        str(getattr(res, "content", ""))[:MAX_TOOL_ERROR_CHARS]
                         if (not ok and rkind == "retry-prompt")
                         else None
                     )
