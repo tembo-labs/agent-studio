@@ -400,22 +400,28 @@ def make_stream_handler():
         if node_counted:
             try:
                 usage = getattr(_ctx, "usage", None)
-                in_cum = _uncached_input(usage)
-                out_cum = _usage_field(usage, "output_tokens", "response_tokens")
-                if in_cum is not None or out_cum is not None:
-                    in_cum = in_cum or 0
-                    out_cum = out_cum or 0
+                # Report TOTAL input per step (the whole context the request
+                # processed) to match the authoritative end-of-run __TAS_STEPS__,
+                # which reads per-ModelResponse usage that carries no cache split
+                # and so reports total input too. Feeding _uncached_input the
+                # CUMULATIVE RunUsage here instead netted out the cached prefix
+                # (re-sent every step), so live In showed ~0 until the run ended.
+                input_so_far = _usage_field(usage, "input_tokens", "request_tokens")
+                output_so_far = _usage_field(usage, "output_tokens", "response_tokens")
+                if input_so_far is not None or output_so_far is not None:
+                    input_so_far = input_so_far or 0
+                    output_so_far = output_so_far or 0
                     _emit_stream_line(
                         PROGRESS_SENTINEL,
                         {
                             "kind": "step_usage",
                             "step": state["step"],
-                            "input_tokens": in_cum - state["prev_in"],
-                            "output_tokens": out_cum - state["prev_out"],
+                            "input_tokens": input_so_far - state["prev_in"],
+                            "output_tokens": output_so_far - state["prev_out"],
                         },
                     )
-                    state["prev_in"] = in_cum
-                    state["prev_out"] = out_cum
+                    state["prev_in"] = input_so_far
+                    state["prev_out"] = output_so_far
             except Exception:
                 pass
 
