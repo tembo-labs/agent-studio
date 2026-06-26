@@ -4,6 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { authorizeWorkspace } from "@/lib/auth-server";
 import { getPublicOrigin } from "@/lib/config";
 import { createApiKey, deleteApiKey } from "@/lib/api-keys-db";
+import { encryptSecret } from "@/lib/crypto";
+import { aadNativeConnection } from "@/lib/crypto-aad";
 import {
   getNativeConnection,
   saveNativeConnection,
@@ -171,6 +173,9 @@ type AuthServerMetadata = {
 
 type DcrResponse = {
   client_id?: string;
+  /** Present when the server registers a CONFIDENTIAL client (Avoma). We capture
+   *  it and present it (HTTP Basic) at token exchange + refresh. */
+  client_secret?: string;
 };
 
 export async function GET(
@@ -394,6 +399,8 @@ export async function GET(
 
   // ── Step 3: obtain a client_id ──────────────────────────────────
   let clientId: string;
+  // Set when DCR registers a CONFIDENTIAL client (Avoma) — the secret to present.
+  let dcrClientSecret: string | null = null;
   if (isManual) {
     // Confidential client: require client_secret_post and use the admin-stored
     // OAuth app. The secret is added at the callback's token exchange.
@@ -418,14 +425,9 @@ export async function GET(
     }
     clientId = byo.clientId;
   } else {
-    // Public client → Dynamic Client Registration.
-    if (!authMethods.some((m) => m === "none")) {
-      return back(
-        workspace.slug,
-        provider.slug,
-        `${provider.displayName} auth server requires a confidential client; configure an OAuth app instead.`,
-      );
-    }
+    // Dynamic Client Registration. The server decides public vs confidential:
+    // a public client gets no secret (we use PKCE only); a confidential one
+    // (Avoma) returns a client_secret we capture for token exchange + refresh.
     let registrationEndpoint: URL;
     try {
       registrationEndpoint = await trustedOAuthUrl(
@@ -475,6 +477,18 @@ export async function GET(
         );
       }
       clientId = dcrJson.client_id;
+      // Confidential DCR: the server issued a client_secret. We'll present it via
+      // HTTP Basic. If there's NO secret and the server doesn't support public
+      // ("none"), we can't authenticate the client at all.
+      if (dcrJson.client_secret) {
+        dcrClientSecret = dcrJson.client_secret;
+      } else if (!authMethods.some((m) => m === "none")) {
+        return back(
+          workspace.slug,
+          provider.slug,
+          `${provider.displayName} auth server requires a confidential client but DCR returned no client_secret.`,
+        );
+      }
     } catch (e) {
       return back(
         workspace.slug,
@@ -492,6 +506,7 @@ export async function GET(
     .digest("base64url");
 
   // ── Step 5: sign state + redirect ───────────────────────────────
+  const confidentialDcr = !isManual && dcrClientSecret !== null;
   const state = signNativeMcpState({
     workspaceId: workspace.id,
     workspaceSlug: workspace.slug,
@@ -501,8 +516,24 @@ export async function GET(
     pkceVerifier,
     clientId,
     tokenEndpoint: tokenEndpoint.toString(),
-    authMode: isManual ? "manual" : "dcr",
+    authMode: isManual ? "manual" : confidentialDcr ? "dcr_confidential" : "dcr",
     ...(isManual ? { instance } : {}),
+    // Carry the DCR-issued client_secret to the callback ENCRYPTED (state is
+    // signed but readable, and round-trips through the provider). AAD-bound to
+    // this connection so the ciphertext is useless elsewhere.
+    ...(confidentialDcr
+      ? {
+          clientSecretCiphertext: encryptSecret(
+            dcrClientSecret as string,
+            aadNativeConnection(
+              workspace.id,
+              userId,
+              provider.slug,
+              connectionName,
+            ),
+          ).toString("base64"),
+        }
+      : {}),
   });
 
   const authorizeUrl = new URL(authorizationEndpoint);

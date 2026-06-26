@@ -210,12 +210,15 @@ async fn refresh_one(
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .ok_or_else(|| anyhow!("no refresh_token stored — reconnect required"))?;
-    // The client identity the refresh exchange presents. DCR (public) providers
-    // stored a `dcr_client_id` and send no secret; manual (confidential)
-    // providers (HubSpot) present the BYO client_id + client_secret an admin
-    // stored in workspace_native_oauth_client.
-    let (client_id, client_secret): (String, Option<String>) =
-        if metadata.get("auth_mode").and_then(|v| v.as_str()) == Some("manual") {
+    // The client identity the refresh exchange presents:
+    //  - manual (HubSpot): BYO client_id + client_secret from
+    //    workspace_native_oauth_client → client_secret_post.
+    //  - dcr_confidential (Avoma): client_id + client_secret stored IN the
+    //    credentials blob (no per-workspace app) → HTTP Basic.
+    //  - dcr (public): a `dcr_client_id`, no secret.
+    let auth_mode = metadata.get("auth_mode").and_then(|v| v.as_str());
+    let (client_id, client_secret, use_basic): (String, Option<String>, bool) = match auth_mode {
+        Some("manual") => {
             // Which BYO app instance this connection authorized against. Older
             // rows (pre multi-instance) have no `instance` → fall back to
             // "default", which is where their single app was migrated.
@@ -226,16 +229,33 @@ async fn refresh_one(
                 .unwrap_or("default");
             let (cid, secret) =
                 native_oauth_client_secret(pool, key, workspace_id, provider, instance).await?;
-            (cid, Some(secret))
-        } else {
+            (cid, Some(secret), false)
+        }
+        Some("dcr_confidential") => {
+            let cid = creds
+                .get("client_id")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| anyhow!("dcr_confidential connection has no client_id stored"))?
+                .to_string();
+            let secret = creds
+                .get("client_secret")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| anyhow!("dcr_confidential connection has no client_secret stored"))?
+                .to_string();
+            (cid, Some(secret), true)
+        }
+        _ => {
             let cid = metadata
                 .get("dcr_client_id")
                 .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| anyhow!("no dcr_client_id in connection metadata"))?
                 .to_string();
-            (cid, None)
-        };
+            (cid, None, false)
+        }
+    };
 
     let token_endpoint = discover_token_endpoint(http, mcp_url).await?;
 
@@ -244,12 +264,19 @@ async fn refresh_one(
         ("refresh_token", refresh_token),
         ("client_id", client_id.as_str()),
     ];
-    if let Some(ref secret) = client_secret {
-        form.push(("client_secret", secret.as_str()));
-    }
-    let res = http
+    let mut req = http
         .post(token_endpoint)
-        .header("Accept", "application/json")
+        .header("Accept", "application/json");
+    // Confidential client auth: dcr_confidential uses HTTP Basic (Avoma's default);
+    // manual uses client_secret_post (in the body). Public sends neither.
+    if let Some(ref secret) = client_secret {
+        if use_basic {
+            req = req.basic_auth(client_id.as_str(), Some(secret.as_str()));
+        } else {
+            form.push(("client_secret", secret.as_str()));
+        }
+    }
+    let res = req
         .form(&form)
         .send()
         .await
@@ -296,13 +323,21 @@ async fn refresh_one(
     // Same JSON shape as the web `ConnectionCredentials` / what
     // saveNativeConnection persists, so a blob written here round-trips
     // through the web layer unchanged.
-    let new_creds = serde_json::json!({
+    let mut new_creds = serde_json::json!({
         "access_token": access_token,
         "refresh_token": new_refresh,
         "expires_at": expires_at.map(|t| t.to_rfc3339()),
         "scope": token.scope,
         "token_type": token.token_type,
     });
+    // dcr_confidential stores its client_id/secret in the blob — this rewrite
+    // would drop them, so carry them forward for the next refresh.
+    if auth_mode == Some("dcr_confidential") {
+        if let Some(ref secret) = client_secret {
+            new_creds["client_id"] = serde_json::Value::String(client_id.clone());
+            new_creds["client_secret"] = serde_json::Value::String(secret.clone());
+        }
+    }
     let blob = key
         .encrypt_aad(&new_creds.to_string(), conn_aad.as_bytes())
         .context("encrypt refreshed credentials")?;
