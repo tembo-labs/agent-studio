@@ -89,6 +89,17 @@ pub async fn create_run(
     State(state): State<AppState>,
     Json(req): Json<CreateRunRequest>,
 ) -> Result<Json<CreateRunResponse>, (StatusCode, String)> {
+    // Refuse new work once we've started draining for shutdown — the run would be
+    // guillotined by the imminent SIGKILL, then reconciled as failed on boot. The
+    // web layer surfaces this as a failed dispatch; during a deploy new traffic is
+    // routed to the fresh instance anyway.
+    if state.draining.load(std::sync::atomic::Ordering::SeqCst) {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "api is shutting down".to_string(),
+        ));
+    }
+
     let run_id = Uuid::new_v4();
 
     let user_message = req.user_message.unwrap_or_default();
