@@ -109,6 +109,7 @@ export default async function EditConnectionPage({
             workspaceSlug={workspace.slug}
             connectionId={loaded.conn.id}
             providerLabel={title}
+            hint={getMcpProvider(loaded.conn.type)?.auxKeyHint ?? null}
             isSet={loaded.conn.hasApiKey}
           />
         </>

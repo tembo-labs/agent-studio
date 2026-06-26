@@ -80,6 +80,13 @@ export type McpProvider = {
    * refresh tokens without the scope or issue short-lived-only access tokens.
    */
   omitOfflineAccess?: boolean;
+  /**
+   * Provider-specific note shown on the connection (detail view + the API-key
+   * edit field) explaining why/when a supplementary API key is needed and which
+   * scopes it requires. Set for providers whose MCP OAuth can't do privileged
+   * ops (Attio: no record/note/delete scopes). Plain text.
+   */
+  auxKeyHint?: string;
 };
 
 export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
@@ -88,6 +95,10 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     displayName: "Attio",
     mcpServerUrl: "https://mcp.attio.com/mcp",
     oauthAuthorizationServerOrigins: ["https://app.attio.com"],
+    // Attio's MCP OAuth grants only mcp/offline_access/openid — no record/note/
+    // delete scopes — so agents can't write through the connection token alone.
+    auxKeyHint:
+      "Attio's MCP login can't write. To let agents create notes or update/delete records, add an Attio access token (Attio → Settings → Developers) with note_content:read-write, record_permission:read-write, and the delete scopes — agents use it via tas_tools.connection(\"attio\").api_key.",
   },
   pylon: {
     slug: "pylon",

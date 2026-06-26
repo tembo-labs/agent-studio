@@ -19,12 +19,15 @@ export function ConnectionApiKeyField({
   workspaceSlug,
   connectionId,
   providerLabel,
+  hint,
   isSet,
 }: {
   action: Action;
   workspaceSlug: string;
   connectionId: string;
   providerLabel: string;
+  /** Provider-specific note (why/what scopes); falls back to generic copy. */
+  hint?: string | null;
   isSet: boolean;
 }) {
   const [state, formAction, pending] = useActionState<State, FormData>(
@@ -54,11 +57,18 @@ export function ConnectionApiKeyField({
           disabled={pending}
         />
         <p className="text-foreground-muted text-sm">
-          For privileged operations the {providerLabel} MCP token can&apos;t do
-          — e.g. writes or deletes that need a granular provider access token.
-          Stored encrypted and scoped to your connection (other members
-          can&apos;t use it); agents read it via{" "}
-          <code>tas_tools.connection().api_key</code>.
+          {hint ? (
+            hint
+          ) : (
+            <>
+              For privileged operations the {providerLabel} MCP token can&apos;t
+              do — e.g. writes or deletes that need a granular provider access
+              token. Agents read it via{" "}
+              <code>tas_tools.connection().api_key</code>.
+            </>
+          )}{" "}
+          Stored encrypted and scoped to your connection — other members
+          can&apos;t use it.
         </p>
       </div>
       {state.error && (
