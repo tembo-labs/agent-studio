@@ -353,6 +353,7 @@ export async function GET(
   // their connect. Gate on the advertised grant, and never duplicate it.
   if (
     !isManual &&
+    !provider.omitOfflineAccess &&
     (asMeta.grant_types_supported ?? []).includes("refresh_token") &&
     !scopes.includes("offline_access")
   ) {

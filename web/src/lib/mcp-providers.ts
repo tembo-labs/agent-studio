@@ -68,6 +68,17 @@ export type McpProvider = {
    * readonly + compose.
    */
   scopeOverride?: string[];
+  /**
+   * Suppress the OIDC `offline_access` scope that TAS otherwise appends for DCR
+   * providers whose auth server advertises the `refresh_token` grant. Most
+   * servers accept the unknown scope leniently (Attio/Dialed even REQUIRE it to
+   * mint a refresh token and don't advertise it), but some STRICTLY validate the
+   * request against their `scopes_supported` and reject `offline_access` with
+   * "invalid scope", which is fatal to the whole authorize. Amplemarket is the
+   * first of these (advertises only mcp:read/mcp:write). Such servers either mint
+   * refresh tokens without the scope or issue short-lived-only access tokens.
+   */
+  omitOfflineAccess?: boolean;
 };
 
 export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
@@ -150,6 +161,9 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // client (token auth method "none") — TAS-managed, no per-customer setup, like Attio.
     mcpServerUrl: "https://mcp.amplemarket.com/mcp",
     oauthAuthorizationServerOrigins: ["https://app.amplemarket.com"],
+    // Strictly validates scope against scopes_supported (mcp:read/mcp:write) and
+    // rejects the auto-appended offline_access with "invalid scope" — suppress it.
+    omitOfflineAccess: true,
   },
   gmail: {
     slug: "gmail",
