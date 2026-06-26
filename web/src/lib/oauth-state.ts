@@ -64,15 +64,25 @@ export type NativeMcpStatePayload = {
   /** Authorization server token endpoint, captured during
    *  discovery so the callback doesn't need to re-discover. */
   tokenEndpoint: string;
-  /** OAuth client mode. "manual" (confidential, BYO app) tells the
-   *  callback to add the stored client_secret at token exchange.
-   *  Absent/"dcr" = public client (no secret). */
-  authMode?: "dcr" | "manual";
+  /** OAuth client mode.
+   *   - absent/"dcr": public client (PKCE only, no secret).
+   *   - "manual": confidential BYO app — callback adds the admin-stored
+   *     client_secret (client_secret_post) read by `instance`.
+   *   - "dcr_confidential": the server's DCR issued a confidential client
+   *     (it returned a client_secret); callback presents it via HTTP Basic.
+   *     The secret rides in `clientSecretCiphertext` (encrypted), NOT plaintext —
+   *     state is signed but readable, and the provider echoes it back. */
+  authMode?: "dcr" | "manual" | "dcr_confidential";
   /** For manual providers: which BYO OAuth-app instance this flow used
    *  (slug in workspace_native_oauth_client). The callback re-reads the
    *  secret by this instance, and it's stored on the connection so refresh
    *  presents the right client_secret. Absent for DCR. */
   instance?: string;
+  /** dcr_confidential only: the DCR-issued client_secret, AES-256-GCM encrypted
+   *  (master key, AAD = the connection's native_connection AAD), base64. The
+   *  callback decrypts it for the token exchange and persists it (encrypted) on
+   *  the connection so refresh can present it. Never plaintext in the URL. */
+  clientSecretCiphertext?: string;
   /** Short random nonce — defends against state replay across users. */
   nonce: string;
   /** Issued-at (epoch ms); states older than STATE_TTL_MS are rejected (#46). */

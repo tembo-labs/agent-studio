@@ -31,6 +31,11 @@ export type ConnectionCredentials = {
   expires_at?: string; // ISO timestamp
   scope?: string;
   token_type?: string;
+  /** dcr_confidential only: the DCR-issued confidential client the refresh
+   *  exchange must present (HTTP Basic). Stored inside the encrypted blob and
+   *  carried forward by the Rust refresh. */
+  client_id?: string;
+  client_secret?: string;
 };
 
 export type WorkspaceConnection = {

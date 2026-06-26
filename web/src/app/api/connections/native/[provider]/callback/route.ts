@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditEvent } from "@/lib/audit-db";
 import { saveNativeConnection } from "@/lib/connections";
 import { getPublicOrigin } from "@/lib/config";
+import { decryptSecret } from "@/lib/crypto";
+import { aadNativeConnection } from "@/lib/crypto-aad";
 import {
   getMcpProvider,
   redirectUriFor,
@@ -134,8 +136,11 @@ export async function GET(
       `Token endpoint is not trusted: ${(e as Error).message}`,
     );
   }
-  // Confidential (manual / BYO-app) providers add the stored client_secret at
-  // the token exchange (client_secret_post). Public DCR providers send none.
+  // Client authentication at the token exchange:
+  //  - manual (BYO confidential app): stored client_secret via client_secret_post.
+  //  - dcr_confidential (Avoma): the DCR-issued secret (decrypted from state) via
+  //    HTTP Basic — the spec default when the server omits the auth-method field.
+  //  - dcr (public): PKCE only, no secret.
   const tokenParams: Record<string, string> = {
     grant_type: "authorization_code",
     code,
@@ -143,6 +148,13 @@ export async function GET(
     client_id: state.clientId,
     code_verifier: state.pkceVerifier,
   };
+  const tokenHeaders: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    Accept: "application/json",
+  };
+  // dcr_confidential: recover the DCR client_secret for both the token exchange
+  // and persistence (so refresh can present it). Decrypted under the connection AAD.
+  let confidentialSecret: string | null = null;
   if (state.authMode === "manual") {
     const byo = await getNativeOAuthClientSecret(
       state.workspaceId,
@@ -158,14 +170,36 @@ export async function GET(
       );
     }
     tokenParams.client_secret = byo.clientSecret;
+  } else if (
+    state.authMode === "dcr_confidential" &&
+    state.clientSecretCiphertext
+  ) {
+    try {
+      confidentialSecret = decryptSecret(
+        Buffer.from(state.clientSecretCiphertext, "base64"),
+        aadNativeConnection(
+          state.workspaceId,
+          state.userId,
+          provider.slug,
+          state.connectionName,
+        ),
+      );
+    } catch {
+      return back(
+        state.workspaceSlug,
+        provider.slug,
+        "error",
+        "Could not recover the OAuth client secret — please reconnect.",
+      );
+    }
+    tokenHeaders.Authorization =
+      "Basic " +
+      Buffer.from(`${state.clientId}:${confidentialSecret}`).toString("base64");
   }
   try {
     const tokenRes = await fetch(tokenEndpoint, noRedirectFetchInit({
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
+      headers: tokenHeaders,
       body: new URLSearchParams(tokenParams).toString(),
     }));
     if (!tokenRes.ok) {
@@ -212,11 +246,19 @@ export async function GET(
       expires_at: expiresAt,
       scope: tokenJson.scope,
       token_type: tokenJson.token_type,
+      // dcr_confidential: stash the DCR client_id + secret WITH the connection
+      // (encrypted with the credentials blob) so the Rust refresh can present
+      // them via Basic — there's no per-workspace BYO app to read them from.
+      ...(state.authMode === "dcr_confidential" && confidentialSecret
+        ? { client_id: state.clientId, client_secret: confidentialSecret }
+        : {}),
     },
-    // The client identity the refresh exchange must present. For DCR
-    // (public) providers that's the registered client_id; for manual
-    // (confidential) providers it's the BYO client_id, plus auth_mode so the
-    // Rust refresh knows to add the stored client_secret.
+    // The client identity the refresh exchange must present:
+    //  - manual: BYO client_id + auth_mode → refresh reads the secret from
+    //    workspace_native_oauth_client.
+    //  - dcr_confidential: auth_mode → refresh reads client_id/secret from the
+    //    credentials blob (above) and uses Basic.
+    //  - dcr (public): just the registered client_id, no secret.
     metadata:
       state.authMode === "manual"
         ? {
@@ -224,7 +266,9 @@ export async function GET(
             client_id: state.clientId,
             instance: state.instance ?? "default",
           }
-        : { dcr_client_id: state.clientId },
+        : state.authMode === "dcr_confidential"
+          ? { auth_mode: "dcr_confidential", dcr_client_id: state.clientId }
+          : { dcr_client_id: state.clientId },
   });
 
   await writeAuditEvent({
