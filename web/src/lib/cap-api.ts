@@ -433,9 +433,7 @@ export function buildChatEditPrompt(args: {
   return [
     buildGuidancePointerBlock(framework),
     "",
-    "**Step 2 — Requested change**",
-    "",
-    `Improve the agent defined at @${args.agentPath}.`,
+    "**Step 2 — Delivery**",
     "",
     ...deliveryDirective(
       args.commitMode,
@@ -451,7 +449,13 @@ export function buildChatEditPrompt(args: {
       args.nativeToolsBaseUrl,
       args.nativeToolsKey,
     ),
+    // Keep the file target adjacent to the user's request (TAS fills the path
+    // in from the agent's route, not the user's words) so it stays in front of
+    // CAP right where the instruction is.
     "## Requested change",
+    "",
+    `Improve the agent defined at @${args.agentPath}:`,
+    "",
     args.improvement.trim(),
   ].join("\n");
 }
@@ -480,9 +484,7 @@ export function buildImprovePrompt(args: {
   return [
     buildGuidancePointerBlock(framework),
     "",
-    "**Step 2 — Requested change**",
-    "",
-    `Improve the agent defined at @${args.agentPath}.`,
+    "**Step 2 — Delivery**",
     "",
     ...deliveryDirective(
       args.commitMode,
@@ -490,7 +492,12 @@ export function buildImprovePrompt(args: {
       args.improvementMarker,
     ),
     "",
+    // Keep the file target next to the user's request (TAS fills the path in
+    // from the run's agent, not the user's words).
     "## Improvement requested by the user",
+    "",
+    `Improve the agent defined at @${args.agentPath}:`,
+    "",
     args.improvement.trim(),
     "",
     "## Context: the run that prompted this request",
