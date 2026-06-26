@@ -55,6 +55,11 @@ export function aadWebhookToken(workspaceId: string, id: string): string {
   return `webhook${SEP}${workspaceId}${SEP}${id}`;
 }
 
+/** `workspace_webhook` Svix signing secret, keyed by (workspace_id, id). */
+export function aadWebhookSigningSecret(workspaceId: string, id: string): string {
+  return `webhook_signing${SEP}${workspaceId}${SEP}${id}`;
+}
+
 /** `workspace_api_key` token, keyed by (workspace_id, id). */
 export function aadApiKeyToken(workspaceId: string, id: string): string {
   return `api_key${SEP}${workspaceId}${SEP}${id}`;

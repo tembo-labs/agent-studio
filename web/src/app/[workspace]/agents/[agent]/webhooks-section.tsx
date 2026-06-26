@@ -222,6 +222,7 @@ function WebhookRow({
         <SecretReveal
           url={rotateState.secret.url}
           token={rotateState.secret.token}
+          signed={rotateState.secret.signed}
         />
       )}
     </li>
@@ -289,6 +290,25 @@ export function AddWebhookForm({
           </p>
         </div>
       )}
+      <div className="grid gap-1.5">
+        <Label htmlFor="webhook-signing-secret" className="text-sm">
+          Clerk signing secret{" "}
+          <span className="text-foreground-muted">(optional)</span>
+        </Label>
+        <Input
+          id="webhook-signing-secret"
+          name="signingSecret"
+          autoComplete="off"
+          disabled={pending}
+          placeholder="whsec_…"
+          className="max-w-sm font-mono"
+        />
+        <p className="text-foreground-muted text-sm">
+          Paste this to verify <strong>Clerk</strong> (Svix-signed) webhooks by
+          signature instead of a bearer token — Clerk can&apos;t send a custom
+          auth header. Leave blank for bearer-token senders like Clay.
+        </p>
+      </div>
       {state.error && (
         <p className="text-sentiment-negative text-sm" role="alert">
           {state.error}
@@ -300,24 +320,49 @@ export function AddWebhookForm({
         </Button>
       </div>
       {state.secret && (
-        <SecretReveal url={state.secret.url} token={state.secret.token} />
+        <SecretReveal
+          url={state.secret.url}
+          token={state.secret.token}
+          signed={state.secret.signed}
+        />
       )}
     </form>
   );
 }
 
-function SecretReveal({ url, token }: { url: string; token: string }) {
+function SecretReveal({
+  url,
+  token,
+  signed,
+}: {
+  url: string;
+  token: string;
+  signed: boolean;
+}) {
   return (
     <div className="border-sentiment-caution bg-[var(--color-sentiment-caution-subtle)] flex flex-col gap-2 rounded-lg border p-3">
       <span className="text-foreground text-sm font-medium">
-        Copy these now — the token is shown only once.
+        {signed
+          ? "Point Clerk at this URL."
+          : "Copy these now — the token is shown only once."}
       </span>
       <Field label="Endpoint URL" value={url} />
-      <Field label="Bearer token" value={token} mono />
+      {!signed && <Field label="Bearer token" value={token} mono />}
       <p className="text-foreground-weak text-sm leading-5">
-        In Clay, add an HTTP API column: method <code>POST</code>, URL above, and
-        a header <code>Authorization: Bearer &lt;token&gt;</code>. The agent
-        receives the request body as its input.
+        {signed ? (
+          <>
+            In Clerk, add a webhook endpoint with this URL and subscribe to the
+            events you want. TAS verifies each delivery&apos;s signature against
+            the signing secret you pasted above; the agent receives the Clerk
+            event as its input.
+          </>
+        ) : (
+          <>
+            In Clay, add an HTTP API column: method <code>POST</code>, URL above,
+            and a header <code>Authorization: Bearer &lt;token&gt;</code>. The
+            agent receives the request body as its input.
+          </>
+        )}
       </p>
     </div>
   );
