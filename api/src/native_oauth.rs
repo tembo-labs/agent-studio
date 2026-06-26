@@ -67,6 +67,11 @@ const LINEAR_OAUTH_ORIGINS: &[&str] = &["https://mcp.linear.app"];
 // public client, PKCE S256, scopes mcp:read/mcp:write) — TAS-managed, like Attio.
 const AMPLEMARKET_MCP_ORIGIN: &str = "https://mcp.amplemarket.com";
 const AMPLEMARKET_OAUTH_ORIGINS: &[&str] = &["https://app.amplemarket.com"];
+// Clay advertises api.clay.com as its auth server (DCR, public client, PKCE S256,
+// scope "mcp"), but its authorize endpoint lives on app.clay.com while
+// token/registration sit on api.clay.com — both origins allowed (like Fathom).
+const CLAY_MCP_ORIGIN: &str = "https://api.clay.com";
+const CLAY_OAUTH_ORIGINS: &[&str] = &["https://api.clay.com", "https://app.clay.com"];
 // Gmail (Google Workspace MCP) is a confidential/manual client on standard
 // Google OAuth: the auth server is accounts.google.com but its TOKEN endpoint
 // lives on a separate origin (oauth2.googleapis.com) — both must be trusted so
@@ -85,6 +90,7 @@ const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (DIALED_MCP_ORIGIN, DIALED_OAUTH_ORIGINS),
     (LINEAR_MCP_ORIGIN, LINEAR_OAUTH_ORIGINS),
     (AMPLEMARKET_MCP_ORIGIN, AMPLEMARKET_OAUTH_ORIGINS),
+    (CLAY_MCP_ORIGIN, CLAY_OAUTH_ORIGINS),
     (GMAIL_MCP_ORIGIN, GMAIL_OAUTH_ORIGINS),
 ];
 
