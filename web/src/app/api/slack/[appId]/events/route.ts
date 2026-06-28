@@ -120,10 +120,19 @@ async function handleEvent(
   // Ignore anything we sent, and message edits/joins/etc. (subtypes).
   if (event.bot_id) return;
   const isMention = event.type === "app_mention";
+  // Inside a thread, hand the surface to whatever custom listener owns it (e.g. the
+  // Composio Y/N reply-handler). An explicit @mention is the deliberate exception —
+  // `@agent do x` in a thread still launches its agent (isMention is evaluated
+  // independently above). What must NOT happen is a plain, untagged thread reply
+  // triggering the native "which agent?" menu — that is the double-response we are
+  // eliminating. So thread replies are excluded from the DM path ONLY; do not "simplify"
+  // this into an early `if (isThreadReply) return`, which would also kill in-thread @tags.
+  const isThreadReply = !!event.thread_ts && event.thread_ts !== event.ts;
   const isDirectMessage =
     event.type === "message" &&
     event.channel_type === "im" &&
-    !event.subtype;
+    !event.subtype &&
+    !isThreadReply;
   if (!isMention && !isDirectMessage) return;
 
   const channel = event.channel;
