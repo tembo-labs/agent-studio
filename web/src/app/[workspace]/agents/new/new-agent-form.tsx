@@ -81,6 +81,22 @@ export function NewAgentForm({
           )}
         </p>
         <p className="text-foreground-weak text-sm">Status: {s.status}</p>
+        {s.schedule && (
+          <p className="text-foreground-weak text-sm">
+            Scheduled to run{" "}
+            <span className="text-foreground font-medium">
+              {s.schedule.humanReadable.toLowerCase()}
+            </span>{" "}
+            (UTC). Adjust it on the{" "}
+            <a
+              href={`/${workspaceSlug}/automations`}
+              className="text-foreground font-medium hover:underline"
+            >
+              Automations
+            </a>{" "}
+            page.
+          </p>
+        )}
         <div className="flex flex-wrap gap-3 pt-1">
           <a
             href={s.htmlUrl}
