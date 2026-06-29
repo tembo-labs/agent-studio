@@ -19,6 +19,8 @@ import {
   type RunListItem,
 } from "@/lib/runs-db";
 import { listMemberActivity } from "@/lib/member-stats";
+import { listAgentOwners } from "@/lib/agent-versions";
+import { listAgents } from "@/lib/workspace-agents";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, getWorkspaceRole } from "@/lib/workspace";
 
@@ -61,6 +63,8 @@ export default async function DashboardPage({
     recentImprovements,
     recentRuns,
     memberActivity,
+    agentsListing,
+    agentOwners,
     role,
   ] = await Promise.all([
     getWorkspaceStats30d(workspace.id),
@@ -70,9 +74,34 @@ export default async function DashboardPage({
     listImprovements(workspace.id, 10),
     listRunsForWorkspace(workspace.id, {}, { limit: 8 }),
     listMemberActivity(workspace.id),
+    listAgents(workspace.id).catch(() => null),
+    listAgentOwners(workspace.id).catch(() => new Map<string, string>()),
     getWorkspaceRole(workspace.id, session.user.id),
   ]);
   const isAdmin = role === "workspace_admin";
+
+  // Tally agents-owned per member, plus what's left unowned. The live agent
+  // list (from the repo) is the inventory; agent_owner rows can outlive a
+  // deleted agent, so we walk the live agents and look each one's owner up —
+  // never the row set, which would over-count ghosts. An agent with an owner
+  // row pointing at a former member (no longer in memberActivity) still counts
+  // as "owned" for the unowned tally, but won't surface in any visible row.
+  const ownedNamesByUser = new Map<string, string[]>();
+  const unownedAgentNames: string[] = [];
+  if (agentsListing && agentsListing.ok) {
+    for (const a of agentsListing.agents) {
+      if (!a.ok) continue;
+      const name = a.spec.name;
+      const owner = agentOwners.get(name);
+      if (owner) {
+        const list = ownedNamesByUser.get(owner) ?? [];
+        list.push(name);
+        ownedNamesByUser.set(owner, list);
+      } else {
+        unownedAgentNames.push(name);
+      }
+    }
+  }
 
   // Disambiguate the Team table: when two members share a first name,
   // append the email in parens so "Ry" and "Ry" are distinguishable.
@@ -112,8 +141,9 @@ export default async function DashboardPage({
         description="Connections, automations, Slack-bot usage, and 30-day run activity per member. Hover a count for details."
       >
         <DashboardTeamTable
-          rows={memberActivity.map(
-            (m): TeamRow => ({
+          rows={memberActivity.map((m): TeamRow => {
+            const owned = ownedNamesByUser.get(m.userId) ?? [];
+            return {
               userId: m.userId,
               label: memberLabel(m),
               memberHref: isAdmin
@@ -126,8 +156,14 @@ export default async function DashboardPage({
               slackRuns30d: m.slackRuns30d,
               slackBots: m.slackBots,
               runs30d: m.runs30d,
-            }),
-          )}
+              agentsOwned: owned.length,
+              ownedAgents: owned.slice().sort((a, b) => a.localeCompare(b)),
+            };
+          })}
+          unownedCount={unownedAgentNames.length}
+          unownedAgents={unownedAgentNames
+            .slice()
+            .sort((a, b) => a.localeCompare(b))}
         />
       </Section>
 

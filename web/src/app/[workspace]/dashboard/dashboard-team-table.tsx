@@ -19,6 +19,10 @@ export type TeamRow = {
   slackRuns30d: number;
   slackBots: string[];
   runs30d: number;
+  /** Count of agents this member owns (agent_owner rows pointing at them). */
+  agentsOwned: number;
+  /** Their owned agent names, sorted — revealed on hover. */
+  ownedAgents: string[];
 };
 
 const COLUMNS: Column<TeamRow>[] = [
@@ -62,6 +66,18 @@ const COLUMNS: Column<TeamRow>[] = [
     ),
   },
   {
+    key: "agents",
+    header: "Agents owned",
+    align: "right",
+    cell: (r) => (
+      <CountCell
+        value={r.agentsOwned}
+        items={r.ownedAgents}
+        empty="Owns no agents"
+      />
+    ),
+  },
+  {
     key: "slack",
     header: "Slack (30d)",
     align: "right",
@@ -82,13 +98,39 @@ const COLUMNS: Column<TeamRow>[] = [
   },
 ];
 
-export function DashboardTeamTable({ rows }: { rows: TeamRow[] }) {
+export function DashboardTeamTable({
+  rows,
+  unownedCount,
+  unownedAgents,
+}: {
+  rows: TeamRow[];
+  /** Agents in the repo with no owner row — surfaced as a footer note so it's
+   *  obvious which agents nobody is accountable for. */
+  unownedCount: number;
+  unownedAgents: string[];
+}) {
   return (
-    <DataTable
-      columns={COLUMNS}
-      rows={rows}
-      getRowKey={(r) => r.userId}
-      // No whole-row navigation — member link (admin) is inside the cell.
-    />
+    <div className="flex flex-col gap-2">
+      <DataTable
+        columns={COLUMNS}
+        rows={rows}
+        getRowKey={(r) => r.userId}
+        // No whole-row navigation — member link (admin) is inside the cell.
+      />
+      <div className="text-foreground-muted px-1 text-sm">
+        {unownedCount === 0 ? (
+          "Every agent has an owner."
+        ) : (
+          <>
+            <CountCell
+              value={unownedCount}
+              items={unownedAgents}
+              empty="No unowned agents"
+            />{" "}
+            {unownedCount === 1 ? "agent is" : "agents are"} unowned.
+          </>
+        )}
+      </div>
+    </div>
   );
 }
