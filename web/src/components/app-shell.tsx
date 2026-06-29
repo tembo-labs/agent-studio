@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { DocsSidebarLink } from "@/components/docs-sidebar-link";
-import { MissingConnectionCards } from "@/components/missing-connection-cards";
+import { ActionNeeded } from "@/components/action-needed";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { countActiveInboxItems } from "@/lib/inbox-api";
 import { Button } from "@/components/ui/button";
@@ -128,104 +128,99 @@ export async function AppShell({
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-3 pt-6">
           <SidebarNav home={home} inboxCount={inboxCount} />
 
-          {(!hasLlmProvider ||
-            failingAgents.length > 0 ||
-            missingConnections.length > 0) && (
-            <div className="mt-6 flex flex-col gap-1.5">
-              <span className="text-foreground-muted px-2 text-sm font-medium uppercase tracking-widest">
-                Action needed
-              </span>
-              {!hasLlmProvider && (
-                <div className="flex items-start gap-2 rounded-md bg-[var(--color-sentiment-caution-subtle)] px-2 py-2">
-                  <IconExclamationTriangle
-                    size={14}
-                    className="mt-0.5 shrink-0 text-[var(--color-icon-sentiment-caution)]"
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
-                    <span className="text-sm leading-tight text-[var(--color-foreground-sentiment-caution)]">
-                      <span className="font-semibold">LLM provider needed</span>{" "}
-                      — add an Anthropic or OpenAI key to run agents
-                    </span>
-                    <Button asChild variant="orange" size="small">
-                      <Link href={`/${workspace.slug}/settings/providers`}>
-                        Add a key
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {failingAgents.map((f) => {
-                const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(f.agentName)}`;
-                return (
-                  <div
-                    key={`fail:${f.agentName}`}
-                    className="flex items-start gap-2 rounded-md bg-[var(--color-sentiment-negative-subtle)] px-2 py-2"
-                  >
+          <ActionNeeded
+            hasStaticContent={!hasLlmProvider || failingAgents.length > 0}
+            staticContent={
+              <>
+                {!hasLlmProvider && (
+                  <div className="flex items-start gap-2 rounded-md bg-[var(--color-sentiment-caution-subtle)] px-2 py-2">
                     <IconExclamationTriangle
                       size={14}
-                      className="text-sentiment-negative mt-0.5 shrink-0"
+                      className="mt-0.5 shrink-0 text-[var(--color-icon-sentiment-caution)]"
                     />
                     <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
-                      <span className="text-sentiment-negative text-sm leading-tight">
-                        <span className="font-semibold">{f.agentName}</span>{" "}
-                        failed{" "}
-                        <span className="font-semibold">{f.failures}×</span> in
-                        24h
+                      <span className="text-sm leading-tight text-[var(--color-foreground-sentiment-caution)]">
+                        <span className="font-semibold">
+                          LLM provider needed
+                        </span>{" "}
+                        — add an Anthropic or OpenAI key to run agents
                       </span>
-                      <Button asChild variant="destructive" size="small">
-                        <Link href={agentHref}>Open</Link>
+                      <Button asChild variant="orange" size="small">
+                        <Link href={`/${workspace.slug}/settings/providers`}>
+                          Add a key
+                        </Link>
                       </Button>
                     </div>
                   </div>
-                );
-              })}
-              <MissingConnectionCards
-                items={groupedMissing.map(({ rep: m, agentNames }) => {
-                  // Authorize endpoint differs per substrate: Composio is one
-                  // route per workspace (toolkit in query string), Native MCP
-                  // one route per provider (provider in path), secrets link to
-                  // the Secrets tab. Dispatch by source so Connect lands on the
-                  // right flow.
-                  let href: string;
-                  let providerLabel: string;
-                  if (m.source === "secret") {
-                    href = `/${workspace.slug}/connections/secrets`;
-                    providerLabel = m.toolkit;
-                  } else if (m.source === "native-mcp") {
-                    const params = new URLSearchParams({
-                      workspace: workspace.slug,
-                    });
-                    if (m.name && m.name !== "default") params.set("name", m.name);
-                    href = `/api/connections/native/${m.toolkit}/authorize?${params.toString()}`;
-                    providerLabel =
-                      getMcpProvider(m.toolkit)?.displayName ?? m.toolkit;
-                  } else {
-                    const params = new URLSearchParams({
-                      workspace: workspace.slug,
-                      toolkit: m.toolkit,
-                    });
-                    if (m.name && m.name !== "default") params.set("name", m.name);
-                    href = `/api/connections/composio/authorize?${params.toString()}`;
-                    providerLabel = toolkitLabel(m.toolkit);
-                  }
-                  const label =
-                    m.name && m.name !== "default"
-                      ? `${providerLabel} (${m.name})`
-                      : providerLabel;
-                  return {
-                    key: `${m.source}:${m.toolkit}:${m.name}`,
-                    label,
-                    agentLabel:
-                      agentNames.length === 1
-                        ? agentNames[0]
-                        : `${agentNames.length} agents`,
-                    href,
-                    action: m.source === "secret" ? "Set" : "Connect",
-                  };
+                )}
+                {failingAgents.map((f) => {
+                  const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(f.agentName)}`;
+                  return (
+                    <div
+                      key={`fail:${f.agentName}`}
+                      className="flex items-start gap-2 rounded-md bg-[var(--color-sentiment-negative-subtle)] px-2 py-2"
+                    >
+                      <IconExclamationTriangle
+                        size={14}
+                        className="text-sentiment-negative mt-0.5 shrink-0"
+                      />
+                      <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+                        <span className="text-sentiment-negative text-sm leading-tight">
+                          <span className="font-semibold">{f.agentName}</span>{" "}
+                          failed{" "}
+                          <span className="font-semibold">{f.failures}×</span> in
+                          24h
+                        </span>
+                        <Button asChild variant="destructive" size="small">
+                          <Link href={agentHref}>Open</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  );
                 })}
-              />
-            </div>
-          )}
+              </>
+            }
+            missingItems={groupedMissing.map(({ rep: m, agentNames }) => {
+              // Authorize endpoint differs per substrate: Composio is one route
+              // per workspace (toolkit in query string), Native MCP one route per
+              // provider (provider in path), secrets link to the Secrets tab.
+              // Dispatch by source so Connect lands on the right flow.
+              let href: string;
+              let providerLabel: string;
+              if (m.source === "secret") {
+                href = `/${workspace.slug}/connections/secrets`;
+                providerLabel = m.toolkit;
+              } else if (m.source === "native-mcp") {
+                const params = new URLSearchParams({ workspace: workspace.slug });
+                if (m.name && m.name !== "default") params.set("name", m.name);
+                href = `/api/connections/native/${m.toolkit}/authorize?${params.toString()}`;
+                providerLabel =
+                  getMcpProvider(m.toolkit)?.displayName ?? m.toolkit;
+              } else {
+                const params = new URLSearchParams({
+                  workspace: workspace.slug,
+                  toolkit: m.toolkit,
+                });
+                if (m.name && m.name !== "default") params.set("name", m.name);
+                href = `/api/connections/composio/authorize?${params.toString()}`;
+                providerLabel = toolkitLabel(m.toolkit);
+              }
+              const label =
+                m.name && m.name !== "default"
+                  ? `${providerLabel} (${m.name})`
+                  : providerLabel;
+              return {
+                key: `${m.source}:${m.toolkit}:${m.name}`,
+                label,
+                agentLabel:
+                  agentNames.length === 1
+                    ? agentNames[0]
+                    : `${agentNames.length} agents`,
+                href,
+                action: m.source === "secret" ? "Set" : "Connect",
+              };
+            })}
+          />
         </nav>
 
         <div className="border-border border-t px-2 pb-1 pt-2">
