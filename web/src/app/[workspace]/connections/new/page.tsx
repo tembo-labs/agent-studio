@@ -84,7 +84,9 @@ export default async function NewConnectionPage({
       <FormShell
         back={<BackLink href={`${newHref}?type=manual`} label="Manual credential" />}
         title={`Connect ${provider.displayName}`}
-        logo={<Glyph />}
+        logo={
+          <McpProviderLogo slug={provider.slug} label={provider.displayName} size={24} />
+        }
       >
         {isAdmin ? (
           <>
@@ -193,7 +195,7 @@ export default async function NewConnectionPage({
             <OptionCard
               key={p.slug}
               href={`${newHref}?type=manual&provider=${encodeURIComponent(p.slug)}`}
-              logo={<Glyph />}
+              logo={<McpProviderLogo slug={p.slug} label={p.displayName} size={24} />}
               title={p.displayName}
               sublabel={`${p.fields.length} field${p.fields.length === 1 ? "" : "s"}`}
             />

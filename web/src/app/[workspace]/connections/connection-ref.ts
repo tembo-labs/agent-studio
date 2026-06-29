@@ -166,7 +166,9 @@ export async function listAllConnections(
       title: p.displayName,
       slot: null,
       typeLabel: "Manual credential",
-      logoSlug: null,
+      // Reuse the provider slug against the shared logo CDN (LinkedIn et al.
+      // resolve there); McpProviderLogo falls back to a glyph if it 404s.
+      logoSlug: p.slug,
       statusLabel: complete ? "connected" : "incomplete",
       statusVariant: complete ? "green" : "yellow",
     });
