@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { IconExclamationTriangle } from "central-icons";
 
 import { Button } from "@/components/ui/button";
 
-// One "Action needed" missing-connection card per item, with a per-user
-// dismiss. A user who doesn't intend to wire up a given connection can hide its
-// nag; the choice persists in localStorage (no server round-trip, matches the
-// sidebar-nav / docs-nav persistence pattern). Dismissals are keyed by the
-// connection identity (source:toolkit:name), so a brand-new missing connection
-// still shows.
+// The sidebar "Action needed" section. Owns its own visibility: the header only
+// renders when there's ACTUALLY-visible content. That has to be client-side,
+// because the missing-connection cards can be dismissed per-user (localStorage),
+// and a server-side gate on the raw count would leave a lonely "Action needed"
+// header over an empty section once the only items left are all dismissed.
+//
+// `staticContent` (the LLM-key / failing-agent cards) is server-rendered and
+// passed in; `hasStaticContent` says whether it's non-empty.
 
 export type MissingConnectionItem = {
   /** Stable identity = `${source}:${toolkit}:${name}` — also the dismiss key. */
@@ -34,18 +36,21 @@ function loadDismissed(): Set<string> {
   }
 }
 
-export function MissingConnectionCards({
-  items,
+export function ActionNeeded({
+  hasStaticContent,
+  staticContent,
+  missingItems,
 }: {
-  items: MissingConnectionItem[];
+  hasStaticContent: boolean;
+  staticContent: ReactNode;
+  missingItems: MissingConnectionItem[];
 }) {
-  // Hydrate dismissals after mount (localStorage is client-only; reading it in
-  // the initializer would mismatch SSR). `ready` gates the first paint so we
-  // don't briefly flash a card the user already dismissed.
+  // Hydrate dismissals after mount (localStorage is client-only). Until then we
+  // withhold the dismissable cards so a dismissed one never flashes — they
+  // appear on the next tick.
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    // Hydrate from localStorage after mount (client-only).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDismissed(loadDismissed());
     setReady(true);
@@ -63,12 +68,19 @@ export function MissingConnectionCards({
     });
   }
 
-  if (!ready) return null;
-  const visible = items.filter((it) => !dismissed.has(it.key));
+  const visibleMissing = ready
+    ? missingItems.filter((it) => !dismissed.has(it.key))
+    : [];
+  // The whole point: no visible content → no header.
+  if (!hasStaticContent && visibleMissing.length === 0) return null;
 
   return (
-    <>
-      {visible.map((it) => (
+    <div className="mt-6 flex flex-col gap-1.5">
+      <span className="text-foreground-muted px-2 text-sm font-medium uppercase tracking-widest">
+        Action needed
+      </span>
+      {staticContent}
+      {visibleMissing.map((it) => (
         <div
           key={it.key}
           className="flex items-start gap-2 rounded-md bg-[var(--color-sentiment-caution-subtle)] px-2 py-2"
@@ -97,6 +109,6 @@ export function MissingConnectionCards({
           </div>
         </div>
       ))}
-    </>
+    </div>
   );
 }
