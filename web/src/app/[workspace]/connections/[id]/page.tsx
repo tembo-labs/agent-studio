@@ -157,7 +157,8 @@ export default async function ConnectionDetailPage({
   } else if (loaded.kind === "manual-cred") {
     const { provider, fields } = loaded;
     title = provider.displayName;
-    logoSlug = null;
+    // Same logo CDN as the list view (LinkedIn et al.); glyph fallback on 404.
+    logoSlug = provider.slug;
     rows.push({ label: "Type", value: "Manual credential" });
     for (const { field, preview } of fields) {
       rows.push({
