@@ -601,7 +601,12 @@ export type FailingAgentRecent = {
  */
 export async function listFailingAgents24h(
   workspaceId: string,
+  userId: string,
 ): Promise<FailingAgentRecent[]> {
+  // Scoped to the viewer's own runs (created_by) — the sidebar alert is "your
+  // agents are failing", so another member's failures shouldn't nag you. The
+  // owner/acting-user is `created_by` (manual click, or the automation/webhook
+  // owner for triggered runs).
   const { rows } = await db.query<{
     agent_name: string;
     failures: string;
@@ -611,7 +616,7 @@ export async function listFailingAgents24h(
        SELECT DISTINCT ON (agent_name)
               agent_name, status, created_at
          FROM run
-        WHERE workspace_id = $1
+        WHERE workspace_id = $1 AND created_by = $2
         ORDER BY agent_name, created_at DESC
      )
      SELECT r.agent_name,
@@ -621,11 +626,12 @@ export async function listFailingAgents24h(
        JOIN latest_run l
          ON l.agent_name = r.agent_name AND l.status = 'failed'
       WHERE r.workspace_id = $1
+        AND r.created_by = $2
         AND r.status = 'failed'
         AND r.created_at >= NOW() - INTERVAL '24 hours'
       GROUP BY r.agent_name
       ORDER BY failures DESC, last_failure_at DESC`,
-    [workspaceId],
+    [workspaceId, userId],
   );
   return rows.map((r) => ({
     agentName: r.agent_name,
