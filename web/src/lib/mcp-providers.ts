@@ -255,6 +255,11 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     oauthAuthorizationServerOrigins: [],
     instanceUrlTemplate: "https://{instance}/api/metabase-mcp",
     instanceUrlLabel: "Your Metabase URL",
+    // Metabase advertises the refresh_token grant but its scopes_supported is
+    // agent:* + mb:full — NO offline_access. It strictly validates the scope at
+    // the (post-login) authorize step and rejects the auto-appended offline_access
+    // with "invalid_request", so suppress it.
+    omitOfflineAccess: true,
   },
   gmail: {
     slug: "gmail",
