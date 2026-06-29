@@ -3,8 +3,6 @@ import "server-only";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 
-import type { McpProvider } from "@/lib/mcp-providers";
-
 const privateIpBlocks = new BlockList();
 
 privateIpBlocks.addSubnet("0.0.0.0", 8, "ipv4");
@@ -119,21 +117,27 @@ async function assertPublicDns(url: URL, label: string): Promise<void> {
   }
 }
 
-export async function trustedProviderMcpOrigin(
-  provider: McpProvider,
-): Promise<string> {
-  const url = parseHttpsUrl(provider.mcpServerUrl, "MCP server URL");
+/** Validate an MCP server URL (https + public DNS) and return its origin. The
+ *  URL is the catalog's fixed `mcpServerUrl` for normal providers, or the
+ *  per-connection resolved URL for instance-based (self-hosted) ones. */
+export async function trustedMcpOrigin(mcpServerUrl: string): Promise<string> {
+  const url = parseHttpsUrl(mcpServerUrl, "MCP server URL");
   await assertPublicDns(url, "MCP server URL");
   return url.origin;
 }
 
+/** Validate an OAuth endpoint URL against an explicit set of allowed origins
+ *  (https + origin-allowlist + public DNS). For fixed providers the caller
+ *  passes the catalog's `oauthAuthorizationServerOrigins`; for instance-based
+ *  providers it passes `[the user-entered instance origin]` — a same-origin
+ *  constraint (every endpoint must live on the host the operator typed). */
 export async function trustedOAuthUrl(
   rawUrl: string,
-  provider: McpProvider,
+  allowedOrigins: string[],
   label: string,
 ): Promise<URL> {
   const url = parseHttpsUrl(rawUrl, label);
-  if (!provider.oauthAuthorizationServerOrigins.includes(url.origin)) {
+  if (!allowedOrigins.includes(url.origin)) {
     throw new Error(`${label} is not on an allowed provider origin.`);
   }
   await assertPublicDns(url, label);

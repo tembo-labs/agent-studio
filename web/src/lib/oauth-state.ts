@@ -83,6 +83,10 @@ export type NativeMcpStatePayload = {
    *  callback decrypts it for the token exchange and persists it (encrypted) on
    *  the connection so refresh can present it. Never plaintext in the URL. */
   clientSecretCiphertext?: string;
+  /** Instance-based providers only: the per-connection MCP server URL resolved
+   *  from the operator-entered host. The callback stores it on the row (the
+   *  catalog `mcpServerUrl` is empty) and trusts its origin (same-origin OAuth). */
+  mcpServerUrl?: string;
   /** Short random nonce — defends against state replay across users. */
   nonce: string;
   /** Issued-at (epoch ms); states older than STATE_TTL_MS are rejected (#46). */

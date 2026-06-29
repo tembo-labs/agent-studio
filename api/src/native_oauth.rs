@@ -257,7 +257,11 @@ async fn refresh_one(
         }
     };
 
-    let token_endpoint = discover_token_endpoint(http, mcp_url).await?;
+    let instance_based = metadata
+        .get("instance_based")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let token_endpoint = discover_token_endpoint(http, mcp_url, instance_based).await?;
 
     let mut form: Vec<(&str, &str)> = vec![
         ("grant_type", "refresh_token"),
@@ -399,13 +403,22 @@ async fn native_oauth_client_secret(
 async fn discover_token_endpoint(
     http: &reqwest::Client,
     mcp_url: &str,
+    instance_based: bool,
 ) -> anyhow::Result<reqwest::Url> {
     let mcp_url = parse_trusted_https_url(mcp_url, "mcp_server_url")?;
     assert_public_endpoint_host(&mcp_url, "mcp_server_url").await?;
     let origin = mcp_url.origin().ascii_serialization();
-    let allowed_oauth_origins = allowed_oauth_origins_for_mcp_origin(&origin).ok_or_else(|| {
-        anyhow!("mcp_server_url origin is not in the native-MCP provider allowlist")
-    })?;
+    // Fixed providers: compile-time allowlist. Instance-based (self-hosted, e.g.
+    // Metabase): same-origin — OAuth endpoints must live on the connection's own
+    // origin (validated at Connect time; still SSRF-guarded above + below).
+    let instance_origins = [origin.as_str()];
+    let allowed_oauth_origins: &[&str] = if instance_based {
+        &instance_origins
+    } else {
+        allowed_oauth_origins_for_mcp_origin(&origin).ok_or_else(|| {
+            anyhow!("mcp_server_url origin is not in the native-MCP provider allowlist")
+        })?
+    };
 
     // RFC 9728: protected-resource metadata lives at the origin — but some
     // servers (Gmail) serve it only PATH-SUFFIXED with the resource path and
