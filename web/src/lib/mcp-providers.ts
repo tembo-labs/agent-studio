@@ -26,6 +26,7 @@ export type McpProviderSlug =
   | "amplemarket"
   | "clay"
   | "avoma"
+  | "metabase"
   | "gmail"
   | "tembo-agent-studio";
 
@@ -88,6 +89,19 @@ export type McpProvider = {
    * ops (Attio: no record/note/delete scopes). Plain text.
    */
   auxKeyHint?: string;
+  /**
+   * Set for INSTANCE-BASED providers whose MCP server is self-hosted, so the
+   * host isn't a fixed constant — the user supplies it at Connect time. The
+   * template's `{instance}` is replaced with the user's host to form the MCP
+   * URL (e.g. Metabase: `https://{instance}/api/metabase-mcp`). For these,
+   * `mcpServerUrl`/`oauthAuthorizationServerOrigins` are empty: the per-connection
+   * URL is resolved + stored on the row, and OAuth trust is same-origin (every
+   * discovered endpoint must share the user-entered origin) rather than a fixed
+   * allowlist. Still SSRF-guarded (https + public-DNS, same as other providers).
+   */
+  instanceUrlTemplate?: string;
+  /** UI hint for the instance-URL field on instance-based providers. */
+  instanceUrlLabel?: string;
 };
 
 export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
@@ -228,6 +242,20 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
       "external_api:engagement-list",
     ],
   },
+  metabase: {
+    slug: "metabase",
+    displayName: "Metabase",
+    // Instance-based: Metabase is self-hosted, so the MCP server is the user's
+    // own instance + the fixed path /api/metabase-mcp. Metabase runs its OWN
+    // embedded OAuth (DCR, same-origin), scoped to the connecting person's
+    // permissions — so it slots into the DCR / confidential-DCR path; trust is
+    // same-origin (the user's instance), not a fixed allowlist.
+    // Docs: https://www.metabase.com/docs/latest/ai/mcp
+    mcpServerUrl: "",
+    oauthAuthorizationServerOrigins: [],
+    instanceUrlTemplate: "https://{instance}/api/metabase-mcp",
+    instanceUrlLabel: "Your Metabase URL",
+  },
   gmail: {
     slug: "gmail",
     displayName: "Gmail",
@@ -288,6 +316,41 @@ export function isDcrProvider(provider: McpProvider | null | undefined): boolean
     provider.authMode !== "manual" &&
     provider.authMode !== "self-key"
   );
+}
+
+/** Instance-based providers (self-hosted; user supplies the host at Connect). */
+export function isInstanceProvider(
+  provider: McpProvider | null | undefined,
+): boolean {
+  return !!provider?.instanceUrlTemplate;
+}
+
+/**
+ * Resolve an instance-based provider's MCP URL from the user's input. Takes the
+ * origin of whatever they entered (bare host or full URL) and applies the
+ * template's fixed path. Returns null if the input can't be parsed as a URL.
+ * https-ness / public-IP are enforced later by the OAuth security layer.
+ */
+export function resolveInstanceMcpUrl(
+  provider: McpProvider,
+  input: string,
+): string | null {
+  if (!provider.instanceUrlTemplate) return null;
+  const raw = input.trim();
+  if (!raw) return null;
+  let origin: string;
+  try {
+    const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    origin = new URL(withScheme).origin;
+  } catch {
+    return null;
+  }
+  // Everything in the template after `https://{instance}` is the fixed path.
+  const path = provider.instanceUrlTemplate.replace(
+    /^https?:\/\/\{instance\}/i,
+    "",
+  );
+  return `${origin}${path}`;
 }
 
 /**

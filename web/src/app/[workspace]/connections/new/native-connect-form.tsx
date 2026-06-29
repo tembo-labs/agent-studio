@@ -13,23 +13,54 @@ export function NativeConnectForm({
   workspaceSlug,
   providerSlug,
   selfKey = false,
+  instanceUrlLabel,
 }: {
   workspaceSlug: string;
   providerSlug: string;
   selfKey?: boolean;
+  /** Set for instance-based (self-hosted) providers — shows a required URL
+   *  field and passes it as `?base=` to the authorize flow. */
+  instanceUrlLabel?: string;
 }) {
   const [name, setName] = useState("default");
+  const [base, setBase] = useState("");
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const params = new URLSearchParams({ workspace: workspaceSlug });
     const trimmed = name.trim().toLowerCase();
     if (trimmed && trimmed !== "default") params.set("name", trimmed);
+    if (instanceUrlLabel) {
+      const b = base.trim();
+      if (!b) return;
+      params.set("base", b);
+    }
     window.location.href = `/api/connections/native/${providerSlug}/authorize?${params.toString()}`;
   }
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      {instanceUrlLabel && (
+        <div className="grid gap-1.5">
+          <Label htmlFor="native-base" className="text-sm">
+            {instanceUrlLabel}
+          </Label>
+          <Input
+            id="native-base"
+            name="base"
+            type="url"
+            required
+            autoComplete="off"
+            spellCheck={false}
+            value={base}
+            onChange={(e) => setBase(e.target.value)}
+            placeholder="https://metabase.your-company.com"
+          />
+          <p className="text-foreground-muted text-sm">
+            Your self-hosted instance. You&apos;ll authenticate against it next.
+          </p>
+        </div>
+      )}
       {!selfKey && (
         <div className="grid gap-1.5">
           <Label htmlFor="native-name" className="text-sm">

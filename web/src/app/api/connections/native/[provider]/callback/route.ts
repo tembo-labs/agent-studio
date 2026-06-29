@@ -121,11 +121,17 @@ export async function GET(
     scope?: string;
     token_type?: string;
   };
+  // Instance-based providers carry their resolved per-connection URL in the
+  // state (catalog mcpServerUrl is empty); trust is same-origin to that host.
+  const mcpServerUrl = state.mcpServerUrl ?? provider.mcpServerUrl;
+  const allowedOauthOrigins = state.mcpServerUrl
+    ? [new URL(state.mcpServerUrl).origin]
+    : provider.oauthAuthorizationServerOrigins;
   let tokenEndpoint: URL;
   try {
     tokenEndpoint = await trustedOAuthUrl(
       state.tokenEndpoint,
-      provider,
+      allowedOauthOrigins,
       "Token endpoint",
     );
   } catch (e) {
@@ -238,7 +244,7 @@ export async function GET(
     userId: state.userId,
     type: provider.slug as McpProviderSlug,
     name: state.connectionName,
-    mcpServerUrl: provider.mcpServerUrl,
+    mcpServerUrl,
     authType: "oauth2",
     credentials: {
       access_token: tokenJson.access_token,
@@ -259,8 +265,8 @@ export async function GET(
     //  - dcr_confidential: auth_mode → refresh reads client_id/secret from the
     //    credentials blob (above) and uses Basic.
     //  - dcr (public): just the registered client_id, no secret.
-    metadata:
-      state.authMode === "manual"
+    metadata: {
+      ...(state.authMode === "manual"
         ? {
             auth_mode: "manual",
             client_id: state.clientId,
@@ -268,7 +274,11 @@ export async function GET(
           }
         : state.authMode === "dcr_confidential"
           ? { auth_mode: "dcr_confidential", dcr_client_id: state.clientId }
-          : { dcr_client_id: state.clientId },
+          : { dcr_client_id: state.clientId }),
+      // Instance-based: tell the Rust refresh to trust this connection's own
+      // (same-origin) endpoints rather than the fixed compile-time allowlist.
+      ...(state.mcpServerUrl ? { instance_based: true } : {}),
+    },
   });
 
   await writeAuditEvent({
@@ -293,7 +303,7 @@ export async function GET(
   // render). Just log so a recurring failure is visible.
   try {
     const tools = await fetchNativeMcpTools(
-      provider.mcpServerUrl,
+      mcpServerUrl,
       tokenJson.access_token,
     );
     await replaceToolsForConnection({

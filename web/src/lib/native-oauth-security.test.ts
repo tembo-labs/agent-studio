@@ -1,14 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { isPublicIpAddress, trustedOAuthUrl } from "./native-oauth-security";
-import type { McpProvider } from "./mcp-providers";
 
-const provider: McpProvider = {
-  slug: "attio",
-  displayName: "Attio",
-  mcpServerUrl: "https://mcp.attio.com/mcp",
-  oauthAuthorizationServerOrigins: ["https://app.attio.com"],
-};
+const allowed = ["https://app.attio.com"];
 
 describe("native OAuth URL trust checks", () => {
   it("rejects non-public IP literals", () => {
@@ -25,33 +19,31 @@ describe("native OAuth URL trust checks", () => {
     expect(isPublicIpAddress("2606:4700:4700::1111")).toBe(true);
   });
 
-  it("requires discovered OAuth endpoints to stay on the provider allowlist", async () => {
+  it("requires discovered OAuth endpoints to stay on the allowed origins", async () => {
     await expect(
-      trustedOAuthUrl("https://app.attio.com/oidc/token", provider, "Token"),
+      trustedOAuthUrl("https://app.attio.com/oidc/token", allowed, "Token"),
     ).resolves.toMatchObject({ origin: "https://app.attio.com" });
 
     await expect(
-      trustedOAuthUrl("https://evil.example/oidc/token", provider, "Token"),
+      trustedOAuthUrl("https://evil.example/oidc/token", allowed, "Token"),
     ).rejects.toThrow(/allowed provider origin/);
   });
 
   it("rejects http and private-address endpoints before fetch", async () => {
     await expect(
-      trustedOAuthUrl("http://app.attio.com/oidc/token", provider, "Token"),
+      trustedOAuthUrl("http://app.attio.com/oidc/token", allowed, "Token"),
     ).rejects.toThrow(/https/);
 
     await expect(
-      trustedOAuthUrl("https://169.254.169.254/token", {
-        ...provider,
-        oauthAuthorizationServerOrigins: ["https://169.254.169.254"],
-      }, "Token"),
+      trustedOAuthUrl(
+        "https://169.254.169.254/token",
+        ["https://169.254.169.254"],
+        "Token",
+      ),
     ).rejects.toThrow(/non-public IP/);
 
     await expect(
-      trustedOAuthUrl("https://[::1]/token", {
-        ...provider,
-        oauthAuthorizationServerOrigins: ["https://[::1]"],
-      }, "Token"),
+      trustedOAuthUrl("https://[::1]/token", ["https://[::1]"], "Token"),
     ).rejects.toThrow(/non-public IP/);
   });
 });

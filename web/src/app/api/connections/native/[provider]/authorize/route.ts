@@ -12,7 +12,9 @@ import {
 } from "@/lib/connections";
 import {
   getMcpProvider,
+  isInstanceProvider,
   redirectUriFor,
+  resolveInstanceMcpUrl,
   tasMcpServerUrl,
   type McpProvider,
   type McpProviderSlug,
@@ -21,8 +23,8 @@ import { fetchNativeMcpTools } from "@/lib/native-mcp-tools";
 import { replaceToolsForConnection } from "@/lib/mcp-tools";
 import {
   noRedirectFetchInit,
+  trustedMcpOrigin,
   trustedOAuthUrl,
-  trustedProviderMcpOrigin,
 } from "@/lib/native-oauth-security";
 import {
   DEFAULT_INSTANCE,
@@ -238,10 +240,29 @@ export async function GET(
     return connectSelfKey(provider, workspace, userId, connectionName);
   }
 
+  // Resolve the MCP server URL. Fixed providers use the catalog constant;
+  // instance-based (self-hosted, e.g. Metabase) take the host the operator
+  // entered (?base=…) and apply the template — so the URL is per-connection.
+  let mcpServerUrl: string;
+  if (isInstanceProvider(provider)) {
+    const baseRaw = request.nextUrl.searchParams.get("base") ?? "";
+    const resolved = resolveInstanceMcpUrl(provider, baseRaw);
+    if (!resolved) {
+      return back(
+        workspace.slug,
+        provider.slug,
+        `Enter your ${provider.displayName} URL (e.g. https://metabase.example.com).`,
+      );
+    }
+    mcpServerUrl = resolved;
+  } else {
+    mcpServerUrl = provider.mcpServerUrl;
+  }
+
   // ── Step 1: protected-resource discovery ────────────────────────
   let mcpOrigin: string;
   try {
-    mcpOrigin = await trustedProviderMcpOrigin(provider);
+    mcpOrigin = await trustedMcpOrigin(mcpServerUrl);
   } catch (e) {
     return back(
       workspace.slug,
@@ -249,11 +270,18 @@ export async function GET(
       `Provider MCP URL is not trusted: ${(e as Error).message}`,
     );
   }
+  // OAuth endpoint trust: fixed providers use the catalog allowlist; instance-
+  // based providers trust the user's own origin (same-origin — every discovered
+  // endpoint must live on the host they typed). SSRF guards (https + public DNS)
+  // apply either way, inside trustedOAuthUrl.
+  const allowedOauthOrigins = isInstanceProvider(provider)
+    ? [mcpOrigin]
+    : provider.oauthAuthorizationServerOrigins;
   // RFC 9728 metadata lives at the origin, but some servers (Gmail) only serve
   // it PATH-SUFFIXED with the resource's path (…/oauth-protected-resource/mcp/v1)
   // and 404 at the bare origin. Try the origin first (all current providers),
-  // then the path-suffixed form derived from the catalog MCP URL.
-  const resourcePath = new URL(provider.mcpServerUrl).pathname.replace(/\/+$/, "");
+  // then the path-suffixed form derived from the MCP URL.
+  const resourcePath = new URL(mcpServerUrl).pathname.replace(/\/+$/, "");
   const prCandidates = [`${mcpOrigin}/.well-known/oauth-protected-resource`];
   if (resourcePath && resourcePath !== "/") {
     prCandidates.push(
@@ -293,7 +321,7 @@ export async function GET(
   try {
     authServerUrl = await trustedOAuthUrl(
       authServerUrlRaw,
-      provider,
+      allowedOauthOrigins,
       "Authorization server URL",
     );
   } catch (e) {
@@ -369,12 +397,12 @@ export async function GET(
   try {
     authorizationEndpoint = await trustedOAuthUrl(
       asMeta.authorization_endpoint,
-      provider,
+      allowedOauthOrigins,
       "Authorization endpoint",
     );
     tokenEndpoint = await trustedOAuthUrl(
       asMeta.token_endpoint,
-      provider,
+      allowedOauthOrigins,
       "Token endpoint",
     );
   } catch (e) {
@@ -432,7 +460,7 @@ export async function GET(
     try {
       registrationEndpoint = await trustedOAuthUrl(
         asMeta.registration_endpoint as string,
-        provider,
+        allowedOauthOrigins,
         "Registration endpoint",
       );
     } catch (e) {
@@ -518,6 +546,9 @@ export async function GET(
     tokenEndpoint: tokenEndpoint.toString(),
     authMode: isManual ? "manual" : confidentialDcr ? "dcr_confidential" : "dcr",
     ...(isManual ? { instance } : {}),
+    // Instance-based: persist the resolved per-connection URL so the callback
+    // stores it (and validates same-origin) — provider.mcpServerUrl is empty.
+    ...(isInstanceProvider(provider) ? { mcpServerUrl } : {}),
     // Carry the DCR-issued client_secret to the callback ENCRYPTED (state is
     // signed but readable, and round-trips through the provider). AAD-bound to
     // this connection so the ciphertext is useless elsewhere.

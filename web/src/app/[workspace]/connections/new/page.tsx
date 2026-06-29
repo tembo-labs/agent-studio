@@ -145,6 +145,11 @@ export default async function NewConnectionPage({
             workspaceSlug={workspace.slug}
             providerSlug={provider.slug}
             selfKey={provider.authMode === "self-key"}
+            instanceUrlLabel={
+              provider.instanceUrlTemplate
+                ? (provider.instanceUrlLabel ?? "Instance URL")
+                : undefined
+            }
           />
         )}
       </FormShell>
