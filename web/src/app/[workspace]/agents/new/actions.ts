@@ -15,6 +15,9 @@ import {
   type CapError,
 } from "@/lib/cap-api";
 import { buildPromptConnectionContext } from "@/lib/prompt-connections";
+import { createAutomation } from "@/lib/automations-api";
+import { validateCron } from "@/lib/cron";
+import { parseScheduleToCron } from "@/lib/schedule-parse";
 import {
   createImprovement,
   improvementMarker,
@@ -52,8 +55,43 @@ export type ChatCreateFormState = {
     status: string;
     agentName: string;
     agentPath: string;
+    /** Set when the description named a schedule and we auto-created an
+     *  enabled automation for the new agent. */
+    schedule?: { cron: string; humanReadable: string };
   };
 };
+
+// If the description names a recurring schedule, create an enabled automation
+// for the new agent so it starts running on its own. Best-effort: any failure
+// (bad cron, DB error) is swallowed so it never blocks agent creation. The
+// automation references the agent by name — in PR mode the agent file lands
+// later, and the scheduler simply records a skip until it exists.
+async function maybeScheduleNewAgent(args: {
+  workspaceId: string;
+  agentName: string;
+  displayName: string;
+  description: string;
+  userId: string;
+}): Promise<{ cron: string; humanReadable: string } | undefined> {
+  const parsed = parseScheduleToCron(args.description);
+  if (!parsed) return undefined;
+  const check = validateCron(parsed.cron);
+  if (!check.ok) return undefined;
+  try {
+    await createAutomation({
+      workspaceId: args.workspaceId,
+      name: `${args.displayName} schedule`,
+      agentName: args.agentName,
+      cron: parsed.cron,
+      inputMessage: "",
+      enabled: true,
+      userId: args.userId,
+    });
+    return { cron: parsed.cron, humanReadable: check.humanReadable };
+  } catch {
+    return undefined;
+  }
+}
 
 export async function createFromChatAction(
   _prev: ChatCreateFormState,
@@ -182,6 +220,14 @@ export async function createFromChatAction(
     });
   }
 
+  const schedule = await maybeScheduleNewAgent({
+    workspaceId: workspace.id,
+    agentName: agentSlug,
+    displayName,
+    description,
+    userId,
+  });
+
   return {
     success: {
       improvementId: row.id,
@@ -190,6 +236,7 @@ export async function createFromChatAction(
       status: res.result.status,
       agentName: displayName,
       agentPath,
+      ...(schedule ? { schedule } : {}),
     },
   };
 }
