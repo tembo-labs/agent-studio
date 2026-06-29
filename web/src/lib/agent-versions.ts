@@ -229,6 +229,20 @@ export async function getAgentOwner(
     : null;
 }
 
+/** Owner of every agent that has one, as agent_name → owner_user_id. Used by the
+ *  dashboard to tally agents-owned per member (and what's left unowned). Rows can
+ *  outlive a deleted agent, so callers should intersect with the live agent list
+ *  rather than trusting the row set as the agent inventory. */
+export async function listAgentOwners(
+  workspaceId: string,
+): Promise<Map<string, string>> {
+  const { rows } = await db.query<{ agent_name: string; owner_user_id: string }>(
+    `SELECT agent_name, owner_user_id FROM agent_owner WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  return new Map(rows.map((r) => [r.agent_name, r.owner_user_id]));
+}
+
 /** Agent names this user owns in the workspace — for the "owned + starred"
  *  default in the agents list. */
 export async function listOwnedAgentNames(
