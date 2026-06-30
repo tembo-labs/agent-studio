@@ -1,0 +1,23 @@
+{
+  "id": "resume-summary",
+  "title": "Resume summary",
+  "task": "Summarize candidates for reviewers",
+  "workArea": "HR / People",
+  "buildOrder": 7,
+  "archetype": "Summarize & Digest",
+  "categories": [
+    "ats"
+  ],
+  "labels": [
+    "Summarize & Digest"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 2,
+  "score": 0,
+  "sizeFit": "Mid-market+",
+  "verticalFit": "Universal",
+  "connectionSummary": "ATS read",
+  "notes": "Keep assistive and human-decided; bias and PII risk",
+  "prompt": "ROLE: Resume summary. Summarize candidates for reviewers.\n ARCHETYPE: Summarize & Digest (Aggregate sources into a concise, skimmable summary. Read-only.)\n TRIGGER: Schedule or on the source event.\n READ / INPUT: The sources for the window (read-only). [this agent: ATS read]\n LOGIC: Pull the relevant items, extract what matters, and compose a concise summary; lead with what changed or needs attention.\n OUTPUT: Post the summary to the destination. [this agent: ATS read]\n GUARDRAILS: Read-only; attribute or link sources; do not editorialize beyond the data; keep it short.\n HUMAN-IN-LOOP: Reads and decides.\n DONE WHEN: Summary delivered."
+}

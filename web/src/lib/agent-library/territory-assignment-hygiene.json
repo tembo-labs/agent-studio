@@ -1,0 +1,22 @@
+{
+  "id": "territory-assignment-hygiene",
+  "title": "Territory / assignment hygiene",
+  "task": "Flag unassigned or misrouted accounts",
+  "workArea": "RevOps / Operations",
+  "buildOrder": 7,
+  "archetype": "Hygiene & Flag",
+  "categories": [
+    "crm"
+  ],
+  "labels": [
+    "Hygiene & Flag"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 1,
+  "score": 1,
+  "sizeFit": "All",
+  "verticalFit": "Universal",
+  "connectionSummary": "CRM read",
+  "prompt": "ROLE: Territory / assignment hygiene. Flag unassigned or misrouted accounts.\n ARCHETYPE: Hygiene & Flag (Scan records for a quality condition; flag offenders for review. Never auto-fix.)\n TRIGGER: Scheduled scan.\n READ / INPUT: The records to scan (read-only). [this agent: CRM read]\n LOGIC: Scan for the defined quality condition. Collect each offending record with the reason it was flagged.\n OUTPUT: Write findings to a tasks/review inbox or notify the owner. Never auto-correct. [this agent: CRM read]\n GUARDRAILS: Flag, do not fix. VERIFY each finding against the actual record before flagging; NEVER synthesize a record. Cap volume per run; summarize if large.\n HUMAN-IN-LOOP: A person reviews and resolves each flag.\n DONE WHEN: Findings posted for review."
+}

@@ -1,0 +1,23 @@
+{
+  "id": "offer-letter-doc-generator",
+  "title": "Offer-letter / doc generator",
+  "task": "Generate offer and onboarding docs from a template",
+  "workArea": "HR / People",
+  "buildOrder": 9,
+  "archetype": "Draft",
+  "categories": [
+    "docs",
+    "hris"
+  ],
+  "labels": [
+    "Draft"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 2,
+  "score": 0,
+  "sizeFit": "Mid-market+",
+  "verticalFit": "Universal",
+  "connectionSummary": "Template + HRIS",
+  "prompt": "ROLE: Offer-letter / doc generator. Generate offer and onboarding docs from a template.\n ARCHETYPE: Draft (Assemble context and produce a draft for human review. Never send.)\n TRIGGER: On request or on the triggering event.\n READ / INPUT: The context sources. [this agent: Template + HRIS]\n LOGIC: Assemble the relevant context and generate a draft in the expected format and tone. Link the source facts used.\n OUTPUT: Produce a DRAFT for human review; never send, publish, or finalize automatically. [this agent: Template + HRIS]\n GUARDRAILS: Draft-only. Do NOT fabricate facts, figures, or quotes; if a needed fact is missing, flag the gap rather than invent it. Keep client- and audit-facing drafts conservative.\n HUMAN-IN-LOOP: A person reviews, edits, and sends.\n DONE WHEN: Draft delivered to the owner."
+}

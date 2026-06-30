@@ -1,0 +1,25 @@
+{
+  "id": "manual-stock-capture",
+  "title": "Manual stock capture",
+  "task": "Staff message 'received 40 of SKU-123'; structure it into a record",
+  "workArea": "Inventory / Supply",
+  "buildOrder": 5,
+  "archetype": "Capture & Structure",
+  "categories": [
+    "email",
+    "forms",
+    "ims"
+  ],
+  "labels": [
+    "Capture & Structure"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 1,
+  "score": 1,
+  "sizeFit": "All",
+  "verticalFit": "CPG",
+  "connectionSummary": "Chat/email/form to record",
+  "notes": "For businesses with NO system. Creates the data layer as a byproduct",
+  "prompt": "ROLE: Manual stock capture. Staff message 'received 40 of SKU-123'; structure it into a record.\n ARCHETYPE: Capture & Structure (Turn unstructured human input into a structured record. Ask, do not guess.)\n TRIGGER: On inbound human input (message, email, photo, or form).\n READ / INPUT: The raw human input. [this agent: Chat/email/form to record]\n LOGIC: Extract the relevant fields, normalize to the target schema, and confirm ambiguous values back to the submitter rather than guessing.\n OUTPUT: Write a structured record to the target; stage as DRAFT/unconfirmed when the field is consequential. [this agent: Chat/email/form to record]\n GUARDRAILS: NEVER invent values; leave unknowns blank and ask. Echo what was captured back to the submitter. Consequential writes stage for confirmation.\n HUMAN-IN-LOOP: Submitter or owner confirms the captured record.\n DONE WHEN: Structured record created (or staged for confirmation)."
+}

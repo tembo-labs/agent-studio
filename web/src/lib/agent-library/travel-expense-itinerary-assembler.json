@@ -1,0 +1,24 @@
+{
+  "id": "travel-expense-itinerary-assembler",
+  "title": "Travel / expense itinerary assembler",
+  "task": "Compile trip details into one view",
+  "workArea": "Executive / Admin",
+  "buildOrder": 9,
+  "archetype": "Summarize & Digest",
+  "categories": [
+    "calendar",
+    "email",
+    "accounting"
+  ],
+  "labels": [
+    "Summarize & Digest"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 2,
+  "score": 0,
+  "sizeFit": "All",
+  "verticalFit": "Universal",
+  "connectionSummary": "Email/calendar read",
+  "prompt": "ROLE: Travel / expense itinerary assembler. Compile trip details into one view.\n ARCHETYPE: Summarize & Digest (Aggregate sources into a concise, skimmable summary. Read-only.)\n TRIGGER: Schedule or on the source event.\n READ / INPUT: The sources for the window (read-only). [this agent: Email/calendar read]\n LOGIC: Pull the relevant items, extract what matters, and compose a concise summary; lead with what changed or needs attention.\n OUTPUT: Post the summary to the destination. [this agent: Email/calendar read]\n GUARDRAILS: Read-only; attribute or link sources; do not editorialize beyond the data; keep it short.\n HUMAN-IN-LOOP: Reads and decides.\n DONE WHEN: Summary delivered."
+}

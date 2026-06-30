@@ -1,0 +1,26 @@
+{
+  "id": "ad-spend-pacing-alert",
+  "title": "Ad-spend pacing alert",
+  "task": "Alert when ad spend is pacing over or under plan",
+  "workArea": "Marketing",
+  "buildOrder": 9,
+  "archetype": "Monitor & Alert",
+  "categories": [
+    "notify",
+    "accounting",
+    "ads"
+  ],
+  "labels": [
+    "Monitor & Alert",
+    "New idea"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 1,
+  "score": 1,
+  "sizeFit": "All",
+  "verticalFit": "Universal",
+  "connectionSummary": "Ad platform read to Slack",
+  "notes": "NEW. Read + notify",
+  "prompt": "ROLE: Ad-spend pacing alert. Alert when ad spend is pacing over or under plan.\n ARCHETYPE: Monitor & Alert (Watch a source, evaluate a condition, notify an owner. Read-only.)\n TRIGGER: On a schedule or on the source event; re-check each run.\n READ / INPUT: The source system (read-only). [this agent: Ad platform read to Slack]\n LOGIC: Evaluate the watch condition. If met and not already alerted, compose a short, specific alert (what crossed, the record/value, a link).\n OUTPUT: Notify the owner at the destination. Do not write back to the source. [this agent: Ad platform read to Slack]\n GUARDRAILS: Read-only; never modify the source. Deduplicate so the same condition does not re-fire. Give enough context to act without opening the system.\n HUMAN-IN-LOOP: The human decides and acts; the agent only surfaces.\n DONE WHEN: Alert delivered to the owner."
+}

@@ -1,0 +1,25 @@
+{
+  "id": "cross-system-reconciliation-flag",
+  "title": "Cross-system reconciliation flag",
+  "task": "Compare two systems and write mismatches to a tasks inbox",
+  "workArea": "RevOps / Operations",
+  "buildOrder": 4,
+  "archetype": "Reconcile",
+  "categories": [
+    "crm",
+    "enrichment",
+    "tasks-inbox"
+  ],
+  "labels": [
+    "Reconcile"
+  ],
+  "firstWave": false,
+  "impact": 3,
+  "resistance": 2,
+  "score": 1,
+  "sizeFit": "Mid-market+",
+  "verticalFit": "Universal",
+  "connectionSummary": "Two reads (read-only)",
+  "notes": "Attio-Amplemarket pattern",
+  "prompt": "ROLE: Cross-system reconciliation flag. Compare two systems and write mismatches to a tasks inbox.\n ARCHETYPE: Reconcile (Compare two or more sources, surface mismatches. Read-only, verify both sides.)\n TRIGGER: Scheduled run.\n READ / INPUT: The two or more sources (read-only on all). [this agent: Two reads (read-only)]\n LOGIC: Align records across sources on a stable key; identify mismatches, duplicates, or missing counterparts.\n OUTPUT: Write discrepancies to a review inbox with both sides shown. Never auto-resolve. [this agent: Two reads (read-only)]\n GUARDRAILS: Read-only. VERIFY both sides actually exist before reporting a mismatch; NEVER synthesize a record. Show the evidence for each discrepancy.\n HUMAN-IN-LOOP: Reviews and resolves each discrepancy.\n DONE WHEN: Discrepancy report posted."
+}

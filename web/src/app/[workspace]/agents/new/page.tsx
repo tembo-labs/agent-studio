@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
 import { getLibraryAgent } from "@/lib/agent-library";
-import { CATEGORY_META } from "@/lib/connection-categories";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, getWorkspaceRepo } from "@/lib/workspace";
 
@@ -11,25 +10,13 @@ import { NewAgentForm } from "./new-agent-form";
 
 export const dynamic = "force-dynamic";
 
-// Wrap a library starter's terse task line into a prompt the Tembo Coding Agent
-// can expand, naming the connection categories it should use.
+// Pre-fill the form from a library starter: its title + the copy-paste-ready
+// composed build prompt (already archetype-shaped, with role/guardrails).
 function starterDefaults(starterId: string | undefined) {
   if (!starterId) return undefined;
   const agent = getLibraryAgent(starterId);
   if (!agent) return undefined;
-  const cats = agent.categories
-    .filter((c) => !CATEGORY_META[c].builtin)
-    .map((c) => CATEGORY_META[c].label);
-  const connLine = cats.length
-    ? ` It should use my connected ${cats.join(", ").replace(/, ([^,]*)$/, " and $1")}.`
-    : "";
-  const inboxLine = agent.categories.includes("tasks-inbox")
-    ? " Surface results into the Tasks Inbox."
-    : "";
-  return {
-    name: agent.title,
-    description: `${agent.task}.${connLine}${inboxLine}`,
-  };
+  return { name: agent.title, description: agent.prompt };
 }
 
 export default async function NewAgentPage({
