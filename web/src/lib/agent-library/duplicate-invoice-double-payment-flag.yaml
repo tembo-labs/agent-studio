@@ -1,0 +1,30 @@
+id: duplicate-invoice-double-payment-flag
+title: Duplicate-invoice / double-payment flag
+task: Flag duplicate vendor invoices before payment
+workArea: Finance / Accounting
+buildOrder: 2
+archetype: Reconcile
+categories:
+  - notify
+  - payments
+  - accounting
+labels:
+  - Reconcile
+firstWave: false
+impact: 3
+resistance: 2
+score: 1
+sizeFit: Mid-market+
+verticalFit: Universal
+connectionSummary: Accounting read (Slack notify)
+notes: Cost protection. Sensitive read holds it at R2
+prompt: |-
+  ROLE: Duplicate-invoice / double-payment flag. Flag duplicate vendor invoices before payment.
+  ARCHETYPE: Reconcile (Compare two or more sources, surface mismatches. Read-only, verify both sides.)
+  TRIGGER: Scheduled run.
+  READ / INPUT: The two or more sources (read-only on all). [this agent: Accounting read (Slack notify)]
+  LOGIC: Align records across sources on a stable key; identify mismatches, duplicates, or missing counterparts.
+  OUTPUT: Write discrepancies to a review inbox with both sides shown. Never auto-resolve. [this agent: Accounting read (Slack notify)]
+  GUARDRAILS: Read-only. VERIFY both sides actually exist before reporting a mismatch; NEVER synthesize a record. Show the evidence for each discrepancy.
+  HUMAN-IN-LOOP: Reviews and resolves each discrepancy.
+  DONE WHEN: Discrepancy report posted.

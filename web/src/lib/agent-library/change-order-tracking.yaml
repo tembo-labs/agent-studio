@@ -1,0 +1,31 @@
+id: change-order-tracking
+title: Change-order tracking
+task: Flag scope changes and track change orders
+workArea: Professional Services
+buildOrder: 5
+archetype: Monitor & Alert
+categories:
+  - email
+  - ims
+  - psa
+labels:
+  - Monitor & Alert
+  - New idea
+firstWave: false
+impact: 2
+resistance: 2
+score: 0
+sizeFit: All
+verticalFit: Services
+connectionSummary: PSA/email read to flag
+notes: NEW
+prompt: |-
+  ROLE: Change-order tracking. Flag scope changes and track change orders.
+  ARCHETYPE: Monitor & Alert (Watch a source, evaluate a condition, notify an owner. Read-only.)
+  TRIGGER: On a schedule or on the source event; re-check each run.
+  READ / INPUT: The source system (read-only). [this agent: PSA/email read to flag]
+  LOGIC: Evaluate the watch condition. If met and not already alerted, compose a short, specific alert (what crossed, the record/value, a link).
+  OUTPUT: Notify the owner at the destination. Do not write back to the source. [this agent: PSA/email read to flag]
+  GUARDRAILS: Read-only; never modify the source. Deduplicate so the same condition does not re-fire. Give enough context to act without opening the system.
+  HUMAN-IN-LOOP: The human decides and acts; the agent only surfaces.
+  DONE WHEN: Alert delivered to the owner.

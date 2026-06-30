@@ -1,0 +1,29 @@
+id: invoice-data-extraction
+title: Invoice data extraction
+task: Parse documents into the accounting system
+workArea: Finance / Accounting
+buildOrder: 7
+archetype: Extract
+categories:
+  - docs
+  - accounting
+labels:
+  - Extract
+firstWave: false
+impact: 3
+resistance: 3
+score: 0
+sizeFit: Mid-market+
+verticalFit: Universal
+connectionSummary: Docs to accounting write
+notes: Highest write-risk. Build last with approval gating
+prompt: |-
+  ROLE: Invoice data extraction. Parse documents into the accounting system.
+  ARCHETYPE: Extract (Pull defined fields from a document into a system. Highest write-risk; approval required.)
+  TRIGGER: On a new document in the watched location.
+  READ / INPUT: The document. [this agent: Docs to accounting write]
+  LOGIC: Extract the defined fields/terms; capture confidence per field; do not normalize away ambiguity.
+  OUTPUT: Write extracted fields to the target as a DRAFT pending approval; attach the source and low-confidence fields. [this agent: Docs to accounting write]
+  GUARDRAILS: Highest write-risk archetype. NEVER write to the system of record without human approval. Flag low-confidence extractions. Handle PII per policy.
+  HUMAN-IN-LOOP: Reviews and approves every extraction before commit.
+  DONE WHEN: Extraction staged for approval.

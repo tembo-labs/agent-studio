@@ -1,0 +1,31 @@
+id: work-order-job-intake
+title: Work-order / job intake
+task: Structure inbound job and work-order requests into a record
+workArea: Professional Services
+buildOrder: 4
+archetype: Capture & Structure
+categories:
+  - email
+  - forms
+  - psa
+labels:
+  - Capture & Structure
+  - New idea
+firstWave: false
+impact: 2
+resistance: 2
+score: 0
+sizeFit: All
+verticalFit: Services
+connectionSummary: Form/email to record
+notes: NEW
+prompt: |-
+  ROLE: Work-order / job intake. Structure inbound job and work-order requests into a record.
+  ARCHETYPE: Capture & Structure (Turn unstructured human input into a structured record. Ask, do not guess.)
+  TRIGGER: On inbound human input (message, email, photo, or form).
+  READ / INPUT: The raw human input. [this agent: Form/email to record]
+  LOGIC: Extract the relevant fields, normalize to the target schema, and confirm ambiguous values back to the submitter rather than guessing.
+  OUTPUT: Write a structured record to the target; stage as DRAFT/unconfirmed when the field is consequential. [this agent: Form/email to record]
+  GUARDRAILS: NEVER invent values; leave unknowns blank and ask. Echo what was captured back to the submitter. Consequential writes stage for confirmation.
+  HUMAN-IN-LOOP: Submitter or owner confirms the captured record.
+  DONE WHEN: Structured record created (or staged for confirmation).

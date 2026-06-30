@@ -1,0 +1,28 @@
+id: internal-knowledge-q-a
+title: Internal knowledge Q&A
+task: Answer policy and how-to questions over your docs
+workArea: IT / Internal
+buildOrder: 6
+archetype: Knowledge Q&A
+categories:
+  - docs
+labels:
+  - Knowledge Q&A
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: All
+verticalFit: Universal
+connectionSummary: Docs read
+notes: Classic deflection win
+prompt: |-
+  ROLE: Internal knowledge Q&A. Answer policy and how-to questions over your docs.
+  ARCHETYPE: Knowledge Q&A (Answer questions only from approved sources, with citations.)
+  TRIGGER: On a user question.
+  READ / INPUT: The approved knowledge source(s) (read-only). [this agent: Docs read]
+  LOGIC: Answer only from approved sources and cite them. If out of scope, say so and route to a human rather than guessing.
+  OUTPUT: A grounded answer with a citation/link. [this agent: Docs read]
+  GUARDRAILS: No answers beyond the source; never speculate on policy, pricing, security, or legal points; log unanswered questions for the KB-gap process.
+  HUMAN-IN-LOOP: Handles anything out of scope or sensitive.
+  DONE WHEN: Question answered or escalated.

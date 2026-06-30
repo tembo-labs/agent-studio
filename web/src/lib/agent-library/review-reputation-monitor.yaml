@@ -1,0 +1,28 @@
+id: review-reputation-monitor
+title: Review / reputation monitor
+task: New Google or app-store review lands; negatives flagged fast
+workArea: Marketing
+buildOrder: 2
+archetype: Monitor & Alert
+categories:
+  - notify
+labels:
+  - Monitor & Alert
+firstWave: true
+impact: 3
+resistance: 1
+score: 2
+sizeFit: All
+verticalFit: CPG, Services
+connectionSummary: Review source to Slack
+notes: Notify-only; First Wave for local, CPG, and services buyers
+prompt: |-
+  ROLE: Review / reputation monitor. New Google or app-store review lands; negatives flagged fast.
+  ARCHETYPE: Monitor & Alert (Watch a source, evaluate a condition, notify an owner. Read-only.)
+  TRIGGER: On a schedule or on the source event; re-check each run.
+  READ / INPUT: The source system (read-only). [this agent: Review source to Slack]
+  LOGIC: Evaluate the watch condition. If met and not already alerted, compose a short, specific alert (what crossed, the record/value, a link).
+  OUTPUT: Notify the owner at the destination. Do not write back to the source. [this agent: Review source to Slack]
+  GUARDRAILS: Read-only; never modify the source. Deduplicate so the same condition does not re-fire. Give enough context to act without opening the system.
+  HUMAN-IN-LOOP: The human decides and acts; the agent only surfaces.
+  DONE WHEN: Alert delivered to the owner.

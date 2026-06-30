@@ -1,0 +1,28 @@
+id: shadow-it-new-app-flag
+title: Shadow-IT / new-app flag
+task: Flag new SaaS signups on the company domain
+workArea: IT / Internal
+buildOrder: 9
+archetype: Hygiene & Flag
+categories:
+  - email
+  - identity
+labels:
+  - Hygiene & Flag
+firstWave: false
+impact: 2
+resistance: 2
+score: 0
+sizeFit: Mid-market+
+verticalFit: Universal
+connectionSummary: Email/SSO read
+prompt: |-
+  ROLE: Shadow-IT / new-app flag. Flag new SaaS signups on the company domain.
+  ARCHETYPE: Hygiene & Flag (Scan records for a quality condition; flag offenders for review. Never auto-fix.)
+  TRIGGER: Scheduled scan.
+  READ / INPUT: The records to scan (read-only). [this agent: Email/SSO read]
+  LOGIC: Scan for the defined quality condition. Collect each offending record with the reason it was flagged.
+  OUTPUT: Write findings to a tasks/review inbox or notify the owner. Never auto-correct. [this agent: Email/SSO read]
+  GUARDRAILS: Flag, do not fix. VERIFY each finding against the actual record before flagging; NEVER synthesize a record. Cap volume per run; summarize if large.
+  HUMAN-IN-LOOP: A person reviews and resolves each flag.
+  DONE WHEN: Findings posted for review.

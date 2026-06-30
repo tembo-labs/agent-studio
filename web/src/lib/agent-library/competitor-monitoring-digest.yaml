@@ -1,0 +1,28 @@
+id: competitor-monitoring-digest
+title: Competitor-monitoring digest
+task: Scheduled summary of competitor moves to Slack
+workArea: Marketing
+buildOrder: 4
+archetype: Summarize & Digest
+categories:
+  - notify
+  - web
+labels:
+  - Summarize & Digest
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: All
+verticalFit: Universal
+connectionSummary: Web to Slack (read-only)
+prompt: |-
+  ROLE: Competitor-monitoring digest. Scheduled summary of competitor moves to Slack.
+  ARCHETYPE: Summarize & Digest (Aggregate sources into a concise, skimmable summary. Read-only.)
+  TRIGGER: Schedule or on the source event.
+  READ / INPUT: The sources for the window (read-only). [this agent: Web to Slack (read-only)]
+  LOGIC: Pull the relevant items, extract what matters, and compose a concise summary; lead with what changed or needs attention.
+  OUTPUT: Post the summary to the destination. [this agent: Web to Slack (read-only)]
+  GUARDRAILS: Read-only; attribute or link sources; do not editorialize beyond the data; keep it short.
+  HUMAN-IN-LOOP: Reads and decides.
+  DONE WHEN: Summary delivered.

@@ -1,0 +1,29 @@
+id: ticket-triage-and-tagging
+title: Ticket triage and tagging
+task: Classify and route inbound tickets
+workArea: Customer Success / Support
+buildOrder: 1
+archetype: Workflow Trigger
+categories:
+  - helpdesk
+  - email
+labels:
+  - Workflow Trigger
+firstWave: true
+impact: 3
+resistance: 1
+score: 2
+sizeFit: All
+verticalFit: Universal
+connectionSummary: Helpdesk inbox
+notes: Canonical first agent; the 40-plus-hours-a-month win
+prompt: |-
+  ROLE: Ticket triage and tagging. Classify and route inbound tickets.
+  ARCHETYPE: Workflow Trigger (On an event, route and fire a defined set of steps. One workflow only.)
+  TRIGGER: On the defined event (record created, stage changed, status set).
+  READ / INPUT: The triggering record and the routing rules. [this agent: Helpdesk inbox]
+  LOGIC: Determine the correct destination/owner and the steps to fire (create records/tasks, set fields, notify). Stay within this one workflow.
+  OUTPUT: Create the records/tasks and notify the owner. Privileged steps (access, money, external messages) stage for approval. [this agent: Helpdesk inbox]
+  GUARDRAILS: Act only on the defined event; be idempotent (no double-firing). Privileged or irreversible steps require human approval. Log every action.
+  HUMAN-IN-LOOP: Approves privileged steps; owns the outcome.
+  DONE WHEN: Steps completed or staged for approval.

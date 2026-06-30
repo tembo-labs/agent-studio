@@ -1,0 +1,29 @@
+id: contract-document-intake
+title: Contract / document intake
+task: A new file lands in storage; extract key terms and write them to a record
+workArea: Docs / Legal
+buildOrder: 4
+archetype: Extract
+categories:
+  - crm
+  - storage
+labels:
+  - Extract
+firstWave: false
+impact: 2
+resistance: 3
+score: -1
+sizeFit: Mid-market+
+verticalFit: SaaS, Services
+connectionSummary: Storage + webhook + CRM write
+notes: Generalized sibling of invoice extraction. Sensitive, later-wave
+prompt: |-
+  ROLE: Contract / document intake. A new file lands in storage; extract key terms and write them to a record.
+  ARCHETYPE: Extract (Pull defined fields from a document into a system. Highest write-risk; approval required.)
+  TRIGGER: On a new document in the watched location.
+  READ / INPUT: The document. [this agent: Storage + webhook + CRM write]
+  LOGIC: Extract the defined fields/terms; capture confidence per field; do not normalize away ambiguity.
+  OUTPUT: Write extracted fields to the target as a DRAFT pending approval; attach the source and low-confidence fields. [this agent: Storage + webhook + CRM write]
+  GUARDRAILS: Highest write-risk archetype. NEVER write to the system of record without human approval. Flag low-confidence extractions. Handle PII per policy.
+  HUMAN-IN-LOOP: Reviews and approves every extraction before commit.
+  DONE WHEN: Extraction staged for approval.

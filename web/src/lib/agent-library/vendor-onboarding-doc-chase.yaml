@@ -1,0 +1,28 @@
+id: vendor-onboarding-doc-chase
+title: Vendor onboarding doc chase
+task: Chase missing vendor docs (W-9, banking)
+workArea: Finance / Accounting
+buildOrder: 11
+archetype: Monitor & Alert
+categories:
+  - email
+  - docs
+labels:
+  - Monitor & Alert
+firstWave: false
+impact: 2
+resistance: 2
+score: 0
+sizeFit: All
+verticalFit: Universal
+connectionSummary: Email + record
+prompt: |-
+  ROLE: Vendor onboarding doc chase. Chase missing vendor docs (W-9, banking).
+  ARCHETYPE: Monitor & Alert (Watch a source, evaluate a condition, notify an owner. Read-only.)
+  TRIGGER: On a schedule or on the source event; re-check each run.
+  READ / INPUT: The source system (read-only). [this agent: Email + record]
+  LOGIC: Evaluate the watch condition. If met and not already alerted, compose a short, specific alert (what crossed, the record/value, a link).
+  OUTPUT: Notify the owner at the destination. Do not write back to the source. [this agent: Email + record]
+  GUARDRAILS: Read-only; never modify the source. Deduplicate so the same condition does not re-fire. Give enough context to act without opening the system.
+  HUMAN-IN-LOOP: The human decides and acts; the agent only surfaces.
+  DONE WHEN: Alert delivered to the owner.

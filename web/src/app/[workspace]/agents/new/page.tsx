@@ -12,9 +12,9 @@ export const dynamic = "force-dynamic";
 
 // Pre-fill the form from a library starter: its title + the copy-paste-ready
 // composed build prompt (already archetype-shaped, with role/guardrails).
-function starterDefaults(starterId: string | undefined) {
+async function starterDefaults(starterId: string | undefined) {
   if (!starterId) return undefined;
-  const agent = getLibraryAgent(starterId);
+  const agent = await getLibraryAgent(starterId);
   if (!agent) return undefined;
   return { name: agent.title, description: agent.prompt };
 }
@@ -42,7 +42,7 @@ export default async function NewAgentPage({
     redirect(`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`);
   }
 
-  const defaults = starterDefaults(starterId);
+  const defaults = await starterDefaults(starterId);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-8">

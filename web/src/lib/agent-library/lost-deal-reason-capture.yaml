@@ -1,0 +1,28 @@
+id: lost-deal-reason-capture
+title: Lost-deal reason capture
+task: On closed-lost, prompt the rep for the reason and log it
+workArea: Sales / SDR
+buildOrder: 7
+archetype: Capture & Structure
+categories:
+  - crm
+labels:
+  - Capture & Structure
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: All
+verticalFit: Universal
+connectionSummary: CRM write
+notes: Capture pattern; builds win-loss data over time
+prompt: |-
+  ROLE: Lost-deal reason capture. On closed-lost, prompt the rep for the reason and log it.
+  ARCHETYPE: Capture & Structure (Turn unstructured human input into a structured record. Ask, do not guess.)
+  TRIGGER: On inbound human input (message, email, photo, or form).
+  READ / INPUT: The raw human input. [this agent: CRM write]
+  LOGIC: Extract the relevant fields, normalize to the target schema, and confirm ambiguous values back to the submitter rather than guessing.
+  OUTPUT: Write a structured record to the target; stage as DRAFT/unconfirmed when the field is consequential. [this agent: CRM write]
+  GUARDRAILS: NEVER invent values; leave unknowns blank and ask. Echo what was captured back to the submitter. Consequential writes stage for confirmation.
+  HUMAN-IN-LOOP: Submitter or owner confirms the captured record.
+  DONE WHEN: Structured record created (or staged for confirmation).
