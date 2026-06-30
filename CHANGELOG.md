@@ -14,6 +14,58 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.6.29] — More MCP providers + confidential/instance connect, Clerk triggers, schedule-from-description, graceful drain — shipped 2026-06-30
+
+### Added
+- **Four more native MCP providers.** Amplemarket, Clay, Avoma, and Metabase
+  join the native-MCP catalog and connect in a couple of clicks.
+- **Confidential & instance-based MCP connect.** Two new connection shapes widen
+  what TAS can authorize: **confidential Dynamic Client Registration** for
+  providers that require a confidential OAuth client (this unblocked Avoma), and
+  **instance-based providers** where the user supplies part of the server URL —
+  e.g. your own Metabase host. Both keep the SSRF guards of the existing flows.
+- **Optional API key on a native-MCP connection.** A connection can now carry a
+  supplementary API key alongside its OAuth token (some providers gate write
+  actions behind a scoped key the MCP token can't grant), with a per-provider
+  note explaining **why** and **which scopes** are needed.
+- **Trigger agents from Clerk webhooks.** Inbound Clerk events (Svix-signature
+  verified) can fire an agent; the webhook signing-secret UI is now
+  provider-agnostic so other signed-webhook sources slot in.
+- **Scriptable run cancel.** `POST /api/v1/runs/[id]/cancel` kills an in-flight
+  run from the API, complementing the in-app Stop button.
+- **Auto-create a schedule from the agent description.** When you create an agent
+  whose description names a recurring schedule ("every weekday at 9am"), TAS
+  parses it and creates an enabled automation alongside the agent. Conservative —
+  prose that merely mentions a time doesn't trigger one.
+- **Timezone-aware automations (DST-correct).** Automations store an IANA
+  timezone and the scheduler evaluates each cron in that zone, so a wall-clock
+  schedule tracks daylight saving. The form gains a timezone picker (defaulting
+  to your browser zone); existing automations keep firing in UTC.
+- **Agents-owned on the Team dashboard.** Each member row shows how many agents
+  they own, with a count of unowned agents so nothing falls through the cracks.
+- **Copy button on the Definition tab** and **expandable tool-call errors** in
+  the run step timeline.
+
+### Changed
+- **Graceful shutdown.** On deploy/restart the api now **drains in-flight runs**
+  before exiting instead of killing them mid-execution.
+- The new agent file is committed next to the user's request, and inbox guidance
+  softens the OAuth-token-for-REST advice (an item now also accepts string
+  context).
+
+### Fixed
+- **Prompt-cache token accounting.** Stopped double-charging cached prompt tokens
+  and fixed live per-step input tokens under-reporting mid-run.
+- **Connect flows.** Amplemarket and Metabase reject the auto-appended
+  `offline_access` scope — no longer requested; an unset auth mode is treated as
+  DCR so those connections stay editable; runs are registered before the
+  subprocess spawns (no orphaned "running" rows on a crash at startup).
+- **Sidebar.** Failing-agent alerts are scoped to your own runs (a teammate's
+  failure no longer nags you), and the "Action needed" header no longer lingers
+  over an empty section once its cards are dismissed.
+- **LinkedIn (and any manual-credential) logo** now renders on the connections
+  list, detail, and picker instead of a generic glyph.
+
 ## [v2026.6.28] — Agent web search, inbox triage + links, self-documenting tool reference — shipped 2026-06-25
 
 ### Added
