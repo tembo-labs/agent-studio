@@ -1,6 +1,9 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
+import { getLibraryAgent } from "@/lib/agent-library";
+import { CATEGORY_META } from "@/lib/connection-categories";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, getWorkspaceRepo } from "@/lib/workspace";
 
@@ -8,12 +11,38 @@ import { NewAgentForm } from "./new-agent-form";
 
 export const dynamic = "force-dynamic";
 
+// Wrap a library starter's terse task line into a prompt the Tembo Coding Agent
+// can expand, naming the connection categories it should use.
+function starterDefaults(starterId: string | undefined) {
+  if (!starterId) return undefined;
+  const agent = getLibraryAgent(starterId);
+  if (!agent) return undefined;
+  const cats = agent.categories
+    .filter((c) => !CATEGORY_META[c].builtin)
+    .map((c) => CATEGORY_META[c].label);
+  const connLine = cats.length
+    ? ` It should use my connected ${cats.join(", ").replace(/, ([^,]*)$/, " and $1")}.`
+    : "";
+  const inboxLine = agent.categories.includes("tasks-inbox")
+    ? " Surface results into the Tasks Inbox."
+    : "";
+  return {
+    name: agent.title,
+    description: `Create an agent that handles this task: ${agent.task}.${connLine}${inboxLine}`,
+  };
+}
+
 export default async function NewAgentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspace: string }>;
+  searchParams: Promise<{ starter?: string }>;
 }) {
-  const { workspace: slug } = await params;
+  const [{ workspace: slug }, { starter: starterId }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
 
   const session = await getServerSession();
   if (!session) notFound();
@@ -25,6 +54,8 @@ export default async function NewAgentPage({
   if (!repo) {
     redirect(`/onboarding/repo?ws=${encodeURIComponent(workspace.slug)}`);
   }
+
+  const defaults = starterDefaults(starterId);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-8">
@@ -45,6 +76,15 @@ export default async function NewAgentPage({
           </code>{" "}
           for your team to review.
         </p>
+        <p className="text-foreground-weak text-sm">
+          Not sure where to start?{" "}
+          <Link
+            href={`/${workspace.slug}/library`}
+            className="text-foreground font-medium hover:underline"
+          >
+            Browse the agent library →
+          </Link>
+        </p>
       </div>
 
       <hr className="border-[var(--color-border-weak)]" />
@@ -52,6 +92,7 @@ export default async function NewAgentPage({
       <NewAgentForm
         workspaceSlug={workspace.slug}
         commitMode={workspace.commitMode}
+        defaults={defaults}
       />
     </div>
   );
