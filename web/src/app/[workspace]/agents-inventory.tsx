@@ -983,7 +983,7 @@ function rowLastRunMs(a: InventoryAgent): number | null {
 }
 
 // Trim the noisy provider/family prefix off the model id for the table:
-// "anthropic:claude-sonnet-4-6" → "sonnet-4-6", "openai:gpt-4o-mini" → "gpt-4o-mini".
+// "anthropic:claude-sonnet-5" → "sonnet-5", "openai:gpt-4o-mini" → "gpt-4o-mini".
 function shortModel(model: string | null): string {
   if (!model) return "—";
   return model.replace(/^anthropic:claude-/, "").replace(/^openai:/, "");

@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn anthropic_sonnet() {
-        let c = estimate_run_cost("anthropic:claude-sonnet-4-6", 1_000_000, 1_000_000, 0, 0)
+        let c = estimate_run_cost("anthropic:claude-sonnet-5", 1_000_000, 1_000_000, 0, 0)
             .expect("priced");
         // 3 + 15 = 18 USD for 1M in + 1M out
         assert!((c - 18.0).abs() < 1e-9, "expected ~18.0, got {c}");

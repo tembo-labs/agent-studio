@@ -23,7 +23,7 @@ describe("diffLines", () => {
   });
 
   it("treats a changed line as remove + add", () => {
-    const d = diffLines("model: gpt-4o-mini", "model: claude-sonnet-4-6");
+    const d = diffLines("model: gpt-4o-mini", "model: claude-sonnet-5");
     expect(d.stats).toEqual({ added: 1, removed: 1 });
     expect(d.unchanged).toBe(false);
   });

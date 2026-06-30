@@ -232,7 +232,7 @@ for diff readability). Required + most common fields:
 
 \`\`\`yaml
 name: my-agent
-model: anthropic:claude-sonnet-4-6
+model: anthropic:claude-sonnet-5
 description: What this agent does.
 instructions: |
   You are a helpful agent. Use clear, concise prose.
@@ -259,7 +259,7 @@ output_schema:
   it's absent. Unlike \`name\`, you can change \`title\` freely.
 - **\`model\`** (required) — format \`provider:model\`. Examples:
   \`anthropic:claude-fable-5\`, \`anthropic:claude-opus-4-8\`,
-  \`anthropic:claude-sonnet-4-6\`, \`openai:gpt-5.5\`,
+  \`anthropic:claude-sonnet-5\`, \`openai:gpt-5.5\`,
   \`openai:gpt-4o-mini\`. The provider's API key must be set under the
   workspace's Settings → API keys. See *Choosing a model* below for
   which to pick.
@@ -285,7 +285,7 @@ Model choice is a cost/reliability tradeoff. Default playbook:
   (Mythos-class, 1M context, ~$10/$50 per MTok) for the hardest reasoning +
   long-horizon agentic work — reach for Fable only when an agent genuinely
   needs more than Opus 4.8 can deliver.
-- **Cheaper, simpler jobs:** \`anthropic:claude-sonnet-4-6\` and the mini tiers
+- **Cheaper, simpler jobs:** \`anthropic:claude-haiku-4-5\` and the mini tiers
   (\`openai:gpt-4o-mini\`, \`openai:gpt-4.1-mini\`) are fine for no-tools or
   high-volume work with a single well-defined job and imperative
   \`instructions:\`. They tend to hedge on tool calls, though, so prefer
@@ -379,7 +379,7 @@ so they're correct and consistent.
 
 \`\`\`yaml
 name: revenue-rollup
-model: anthropic:claude-sonnet-4-6
+model: anthropic:claude-sonnet-5
 tools_module: revenue_tools.py        # a sibling file: agents/pydantic-agentspec/revenue_tools.py
 instructions: |
   Call summarize_arr to compute the monthly ARR waterfall, then post a
@@ -859,7 +859,7 @@ for production agents.
 
 \`\`\`yaml
 name: greet
-model: anthropic:claude-sonnet-4-6
+model: anthropic:claude-sonnet-5
 description: Friendly greeter.
 instructions: |
   You are a friendly agent.
