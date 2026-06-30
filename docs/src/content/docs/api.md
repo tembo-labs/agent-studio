@@ -82,7 +82,7 @@ Validate a spec before committing it:
 curl -s -X POST https://your-tas-host/api/v1/agents/validate \
   -H "Authorization: Bearer tas_..." \
   -H "Content-Type: application/json" \
-  -d '{"content":"name: greet\nmodel: anthropic:claude-sonnet-4-6\ninstructions: hi","format":"yaml"}'
+  -d '{"content":"name: greet\nmodel: anthropic:claude-sonnet-5\ninstructions: hi","format":"yaml"}'
 # → { "valid": true, "framework": "pydantic-agentspec", "name": "greet", "format": "yaml" }
 ```
 
