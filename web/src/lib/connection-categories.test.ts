@@ -41,6 +41,22 @@ describe("categoryStatus", () => {
     expect(s.supported).toBe(false);
     expect(s.satisfied).toBe(false);
   });
+
+  // The knowledge-work-plugins connector batch: each new native provider slug
+  // must satisfy its category.
+  it.each([
+    ["notion", "docs"],
+    ["guru", "docs"],
+    ["intercom", "helpdesk"],
+    ["atlassian", "issues"],
+    ["asana", "issues"],
+    ["monday", "issues"],
+    ["fireflies", "recorder"],
+    ["amplitude", "analytics"],
+    ["apollo", "enrichment"],
+  ] as const)("%s satisfies the %s category", (slug, category) => {
+    expect(categoryStatus(category, new Set([slug])).satisfied).toBe(true);
+  });
 });
 
 describe("rankLibrary", () => {

@@ -85,6 +85,28 @@ const GMAIL_OAUTH_ORIGINS: &[&str] = &[
     "https://accounts.google.com",
     "https://oauth2.googleapis.com",
 ];
+// Batch sourced from anthropics/knowledge-work-plugins .mcp.json; each confirmed
+// DCR (registration_endpoint at the MCP origin's auth-server metadata). Must
+// stay in lockstep with the web catalog (mcp-providers.ts).
+const NOTION_MCP_ORIGIN: &str = "https://mcp.notion.com";
+const NOTION_OAUTH_ORIGINS: &[&str] = &["https://mcp.notion.com"];
+const INTERCOM_MCP_ORIGIN: &str = "https://mcp.intercom.com";
+const INTERCOM_OAUTH_ORIGINS: &[&str] = &["https://mcp.intercom.com"];
+const ATLASSIAN_MCP_ORIGIN: &str = "https://mcp.atlassian.com";
+const ATLASSIAN_OAUTH_ORIGINS: &[&str] =
+    &["https://mcp.atlassian.com", "https://cf.mcp.atlassian.com"];
+const ASANA_MCP_ORIGIN: &str = "https://mcp.asana.com";
+const ASANA_OAUTH_ORIGINS: &[&str] = &["https://mcp.asana.com"];
+const MONDAY_MCP_ORIGIN: &str = "https://mcp.monday.com";
+const MONDAY_OAUTH_ORIGINS: &[&str] = &["https://mcp.monday.com"];
+const GURU_MCP_ORIGIN: &str = "https://mcp.api.getguru.com";
+const GURU_OAUTH_ORIGINS: &[&str] = &["https://mcp.api.getguru.com"];
+const FIREFLIES_MCP_ORIGIN: &str = "https://api.fireflies.ai";
+const FIREFLIES_OAUTH_ORIGINS: &[&str] = &["https://api.fireflies.ai"];
+const AMPLITUDE_MCP_ORIGIN: &str = "https://mcp.amplitude.com";
+const AMPLITUDE_OAUTH_ORIGINS: &[&str] = &["https://mcp.amplitude.com"];
+const APOLLO_MCP_ORIGIN: &str = "https://mcp.apollo.io";
+const APOLLO_OAUTH_ORIGINS: &[&str] = &["https://mcp.apollo.io"];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
@@ -97,6 +119,15 @@ const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (CLAY_MCP_ORIGIN, CLAY_OAUTH_ORIGINS),
     (AVOMA_MCP_ORIGIN, AVOMA_OAUTH_ORIGINS),
     (GMAIL_MCP_ORIGIN, GMAIL_OAUTH_ORIGINS),
+    (NOTION_MCP_ORIGIN, NOTION_OAUTH_ORIGINS),
+    (INTERCOM_MCP_ORIGIN, INTERCOM_OAUTH_ORIGINS),
+    (ATLASSIAN_MCP_ORIGIN, ATLASSIAN_OAUTH_ORIGINS),
+    (ASANA_MCP_ORIGIN, ASANA_OAUTH_ORIGINS),
+    (MONDAY_MCP_ORIGIN, MONDAY_OAUTH_ORIGINS),
+    (GURU_MCP_ORIGIN, GURU_OAUTH_ORIGINS),
+    (FIREFLIES_MCP_ORIGIN, FIREFLIES_OAUTH_ORIGINS),
+    (AMPLITUDE_MCP_ORIGIN, AMPLITUDE_OAUTH_ORIGINS),
+    (APOLLO_MCP_ORIGIN, APOLLO_OAUTH_ORIGINS),
 ];
 
 #[derive(Deserialize)]

@@ -28,6 +28,15 @@ export type McpProviderSlug =
   | "avoma"
   | "metabase"
   | "gmail"
+  | "notion"
+  | "intercom"
+  | "atlassian"
+  | "asana"
+  | "monday"
+  | "guru"
+  | "fireflies"
+  | "amplitude"
+  | "apollo"
   | "tembo-agent-studio";
 
 export type McpProvider = {
@@ -289,6 +298,74 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // what WE request here — what's enabled on the consent screen is moot
     // unless it's in this list.
     scopeOverride: ["https://mail.google.com/"],
+  },
+  // ── Batch sourced from anthropics/knowledge-work-plugins .mcp.json ──
+  // Endpoints + DCR support confirmed by probing each server's
+  // /.well-known/oauth-authorization-server (registration_endpoint present,
+  // auth server == MCP origin). Public DCR like Attio — no per-customer setup.
+  // offline_access handling is left at the default; if a server strictly
+  // validates and rejects it at Connect, add omitOfflineAccess reactively
+  // (as done for Amplemarket/Metabase). Connect-verify each on the dogfood
+  // instance before relying on it.
+  notion: {
+    slug: "notion",
+    displayName: "Notion",
+    mcpServerUrl: "https://mcp.notion.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.notion.com"],
+  },
+  intercom: {
+    slug: "intercom",
+    displayName: "Intercom",
+    mcpServerUrl: "https://mcp.intercom.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.intercom.com"],
+  },
+  atlassian: {
+    slug: "atlassian",
+    displayName: "Atlassian (Jira)",
+    // Auth + token/registration split across mcp.atlassian.com and its
+    // cf. subdomain — both trusted.
+    mcpServerUrl: "https://mcp.atlassian.com/v1/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.atlassian.com",
+      "https://cf.mcp.atlassian.com",
+    ],
+  },
+  asana: {
+    slug: "asana",
+    displayName: "Asana",
+    mcpServerUrl: "https://mcp.asana.com/v2/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.asana.com"],
+  },
+  monday: {
+    slug: "monday",
+    displayName: "monday.com",
+    mcpServerUrl: "https://mcp.monday.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.monday.com"],
+  },
+  guru: {
+    slug: "guru",
+    displayName: "Guru",
+    mcpServerUrl: "https://mcp.api.getguru.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.api.getguru.com"],
+  },
+  fireflies: {
+    slug: "fireflies",
+    displayName: "Fireflies",
+    mcpServerUrl: "https://api.fireflies.ai/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.fireflies.ai"],
+  },
+  amplitude: {
+    slug: "amplitude",
+    displayName: "Amplitude",
+    // Advertises offline_access in scopes_supported, so the default append is fine.
+    mcpServerUrl: "https://mcp.amplitude.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.amplitude.com"],
+  },
+  apollo: {
+    slug: "apollo",
+    displayName: "Apollo",
+    mcpServerUrl: "https://mcp.apollo.io/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.apollo.io"],
   },
   "tembo-agent-studio": {
     slug: "tembo-agent-studio",
