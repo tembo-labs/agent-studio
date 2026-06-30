@@ -15,9 +15,14 @@ code-execution sandbox) and work with **any model**.
 
 ## Installing skills
 
-Open **Skills** in the sidebar. Three sources, each commits the skill folder to
+Open **Skills** in the sidebar. Several sources, each commits the skill folder to
 your repo:
 
+- **Anthropic knowledge-work skills** — browse role-specific Agent Skills from
+  [anthropics/knowledge-work-plugins](https://github.com/anthropics/knowledge-work-plugins)
+  (sales, support, finance, legal, data, …) by work area and install with one
+  click. These give an agent domain expertise it can draw on; pair them with a
+  matching [agent library](/agent-studio/agent-library/) starter.
 - **skills.sh** — browse and search the open
   [Agent Skills directory](https://www.skills.sh/) right in the app and install
   with one click. (You can also paste a slug or GitHub URL for a skill that
