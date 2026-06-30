@@ -1,0 +1,22 @@
+{
+  "id": "lead-to-account-matching",
+  "title": "Lead-to-account matching",
+  "task": "Match inbound leads to existing accounts",
+  "workArea": "RevOps / Operations",
+  "buildOrder": 10,
+  "archetype": "Reconcile",
+  "categories": [
+    "crm"
+  ],
+  "labels": [
+    "Reconcile"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 2,
+  "score": 0,
+  "sizeFit": "All",
+  "verticalFit": "Universal",
+  "connectionSummary": "CRM read/write",
+  "prompt": "ROLE: Lead-to-account matching. Match inbound leads to existing accounts.\n ARCHETYPE: Reconcile (Compare two or more sources, surface mismatches. Read-only, verify both sides.)\n TRIGGER: Scheduled run.\n READ / INPUT: The two or more sources (read-only on all). [this agent: CRM read/write]\n LOGIC: Align records across sources on a stable key; identify mismatches, duplicates, or missing counterparts.\n OUTPUT: Write discrepancies to a review inbox with both sides shown. Never auto-resolve. [this agent: CRM read/write]\n GUARDRAILS: Read-only. VERIFY both sides actually exist before reporting a mismatch; NEVER synthesize a record. Show the evidence for each discrepancy.\n HUMAN-IN-LOOP: Reviews and resolves each discrepancy.\n DONE WHEN: Discrepancy report posted."
+}

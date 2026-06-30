@@ -1,0 +1,26 @@
+{
+  "id": "vendor-security-review-intake",
+  "title": "Vendor-security-review intake",
+  "task": "Structure inbound vendor security reviews into a record or checklist",
+  "workArea": "Security / Trust & Compliance",
+  "buildOrder": 6,
+  "archetype": "Capture & Structure",
+  "categories": [
+    "email",
+    "docs",
+    "forms"
+  ],
+  "labels": [
+    "Capture & Structure",
+    "New idea"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 2,
+  "score": 0,
+  "sizeFit": "Mid-market+",
+  "verticalFit": "SaaS, Services",
+  "connectionSummary": "Form/email to record",
+  "notes": "NEW",
+  "prompt": "ROLE: Vendor-security-review intake. Structure inbound vendor security reviews into a record or checklist.\n ARCHETYPE: Capture & Structure (Turn unstructured human input into a structured record. Ask, do not guess.)\n TRIGGER: On inbound human input (message, email, photo, or form).\n READ / INPUT: The raw human input. [this agent: Form/email to record]\n LOGIC: Extract the relevant fields, normalize to the target schema, and confirm ambiguous values back to the submitter rather than guessing.\n OUTPUT: Write a structured record to the target; stage as DRAFT/unconfirmed when the field is consequential. [this agent: Form/email to record]\n GUARDRAILS: NEVER invent values; leave unknowns blank and ask. Echo what was captured back to the submitter. Consequential writes stage for confirmation.\n HUMAN-IN-LOOP: Submitter or owner confirms the captured record.\n DONE WHEN: Structured record created (or staged for confirmation)."
+}

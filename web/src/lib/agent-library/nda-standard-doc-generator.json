@@ -1,0 +1,22 @@
+{
+  "id": "nda-standard-doc-generator",
+  "title": "NDA / standard-doc generator",
+  "task": "Generate a standard NDA or MSA from a template and parameters",
+  "workArea": "Docs / Legal",
+  "buildOrder": 2,
+  "archetype": "Draft",
+  "categories": [
+    "docs"
+  ],
+  "labels": [
+    "Draft"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 1,
+  "score": 1,
+  "sizeFit": "All",
+  "verticalFit": "Universal",
+  "connectionSummary": "Template + params",
+  "prompt": "ROLE: NDA / standard-doc generator. Generate a standard NDA or MSA from a template and parameters.\n ARCHETYPE: Draft (Assemble context and produce a draft for human review. Never send.)\n TRIGGER: On request or on the triggering event.\n READ / INPUT: The context sources. [this agent: Template + params]\n LOGIC: Assemble the relevant context and generate a draft in the expected format and tone. Link the source facts used.\n OUTPUT: Produce a DRAFT for human review; never send, publish, or finalize automatically. [this agent: Template + params]\n GUARDRAILS: Draft-only. Do NOT fabricate facts, figures, or quotes; if a needed fact is missing, flag the gap rather than invent it. Keep client- and audit-facing drafts conservative.\n HUMAN-IN-LOOP: A person reviews, edits, and sends.\n DONE WHEN: Draft delivered to the owner."
+}

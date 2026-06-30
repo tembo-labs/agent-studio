@@ -1,0 +1,26 @@
+{
+  "id": "project-budget-burn-alert",
+  "title": "Project budget-burn alert",
+  "task": "Alert when a project crosses a budget or hours threshold",
+  "workArea": "Professional Services",
+  "buildOrder": 1,
+  "archetype": "Monitor & Alert",
+  "categories": [
+    "notify",
+    "accounting",
+    "psa"
+  ],
+  "labels": [
+    "Monitor & Alert",
+    "New idea"
+  ],
+  "firstWave": true,
+  "impact": 3,
+  "resistance": 1,
+  "score": 2,
+  "sizeFit": "All",
+  "verticalFit": "Services",
+  "connectionSummary": "PSA read to Slack",
+  "notes": "NEW. Notify-only; margin protection. New First Wave",
+  "prompt": "ROLE: Project budget-burn alert. Alert when a project crosses a budget or hours threshold.\n ARCHETYPE: Monitor & Alert (Watch a source, evaluate a condition, notify an owner. Read-only.)\n TRIGGER: On a schedule or on the source event; re-check each run.\n READ / INPUT: The source system (read-only). [this agent: PSA read to Slack]\n LOGIC: Evaluate the watch condition. If met and not already alerted, compose a short, specific alert (what crossed, the record/value, a link).\n OUTPUT: Notify the owner at the destination. Do not write back to the source. [this agent: PSA read to Slack]\n GUARDRAILS: Read-only; never modify the source. Deduplicate so the same condition does not re-fire. Give enough context to act without opening the system.\n HUMAN-IN-LOOP: The human decides and acts; the agent only surfaces.\n DONE WHEN: Alert delivered to the owner."
+}

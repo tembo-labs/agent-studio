@@ -1,0 +1,26 @@
+{
+  "id": "pre-call-brief",
+  "title": "Pre-call brief",
+  "task": "Assemble account context into Slack before the meeting",
+  "workArea": "Sales / SDR",
+  "buildOrder": 9,
+  "archetype": "Summarize & Digest",
+  "categories": [
+    "crm",
+    "notify",
+    "calendar",
+    "accounting"
+  ],
+  "labels": [
+    "Summarize & Digest"
+  ],
+  "firstWave": false,
+  "impact": 2,
+  "resistance": 2,
+  "score": 0,
+  "sizeFit": "All",
+  "verticalFit": "Universal",
+  "connectionSummary": "Calendar + CRM to Slack",
+  "notes": "Documented 2026 pattern",
+  "prompt": "ROLE: Pre-call brief. Assemble account context into Slack before the meeting.\n ARCHETYPE: Summarize & Digest (Aggregate sources into a concise, skimmable summary. Read-only.)\n TRIGGER: Schedule or on the source event.\n READ / INPUT: The sources for the window (read-only). [this agent: Calendar + CRM to Slack]\n LOGIC: Pull the relevant items, extract what matters, and compose a concise summary; lead with what changed or needs attention.\n OUTPUT: Post the summary to the destination. [this agent: Calendar + CRM to Slack]\n GUARDRAILS: Read-only; attribute or link sources; do not editorialize beyond the data; keep it short.\n HUMAN-IN-LOOP: Reads and decides.\n DONE WHEN: Summary delivered."
+}
