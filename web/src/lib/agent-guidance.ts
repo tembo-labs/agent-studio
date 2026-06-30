@@ -274,38 +274,29 @@ output_schema:
 
 Model choice is a cost/reliability tradeoff. Default playbook:
 
-- **Default to \`anthropic:claude-opus-4-8\`** for capable agents — it's
-  the sensible high-capability starting point. **\`anthropic:claude-fable-5\`**
-  is Anthropic's most capable widely-released model (Mythos-class, 1M
-  context) and beats Opus on the hardest reasoning + long-horizon agentic
-  work — but it's ~2× the cost ($10/$50 vs $5/$25 per MTok), so reach for
-  it only when an agent genuinely needs more than Opus 4.8 can deliver.
-- **First-run + iterating: start on \`anthropic:claude-opus-4-8\`
-  for any agent that calls tools** (i.e. declares \`connections:\`).
-  Tool-using agents need to decide when to act without follow-up
-  questions, and lower-tier models (Sonnet, GPT-4o-mini) tend to
-  hedge — replying "would you like me to…" instead of executing.
-  Opus is more decisive out of the box, which makes it easier to
-  prove the agent works before you optimise.
-- **Once the agent runs reliably on Opus, try downgrading.**
-  \`anthropic:claude-sonnet-4-6\` is ~5× cheaper input, ~5× cheaper
-  output. Sonnet usually works fine when:
-    - the agent uses the narrow \`connections:\` form (so the model
-      sees specific tool slugs, not a search dance);
-    - the \`instructions:\` are imperative ("when invoked, do X")
-      rather than descriptive ("you can help with X");
-    - the agent has a single well-defined job rather than a vague
-      "be a helpful assistant about Y" role.
-  If Sonnet hedges on tool calls, go back to Opus and don't fight it.
-- **No tools? Sonnet is the right starting point** — the hedging
-  problem only shows up with tool use.
-- **OpenAI alternatives**: \`openai:gpt-5.5\` is the flagship /
-  Opus-tier option for tool-use reliability (\`openai:gpt-5.4\` is the
-  cheaper balance); \`openai:gpt-4o-mini\` and \`openai:gpt-4.1-mini\`
-  are roughly Sonnet-tier. The Anthropic /
-  OpenAI choice is a separate axis from the tier — pick based on
-  which provider key the workspace has + which provider your team
-  is already auditing for governance.
+- **Default to \`anthropic:claude-sonnet-5\`** for most agents, including
+  tool-using ones. It's the most agentic Sonnet yet — decisive about when to
+  act, so it doesn't hedge ("would you like me to…") the way earlier Sonnet and
+  mini tiers do — and its reasoning, tool use, and coding are close to Opus 4.8
+  at lower cost ($3/$15 vs Opus's $5/$25 per MTok). This is the right starting
+  point for the large majority of agents, tools or not.
+- **Step up to \`anthropic:claude-opus-4-8\`** when an agent needs the most
+  reliable reasoning at the Opus tier, and to **\`anthropic:claude-fable-5\`**
+  (Mythos-class, 1M context, ~$10/$50 per MTok) for the hardest reasoning +
+  long-horizon agentic work — reach for Fable only when an agent genuinely
+  needs more than Opus 4.8 can deliver.
+- **Cheaper, simpler jobs:** \`anthropic:claude-sonnet-4-6\` and the mini tiers
+  (\`openai:gpt-4o-mini\`, \`openai:gpt-4.1-mini\`) are fine for no-tools or
+  high-volume work with a single well-defined job and imperative
+  \`instructions:\`. They tend to hedge on tool calls, though, so prefer
+  Sonnet 5 for anything that declares \`connections:\`.
+- **OpenAI alternatives**: \`openai:gpt-5.5\` is the flagship / Opus-tier
+  option for tool-use reliability (\`openai:gpt-5.4\` is the cheaper balance).
+  The Anthropic / OpenAI choice is a separate axis from the tier — pick based
+  on which provider key the workspace has + which provider your team is already
+  auditing for governance.
+- **Note:** Sonnet 5 uses an updated tokenizer that can count ~1.0–1.35× the
+  tokens of earlier models; factor that into cost comparisons.
 
 The runtime tracks \`tokens_input\`, \`tokens_output\`, and
 \`cost_usd\` per run, so the downgrade decision is a measurement,

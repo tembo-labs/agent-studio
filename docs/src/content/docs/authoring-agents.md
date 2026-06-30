@@ -25,7 +25,7 @@ A minimal agent is a YAML file under `agents/pydantic-agentspec/`:
 
 ```yaml
 name: standup-summary
-model: anthropic:claude-sonnet-4-6
+model: anthropic:claude-sonnet-5
 description: Summarize yesterday's commits into a standup note.
 instructions: |
   When invoked, summarize the team's activity in three bullet points.
@@ -41,8 +41,8 @@ Key fields:
   `title: "Inbox Triage"`). When you create an agent you can type any name; the
   filename slug is derived from it and the text is saved as `title`. The UI falls
   back to `name` when there's no title.
-- **`model`** (required) — `provider:model`, e.g. `anthropic:claude-fable-5`,
-  `anthropic:claude-opus-4-8`, `anthropic:claude-sonnet-4-6`, `openai:gpt-5.5`,
+- **`model`** (required) — `provider:model`, e.g. `anthropic:claude-sonnet-5`,
+  `anthropic:claude-opus-4-8`, `anthropic:claude-fable-5`, `openai:gpt-5.5`,
   `openai:gpt-4o-mini`. The provider's key must be set in
   **Settings → LLM Providers**.
 - **`instructions`** (required) — the system prompt, usually a `|` block scalar.
@@ -84,20 +84,19 @@ field reference for coding agents.
 
 Model choice is a cost/reliability tradeoff:
 
-- **Start tool-using agents on a top-tier model** (e.g.
-  `anthropic:claude-opus-4-8`). Lower tiers tend to *hedge* on tool use — asking
-  "would you like me to…" instead of acting — and a decisive model is easier to
-  prove out.
-- **Need more than Opus?** `anthropic:claude-fable-5` is Anthropic's most
-  capable widely-released model (Mythos-class) — best on the hardest reasoning
-  and long-horizon agentic work, at ~2× the cost. Reach for it only when Opus
-  4.8 isn't enough.
-- **Then downgrade and measure.** `anthropic:claude-sonnet-4-6` is much cheaper
-  and usually fine when the agent has a single, well-defined job with imperative
-  instructions and narrow `connections:`. Compare cost side-by-side on the
+- **Default to `anthropic:claude-sonnet-5`** for most agents, tools or not.
+  It's the most agentic Sonnet yet — decisive about when to act, so it doesn't
+  *hedge* ("would you like me to…") the way earlier Sonnet and mini tiers do —
+  with reasoning and tool use close to Opus 4.8 at lower cost.
+- **Need more than Sonnet 5?** Step up to `anthropic:claude-opus-4-8`, and to
+  `anthropic:claude-fable-5` (Anthropic's most capable, Mythos-class) for the
+  hardest reasoning and long-horizon agentic work — reach for Fable only when
+  Opus 4.8 isn't enough.
+- **Cheaper, simpler jobs.** `anthropic:claude-sonnet-4-6` and the mini tiers
+  are fine for no-tools or high-volume work with a single, well-defined job and
+  imperative instructions; they tend to hedge on tool calls, so prefer Sonnet 5
+  for anything that declares `connections:`. Compare cost side-by-side on the
   [Runs](/agent-studio/dashboard-and-runs/) page.
-- **No tools? Sonnet is a fine starting point** — the hedging problem only shows
-  up with tool use.
 
 ## ScaleDown prompt compression
 
