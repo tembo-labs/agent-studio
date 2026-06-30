@@ -11,6 +11,7 @@ import {
 } from "@/lib/connection-categories";
 import { listSecretConnections } from "@/lib/secret-connections";
 import { getServerSession } from "@/lib/session";
+import { listSlackApps } from "@/lib/slack-apps";
 import { getWorkspaceBySlug } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
@@ -29,13 +30,18 @@ export default async function AgentLibraryPage({
 
   // Same per-user connection fetch the sidebar does (layout.tsx), tolerant of
   // failures — a connection-query error just means nothing ranks as "ready".
-  const [composio, native, secrets, library] = await Promise.all([
+  const [composio, native, secrets, slackApps, library] = await Promise.all([
     listConnectionsForUser(workspace.id, session.user.id).catch(() => []),
     listNativeConnectionsForUser(workspace.id, session.user.id).catch(() => []),
     listSecretConnections(workspace.id).catch(() => []),
+    listSlackApps(workspace.id).catch(() => []),
     loadAgentLibrary(),
   ]);
   const connected = collectConnectedSlugs(composio, native, secrets);
+  // Slack notifications run through TAS-managed Slack apps (workspace-level), not
+  // a per-user connection — so satisfy the "notify" category when an app is
+  // installed. This is the single biggest readiness lever (52 starters notify).
+  if (slackApps.some((a) => a.status === "installed")) connected.add("slack");
   const ranked = rankLibrary(library, connected);
 
   return (
