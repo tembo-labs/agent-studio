@@ -28,7 +28,7 @@ function starterDefaults(starterId: string | undefined) {
     : "";
   return {
     name: agent.title,
-    description: `Create an agent that handles this task: ${agent.task}.${connLine}${inboxLine}`,
+    description: `${agent.task}.${connLine}${inboxLine}`,
   };
 }
 
