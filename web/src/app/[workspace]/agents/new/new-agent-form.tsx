@@ -25,9 +25,12 @@ const CHAT_INITIAL: ChatCreateFormState = {};
 export function NewAgentForm({
   workspaceSlug,
   commitMode,
+  defaults,
 }: {
   workspaceSlug: string;
   commitMode: CommitMode;
+  /** Prefill from an Agent Library starter (?starter=<id>). */
+  defaults?: { name?: string; description?: string };
 }) {
   const direct = commitMode === "direct";
   const [state, action, pending] = useActionState(
@@ -45,8 +48,8 @@ export function NewAgentForm({
   // returned-error path. Holding the values in state preserves the
   // user's input when the action returns an error and the form
   // re-renders.
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState(defaults?.name ?? "");
+  const [description, setDescription] = useState(defaults?.description ?? "");
   const [framework, setFramework] = useState<Framework>(DEFAULT_FRAMEWORK);
   // The name is free text; the filename + spec `name:` slug are derived from it.
   const nameSlug = suggestSlug(name.trim());

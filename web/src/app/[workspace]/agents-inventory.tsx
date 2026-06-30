@@ -469,12 +469,20 @@ export function AgentsInventory({
         <>
           <p>No agents yet.</p>
           {canCreate && (
-            <Link
-              href={newAgentHref}
-              className="text-foreground font-medium hover:underline"
-            >
-              Create your first one →
-            </Link>
+            <div className="flex flex-col items-center gap-1">
+              <Link
+                href={`/${workspaceSlug}/library`}
+                className="text-foreground font-medium hover:underline"
+              >
+                Browse the agent library →
+              </Link>
+              <Link
+                href={newAgentHref}
+                className="text-foreground-muted hover:text-foreground hover:underline"
+              >
+                or describe your own
+              </Link>
+            </div>
           )}
         </>
       ) : (

@@ -9,6 +9,7 @@ import { SidebarNavItem } from "@/components/sidebar-nav-item";
 import { cn } from "@/lib/utils";
 import {
   IconApiConnection,
+  IconAppstore,
   IconBook,
   IconBulletList,
   IconCalendarRepeat,
@@ -94,6 +95,11 @@ export function SidebarNav({
       label: "Build",
       items: [
         { href: home, label: "Agents", icon: <AgentsIcon />, matchPrefix: true },
+        {
+          href: `${home}/library`,
+          label: "Library",
+          icon: <IconAppstore />,
+        },
         {
           href: `${home}/automations`,
           label: "Automations",
