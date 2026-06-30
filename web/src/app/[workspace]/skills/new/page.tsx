@@ -11,6 +11,7 @@ import {
 } from "@/lib/workspace";
 import { listInstalledSkills } from "@/lib/workspace-skills";
 
+import { KnowledgeWorkSkillsBrowser } from "../knowledge-work-skills-browser";
 import { SkillsCatalogBrowser } from "../skills-catalog-browser";
 import {
   AddFromGitHubForm,
@@ -101,6 +102,17 @@ export default async function NewSkillPage({
 
       <div className="divide-y divide-[var(--color-border-weak)]">
         <div className="pb-6">
+          <Section
+            title="Anthropic knowledge-work skills"
+            description="Role-specific Agent Skills from anthropics/knowledge-work-plugins — domain expertise your agents draw on. Install with one click."
+          >
+            <KnowledgeWorkSkillsBrowser
+              workspaceSlug={slug}
+              installed={installedNames}
+            />
+          </Section>
+        </div>
+        <div className="py-6">
           <Section
             title="Browse skills.sh"
             description="Search the open Agent Skills directory and install with one click."
