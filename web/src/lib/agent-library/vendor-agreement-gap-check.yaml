@@ -1,0 +1,30 @@
+id: vendor-agreement-gap-check
+title: Vendor agreement gap check
+task: For a vendor, consolidate what's signed vs missing (MSA, DPA, SOW) across systems and flag gaps and upcoming deadlines
+workArea: Docs / Legal
+buildOrder: 7
+archetype: Hygiene & Flag
+categories:
+  - docs
+  - crm
+labels:
+  - Hygiene & Flag
+  - New idea
+firstWave: false
+impact: 2
+resistance: 2
+score: 0
+sizeFit: Mid-market+
+verticalFit: Universal
+connectionSummary: CLM / CRM / storage read
+notes: Adapted from anthropics/knowledge-work-plugins (Apache-2.0).
+prompt: |-
+  ROLE: Vendor agreement gap check. For a vendor, consolidate what's signed vs missing (MSA, DPA, SOW) across systems and flag gaps and upcoming deadlines.
+  ARCHETYPE: Hygiene & Flag (Scan records for a quality condition; flag offenders for review. Never auto-fix.)
+  TRIGGER: Scheduled scan.
+  READ / INPUT: The records to scan (read-only). [this agent: CLM / CRM / storage read]
+  LOGIC: Scan for the defined quality condition. Collect each offending item with the reason it was flagged.
+  OUTPUT: Write findings to a tasks/review inbox or notify the owner. Never auto-correct. [this agent: CLM / CRM / storage read]
+  GUARDRAILS: Flag, do not fix. VERIFY each finding against the actual source before flagging; NEVER synthesize a record. Cap volume per run; summarize if large.
+  HUMAN-IN-LOOP: A person reviews and resolves each flag.
+  DONE WHEN: Findings posted for review.

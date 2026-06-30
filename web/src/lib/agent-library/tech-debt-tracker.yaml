@@ -1,0 +1,30 @@
+id: tech-debt-tracker
+title: Tech-debt tracker
+task: Scan the codebase and tracker for technical-debt signals; categorize and flag a prioritized refactor list
+workArea: Product / Engineering
+buildOrder: 9
+archetype: Hygiene & Flag
+categories:
+  - issues
+  - tasks-inbox
+labels:
+  - Hygiene & Flag
+  - New idea
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: Mid-market+
+verticalFit: SaaS
+connectionSummary: Issue tracker / repo read
+notes: Adapted from anthropics/knowledge-work-plugins (Apache-2.0).
+prompt: |-
+  ROLE: Tech-debt tracker. Scan the codebase and tracker for technical-debt signals; categorize and flag a prioritized refactor list.
+  ARCHETYPE: Hygiene & Flag (Scan records for a quality condition; flag offenders for review. Never auto-fix.)
+  TRIGGER: Scheduled scan.
+  READ / INPUT: The records to scan (read-only). [this agent: Issue tracker / repo read]
+  LOGIC: Scan for the defined quality condition. Collect each offending item with the reason it was flagged.
+  OUTPUT: Write findings to a tasks/review inbox or notify the owner. Never auto-correct. [this agent: Issue tracker / repo read]
+  GUARDRAILS: Flag, do not fix. VERIFY each finding against the actual source before flagging; NEVER synthesize a record. Cap volume per run; summarize if large.
+  HUMAN-IN-LOOP: A person reviews and resolves each flag.
+  DONE WHEN: Findings posted for review.

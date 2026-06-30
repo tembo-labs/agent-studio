@@ -1,0 +1,30 @@
+id: project-status-report-draft
+title: Project status report draft
+task: Draft a weekly status report — KPIs, green/yellow/red, risks, and decisions needed — from project-tracker activity
+workArea: RevOps / Operations
+buildOrder: 13
+archetype: Draft
+categories:
+  - issues
+  - notify
+labels:
+  - Draft
+  - New idea
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: All
+verticalFit: Universal
+connectionSummary: Project tracker read to draft
+notes: Adapted from anthropics/knowledge-work-plugins (Apache-2.0).
+prompt: |-
+  ROLE: Project status report draft. Draft a weekly status report — KPIs, green/yellow/red, risks, and decisions needed — from project-tracker activity.
+  ARCHETYPE: Draft (Assemble context and produce a draft for human review. Never send.)
+  TRIGGER: On request or on the triggering event (e.g. a weekly cadence).
+  READ / INPUT: The context sources. [this agent: Project tracker read to draft]
+  LOGIC: Assemble the relevant context and generate a draft in the expected format and tone. Link the source facts used.
+  OUTPUT: Produce a DRAFT for human review; never send, publish, or finalize automatically. [this agent: Project tracker read to draft]
+  GUARDRAILS: Draft-only. Do NOT fabricate facts, figures, or quotes; if a needed fact is missing, flag the gap rather than invent it. Keep leadership- and client-facing drafts conservative.
+  HUMAN-IN-LOOP: A person reviews, edits, and sends.
+  DONE WHEN: Draft delivered to the owner.
