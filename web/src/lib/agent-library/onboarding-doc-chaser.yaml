@@ -1,0 +1,28 @@
+id: onboarding-doc-chaser
+title: Onboarding-doc chaser
+task: Chase missing new-hire paperwork
+workArea: HR / People
+buildOrder: 3
+archetype: Monitor & Alert
+categories:
+  - email
+  - hris
+labels:
+  - Monitor & Alert
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: Mid-market+
+verticalFit: Universal
+connectionSummary: Email + record
+prompt: |-
+  ROLE: Onboarding-doc chaser. Chase missing new-hire paperwork.
+  ARCHETYPE: Monitor & Alert (Watch a source, evaluate a condition, notify an owner. Read-only.)
+  TRIGGER: On a schedule or on the source event; re-check each run.
+  READ / INPUT: The source system (read-only). [this agent: Email + record]
+  LOGIC: Evaluate the watch condition. If met and not already alerted, compose a short, specific alert (what crossed, the record/value, a link).
+  OUTPUT: Notify the owner at the destination. Do not write back to the source. [this agent: Email + record]
+  GUARDRAILS: Read-only; never modify the source. Deduplicate so the same condition does not re-fire. Give enough context to act without opening the system.
+  HUMAN-IN-LOOP: The human decides and acts; the agent only surfaces.
+  DONE WHEN: Alert delivered to the owner.

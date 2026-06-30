@@ -1,0 +1,29 @@
+id: permission-access-drift-flag
+title: Permission / access-drift flag
+task: Flag users whose access exceeds their role or peers
+workArea: IT / Internal
+buildOrder: 5
+archetype: Hygiene & Flag
+categories:
+  - identity
+labels:
+  - Hygiene & Flag
+  - New idea
+firstWave: false
+impact: 3
+resistance: 2
+score: 1
+sizeFit: Mid-market+
+verticalFit: Universal
+connectionSummary: IAM/SSO read
+notes: NEW. Data/access governance; risk reduction
+prompt: |-
+  ROLE: Permission / access-drift flag. Flag users whose access exceeds their role or peers.
+  ARCHETYPE: Hygiene & Flag (Scan records for a quality condition; flag offenders for review. Never auto-fix.)
+  TRIGGER: Scheduled scan.
+  READ / INPUT: The records to scan (read-only). [this agent: IAM/SSO read]
+  LOGIC: Scan for the defined quality condition. Collect each offending record with the reason it was flagged.
+  OUTPUT: Write findings to a tasks/review inbox or notify the owner. Never auto-correct. [this agent: IAM/SSO read]
+  GUARDRAILS: Flag, do not fix. VERIFY each finding against the actual record before flagging; NEVER synthesize a record. Cap volume per run; summarize if large.
+  HUMAN-IN-LOOP: A person reviews and resolves each flag.
+  DONE WHEN: Findings posted for review.

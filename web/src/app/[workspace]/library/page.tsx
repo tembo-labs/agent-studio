@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
 import { LibraryGallery } from "@/components/library-gallery";
-import { AGENT_LIBRARY } from "@/lib/agent-library";
+import { loadAgentLibrary } from "@/lib/agent-library";
 import { listConnectionsForUser } from "@/lib/composio-connections";
 import { listNativeConnectionsForUser } from "@/lib/connections";
 import {
@@ -29,13 +29,14 @@ export default async function AgentLibraryPage({
 
   // Same per-user connection fetch the sidebar does (layout.tsx), tolerant of
   // failures — a connection-query error just means nothing ranks as "ready".
-  const [composio, native, secrets] = await Promise.all([
+  const [composio, native, secrets, library] = await Promise.all([
     listConnectionsForUser(workspace.id, session.user.id).catch(() => []),
     listNativeConnectionsForUser(workspace.id, session.user.id).catch(() => []),
     listSecretConnections(workspace.id).catch(() => []),
+    loadAgentLibrary(),
   ]);
   const connected = collectConnectedSlugs(composio, native, secrets);
-  const ranked = rankLibrary(AGENT_LIBRARY, connected);
+  const ranked = rankLibrary(library, connected);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">

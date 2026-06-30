@@ -1,0 +1,28 @@
+id: release-notes-draft
+title: Release-notes draft
+task: Draft release notes from merged changes
+workArea: Product / Engineering
+buildOrder: 2
+archetype: Draft
+categories:
+  - docs
+  - issues
+labels:
+  - Draft
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: All
+verticalFit: SaaS
+connectionSummary: Repo/issue read to doc
+prompt: |-
+  ROLE: Release-notes draft. Draft release notes from merged changes.
+  ARCHETYPE: Draft (Assemble context and produce a draft for human review. Never send.)
+  TRIGGER: On request or on the triggering event.
+  READ / INPUT: The context sources. [this agent: Repo/issue read to doc]
+  LOGIC: Assemble the relevant context and generate a draft in the expected format and tone. Link the source facts used.
+  OUTPUT: Produce a DRAFT for human review; never send, publish, or finalize automatically. [this agent: Repo/issue read to doc]
+  GUARDRAILS: Draft-only. Do NOT fabricate facts, figures, or quotes; if a needed fact is missing, flag the gap rather than invent it. Keep client- and audit-facing drafts conservative.
+  HUMAN-IN-LOOP: A person reviews, edits, and sends.
+  DONE WHEN: Draft delivered to the owner.

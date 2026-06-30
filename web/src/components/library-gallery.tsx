@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { CATEGORY_META, type Ranked } from "@/lib/connection-categories";
-import type { LibraryAgent } from "@/lib/agent-library";
+import type { LibraryAgent } from "@/lib/agent-library/types";
 
 // Browsable gallery of starter agents, ranked so the ones the user can run now
 // (given their connections) lead. Facets: work area, label, connection, plus a

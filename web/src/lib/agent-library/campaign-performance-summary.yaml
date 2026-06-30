@@ -1,0 +1,28 @@
+id: campaign-performance-summary
+title: Campaign performance summary
+task: Weekly performance rollup to Slack
+workArea: Marketing
+buildOrder: 5
+archetype: Summarize & Digest
+categories:
+  - notify
+  - analytics
+labels:
+  - Summarize & Digest
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: All
+verticalFit: Universal
+connectionSummary: Analytics read to Slack
+prompt: |-
+  ROLE: Campaign performance summary. Weekly performance rollup to Slack.
+  ARCHETYPE: Summarize & Digest (Aggregate sources into a concise, skimmable summary. Read-only.)
+  TRIGGER: Schedule or on the source event.
+  READ / INPUT: The sources for the window (read-only). [this agent: Analytics read to Slack]
+  LOGIC: Pull the relevant items, extract what matters, and compose a concise summary; lead with what changed or needs attention.
+  OUTPUT: Post the summary to the destination. [this agent: Analytics read to Slack]
+  GUARDRAILS: Read-only; attribute or link sources; do not editorialize beyond the data; keep it short.
+  HUMAN-IN-LOOP: Reads and decides.
+  DONE WHEN: Summary delivered.

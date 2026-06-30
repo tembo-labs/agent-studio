@@ -1,0 +1,30 @@
+id: interview-feedback-chaser
+title: Interview-feedback chaser
+task: Chase interviewers for their scorecards
+workArea: HR / People
+buildOrder: 6
+archetype: Monitor & Alert
+categories:
+  - notify
+  - ats
+labels:
+  - Monitor & Alert
+  - New idea
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: Mid-market+
+verticalFit: Universal
+connectionSummary: ATS read to Slack
+notes: NEW. A real, specific recruiting pain
+prompt: |-
+  ROLE: Interview-feedback chaser. Chase interviewers for their scorecards.
+  ARCHETYPE: Monitor & Alert (Watch a source, evaluate a condition, notify an owner. Read-only.)
+  TRIGGER: On a schedule or on the source event; re-check each run.
+  READ / INPUT: The source system (read-only). [this agent: ATS read to Slack]
+  LOGIC: Evaluate the watch condition. If met and not already alerted, compose a short, specific alert (what crossed, the record/value, a link).
+  OUTPUT: Notify the owner at the destination. Do not write back to the source. [this agent: ATS read to Slack]
+  GUARDRAILS: Read-only; never modify the source. Deduplicate so the same condition does not re-fire. Give enough context to act without opening the system.
+  HUMAN-IN-LOOP: The human decides and acts; the agent only surfaces.
+  DONE WHEN: Alert delivered to the owner.

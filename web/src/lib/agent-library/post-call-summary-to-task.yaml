@@ -1,0 +1,29 @@
+id: post-call-summary-to-task
+title: Post-call summary to task
+task: Turn a call into a summary written as a CRM task
+workArea: Customer Success / Support
+buildOrder: 4
+archetype: Summarize & Digest
+categories:
+  - crm
+  - recorder
+labels:
+  - Summarize & Digest
+firstWave: false
+impact: 3
+resistance: 2
+score: 1
+sizeFit: All
+verticalFit: Universal
+connectionSummary: Recorder to CRM task
+notes: Live V1 flow. Strategic anchor for the in-flight account
+prompt: |-
+  ROLE: Post-call summary to task. Turn a call into a summary written as a CRM task.
+  ARCHETYPE: Summarize & Digest (Aggregate sources into a concise, skimmable summary. Read-only.)
+  TRIGGER: Schedule or on the source event.
+  READ / INPUT: The sources for the window (read-only). [this agent: Recorder to CRM task]
+  LOGIC: Pull the relevant items, extract what matters, and compose a concise summary; lead with what changed or needs attention.
+  OUTPUT: Post the summary to the destination. [this agent: Recorder to CRM task]
+  GUARDRAILS: Read-only; attribute or link sources; do not editorialize beyond the data; keep it short.
+  HUMAN-IN-LOOP: Reads and decides.
+  DONE WHEN: Summary delivered.
