@@ -1,0 +1,30 @@
+id: product-metrics-digest
+title: Product metrics digest
+task: Roll product metrics into a weekly scorecard with trends and notable changes
+workArea: Product / Engineering
+buildOrder: 6
+archetype: Summarize & Digest
+categories:
+  - analytics
+  - notify
+labels:
+  - Summarize & Digest
+  - New idea
+firstWave: false
+impact: 2
+resistance: 1
+score: 1
+sizeFit: All
+verticalFit: SaaS
+connectionSummary: Product analytics to Slack
+notes: Adapted from anthropics/knowledge-work-plugins (Apache-2.0).
+prompt: |-
+  ROLE: Product metrics digest. Roll product metrics into a weekly scorecard with trends and notable changes.
+  ARCHETYPE: Summarize & Digest (Roll many items into one concise, scannable summary. Read-only.)
+  TRIGGER: Scheduled (e.g. daily or weekly).
+  READ / INPUT: The sources to roll up (read-only). [this agent: Product analytics to Slack]
+  LOGIC: Gather the relevant items for the window, group them, and write a concise digest of what matters and any notable changes. Link sources.
+  OUTPUT: Post the digest to the destination. Do not modify the sources. [this agent: Product analytics to Slack]
+  GUARDRAILS: Read-only; never write back. Attribute every figure to its source; do not invent numbers. Keep it scannable; link out for detail.
+  HUMAN-IN-LOOP: The human reads and decides; the agent only summarizes.
+  DONE WHEN: Digest delivered.

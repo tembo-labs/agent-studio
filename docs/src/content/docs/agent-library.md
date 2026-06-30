@@ -8,6 +8,66 @@ browsable catalog of ready-made starters — each a one-task agent with a
 copy-paste-ready build prompt — surfaced so the ones you can actually run, given
 what you've connected, come first. Open it from **Library** in the sidebar.
 
+## What's in the library
+
+**124 starters** across 14 work areas, **15** of them flagged **First Wave** —
+the highest-impact, lowest-effort places to start. (Counts as of this writing;
+the library grows over time.)
+
+By **work area**:
+
+| Work area | Agents | First Wave |
+| --- | --- | --- |
+| RevOps / Operations | 13 | 2 |
+| Finance / Accounting | 12 | 1 |
+| HR / People | 11 | 0 |
+| Sales / SDR | 10 | 2 |
+| Customer Success / Support | 10 | 2 |
+| Marketing | 10 | 2 |
+| Inventory / Supply | 10 | 1 |
+| IT / Internal | 9 | 1 |
+| Executive / Admin | 9 | 1 |
+| Product / Engineering | 9 | 1 |
+| Docs / Legal | 7 | 0 |
+| Security / Trust & Compliance | 6 | 1 |
+| Professional Services | 5 | 1 |
+| Partnerships / Channel | 3 | 0 |
+
+By **archetype** (the shape of work — see below):
+
+| Archetype | Agents |
+| --- | --- |
+| Monitor & Alert | 36 |
+| Workflow Trigger | 21 |
+| Draft | 16 |
+| Hygiene & Flag | 15 |
+| Summarize & Digest | 13 |
+| Capture & Structure | 10 |
+| Knowledge Q&A | 6 |
+| Reconcile | 4 |
+| Extract | 3 |
+
+By **connection** — how many starters a given connection unlocks (the top dozen;
+26 connection categories appear in all):
+
+| Connection | Starters that use it |
+| --- | --- |
+| Slack (notify) | 57 |
+| CRM | 28 |
+| Docs / knowledge | 25 |
+| Email | 22 |
+| Accounting | 13 |
+| HRIS | 12 |
+| Forms | 11 |
+| Inventory | 10 |
+| Issue tracker | 9 |
+| Identity / SSO | 8 |
+| Call recorder | 7 |
+| Helpdesk | 6 |
+
+Connecting **Slack** and your **CRM** alone makes the largest share of the
+library runnable.
+
 ## Connection-aware ranking
 
 The library knows which [connections](/agent-studio/connections/) you have, and

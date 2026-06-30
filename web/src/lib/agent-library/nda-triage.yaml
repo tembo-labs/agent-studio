@@ -1,0 +1,30 @@
+id: nda-triage
+title: NDA triage
+task: On a new inbound NDA, classify it green/yellow/red and route it for the right level of review
+workArea: Docs / Legal
+buildOrder: 6
+archetype: Workflow Trigger
+categories:
+  - docs
+  - tasks-inbox
+labels:
+  - Workflow Trigger
+  - New idea
+firstWave: false
+impact: 3
+resistance: 2
+score: 1
+sizeFit: All
+verticalFit: Universal
+connectionSummary: Email/document storage to tasks inbox
+notes: Adapted from anthropics/knowledge-work-plugins (Apache-2.0).
+prompt: |-
+  ROLE: NDA triage. On a new inbound NDA, classify it green/yellow/red and route it for the right level of review.
+  ARCHETYPE: Workflow Trigger (On an event, classify and route to the next step. Scoped and idempotent.)
+  TRIGGER: On the inbound event (e.g. a new item arrives).
+  READ / INPUT: The triggering item plus the context needed to classify it (read-only). [this agent: Email/document storage to tasks inbox]
+  LOGIC: Evaluate against the defined criteria, assign a clear classification/route, and explain the reason. Do only the scoped next step.
+  OUTPUT: Route the item — create a review task or notify the right owner — with the classification and reason. [this agent: Email/document storage to tasks inbox]
+  GUARDRAILS: Read-only on the source; never approve, sign, or send. Default to the more cautious route when uncertain; deduplicate so the same item doesn't re-fire.
+  HUMAN-IN-LOOP: A person makes the final decision on flagged items.
+  DONE WHEN: Item classified and routed for review.
