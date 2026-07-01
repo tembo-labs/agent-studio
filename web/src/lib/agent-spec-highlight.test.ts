@@ -48,7 +48,7 @@ describe("highlightAgentSpec", () => {
         "name: hello-world",
         "parallel: true",
         "retries: 2",
-        "model: anthropic:claude-sonnet-4-6 # default",
+        "model: anthropic:claude-sonnet-5 # default",
         "",
       ].join("\n"),
       "yaml",
@@ -60,7 +60,7 @@ describe("highlightAgentSpec", () => {
     expect(tokens.number).toEqual(["2"]);
     expect(tokens.string).toEqual([
       "hello-world",
-      "anthropic:claude-sonnet-4-6",
+      "anthropic:claude-sonnet-5",
     ]);
   });
 
@@ -90,7 +90,7 @@ describe("highlightAgentSpec", () => {
         "instructions: |",
         "  Subject: keep this as instruction text",
         "  Count: 3",
-        "model: anthropic:claude-sonnet-4-6",
+        "model: anthropic:claude-sonnet-5",
         "",
       ].join("\n"),
       "yaml",

@@ -220,7 +220,7 @@ describe("buildMcpServer", () => {
       agentName: "greet",
       agentPath: "agents/pydantic-agentspec/greet.yaml",
       userMessage: "hi",
-      model: "anthropic:claude-sonnet-4-6",
+      model: "anthropic:claude-sonnet-5",
       status: "succeeded",
       output: "Hello!",
       streamedOutput: null,

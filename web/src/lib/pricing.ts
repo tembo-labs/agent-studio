@@ -50,7 +50,7 @@ const OPENAI_RATES: Array<{ pattern: RegExp; rate: Rate }> = [
 /**
  * Returns the estimated USD cost of a run, or null if we don't have a
  * pricing entry for the model. Model strings look like
- * `provider:model-name` (e.g. `anthropic:claude-sonnet-4-6`,
+ * `provider:model-name` (e.g. `anthropic:claude-sonnet-5`,
  * `openai:gpt-4o-mini`).
  */
 function lookupRate(model: string): Rate | null {
