@@ -498,12 +498,13 @@ Opt the agent into one or more **Agent Skills** — reusable \`SKILL.md\`
 folders (instructions + optional scripts/resources) installed in this
 repo under \`skills/<name>/\`. At run time the model can load a skill's
 instructions and run its scripts. Skills are installed out-of-band (the
-Skills page: skills.sh, a custom upload, or imported from the Claude
-API), so only reference skills that already exist under \`skills/\`.
+Skills page: Anthropic's knowledge-work library, skills.sh, a custom
+upload, or imported from the Claude API), so only reference skills that
+already exist under \`skills/\`.
 
 \`\`\`yaml
 name: deck-builder
-model: anthropic:claude-opus-4-7
+model: anthropic:claude-sonnet-5
 skills:
   - pptx                 # folder name under skills/pptx/
   - brand-guidelines

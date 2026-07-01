@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  renderIndexMarkdown,
   renderProviderMarkdown,
   type ForAgentsTool,
 } from "@/lib/for-agents-markdown";
@@ -60,5 +61,31 @@ describe("renderProviderMarkdown — parameter tables", () => {
     ];
     const md = renderProviderMarkdown(provider, tools);
     expect(md).not.toContain("## Parameters");
+  });
+});
+
+describe("renderIndexMarkdown — Agent Skills section", () => {
+  const base = "https://tas.example/for-agents";
+  const providers = [provider];
+
+  it("lists installed skills with descriptions", () => {
+    const md = renderIndexMarkdown(base, providers, new Set(), [
+      { name: "pdf", description: "Read + fill PDFs." },
+      { name: "brand", description: null },
+    ]);
+    expect(md).toContain("## Agent Skills");
+    expect(md).toContain("`skills: [pdf]`");
+    expect(md).toContain("- `pdf` — Read + fill PDFs.");
+    expect(md).toContain("- `brand`");
+  });
+
+  it("notes when none are installed, and hints at the token in the public view", () => {
+    expect(renderIndexMarkdown(base, providers, new Set(), [])).toContain(
+      "No skills installed here yet._",
+    );
+    // tokenless (skills omitted): suggest sending a token
+    expect(renderIndexMarkdown(base, providers, new Set())).toContain(
+      "send a token to list this workspace's skills",
+    );
   });
 });

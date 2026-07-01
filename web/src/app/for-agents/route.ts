@@ -8,6 +8,7 @@ import {
 } from "@/lib/for-agents-token";
 import { listMcpProviders } from "@/lib/mcp-providers";
 import { listCachedNativeProviders, listToolsForUser } from "@/lib/mcp-tools";
+import { listInstalledSkills } from "@/lib/workspace-skills";
 
 // Agent-facing index: GET /for-agents → a linked list of the per-provider
 // tool-reference pages. Token-gated by default; an instance can opt into a
@@ -37,10 +38,19 @@ export async function GET(request: NextRequest): Promise<Response> {
           .map((t) => t.provider)
       : await listCachedNativeProviders(),
   );
+  // With a token, list the workspace's installed Agent Skills so an authoring
+  // agent knows which `skills:` it can reference. Tokenless: omit (no workspace).
+  const skills = payload
+    ? (await listInstalledSkills(payload.w).catch(() => [])).map((s) => ({
+        name: s.name,
+        description: s.description,
+      }))
+    : undefined;
   const md = renderIndexMarkdown(
     `${getPublicOrigin()}/for-agents`,
     listMcpProviders(),
     connected,
+    skills,
   );
   return new Response(md, {
     status: 200,
