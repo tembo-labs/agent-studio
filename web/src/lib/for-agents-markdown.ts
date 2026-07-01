@@ -135,6 +135,9 @@ export function renderIndexMarkdown(
   baseUrl: string,
   providers: McpProvider[],
   connected: Set<string>,
+  /** Installed Agent Skills for this workspace (token-gated). Omitted/empty in
+   *  the public/tokenless view, which still documents the field + sources. */
+  skills?: { name: string; description: string | null }[],
 ): string {
   const lines = [
     "# Native MCP tool reference (for agents)",
@@ -152,5 +155,33 @@ export function renderIndexMarkdown(
     lines.push(`- [${p.displayName}](${baseUrl}/${p.slug}.md) — \`${p.slug}\`${note}`);
   }
   lines.push("");
+
+  // Agent Skills — reusable SKILL.md capabilities an agent opts into with its
+  // `skills:` field. Only skills already installed under skills/<name>/ can be
+  // referenced (a missing one fails the run), so list what's installed here.
+  lines.push(
+    "## Agent Skills",
+    "",
+    "Reusable `SKILL.md` capabilities an agent opts into with its `skills:` field",
+    "(e.g. `skills: [pdf]`). They live in `skills/<name>/` in this repo — only",
+    "reference ones already installed (a missing skill fails the run). Operators",
+    "install more from the Skills page: **Anthropic's knowledge-work library**,",
+    "skills.sh, a custom `.zip` upload, or the Claude API.",
+    "",
+  );
+  if (skills && skills.length > 0) {
+    lines.push("Installed here:", "");
+    for (const s of [...skills].sort((a, b) => a.name.localeCompare(b.name))) {
+      lines.push(`- \`${s.name}\`${s.description ? ` — ${s.description}` : ""}`);
+    }
+    lines.push("");
+  } else {
+    lines.push(
+      "_No skills installed here yet" +
+        (skills ? "" : " (send a token to list this workspace's skills)") +
+        "._",
+      "",
+    );
+  }
   return lines.join("\n");
 }
