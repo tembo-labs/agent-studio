@@ -92,7 +92,7 @@ Model choice is a cost/reliability tradeoff:
   `anthropic:claude-fable-5` (Anthropic's most capable, Mythos-class) for the
   hardest reasoning and long-horizon agentic work — reach for Fable only when
   Opus 4.8 isn't enough.
-- **Cheaper, simpler jobs.** `anthropic:claude-sonnet-4-6` and the mini tiers
+- **Cheaper, simpler jobs.** `anthropic:claude-haiku-4-5` and the mini tiers
   are fine for no-tools or high-volume work with a single, well-defined job and
   imperative instructions; they tend to hedge on tool calls, so prefer Sonnet 5
   for anything that declares `connections:`. Compare cost side-by-side on the

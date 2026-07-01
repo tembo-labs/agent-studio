@@ -7,7 +7,7 @@
 # the fields below. pydantic-ai 1.5 has no Agent.from_file factory —
 # the TAS wrapper does the mapping.
 name: hello-world
-model: anthropic:claude-sonnet-4-6
+model: anthropic:claude-sonnet-5
 description: Sample agent — friendly greeter used to verify a workspace runs.
 instructions: |
   You are a friendly agent.

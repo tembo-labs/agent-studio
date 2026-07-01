@@ -4,7 +4,7 @@ import { agentDisplayName, parseAgentContent } from "@/lib/agent-format";
 
 // Minimal valid Pydantic spec + an extra line under test.
 function pyd(extra: string): string {
-  return `name: test-agent\nmodel: anthropic:claude-sonnet-4-6\ninstructions: do it\n${extra}`;
+  return `name: test-agent\nmodel: anthropic:claude-sonnet-5\ninstructions: do it\n${extra}`;
 }
 
 function skillsOf(content: string): string[] | null {

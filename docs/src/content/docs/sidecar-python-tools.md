@@ -17,7 +17,7 @@ to** the spec:
 
 ```yaml
 name: revenue-rollup
-model: anthropic:claude-sonnet-4-6
+model: anthropic:claude-sonnet-5
 tools_module: revenue_tools.py        # agents/pydantic-agentspec/revenue_tools.py
 instructions: |
   Call summarize_arr to compute the monthly ARR waterfall, then post a
