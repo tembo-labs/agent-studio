@@ -10,61 +10,48 @@
 > change is a commit (PR by default, or direct commit in YOLO mode), and runs,
 > audit logs, and identity stay in your environment.
 
-Tembo Agent Studio (TAS) treats agents like production software instead of
-editable prompts in a vendor console. Agent definitions live in a repository
-you own. New agents, edits, and "this run was wrong" feedback all produce the
-same reviewable artifact your team already trusts: a pull request. Those agents
-run on your schedules and triggers, act through your connections, and loop a
-human in through a **Tasks Inbox** when a decision matters.
+Tembo Agent Studio (TAS) treats agents like production software, not editable
+prompts in a vendor console. Agents are spec files in a GitHub repository you
+own. New agents, edits, and run feedback produce reviewable Git diffs. Runs,
+identity, audit history, secrets, and approvals stay in your deployment.
 
-## Why TAS
+## At a Glance
 
-- **Git is the system of record.** Agent definitions are files in your repo.
-- **Every change is a commit.** Human or AI author, the output is always a
-  reviewable diff in Git — a pull request by default, or a direct commit in YOLO
-  mode.
-- **Runtime stays in your environment.** Runs, audit history, and identity stay
-  tied to your stack.
-- **Humans stay in the loop.** When a run needs judgment, agents surface it in
-  the Tasks Inbox to review and act on — reply, complete, archive — instead of
-  acting blindly; your edits feed back as reviewable improvements.
-- **Drift is governed.** Agents can evolve without turning into opaque prompt
-  sprawl.
+| Area | What TAS provides |
+| --- | --- |
+| Source of truth | Agent definitions in your GitHub repository |
+| Authoring | Pull requests by default, direct commits in YOLO mode |
+| Runtime | Self-hosted web app, Rust API, and Postgres |
+| Agent frameworks | Pydantic AgentSpec and Cargo AI |
+| Triggers | Manual runs, schedules, external events, webhooks, and Slack apps |
+| Tools | Composio integrations, native MCP servers, and reusable Skills |
+| Governance | Tasks Inbox, roles, audit log, draft/stable versions, agent locks |
 
-Authoring is delegated to the [Tembo Coding Agent Platform](https://tembo.io):
-TAS is the control plane, Tembo is the system that turns natural-language change
-requests into repository changes.
-
-## What You Can Do Today
-
-- Self-host the full stack with Docker Compose, from source or from published
-  GHCR images.
-- Sign in with Google, Microsoft Entra ID, or a generic OIDC provider.
-- Connect a GitHub repository as the source of truth for agent definitions, supporting both PR-based workflows and direct commits.
-- Create, edit, and run agents in two frameworks: Pydantic AgentSpec (with native WebSearch capability) and Cargo AI.
-- Open PRs or commit directly from chat-based authoring and run feedback.
-- Schedule agents with Automations, trigger them from external events, or create inbound webhooks (with bearer token or Svix signature verification).
-- Launch agents from Slack apps, and equip them with reusable Skills.
-- Manage per-user connections to external systems — ~1,000 services via Composio plus native MCP servers (Attio, Linear, HubSpot, Gmail, Clay, Amplemarket, and more).
-- Triage agent output in the Tasks Inbox: review proposed actions and act in the source system (reply, complete, archive), snooze, or dismiss — complete with structured links lists and auto-extracted links.
-- Organize and govern agents: toggle agent lock, fork or star agents, and inspect draft/stable version history and git commits.
-- Inspect operational dashboards, run history (with cancellation support), and append-only audit trails.
-- Manage workspace membership with API-enforced roles.
-
-See [`CHANGELOG.md`](./CHANGELOG.md) for shipped work and
-[`ROADMAP.md`](./ROADMAP.md) for what is next.
+Tembo's hosted Coding Agent Platform is optional. TAS can run hand-authored
+agent specs without it. Add a Tembo API key when you want natural-language
+authoring, chat-to-edit, and "Improve" flows that open PRs for review.
 
 ## Quickstart
 
-**Fastest path** (Docker host or a [Tembo sandbox](https://docs.tembo.io/features/sandbox/overview)):
+Fastest path on any Docker host:
 
 ```bash
 ./scripts/dev-up.sh
 ```
 
-This generates a `.env` (random secrets, email/password sign-in), boots the
-stack, and seeds an admin login — then prints the URL and credentials. The
-manual steps below are the same thing, broken out.
+The script is safe to rerun. On first run it:
+
+- writes `.env` with random development secrets,
+- enables email/password sign-in by leaving OAuth unset,
+- boots Postgres, the API, and the web app with Docker Compose,
+- waits for the web app,
+- seeds an admin account and prints the login details.
+
+When it finishes, open `http://localhost:3000`, sign in, and create a workspace.
+The bundled sample agents under [`agents/`](./agents) appear automatically until
+you connect your own GitHub repository.
+
+## Manual Setup
 
 ### 1. Prepare `.env`
 
@@ -84,30 +71,31 @@ Generate each with:
 openssl rand -base64 32
 ```
 
-**Sign-in:** by default (no OAuth configured) the login screen offers
-**email + password** — the zero-setup quickstart. Just sign in with an
-`INSTANCE_ADMIN_EMAILS` address to create the first account.
+Set `INSTANCE_ADMIN_EMAILS` to one or more comma-separated emails. These users
+can create the first workspace and reach instance-level settings. Without this
+value, the instance is invite-only and nobody can bootstrap administration.
 
-For production / multi-user, configure an OAuth provider instead (email/password
-turns off automatically when any is set):
+By default, when no OAuth provider is configured, the login screen offers
+email/password sign-in. This is useful for local development and sandbox
+evaluation.
+
+For production or multi-user deployments, configure one OAuth provider instead.
+Email/password turns off automatically when any provider is set:
 
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, or
 - `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, and
   `MICROSOFT_TENANT_ID`, or
 - `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`
 
-Set `INSTANCE_ADMIN_EMAILS` to bootstrap the first instance admin. Without it,
-the instance is invite-only and nobody gets the admin surface on first sign-in.
-
 ### 2. Start the stack
 
-Build from source:
+Build from source with the default compose file:
 
 ```bash
 docker compose up --build
 ```
 
-Or run published images:
+Or run published GHCR images:
 
 ```bash
 docker compose -f compose.release.yaml pull
@@ -129,16 +117,31 @@ The API applies database migrations automatically on boot via `sqlx::migrate!()`
 After the first admin signs in:
 
 1. Create a workspace.
-2. Connect the GitHub repository that stores your agent definitions.
-3. Add an Anthropic and/or OpenAI API key in workspace settings so agents can
-   run.
-4. Optionally add a Tembo API key to enable chat-to-PR authoring and
+2. Connect the GitHub repository that stores agent definitions.
+3. Add an Anthropic and/or OpenAI API key so agents can run.
+4. Add a Composio key if agents need external app connections.
+5. Optionally add a Tembo API key to enable chat-to-PR authoring and run
    improvement requests.
 
 The full zero-to-running checklist lives in
 [Customer setup](https://tembo.github.io/agent-studio/customer-setup/).
 
-## Deployment Paths
+## Core Concepts
+
+- **Workspaces** group agents, runs, members, secrets, connections, and audit
+  history.
+- **Agents** are versioned files in Git. TAS tracks draft and stable versions,
+  the backing commit, and the run history for each agent.
+- **Runs** execute an agent once and record model output, tool use, cost, and
+  operational status.
+- **Connections** let agents act through user-authorized external systems such
+  as Slack, Gmail, Sheets, Attio, Linear, HubSpot, and native MCP providers.
+- **Tasks Inbox** is the human-review surface for agent output that needs a
+  decision before acting in the source system.
+- **Automations and webhooks** run agents on schedules, external events, or
+  signed inbound requests.
+
+## Deployment
 
 - **Local or self-managed host:** [`docker-compose.yml`](./docker-compose.yml)
   builds from source.
@@ -149,13 +152,16 @@ The full zero-to-running checklist lives in
   [AWS](https://tembo.github.io/agent-studio/deploy-aws/), and
   [Vercel](https://tembo.github.io/agent-studio/deploy-vercel/).
 
+Pin `TAS_VERSION` in `.env` when using `compose.release.yaml` so upgrades are
+intentional and reproducible.
+
 ## Local Development
 
 Prerequisites:
 
 - Docker or OrbStack
 - Node `22+`
-- `pnpm`
+- `pnpm` `10.24+`
 - Rust `1.93+`
 
 Run everything with Docker:
@@ -164,7 +170,7 @@ Run everything with Docker:
 docker compose up --build
 ```
 
-Run only Postgres in Docker and develop the app code on the host:
+Or run only Postgres in Docker and develop services on the host:
 
 ```bash
 docker compose up -d postgres
@@ -185,7 +191,7 @@ pnpm install
 pnpm dev
 ```
 
-Useful commands:
+Useful verification commands:
 
 ```bash
 # web
@@ -198,17 +204,22 @@ cd api
 cargo test
 ```
 
+When you change product behavior, update the user manual under [`docs/`](./docs)
+in the same change. If you edit markdown under `docs/src/content/docs/`, run
+`cd web && pnpm gen:docs` so the in-app docs bundle stays in sync.
+
 ## Repository Layout
 
 ```text
 agent-studio/
-├── web/        Next.js control plane UI
-├── api/        Rust API, orchestration layer, and Postgres migrations
-├── docs/       Astro Starlight user manual
-├── agents/     Seed agent fixtures
-├── context/    Phase docs, demos, and planning material
-├── docker-compose.yml
-└── compose.release.yaml
+|-- web/                  Next.js control plane UI
+|-- api/                  Rust API, runner orchestration, migrations
+|-- docs/                 Astro Starlight user manual
+|-- agents/               Bundled sample agent specs
+|-- context/              Planning, phase notes, demos, user stories
+|-- scripts/dev-up.sh     One-command local/sandbox bootstrap
+|-- docker-compose.yml    Source-build compose stack
+`-- compose.release.yaml  Published-image compose stack
 ```
 
 Repo-specific contributor guidance lives in [`AGENTS.md`](./AGENTS.md). If you
@@ -218,8 +229,8 @@ same change.
 ## Documentation
 
 The product manual is published at
-[`tembo.github.io/agent-studio`](https://tembo.github.io/agent-studio/) and the
-source lives under [`docs/`](./docs).
+[`tembo.github.io/agent-studio`](https://tembo.github.io/agent-studio/). Source
+files live under [`docs/`](./docs).
 
 Recommended entry points:
 
@@ -236,6 +247,9 @@ Recommended entry points:
 - [Automations & triggers](https://tembo.github.io/agent-studio/automations-triggers/)
 - [Example Agents](https://tembo.github.io/agent-studio/example-agents/)
 - [API Reference](https://tembo.github.io/agent-studio/api/)
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for shipped work and
+[`ROADMAP.md`](./ROADMAP.md) for what is next.
 
 ## License
 
