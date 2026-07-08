@@ -10,6 +10,7 @@ import {
   THEME_BOOT_SCRIPT,
   ThemeProvider,
 } from "@/components/providers/theme-provider";
+import { FAVICON_ASSET_VERSION } from "@/lib/favicon-constants";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -24,15 +25,20 @@ export const metadata: Metadata = {
   // workspace's chosen favicon. We deliberately ship no app/favicon.ico:
   // that file convention injects a competing `/favicon.ico` <link> on
   // every page that the browser preferred over the workspace icon.
-  // The `?v=3` busts the browser's per-origin favicon cache: instances
+  // The `?v=` busts the browser's per-origin favicon cache: instances
   // that previously served an older icon leave a stale entry that a
   // hard refresh won't clear, so we change the URL to force a refetch
-  // (v=3: new Tembo T mark). The explicit `type` helps browsers render
-  // the SVG icon.
+  // (see FAVICON_ASSET_VERSION). The explicit `type` helps browsers
+  // render the SVG icon.
   icons: {
-    icon: [{ url: "/favicons/default-tembo.svg?v=3", type: "image/svg+xml" }],
-    shortcut: "/favicons/default-tembo.svg?v=3",
-    apple: "/favicons/default-tembo.svg?v=3",
+    icon: [
+      {
+        url: `/favicons/default-tembo.svg?v=${FAVICON_ASSET_VERSION}`,
+        type: "image/svg+xml",
+      },
+    ],
+    shortcut: `/favicons/default-tembo.svg?v=${FAVICON_ASSET_VERSION}`,
+    apple: `/favicons/default-tembo.svg?v=${FAVICON_ASSET_VERSION}`,
   },
 };
 
