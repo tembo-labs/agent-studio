@@ -14,6 +14,46 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.7.1] — Agent Library, knowledge-work skills + 9 MCP providers, Sonnet 5 default, new Tembo mark — shipped 2026-07-08
+
+### Added
+- **Agent Library.** A browsable catalog of ~124 ready-made starter agents
+  across work areas (Sales, CS, RevOps, Finance, Legal, Data,
+  Product/Engineering, IT…), ranked **connection-aware** so the starters you
+  can actually run — given what you've connected — lead. Clicking a starter
+  pre-fills the New Agent form and the existing Tembo Coding Agent flow turns
+  it into a spec + PR. Starters live as one-file-per-starter YAML read at
+  runtime, composed from shared archetype prompts. Public + in-app docs page.
+- **Nine more native MCP providers.** Notion, Intercom, Atlassian (Jira),
+  Asana, monday.com, Guru, Fireflies, Amplitude, and Apollo — all confirmed
+  Dynamic Client Registration, so they're TAS-managed connections with no
+  per-customer OAuth app and are enabled by default in the picker. Harvested
+  from Anthropic's
+  [knowledge-work-plugins](https://github.com/anthropics/knowledge-work-plugins)
+  connector catalog (batch 1).
+- **Browse + install Anthropic knowledge-work skills.** The Skills install
+  page now surfaces that repo's ~95 Agent Skills as a catalog — filter by
+  work area, search, install with one click. Their `SKILL.md` format is
+  exactly what TAS already mounts, so agents pick up role-specific domain
+  expertise alongside the matching library starters.
+- **Agent Skills documented for the Coding Agent.** `/for-agents` guidance
+  now covers authoring and consuming Agent Skills.
+
+### Changed
+- **New agents default to Claude Sonnet 5** (`anthropic:claude-sonnet-5`).
+  Model guidance flips the "start on Opus, then downgrade" playbook — Sonnet 5
+  is agentic enough to be the starting point, with Opus 4.8 / Fable 5 reserved
+  for the hardest work. Sonnet 4.6 is retired from examples, docs, the sample
+  agent, and the CAP prompt.
+- **New Tembo T mark.** The app and docs favicons (and the README badge) swap
+  the old elephant-trunk logo for the new blocky-T mark, with cache-busting so
+  stale favicons refetch.
+- README refreshed to clarify setup and the project overview.
+
+### Fixed
+- Dropped the redundant "Create an agent that handles this task:" prefix on
+  library-seeded agent requests.
+
 ## [v2026.6.29] — More MCP providers + confidential/instance connect, Clerk triggers, schedule-from-description, graceful drain — shipped 2026-06-30
 
 ### Added
