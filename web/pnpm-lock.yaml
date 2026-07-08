@@ -54,8 +54,8 @@ importers:
         specifier: ^5.6.0
         version: 5.6.0
       cronstrue:
-        specifier: ^3.14.0
-        version: 3.14.0
+        specifier: ^3.21.0
+        version: 3.21.0
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -2377,8 +2377,8 @@ packages:
     resolution: {integrity: sha512-6159NDv4eDOjXYDmMTkvUtaVcIrNZI779ydTMOfDdi9fSjhPqmySx0icCHX2+nOyXgNSw6sFCsgLKxYs/2KPuQ==}
     engines: {node: '>=18'}
 
-  cronstrue@3.14.0:
-    resolution: {integrity: sha512-XnW4vuK/jPJjmTyDWiej1Zq36Od7ITwxaV2O1pzHZuyMVvdy7NAvyvIBzybt+idqSpfqYuoDG7uf/ocGtJVWxA==}
+  cronstrue@3.21.0:
+    resolution: {integrity: sha512-6DgX87NpjknhNmYC0/JjexQIAwCvtaUNoayqxLsciU5NkwGcEhuXLgXkIOX/bsuXL4f/aaLfgimJ6/2X8c5ezg==}
     hasBin: true
 
   cross-spawn@7.0.6:
@@ -7222,7 +7222,7 @@ snapshots:
     dependencies:
       luxon: 3.7.2
 
-  cronstrue@3.14.0: {}
+  cronstrue@3.21.0: {}
 
   cross-spawn@7.0.6:
     dependencies:
