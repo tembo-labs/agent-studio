@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { FAVICON_ASSET_VERSION } from "@/lib/favicon-constants";
 import { getServerSession } from "@/lib/session";
 import {
   getCustomFaviconBytes,
@@ -24,7 +25,11 @@ import {
 // authenticated [workspace] layout; pre-auth pages render the static
 // default-tembo from the root layout, so gating here costs nothing there.
 
-const GENERIC_DEFAULT = "/favicons/default-tembo.svg";
+// Redirect targets carry the artwork version: the <link> URL in the
+// workspace layout is already version-busted, but without `?v=` here the
+// browser can follow the fresh redirect straight into its stale cache
+// entry for the bare static SVG.
+const GENERIC_DEFAULT = `/favicons/default-tembo.svg?v=${FAVICON_ASSET_VERSION}`;
 
 function redirectToStatic(path: string): NextResponse {
   return new NextResponse(null, { status: 302, headers: { Location: path } });
@@ -46,7 +51,9 @@ export async function GET(
   if (!role) return redirectToStatic(GENERIC_DEFAULT);
 
   if (workspace.faviconKind !== "custom") {
-    return redirectToStatic(`/favicons/${workspace.faviconKind}.svg`);
+    return redirectToStatic(
+      `/favicons/${workspace.faviconKind}.svg?v=${FAVICON_ASSET_VERSION}`,
+    );
   }
 
   const blob = await getCustomFaviconBytes(workspace.id);
