@@ -37,9 +37,12 @@ export async function generateMetadata({
   // (e.g. from before the icon was wired up, or the previous choice)
   // sticks. Keying on faviconKind changes the URL whenever the default
   // kind changes; custom uploads stay fresh via the route's
-  // must-revalidate header.
+  // must-revalidate header. The `-3` suffix versions the default SVG
+  // artwork itself (bump alongside the root layout's `?v=`) so a
+  // redesign of the static icons refetches even when the kind is
+  // unchanged.
   const ws = await getWorkspaceBySlug(slug);
-  const v = ws ? encodeURIComponent(ws.faviconKind) : "default";
+  const v = ws ? `${encodeURIComponent(ws.faviconKind)}-3` : "default-3";
   const href = `/api/workspaces/${encodeURIComponent(slug)}/favicon?v=${v}`;
   return {
     icons: { icon: href, shortcut: href, apple: href },
