@@ -6,7 +6,7 @@
 //! refreshed native-MCP OAuth token).
 
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng, Payload},
+    aead::{Aead, Generate, KeyInit, Payload},
     Aes256Gcm, Key, Nonce,
 };
 use anyhow::{anyhow, Context};
@@ -69,14 +69,13 @@ impl MasterKey {
         let bytes = STANDARD
             .decode(raw.trim())
             .context("TAS_ENCRYPTION_KEY must be base64")?;
-        if bytes.len() != KEY_LEN {
-            return Err(anyhow!(
+        let key = Key::<Aes256Gcm>::try_from(bytes.as_slice()).map_err(|_| {
+            anyhow!(
                 "TAS_ENCRYPTION_KEY must decode to {} bytes (got {})",
                 KEY_LEN,
                 bytes.len()
-            ));
-        }
-        let key = Key::<Aes256Gcm>::clone_from_slice(&bytes);
+            )
+        })?;
         Ok(Self(key))
     }
 
@@ -96,7 +95,7 @@ impl MasterKey {
     /// `decrypt_aad` must pass the same `aad`.
     pub fn encrypt_aad(&self, plaintext: &str, aad: &[u8]) -> anyhow::Result<Vec<u8>> {
         let cipher = Aes256Gcm::new(&self.0);
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let nonce = Nonce::generate();
         let ciphertext = if aad.is_empty() {
             cipher.encrypt(&nonce, plaintext.as_bytes())
         } else {
@@ -131,9 +130,9 @@ impl MasterKey {
         // Versioned + AAD-bound layout, when both the marker and an AAD exist.
         if !aad.is_empty() && blob.len() >= 1 + NONCE_LEN + TAG_LEN && blob[0] == VERSION_AAD {
             let (nonce_bytes, body_and_tag) = blob[1..].split_at(NONCE_LEN);
-            let nonce = Nonce::from_slice(nonce_bytes);
+            let nonce = Nonce::try_from(nonce_bytes).expect("split_at yields NONCE_LEN bytes");
             if let Ok(plain) = cipher.decrypt(
-                nonce,
+                &nonce,
                 Payload {
                     msg: body_and_tag,
                     aad,
@@ -150,9 +149,9 @@ impl MasterKey {
             return Err(anyhow!("encrypted blob shorter than nonce+tag"));
         }
         let (nonce_bytes, body_and_tag) = blob.split_at(NONCE_LEN);
-        let nonce = Nonce::from_slice(nonce_bytes);
+        let nonce = Nonce::try_from(nonce_bytes).expect("split_at yields NONCE_LEN bytes");
         let plain = cipher
-            .decrypt(nonce, body_and_tag)
+            .decrypt(&nonce, body_and_tag)
             .map_err(|e| anyhow!("decrypt failed: {e}"))?;
         String::from_utf8(plain).context("decrypted bytes are not valid UTF-8")
     }
@@ -163,7 +162,7 @@ mod tests {
     use super::*;
 
     fn test_key() -> MasterKey {
-        MasterKey(Key::<Aes256Gcm>::clone_from_slice(&[0u8; KEY_LEN]))
+        MasterKey(Key::<Aes256Gcm>::from([0u8; KEY_LEN]))
     }
 
     #[test]
