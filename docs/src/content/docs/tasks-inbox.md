@@ -74,12 +74,18 @@ Every active item can be:
   clear/archive action). **Dismiss is terminal**: a later agent run will *not*
   resurface a dismissed item, even if the source object changes.
 
+On the **Dismissed** facet you can multi-select items and **Delete** them to
+remove the rows permanently. Deleted items are gone from history; an agent that
+later produces the same source object again will create a **new** inbox item
+(unlike dismiss, which blocks reopen).
+
 ## Filtering the queue
 
 The inbox list supports full-text **search**, a **source** filter, a **type**
 filter, and status **facets** — *Active*, *Needs review*, *Open*, *Claimed*,
-*Snoozed*, *Done*, *Dismissed*. The sidebar shows a live count of active items
-(it updates on its own as agents produce work in the background).
+*Snoozed*, *Done*, *Dismissed*. Multi-select on active facets **Dismiss**es
+items; on *Dismissed* it **Delete**s them. The sidebar shows a live count of
+active items (it updates on its own as agents produce work in the background).
 
 ## Learning from your edits
 

@@ -12,7 +12,10 @@ import { DataTable, type Column, type SortDir } from "@/components/ui/data-table
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
-import { bulkDismissInboxItemsAction } from "./actions";
+import {
+  bulkDeleteDismissedInboxItemsAction,
+  bulkDismissInboxItemsAction,
+} from "./actions";
 
 // Search / filter / facet for the Tasks Inbox. The table chrome, row hover,
 // whole-row click, and sortable headers all come from the shared DataTable.
@@ -67,9 +70,11 @@ export function InboxList({
 
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [dismissing, startDismiss] = useTransition();
-  // Terminal facets aren't dismissable, so selection is disabled there.
-  const selectionEnabled = facet !== "done" && facet !== "dismissed";
+  const [bulkBusy, startBulk] = useTransition();
+  // Active facets mass-dismiss; Dismissed mass-deletes. Done stays
+  // unselectable (keep history). Selection is disabled only on Done.
+  const selectionEnabled = facet !== "done";
+  const isDismissedFacet = facet === "dismissed";
 
   const counts = useMemo(() => {
     const c = {
@@ -176,10 +181,28 @@ export function InboxList({
   function bulkDismiss() {
     const itemIds = [...effectiveSelected];
     if (itemIds.length === 0) return;
-    startDismiss(async () => {
+    startBulk(async () => {
       const r = await bulkDismissInboxItemsAction({ workspaceSlug, itemIds });
       if (r.ok) {
         toast.success(`Dismissed ${r.dismissed} item${r.dismissed === 1 ? "" : "s"}`);
+        setSelected(new Set());
+        router.refresh();
+      } else {
+        toast.error(r.error);
+      }
+    });
+  }
+
+  function bulkDelete() {
+    const itemIds = [...effectiveSelected];
+    if (itemIds.length === 0) return;
+    startBulk(async () => {
+      const r = await bulkDeleteDismissedInboxItemsAction({
+        workspaceSlug,
+        itemIds,
+      });
+      if (r.ok) {
+        toast.success(`Deleted ${r.deleted} item${r.deleted === 1 ? "" : "s"}`);
         setSelected(new Set());
         router.refresh();
       } else {
@@ -295,14 +318,25 @@ export function InboxList({
           <span className="text-foreground text-sm font-medium">
             {effectiveSelected.size} selected
           </span>
-          <Button
-            size="small"
-            variant="destructive"
-            disabled={dismissing}
-            onClick={bulkDismiss}
-          >
-            {dismissing ? "Dismissing…" : "Dismiss"}
-          </Button>
+          {isDismissedFacet ? (
+            <Button
+              size="small"
+              variant="destructive"
+              disabled={bulkBusy}
+              onClick={bulkDelete}
+            >
+              {bulkBusy ? "Deleting…" : "Delete"}
+            </Button>
+          ) : (
+            <Button
+              size="small"
+              variant="destructive"
+              disabled={bulkBusy}
+              onClick={bulkDismiss}
+            >
+              {bulkBusy ? "Dismissing…" : "Dismiss"}
+            </Button>
+          )}
           <button
             type="button"
             onClick={() => setSelected(new Set())}

@@ -28,6 +28,9 @@ they are no longer release versions. Phase scope now lives in
   TAS-managed OAuth (`mcp.stripe.com`). GitHub and X use a new **API token**
   connect path (paste a GitHub PAT or X App-only Bearer) because their hosted
   MCP servers don't offer third-party DCR. (Pylon was already in the catalog.)
+- **Delete dismissed inbox items.** On the Inbox **Dismissed** facet, multi-
+  select items and **Delete** them permanently (owner-scoped). Active facets
+  keep mass-**Dismiss**; *Done* stays unselectable.
 
 ## v2026.7.1 — Agent Library, knowledge-work skills + 9 MCP providers, Sonnet 5 default, new Tembo mark
 

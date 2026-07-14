@@ -489,6 +489,27 @@ export async function dismissInboxItems(
   return res.rows.map((r) => r.id);
 }
 
+/** Permanently delete the owner's *dismissed* items (Dismissed-facet bulk
+ *  delete). Only `status = 'dismissed'` rows are removed — active/done items
+ *  are never hard-deleted this way. Returns the ids actually deleted. After
+ *  delete, a re-produce of the same (source, externalRef) creates a fresh
+ *  item (unlike dismiss, which is terminal against reopens). */
+export async function deleteDismissedInboxItems(
+  ids: string[],
+  workspaceId: string,
+  ownerUserId: string,
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const res = await db.query<{ id: string }>(
+    `DELETE FROM inbox_item
+      WHERE id = ANY($1::uuid[]) AND workspace_id = $2 AND owner_user_id = $3
+        AND status = 'dismissed'
+      RETURNING id`,
+    [ids, workspaceId, ownerUserId],
+  );
+  return res.rows.map((r) => r.id);
+}
+
 // ── Learning-loop signal gathering (scheduler) ────────────────────────
 
 /**

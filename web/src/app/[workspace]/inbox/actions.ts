@@ -8,6 +8,7 @@ import { authorizeWorkspace, DENIED_MESSAGE } from "@/lib/auth-server";
 import {
   completeInboxItem,
   countActiveInboxItems,
+  deleteDismissedInboxItems,
   dismissInboxItem,
   dismissInboxItems,
   getInboxItem,
@@ -139,6 +140,45 @@ export async function bulkDismissInboxItemsAction(args: {
 
   revalidateInbox(args.workspaceSlug);
   return { ok: true, dismissed: dismissed.length };
+}
+
+export type BulkDeleteResult =
+  | { ok: true; deleted: number }
+  | { ok: false; error: string };
+
+/** Permanently delete selected *dismissed* inbox items (Dismissed-facet
+ *  multi-select). Operator+, owner-scoped; non-dismissed ids are skipped. */
+export async function bulkDeleteDismissedInboxItemsAction(args: {
+  workspaceSlug: string;
+  itemIds: string[];
+}): Promise<BulkDeleteResult> {
+  const ids = Array.from(new Set(args.itemIds)).filter(Boolean);
+  if (ids.length === 0) return { ok: true, deleted: 0 };
+
+  const auth = await authorizeWorkspace(args.workspaceSlug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { ok: false, error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+
+  const deleted = await deleteDismissedInboxItems(ids, workspace.id, userId);
+  await Promise.all(
+    deleted.map((id) =>
+      writeAuditEvent({
+        workspaceId: workspace.id,
+        actorUserId: userId,
+        source: "hitl_response",
+        kind: "inbox.deleted",
+        targetType: "inbox_item",
+        targetId: id,
+        agentName: null,
+      }),
+    ),
+  );
+
+  revalidateInbox(args.workspaceSlug);
+  return { ok: true, deleted: deleted.length };
 }
 
 // The human picked an action-menu button. Look up the chosen option ON THE
