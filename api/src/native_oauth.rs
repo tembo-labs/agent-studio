@@ -115,6 +115,78 @@ const POSTHOG_OAUTH_ORIGINS: &[&str] = &["https://oauth.posthog.com"];
 // Docs: https://docs.stripe.com/mcp
 const STRIPE_MCP_ORIGIN: &str = "https://mcp.stripe.com";
 const STRIPE_OAUTH_ORIGINS: &[&str] = &["https://access.stripe.com", "https://mcp.stripe.com"];
+// ── Hosted OAuth MCP batch (must match web/src/lib/mcp-providers.ts) ──
+const VERCEL_MCP_ORIGIN: &str = "https://mcp.vercel.com";
+const VERCEL_OAUTH_ORIGINS: &[&str] = &["https://mcp.vercel.com", "https://vercel.com"];
+const CANVA_MCP_ORIGIN: &str = "https://mcp.canva.com";
+const CANVA_OAUTH_ORIGINS: &[&str] = &["https://mcp.canva.com"];
+const CLICKUP_MCP_ORIGIN: &str = "https://mcp.clickup.com";
+const CLICKUP_OAUTH_ORIGINS: &[&str] = &["https://mcp.clickup.com"];
+const CLOSE_MCP_ORIGIN: &str = "https://mcp.close.com";
+const CLOSE_OAUTH_ORIGINS: &[&str] = &[
+    "https://mcp.close.com",
+    "https://api.close.com",
+    "https://app.close.com",
+];
+const SENTRY_MCP_ORIGIN: &str = "https://mcp.sentry.dev";
+const SENTRY_OAUTH_ORIGINS: &[&str] = &["https://mcp.sentry.dev"];
+const MIXPANEL_MCP_ORIGIN: &str = "https://mcp.mixpanel.com";
+const MIXPANEL_OAUTH_ORIGINS: &[&str] = &["https://mcp.mixpanel.com", "https://mixpanel.com"];
+const GRANOLA_MCP_ORIGIN: &str = "https://mcp.granola.ai";
+const GRANOLA_OAUTH_ORIGINS: &[&str] = &["https://mcp.granola.ai", "https://mcp-auth.granola.ai"];
+const DROPBOX_MCP_ORIGIN: &str = "https://mcp.dropbox.com";
+const DROPBOX_OAUTH_ORIGINS: &[&str] = &[
+    "https://mcp.dropbox.com",
+    "https://www.dropbox.com",
+    "https://api.dropboxapi.com",
+];
+const WEBFLOW_MCP_ORIGIN: &str = "https://mcp.webflow.com";
+const WEBFLOW_OAUTH_ORIGINS: &[&str] = &["https://mcp.webflow.com"];
+const CLOUDFLARE_MCP_ORIGIN: &str = "https://mcp.cloudflare.com";
+const CLOUDFLARE_OAUTH_ORIGINS: &[&str] = &["https://mcp.cloudflare.com"];
+const NEON_MCP_ORIGIN: &str = "https://mcp.neon.tech";
+const NEON_OAUTH_ORIGINS: &[&str] = &["https://mcp.neon.tech"];
+const CAL_MCP_ORIGIN: &str = "https://mcp.cal.com";
+const CAL_OAUTH_ORIGINS: &[&str] = &["https://mcp.cal.com"];
+const KLAVIYO_MCP_ORIGIN: &str = "https://mcp.klaviyo.com";
+const KLAVIYO_OAUTH_ORIGINS: &[&str] = &["https://mcp.klaviyo.com"];
+const PAYPAL_MCP_ORIGIN: &str = "https://mcp.paypal.com";
+const PAYPAL_OAUTH_ORIGINS: &[&str] = &["https://mcp.paypal.com"];
+const SQUARE_MCP_ORIGIN: &str = "https://mcp.squareup.com";
+const SQUARE_OAUTH_ORIGINS: &[&str] = &["https://mcp.squareup.com"];
+const AIRTABLE_MCP_ORIGIN: &str = "https://mcp.airtable.com";
+const AIRTABLE_OAUTH_ORIGINS: &[&str] = &["https://mcp.airtable.com", "https://airtable.com"];
+const RAILWAY_MCP_ORIGIN: &str = "https://mcp.railway.app";
+const RAILWAY_OAUTH_ORIGINS: &[&str] =
+    &["https://mcp.railway.app", "https://backboard.railway.com"];
+const RESEND_MCP_ORIGIN: &str = "https://mcp.resend.com";
+const RESEND_OAUTH_ORIGINS: &[&str] = &["https://mcp.resend.com", "https://api.resend.com"];
+const HEX_MCP_ORIGIN: &str = "https://app.hex.tech";
+const HEX_OAUTH_ORIGINS: &[&str] = &["https://app.hex.tech", "https://auth.app.hex.tech"];
+const PENDO_MCP_ORIGIN: &str = "https://app.pendo.io";
+const PENDO_OAUTH_ORIGINS: &[&str] = &["https://app.pendo.io"];
+const SIMILARWEB_MCP_ORIGIN: &str = "https://mcp.similarweb.com";
+const SIMILARWEB_OAUTH_ORIGINS: &[&str] =
+    &["https://mcp.similarweb.com", "https://mcp-auth.similarweb.com"];
+const DATADOG_MCP_ORIGIN: &str = "https://mcp.datadoghq.com";
+const DATADOG_OAUTH_ORIGINS: &[&str] =
+    &["https://mcp.datadoghq.com", "https://app.datadoghq.com"];
+const COMMONROOM_MCP_ORIGIN: &str = "https://mcp.commonroom.io";
+const COMMONROOM_OAUTH_ORIGINS: &[&str] =
+    &["https://mcp.commonroom.io", "https://login.commonroom.io"];
+const GONG_MCP_ORIGIN: &str = "https://mcp.gong.io";
+const GONG_OAUTH_ORIGINS: &[&str] = &["https://mcp.gong.io", "https://app.gong.io"];
+const BOX_MCP_ORIGIN: &str = "https://mcp.box.com";
+const BOX_OAUTH_ORIGINS: &[&str] = &[
+    "https://mcp.box.com",
+    "https://api.box.com",
+    "https://account.box.com",
+];
+const PAGERDUTY_MCP_ORIGIN: &str = "https://mcp.pagerduty.com";
+const PAGERDUTY_OAUTH_ORIGINS: &[&str] =
+    &["https://mcp.pagerduty.com", "https://app.pagerduty.com"];
+const SLACK_MCP_ORIGIN: &str = "https://mcp.slack.com";
+const SLACK_OAUTH_ORIGINS: &[&str] = &["https://mcp.slack.com", "https://slack.com"];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
@@ -138,6 +210,33 @@ const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (APOLLO_MCP_ORIGIN, APOLLO_OAUTH_ORIGINS),
     (POSTHOG_MCP_ORIGIN, POSTHOG_OAUTH_ORIGINS),
     (STRIPE_MCP_ORIGIN, STRIPE_OAUTH_ORIGINS),
+    (VERCEL_MCP_ORIGIN, VERCEL_OAUTH_ORIGINS),
+    (CANVA_MCP_ORIGIN, CANVA_OAUTH_ORIGINS),
+    (CLICKUP_MCP_ORIGIN, CLICKUP_OAUTH_ORIGINS),
+    (CLOSE_MCP_ORIGIN, CLOSE_OAUTH_ORIGINS),
+    (SENTRY_MCP_ORIGIN, SENTRY_OAUTH_ORIGINS),
+    (MIXPANEL_MCP_ORIGIN, MIXPANEL_OAUTH_ORIGINS),
+    (GRANOLA_MCP_ORIGIN, GRANOLA_OAUTH_ORIGINS),
+    (DROPBOX_MCP_ORIGIN, DROPBOX_OAUTH_ORIGINS),
+    (WEBFLOW_MCP_ORIGIN, WEBFLOW_OAUTH_ORIGINS),
+    (CLOUDFLARE_MCP_ORIGIN, CLOUDFLARE_OAUTH_ORIGINS),
+    (NEON_MCP_ORIGIN, NEON_OAUTH_ORIGINS),
+    (CAL_MCP_ORIGIN, CAL_OAUTH_ORIGINS),
+    (KLAVIYO_MCP_ORIGIN, KLAVIYO_OAUTH_ORIGINS),
+    (PAYPAL_MCP_ORIGIN, PAYPAL_OAUTH_ORIGINS),
+    (SQUARE_MCP_ORIGIN, SQUARE_OAUTH_ORIGINS),
+    (AIRTABLE_MCP_ORIGIN, AIRTABLE_OAUTH_ORIGINS),
+    (RAILWAY_MCP_ORIGIN, RAILWAY_OAUTH_ORIGINS),
+    (RESEND_MCP_ORIGIN, RESEND_OAUTH_ORIGINS),
+    (HEX_MCP_ORIGIN, HEX_OAUTH_ORIGINS),
+    (PENDO_MCP_ORIGIN, PENDO_OAUTH_ORIGINS),
+    (SIMILARWEB_MCP_ORIGIN, SIMILARWEB_OAUTH_ORIGINS),
+    (DATADOG_MCP_ORIGIN, DATADOG_OAUTH_ORIGINS),
+    (COMMONROOM_MCP_ORIGIN, COMMONROOM_OAUTH_ORIGINS),
+    (GONG_MCP_ORIGIN, GONG_OAUTH_ORIGINS),
+    (BOX_MCP_ORIGIN, BOX_OAUTH_ORIGINS),
+    (PAGERDUTY_MCP_ORIGIN, PAGERDUTY_OAUTH_ORIGINS),
+    (SLACK_MCP_ORIGIN, SLACK_OAUTH_ORIGINS),
 ];
 
 #[derive(Deserialize)]

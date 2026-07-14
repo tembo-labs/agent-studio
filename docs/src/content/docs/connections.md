@@ -42,9 +42,9 @@ TAS ships native MCP support for these providers:
 
 | Provider | Auth |
 | --- | --- |
-| Attio, Pylon, Fathom, Dialed, Linear, Amplemarket, Clay, Avoma, Metabase, Notion, Intercom, Atlassian (Jira), Asana, monday.com, Guru, Fireflies, Amplitude, Apollo, PostHog, Stripe | **TAS-managed OAuth** — click **Connect**, authorize, done |
+| Attio, Pylon, Fathom, Dialed, Linear, Amplemarket, Clay, Avoma, Metabase, Notion, Intercom, Atlassian (Jira), Asana, monday.com, Guru, Fireflies, Amplitude, Apollo, PostHog, Stripe, Vercel, Canva, ClickUp, Close, Sentry, Mixpanel, Granola, Dropbox, Webflow, Cloudflare, Neon, Cal.com, Klaviyo, PayPal, Square, Airtable, Railway, Resend, Hex, Pendo, Similarweb, Datadog, Common Room | **TAS-managed OAuth** — click **Connect**, authorize, done |
 | GitHub, X | **API token** — paste a PAT (GitHub) or App-only Bearer (X) |
-| HubSpot, Gmail | **Bring-your-own OAuth app** — admin sets up once (below) |
+| HubSpot, Gmail, Slack, Gong, Box, PagerDuty | **Bring-your-own OAuth app** — admin sets up once (below) |
 
 There's also a built-in **Tembo Agent Studio** native connection (TAS's own MCP
 server) that agents use to read/produce [Tasks Inbox](/agent-studio/tasks-inbox/)

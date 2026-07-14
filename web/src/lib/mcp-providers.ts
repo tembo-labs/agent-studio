@@ -41,6 +41,35 @@ export type McpProviderSlug =
   | "stripe"
   | "github"
   | "twitter"
+  // Batch 2026-07: hosted OAuth MCP servers harvested from Anthropic
+  // knowledge-work-plugins + live /.well-known OAuth probes (DCR public unless noted).
+  | "vercel"
+  | "canva"
+  | "clickup"
+  | "close"
+  | "sentry"
+  | "mixpanel"
+  | "granola"
+  | "dropbox"
+  | "webflow"
+  | "cloudflare"
+  | "neon"
+  | "cal"
+  | "klaviyo"
+  | "paypal"
+  | "square"
+  | "airtable"
+  | "railway"
+  | "resend"
+  | "hex"
+  | "pendo"
+  | "similarweb"
+  | "datadog"
+  | "commonroom"
+  | "gong"
+  | "box"
+  | "pagerduty"
+  | "slack"
   | "tembo-agent-studio";
 
 export type McpProvider = {
@@ -432,6 +461,245 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     authMode: "pat",
     patHint:
       "Paste your X app's App-only Bearer token (Developer Portal → your app → Keys and tokens). This grants app-level read access; it does not post as a user.",
+  },
+  // ── Hosted OAuth MCP batch (knowledge-work-plugins + OAuth probe) ──
+  // Each verified: protected-resource metadata + DCR public client (token
+  // auth method "none") + PKCE S256, unless authMode is "manual". omitOfflineAccess
+  // when offline_access is not in scopes_supported (strict validators).
+  vercel: {
+    slug: "vercel",
+    displayName: "Vercel",
+    mcpServerUrl: "https://mcp.vercel.com",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.vercel.com",
+      "https://vercel.com",
+    ],
+  },
+  canva: {
+    slug: "canva",
+    displayName: "Canva",
+    mcpServerUrl: "https://mcp.canva.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.canva.com"],
+    omitOfflineAccess: true,
+  },
+  clickup: {
+    slug: "clickup",
+    displayName: "ClickUp",
+    // Auth-code only (no refresh_token grant advertised).
+    mcpServerUrl: "https://mcp.clickup.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.clickup.com"],
+    omitOfflineAccess: true,
+  },
+  close: {
+    slug: "close",
+    displayName: "Close",
+    mcpServerUrl: "https://mcp.close.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.close.com",
+      "https://api.close.com",
+      "https://app.close.com",
+    ],
+  },
+  sentry: {
+    slug: "sentry",
+    displayName: "Sentry",
+    mcpServerUrl: "https://mcp.sentry.dev/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.sentry.dev"],
+    omitOfflineAccess: true,
+  },
+  mixpanel: {
+    slug: "mixpanel",
+    displayName: "Mixpanel",
+    mcpServerUrl: "https://mcp.mixpanel.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.mixpanel.com",
+      "https://mixpanel.com",
+    ],
+    omitOfflineAccess: true,
+  },
+  granola: {
+    slug: "granola",
+    displayName: "Granola",
+    mcpServerUrl: "https://mcp.granola.ai/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.granola.ai",
+      "https://mcp-auth.granola.ai",
+    ],
+  },
+  dropbox: {
+    slug: "dropbox",
+    displayName: "Dropbox",
+    mcpServerUrl: "https://mcp.dropbox.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.dropbox.com",
+      "https://www.dropbox.com",
+      "https://api.dropboxapi.com",
+    ],
+    omitOfflineAccess: true,
+  },
+  webflow: {
+    slug: "webflow",
+    displayName: "Webflow",
+    mcpServerUrl: "https://mcp.webflow.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.webflow.com"],
+    omitOfflineAccess: true,
+  },
+  cloudflare: {
+    slug: "cloudflare",
+    displayName: "Cloudflare",
+    mcpServerUrl: "https://mcp.cloudflare.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.cloudflare.com"],
+    omitOfflineAccess: true,
+  },
+  neon: {
+    slug: "neon",
+    displayName: "Neon",
+    mcpServerUrl: "https://mcp.neon.tech/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.neon.tech"],
+    omitOfflineAccess: true,
+  },
+  cal: {
+    slug: "cal",
+    displayName: "Cal.com",
+    mcpServerUrl: "https://mcp.cal.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.cal.com"],
+    omitOfflineAccess: true,
+  },
+  klaviyo: {
+    slug: "klaviyo",
+    displayName: "Klaviyo",
+    mcpServerUrl: "https://mcp.klaviyo.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.klaviyo.com"],
+    omitOfflineAccess: true,
+  },
+  paypal: {
+    slug: "paypal",
+    displayName: "PayPal",
+    mcpServerUrl: "https://mcp.paypal.com/sse",
+    oauthAuthorizationServerOrigins: ["https://mcp.paypal.com"],
+    omitOfflineAccess: true,
+  },
+  square: {
+    slug: "square",
+    displayName: "Square",
+    mcpServerUrl: "https://mcp.squareup.com/sse",
+    oauthAuthorizationServerOrigins: ["https://mcp.squareup.com"],
+    omitOfflineAccess: true,
+  },
+  airtable: {
+    slug: "airtable",
+    displayName: "Airtable",
+    mcpServerUrl: "https://mcp.airtable.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.airtable.com",
+      "https://airtable.com",
+    ],
+    omitOfflineAccess: true,
+  },
+  railway: {
+    slug: "railway",
+    displayName: "Railway",
+    mcpServerUrl: "https://mcp.railway.app/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.railway.app",
+      "https://backboard.railway.com",
+    ],
+  },
+  resend: {
+    slug: "resend",
+    displayName: "Resend",
+    mcpServerUrl: "https://mcp.resend.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.resend.com",
+      "https://api.resend.com",
+    ],
+    omitOfflineAccess: true,
+  },
+  hex: {
+    slug: "hex",
+    displayName: "Hex",
+    mcpServerUrl: "https://app.hex.tech/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://app.hex.tech",
+      "https://auth.app.hex.tech",
+    ],
+  },
+  pendo: {
+    slug: "pendo",
+    displayName: "Pendo",
+    mcpServerUrl: "https://app.pendo.io/mcp/v0/shttp",
+    oauthAuthorizationServerOrigins: ["https://app.pendo.io"],
+    omitOfflineAccess: true,
+  },
+  similarweb: {
+    slug: "similarweb",
+    displayName: "Similarweb",
+    mcpServerUrl: "https://mcp.similarweb.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.similarweb.com",
+      "https://mcp-auth.similarweb.com",
+    ],
+    omitOfflineAccess: true,
+  },
+  datadog: {
+    slug: "datadog",
+    displayName: "Datadog",
+    mcpServerUrl: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.datadoghq.com",
+      "https://app.datadoghq.com",
+    ],
+    omitOfflineAccess: true,
+  },
+  commonroom: {
+    slug: "commonroom",
+    displayName: "Common Room",
+    mcpServerUrl: "https://mcp.commonroom.io/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.commonroom.io",
+      "https://login.commonroom.io",
+    ],
+  },
+  // Manual (BYO confidential OAuth app) — popular hosted MCPs without DCR.
+  gong: {
+    slug: "gong",
+    displayName: "Gong",
+    mcpServerUrl: "https://mcp.gong.io/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.gong.io",
+      "https://app.gong.io",
+    ],
+    authMode: "manual",
+  },
+  box: {
+    slug: "box",
+    displayName: "Box",
+    mcpServerUrl: "https://mcp.box.com",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.box.com",
+      "https://api.box.com",
+      "https://account.box.com",
+    ],
+    authMode: "manual",
+  },
+  pagerduty: {
+    slug: "pagerduty",
+    displayName: "PagerDuty",
+    mcpServerUrl: "https://mcp.pagerduty.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.pagerduty.com",
+      "https://app.pagerduty.com",
+    ],
+    authMode: "manual",
+  },
+  slack: {
+    slug: "slack",
+    displayName: "Slack",
+    // Hosted MCP; confidential OAuth only (no DCR). Docs:
+    // https://docs.slack.dev/ai/slack-mcp-server
+    mcpServerUrl: "https://mcp.slack.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.slack.com", "https://slack.com"],
+    authMode: "manual",
   },
   "tembo-agent-studio": {
     slug: "tembo-agent-studio",

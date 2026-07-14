@@ -26,6 +26,12 @@ they are no longer release versions. Phase scope now lives in
 - **Delete dismissed inbox items.** On the Inbox **Dismissed** facet, multi-
   select items and **Delete** them permanently (owner-scoped). Active facets
   keep mass-**Dismiss**; *Done* stays unselectable.
+- **~25 more native MCP providers.** Hosted OAuth MCP servers verified via
+  live discovery (Anthropic knowledge-work-plugins + `/.well-known` probes):
+  Vercel, Canva, ClickUp, Close, Sentry, Mixpanel, Granola, Dropbox, Webflow,
+  Cloudflare, Neon, Cal.com, Klaviyo, PayPal, Square, Airtable, Railway, Resend,
+  Hex, Pendo, Similarweb, Datadog, Common Room (TAS-managed DCR), plus Slack,
+  Gong, Box, and PagerDuty as bring-your-own OAuth apps.
 
 ## [v2026.7.1] — Agent Library, knowledge-work skills + 9 MCP providers, Sonnet 5 default, new Tembo mark — shipped 2026-07-08
 
