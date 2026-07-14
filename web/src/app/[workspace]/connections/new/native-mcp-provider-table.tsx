@@ -14,10 +14,12 @@ export type NativeMcpProviderRow = {
   displayName: string;
   /** Auth-mode label shown in the Auth column and used as the filter value. */
   authLabel: string;
+  /** Work-area category (CRM, Helpdesk, …); empty when uncategorized. */
+  categoryLabel: string;
   href: string;
 };
 
-type SortKey = "displayName" | "authLabel";
+type SortKey = "displayName" | "authLabel" | "categoryLabel";
 
 export function NativeMcpProviderTable({
   rows,
@@ -26,6 +28,7 @@ export function NativeMcpProviderTable({
 }) {
   const [search, setSearch] = useState("");
   const [auth, setAuth] = useState<string>("all");
+  const [category, setCategory] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("displayName");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -33,24 +36,35 @@ export function NativeMcpProviderTable({
     () => Array.from(new Set(rows.map((r) => r.authLabel))).sort(),
     [rows],
   );
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(rows.map((r) => r.categoryLabel).filter((c) => c.length > 0)),
+      ).sort(),
+    [rows],
+  );
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
     const out = rows.filter((r) => {
       if (auth !== "all" && r.authLabel !== auth) return false;
+      if (category !== "all" && r.categoryLabel !== category) return false;
       if (!needle) return true;
       return (
         r.displayName.toLowerCase().includes(needle) ||
         r.slug.toLowerCase().includes(needle) ||
-        r.authLabel.toLowerCase().includes(needle)
+        r.authLabel.toLowerCase().includes(needle) ||
+        r.categoryLabel.toLowerCase().includes(needle)
       );
     });
     const dir = sortDir === "asc" ? 1 : -1;
     return out.sort((a, b) => {
-      const primary = a[sortKey].localeCompare(b[sortKey]) * dir;
+      const av = a[sortKey] || "\uffff"; // empty category sorts last
+      const bv = b[sortKey] || "\uffff";
+      const primary = av.localeCompare(bv) * dir;
       return primary !== 0 ? primary : a.displayName.localeCompare(b.displayName);
     });
-  }, [rows, search, auth, sortKey, sortDir]);
+  }, [rows, search, auth, category, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) {
@@ -77,12 +91,34 @@ export function NativeMcpProviderTable({
       ),
     },
     {
+      key: "categoryLabel",
+      header: "Category",
+      sortable: true,
+      thClassName: "w-[160px]",
+      cell: (r) => (
+        <span className="text-foreground-muted text-sm">
+          {r.categoryLabel || "—"}
+        </span>
+      ),
+    },
+    {
       key: "authLabel",
       header: "Auth",
       sortable: true,
-      thClassName: "w-[180px]",
+      thClassName: "w-[160px]",
       cell: (r) => (
         <span className="text-foreground-muted text-sm">{r.authLabel}</span>
+      ),
+    },
+    {
+      key: "connect",
+      header: "",
+      thClassName: "w-[90px]",
+      tdClassName: "text-right",
+      cell: () => (
+        <span className="text-foreground-weak text-sm font-medium">
+          Connect →
+        </span>
       ),
     },
   ];
@@ -90,7 +126,7 @@ export function NativeMcpProviderTable({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex min-w-[240px] flex-1 flex-col gap-1">
+        <div className="flex min-w-[220px] flex-1 flex-col gap-1">
           <label
             htmlFor="native-mcp-search"
             className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
@@ -106,7 +142,30 @@ export function NativeMcpProviderTable({
             className="bg-input border-border text-foreground rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)]"
           />
         </div>
-        <div className="flex min-w-[160px] flex-col gap-1">
+        {categoryOptions.length > 0 && (
+          <div className="flex min-w-[150px] flex-col gap-1">
+            <label
+              htmlFor="native-mcp-category"
+              className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
+            >
+              Category
+            </label>
+            <select
+              id="native-mcp-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="bg-input border-border text-foreground rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color,#009eff)]"
+            >
+              <option value="all">All categories</option>
+              {categoryOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="flex min-w-[150px] flex-col gap-1">
           <label
             htmlFor="native-mcp-auth"
             className="text-foreground-weak text-sm font-medium uppercase tracking-wide"
@@ -139,7 +198,10 @@ export function NativeMcpProviderTable({
         rowHref={(r) => r.href}
         sortKey={sortKey}
         sortDir={sortDir}
-        onSort={(key) => toggleSort(key as SortKey)}
+        onSort={(key) => {
+          if (key === "connect") return;
+          toggleSort(key as SortKey);
+        }}
         empty={
           <p className="text-foreground-weak text-base">
             No providers match the current filters.

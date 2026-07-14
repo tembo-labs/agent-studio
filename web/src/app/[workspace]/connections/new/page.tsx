@@ -13,6 +13,7 @@ import {
   getManualCredentialProvider,
   listManualCredentialProviders,
 } from "@/lib/manual-credential-providers";
+import { CATEGORY_META } from "@/lib/connection-categories";
 import { listMcpProviders, type McpProvider } from "@/lib/mcp-providers";
 import {
   getProviderEnableMap,
@@ -177,6 +178,7 @@ export default async function NewConnectionPage({
         slug: p.slug,
         displayName: p.displayName,
         authLabel: authModeLabel(p),
+        categoryLabel: categoryLabelForSlug(p.slug),
         href: `${newHref}?provider=${encodeURIComponent(p.slug)}`,
       }));
     return (
@@ -356,6 +358,15 @@ function authModeLabel(p: McpProvider): string {
   if (p.authMode === "self-key") return "Built-in";
   if (p.authMode === "pat") return "API token";
   return "OAuth";
+}
+
+/** First matching Agent Library category for a native-MCP slug, if any. */
+function categoryLabelForSlug(slug: string): string {
+  const s = slug.toLowerCase();
+  for (const meta of Object.values(CATEGORY_META)) {
+    if (meta.slugs.some((x) => x.toLowerCase() === s)) return meta.label;
+  }
+  return "";
 }
 
 function OptionCard({
