@@ -31,6 +31,7 @@ import { ConnectNativeMcpAppForm } from "../connect-native-mcp-app-form";
 import { ManualCredentialConnectForm } from "../manual-credential-connect-form";
 import { ToolkitPicker } from "../toolkit-picker";
 import { NativeConnectForm } from "./native-connect-form";
+import { NativePatConnectForm } from "./native-pat-connect-form";
 import { SecretAddForm } from "./secret-add-form";
 
 export const dynamic = "force-dynamic";
@@ -142,6 +143,13 @@ export default async function NewConnectionPage({
               {provider.displayName} needs an admin to set up its OAuth app first.
             </p>
           )
+        ) : provider.authMode === "pat" ? (
+          <NativePatConnectForm
+            workspaceSlug={workspace.slug}
+            providerSlug={provider.slug}
+            displayName={provider.displayName}
+            patHint={provider.patHint}
+          />
         ) : (
           <NativeConnectForm
             workspaceSlug={workspace.slug}
@@ -334,6 +342,7 @@ export default async function NewConnectionPage({
 function authModeLabel(p: McpProvider): string {
   if (p.authMode === "manual") return "OAuth · your app";
   if (p.authMode === "self-key") return "Built-in";
+  if (p.authMode === "pat") return "API token";
   return "OAuth";
 }
 

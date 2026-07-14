@@ -54,6 +54,8 @@ describe("categoryStatus", () => {
     ["fireflies", "recorder"],
     ["amplitude", "analytics"],
     ["posthog", "analytics"],
+    ["stripe", "payments"],
+    ["github", "issues"],
     ["apollo", "enrichment"],
   ] as const)("%s satisfies the %s category", (slug, category) => {
     expect(categoryStatus(category, new Set([slug])).satisfied).toBe(true);

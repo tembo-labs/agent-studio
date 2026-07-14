@@ -12,6 +12,7 @@ import {
   getNativeConnectionCredentials,
   listNativeConnectionsForUser,
   renameNativeConnection,
+  saveNativeConnection,
   setNativeConnectionAuxSecret,
 } from "@/lib/connections";
 import {
@@ -19,8 +20,9 @@ import {
   renameToolsForConnection,
   replaceToolsForConnection,
 } from "@/lib/mcp-tools";
-import { getMcpProvider } from "@/lib/mcp-providers";
+import { getMcpProvider, type McpProviderSlug } from "@/lib/mcp-providers";
 import { fetchNativeMcpTools } from "@/lib/native-mcp-tools";
+import { trustedMcpOrigin } from "@/lib/native-oauth-security";
 
 // Server actions for native-MCP connection rows. Read-paths live on
 // the page; the action surface here is just the disconnect button.
@@ -32,6 +34,106 @@ export type SimpleConnectionActionState = {
   error?: string;
 };
 const EMPTY: SimpleConnectionActionState = {};
+
+/**
+ * Connect a PAT / static-bearer native-MCP provider (GitHub, X, …). The
+ * user pastes a token; we store it as authType "pat" (no refresh) and
+ * best-effort prime the tool cache by calling the MCP server.
+ */
+export async function connectNativePatAction(
+  _prev: SimpleConnectionActionState,
+  formData: FormData,
+): Promise<SimpleConnectionActionState> {
+  const slug = String(formData.get("workspace") ?? "");
+  const providerSlug = String(formData.get("provider") ?? "");
+  const nameRaw = String(formData.get("name") ?? "default");
+  const token = String(formData.get("token") ?? "").trim();
+
+  const auth = await authorizeWorkspace(slug, "operator");
+  if (!auth.ok) {
+    if (auth.reason === "denied") return { error: DENIED_MESSAGE };
+    notFound();
+  }
+  const { workspace, userId } = auth;
+
+  const provider = getMcpProvider(providerSlug);
+  if (!provider || provider.authMode !== "pat" || !provider.mcpServerUrl) {
+    return { error: "Unknown or non-token provider." };
+  }
+  const connectionName = nameRaw.trim().toLowerCase() || "default";
+  if (!/^[a-z0-9_-]+$/.test(connectionName)) {
+    return { error: "Connection name must be lowercase letters, digits, _ or -." };
+  }
+  if (!token) return { error: "Token is required." };
+
+  // SSRF guard on the catalog URL (same as OAuth connect).
+  try {
+    await trustedMcpOrigin(provider.mcpServerUrl);
+  } catch (e) {
+    return { error: `Provider MCP URL is not trusted: ${(e as Error).message}` };
+  }
+
+  // Verify the token talks to the MCP server before we persist it.
+  let tools: Awaited<ReturnType<typeof fetchNativeMcpTools>> = [];
+  try {
+    tools = await fetchNativeMcpTools(provider.mcpServerUrl, token);
+  } catch (e) {
+    return {
+      error: `Couldn't reach ${provider.displayName} with that token: ${(e as Error).message}`,
+    };
+  }
+
+  const saved = await saveNativeConnection({
+    workspaceId: workspace.id,
+    userId,
+    type: provider.slug as McpProviderSlug,
+    name: connectionName,
+    mcpServerUrl: provider.mcpServerUrl,
+    authType: "pat",
+    credentials: { access_token: token },
+    metadata: { auth_mode: "pat" },
+  });
+
+  await writeAuditEvent({
+    workspaceId: workspace.id,
+    actorUserId: userId,
+    source: "human_action",
+    kind: "connection.authorized",
+    targetType: "connection",
+    targetId: saved.id,
+    agentName: null,
+    payload: {
+      provider: provider.slug,
+      name: connectionName,
+      source: "native-mcp",
+      auth_mode: "pat",
+    },
+  });
+
+  try {
+    await replaceToolsForConnection({
+      workspaceId: workspace.id,
+      userId,
+      source: "native-mcp",
+      provider: provider.slug,
+      connectionName,
+      tools: tools.map((t) => ({
+        slug: t.slug,
+        displayName: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema,
+      })),
+    });
+  } catch (e) {
+    console.error(
+      `[native-mcp/${provider.slug}] tool-cache prime failed:`,
+      (e as Error).message,
+    );
+  }
+
+  revalidatePath(`/${slug}/connections`);
+  redirect(`/${slug}/connections/native~${saved.id}?result=ok`);
+}
 
 /**
  * Disconnect a user's native-MCP connection. The row's owner can

@@ -111,6 +111,10 @@ const APOLLO_OAUTH_ORIGINS: &[&str] = &["https://mcp.apollo.io"];
 // Docs: https://posthog.com/docs/model-context-protocol
 const POSTHOG_MCP_ORIGIN: &str = "https://mcp.posthog.com";
 const POSTHOG_OAUTH_ORIGINS: &[&str] = &["https://oauth.posthog.com"];
+// Stripe hosted MCP: issuer is access.stripe.com/mcp; metadata also on mcp.stripe.com.
+// Docs: https://docs.stripe.com/mcp
+const STRIPE_MCP_ORIGIN: &str = "https://mcp.stripe.com";
+const STRIPE_OAUTH_ORIGINS: &[&str] = &["https://access.stripe.com", "https://mcp.stripe.com"];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
@@ -133,6 +137,7 @@ const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (AMPLITUDE_MCP_ORIGIN, AMPLITUDE_OAUTH_ORIGINS),
     (APOLLO_MCP_ORIGIN, APOLLO_OAUTH_ORIGINS),
     (POSTHOG_MCP_ORIGIN, POSTHOG_OAUTH_ORIGINS),
+    (STRIPE_MCP_ORIGIN, STRIPE_OAUTH_ORIGINS),
 ];
 
 #[derive(Deserialize)]

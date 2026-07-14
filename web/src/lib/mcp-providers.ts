@@ -38,6 +38,9 @@ export type McpProviderSlug =
   | "amplitude"
   | "apollo"
   | "posthog"
+  | "stripe"
+  | "github"
+  | "twitter"
   | "tembo-agent-studio";
 
 export type McpProvider = {
@@ -65,8 +68,16 @@ export type McpProvider = {
    *    own /mcp server. Connect mints a per-user `tas_` API key and
    *    stores it as the connection's bearer; the key's owner (and their
    *    live workspace role) is what /mcp enforces. Tembo is the first.
+   *  - "pat": static bearer / personal access token the user pastes at
+   *    Connect time (no OAuth). Used when the provider's hosted MCP only
+   *    supports API keys / PATs (GitHub remote MCP, X app-only Bearer).
    */
-  authMode?: "dcr" | "manual" | "self-key";
+  authMode?: "dcr" | "manual" | "self-key" | "pat";
+  /**
+   * Help text for `authMode: "pat"` — where to mint the token and which
+   * scopes/presets to pick. Shown next to the token field on Connect.
+   */
+  patHint?: string;
   /**
    * Extra static query params appended to the /authorize redirect, verbatim.
    * Some auth servers need provider-specific params the MCP spec doesn't model
@@ -381,6 +392,47 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     oauthAuthorizationServerOrigins: ["https://oauth.posthog.com"],
     omitOfflineAccess: true,
   },
+  stripe: {
+    slug: "stripe",
+    displayName: "Stripe",
+    // Hosted MCP at mcp.stripe.com. PR metadata advertises auth server
+    // https://access.stripe.com/mcp (path-aware AS discovery); DCR public
+    // client + PKCE S256 + refresh_token. Scope is the single "mcp" grant —
+    // offline_access is not advertised, so suppress the auto-append.
+    // Docs: https://docs.stripe.com/mcp
+    mcpServerUrl: "https://mcp.stripe.com",
+    oauthAuthorizationServerOrigins: [
+      "https://access.stripe.com",
+      "https://mcp.stripe.com",
+    ],
+    scopeOverride: ["mcp"],
+    omitOfflineAccess: true,
+  },
+  github: {
+    slug: "github",
+    displayName: "GitHub",
+    // Hosted remote MCP (api.githubcopilot.com). GitHub's auth server has no
+    // DCR and incomplete OAuth metadata for third-party hosts — connect with
+    // a fine-grained or classic PAT (Bearer), matching GitHub's documented
+    // non-OAuth path. Docs: https://github.com/github/github-mcp-server
+    mcpServerUrl: "https://api.githubcopilot.com/mcp/",
+    oauthAuthorizationServerOrigins: [],
+    authMode: "pat",
+    patHint:
+      "Paste a GitHub personal access token with the scopes your agent needs (repo, read:org, …). Classic or fine-grained both work as a Bearer token against the remote GitHub MCP server.",
+  },
+  twitter: {
+    slug: "twitter",
+    displayName: "X",
+    // Official hosted X API MCP. No MCP OAuth discovery / DCR — use an
+    // App-only Bearer from the X Developer Portal (read tools; user-context
+    // writes need the xurl bridge outside TAS). Docs: https://docs.x.com/tools/mcp
+    mcpServerUrl: "https://api.x.com/mcp",
+    oauthAuthorizationServerOrigins: [],
+    authMode: "pat",
+    patHint:
+      "Paste your X app's App-only Bearer token (Developer Portal → your app → Keys and tokens). This grants app-level read access; it does not post as a user.",
+  },
   "tembo-agent-studio": {
     slug: "tembo-agent-studio",
     displayName: "Tembo Agent Studio",
@@ -410,7 +462,8 @@ export function isDcrProvider(provider: McpProvider | null | undefined): boolean
   return (
     !!provider &&
     provider.authMode !== "manual" &&
-    provider.authMode !== "self-key"
+    provider.authMode !== "self-key" &&
+    provider.authMode !== "pat"
   );
 }
 

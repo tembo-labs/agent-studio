@@ -89,7 +89,7 @@ export default async function ManageProvidersPage({
 
       <Section
         title="Simple MCPs"
-        description="Zero-config providers — TAS registers itself automatically. Toggle which ones members can connect."
+        description="Zero-config providers — TAS-managed OAuth, built-in, or paste-a-token. Toggle which ones members can connect."
       >
         <ul className="divide-border bg-surface border-border flex flex-col divide-y overflow-hidden rounded-lg border">
           {dcrProviders.map((p) => (

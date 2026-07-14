@@ -19,6 +19,10 @@ they are no longer release versions. Phase scope now lives in
   TAS-managed OAuth connection — feature flags, insights, error tracking,
   experiments, HogQL, and the rest of PostHog's MCP tools. Dynamic Client
   Registration; region (US/EU) is picked from the account you sign in with.
+- **Stripe, GitHub, and X native MCP providers.** Stripe connects via
+  TAS-managed OAuth (`mcp.stripe.com`). GitHub and X use a new **API token**
+  connect path (paste a GitHub PAT or X App-only Bearer) because their hosted
+  MCP servers don't offer third-party DCR. (Pylon was already in the catalog.)
 
 ## [v2026.7.1] — Agent Library, knowledge-work skills + 9 MCP providers, Sonnet 5 default, new Tembo mark — shipped 2026-07-08
 

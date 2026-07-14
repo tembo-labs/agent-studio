@@ -239,6 +239,17 @@ export async function GET(
   if (provider.authMode === "self-key") {
     return connectSelfKey(provider, workspace, userId, connectionName);
   }
+  // PAT / static-bearer providers use a form + server action, not this OAuth
+  // route. Bounce back to the connect page so the user pastes a token there.
+  if (provider.authMode === "pat") {
+    return NextResponse.redirect(
+      new URL(
+        `/${workspace.slug}/connections/new?provider=${encodeURIComponent(provider.slug)}`,
+        getPublicOrigin(),
+      ),
+      302,
+    );
+  }
 
   // Resolve the MCP server URL. Fixed providers use the catalog constant;
   // instance-based (self-hosted, e.g. Metabase) take the host the operator
@@ -336,29 +347,56 @@ export async function GET(
   const scopes = provider.scopeOverride ?? prMeta.scopes_supported ?? [];
 
   // ── Step 2: authorization-server discovery ──────────────────────
-  const asMetaUrl = new URL(
-    "/.well-known/oauth-authorization-server",
-    authServerUrl,
-  );
-  let asMeta: AuthServerMetadata;
-  try {
-    const res = await fetch(
-      asMetaUrl,
-      noRedirectFetchInit({ headers: { Accept: "application/json" } }),
-    );
-    if (!res.ok) {
-      return back(
-        workspace.slug,
-        provider.slug,
-        `Couldn't fetch authorization server metadata (${res.status}).`,
+  // RFC 8414: bare `/.well-known/oauth-authorization-server` at the auth
+  // server origin, plus the path-aware form when the issuer has a path
+  // (Stripe advertises https://access.stripe.com/mcp → metadata lives at
+  // …/oauth-authorization-server/mcp). Some servers (GitHub) only publish
+  // OpenID discovery. Also try the MCP origin itself (Stripe serves a
+  // copy there). First successful JSON wins.
+  const asIssuerPath = authServerUrl.pathname.replace(/\/+$/, "");
+  const asCandidates = [
+    `${authServerUrl.origin}/.well-known/oauth-authorization-server`,
+    ...(asIssuerPath && asIssuerPath !== "/"
+      ? [
+          `${authServerUrl.origin}/.well-known/oauth-authorization-server${asIssuerPath}`,
+        ]
+      : []),
+    `${authServerUrl.origin}/.well-known/openid-configuration`,
+    ...(asIssuerPath && asIssuerPath !== "/"
+      ? [`${authServerUrl.href.replace(/\/+$/, "")}/.well-known/openid-configuration`]
+      : []),
+    `${mcpOrigin}/.well-known/oauth-authorization-server`,
+  ];
+  // De-dupe while preserving order.
+  const seenAs = new Set<string>();
+  const asUrls = asCandidates.filter((u) => {
+    if (seenAs.has(u)) return false;
+    seenAs.add(u);
+    return true;
+  });
+  let asMeta: AuthServerMetadata | null = null;
+  let asLastDetail = "";
+  for (const asMetaUrl of asUrls) {
+    try {
+      const res = await fetch(
+        asMetaUrl,
+        noRedirectFetchInit({ headers: { Accept: "application/json" } }),
       );
+      if (!res.ok) {
+        asLastDetail = `Couldn't fetch authorization server metadata (${res.status}).`;
+        continue;
+      }
+      asMeta = (await res.json()) as AuthServerMetadata;
+      break;
+    } catch (e) {
+      asLastDetail = `Authorization server metadata fetch failed: ${(e as Error).message}`;
     }
-    asMeta = (await res.json()) as AuthServerMetadata;
-  } catch (e) {
+  }
+  if (!asMeta) {
     return back(
       workspace.slug,
       provider.slug,
-      `Authorization server metadata fetch failed: ${(e as Error).message}`,
+      asLastDetail || "Authorization server discovery failed.",
     );
   }
   // "manual" providers (HubSpot) use a confidential BYO OAuth app and have no
@@ -412,9 +450,23 @@ export async function GET(
       `Authorization server endpoint is not trusted: ${(e as Error).message}`,
     );
   }
+  // Require advertised S256 for DCR (public) clients. Manual/BYO providers
+  // (GitHub) often omit code_challenge_methods_supported from their metadata
+  // but still accept PKCE S256 — we send it either way; reject only when the
+  // server explicitly lists methods and S256 isn't among them.
+  const pkceMethods = asMeta.code_challenge_methods_supported;
   if (
-    !(asMeta.code_challenge_methods_supported ?? []).some((m) => m === "S256")
+    pkceMethods &&
+    pkceMethods.length > 0 &&
+    !pkceMethods.some((m) => m === "S256")
   ) {
+    return back(
+      workspace.slug,
+      provider.slug,
+      `${provider.displayName} auth server doesn't support PKCE/S256 — auth flow won't complete safely.`,
+    );
+  }
+  if (!isManual && !(pkceMethods ?? []).some((m) => m === "S256")) {
     return back(
       workspace.slug,
       provider.slug,
@@ -430,9 +482,14 @@ export async function GET(
   // Set when DCR registers a CONFIDENTIAL client (Avoma) — the secret to present.
   let dcrClientSecret: string | null = null;
   if (isManual) {
-    // Confidential client: require client_secret_post and use the admin-stored
-    // OAuth app. The secret is added at the callback's token exchange.
-    if (!authMethods.some((m) => m === "client_secret_post")) {
+    // Confidential client: prefer client_secret_post. When the server omits
+    // token_endpoint_auth_methods_supported (GitHub), still use the BYO secret
+    // via client_secret_post — the callback already posts client_secret in the
+    // body.
+    if (
+      authMethods.length > 0 &&
+      !authMethods.some((m) => m === "client_secret_post")
+    ) {
       return back(
         workspace.slug,
         provider.slug,
