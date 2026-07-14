@@ -37,6 +37,9 @@ they are no longer release versions. Phase scope now lives in
   Cloudflare, Neon, Cal.com, Klaviyo, PayPal, Square, Airtable, Railway, Resend,
   Hex, Pendo, Similarweb, Datadog, Common Room (TAS-managed DCR), plus Slack,
   Gong, Box, and PagerDuty as bring-your-own OAuth apps.
+- **Zoom native MCP (BYO OAuth).** Meetings/recordings/hub streamable MCP at
+  `mcp.zoom.us`; confidential OAuth on `zoom.us` with **client_secret_basic**
+  (manual connect path now supports Basic as well as client_secret_post).
 
 ## v2026.7.1 — Agent Library, knowledge-work skills + 9 MCP providers, Sonnet 5 default, new Tembo mark
 

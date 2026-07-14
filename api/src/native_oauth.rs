@@ -188,6 +188,13 @@ const PAGERDUTY_OAUTH_ORIGINS: &[&str] =
     &["https://mcp.pagerduty.com", "https://app.pagerduty.com"];
 const SLACK_MCP_ORIGIN: &str = "https://mcp.slack.com";
 const SLACK_OAUTH_ORIGINS: &[&str] = &["https://mcp.slack.com", "https://slack.com"];
+// Zoom meetings MCP (streamable); AS is zoom.us (client_secret_basic only).
+const ZOOM_MCP_ORIGIN: &str = "https://mcp.zoom.us";
+const ZOOM_OAUTH_ORIGINS: &[&str] = &[
+    "https://zoom.us",
+    "https://mcp.zoom.us",
+    "https://mcp-us.zoom.us",
+];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
@@ -238,6 +245,7 @@ const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (BOX_MCP_ORIGIN, BOX_OAUTH_ORIGINS),
     (PAGERDUTY_MCP_ORIGIN, PAGERDUTY_OAUTH_ORIGINS),
     (SLACK_MCP_ORIGIN, SLACK_OAUTH_ORIGINS),
+    (ZOOM_MCP_ORIGIN, ZOOM_OAUTH_ORIGINS),
 ];
 
 #[derive(Deserialize)]
@@ -353,7 +361,9 @@ async fn refresh_one(
         .ok_or_else(|| anyhow!("no refresh_token stored — reconnect required"))?;
     // The client identity the refresh exchange presents:
     //  - manual (HubSpot): BYO client_id + client_secret from
-    //    workspace_native_oauth_client → client_secret_post.
+    //    workspace_native_oauth_client → client_secret_post by default, or
+    //    HTTP Basic when metadata says token_endpoint_auth_method=client_secret_basic
+    //    (Zoom only advertises Basic).
     //  - dcr_confidential (Avoma): client_id + client_secret stored IN the
     //    credentials blob (no per-workspace app) → HTTP Basic.
     //  - dcr (public): a `dcr_client_id`, no secret.
@@ -370,7 +380,11 @@ async fn refresh_one(
                 .unwrap_or("default");
             let (cid, secret) =
                 native_oauth_client_secret(pool, key, workspace_id, provider, instance).await?;
-            (cid, Some(secret), false)
+            let basic = metadata
+                .get("token_endpoint_auth_method")
+                .and_then(|v| v.as_str())
+                == Some("client_secret_basic");
+            (cid, Some(secret), basic)
         }
         Some("dcr_confidential") => {
             let cid = creds

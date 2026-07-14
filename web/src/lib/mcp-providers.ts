@@ -70,6 +70,7 @@ export type McpProviderSlug =
   | "box"
   | "pagerduty"
   | "slack"
+  | "zoom"
   | "tembo-agent-studio";
 
 export type McpProvider = {
@@ -699,6 +700,22 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     // https://docs.slack.dev/ai/slack-mcp-server
     mcpServerUrl: "https://mcp.slack.com/mcp",
     oauthAuthorizationServerOrigins: ["https://mcp.slack.com", "https://slack.com"],
+    authMode: "manual",
+  },
+  zoom: {
+    slug: "zoom",
+    displayName: "Zoom",
+    // Hosted streamable MCP (meetings / recordings / hub). Auth is Zoom's
+    // standard OAuth AS (https://zoom.us) — no DCR, client_secret_basic only
+    // (not post), PKCE not advertised. Manual BYO app; authorize picks Basic
+    // from token_endpoint_auth_methods_supported. Docs:
+    // https://developers.zoom.us/docs/guides/tools-and-extensions/mcp/
+    mcpServerUrl: "https://mcp.zoom.us/mcp/zoom/streamable",
+    oauthAuthorizationServerOrigins: [
+      "https://zoom.us",
+      "https://mcp.zoom.us",
+      "https://mcp-us.zoom.us",
+    ],
     authMode: "manual",
   },
   "tembo-agent-studio": {

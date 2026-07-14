@@ -481,20 +481,24 @@ export async function GET(
   let clientId: string;
   // Set when DCR registers a CONFIDENTIAL client (Avoma) — the secret to present.
   let dcrClientSecret: string | null = null;
+  // For manual (BYO) confidential clients: which token-endpoint auth method
+  // to use. Prefer client_secret_post (HubSpot/Gmail legacy); fall back to
+  // client_secret_basic when that's all the AS advertises (Zoom). Empty
+  // methods_supported → post (same as before).
+  let manualTokenAuth: "client_secret_post" | "client_secret_basic" =
+    "client_secret_post";
   if (isManual) {
-    // Confidential client: prefer client_secret_post. When the server omits
-    // token_endpoint_auth_methods_supported (GitHub), still use the BYO secret
-    // via client_secret_post — the callback already posts client_secret in the
-    // body.
-    if (
-      authMethods.length > 0 &&
-      !authMethods.some((m) => m === "client_secret_post")
-    ) {
+    const supportsPost = authMethods.some((m) => m === "client_secret_post");
+    const supportsBasic = authMethods.some((m) => m === "client_secret_basic");
+    if (authMethods.length > 0 && !supportsPost && !supportsBasic) {
       return back(
         workspace.slug,
         provider.slug,
-        `${provider.displayName} auth server doesn't support client_secret_post.`,
+        `${provider.displayName} auth server doesn't support client_secret_post or client_secret_basic.`,
       );
+    }
+    if (!supportsPost && supportsBasic) {
+      manualTokenAuth = "client_secret_basic";
     }
     const byo = await getNativeOAuthClientPreview(
       workspace.id,
@@ -602,7 +606,9 @@ export async function GET(
     clientId,
     tokenEndpoint: tokenEndpoint.toString(),
     authMode: isManual ? "manual" : confidentialDcr ? "dcr_confidential" : "dcr",
-    ...(isManual ? { instance } : {}),
+    ...(isManual
+      ? { instance, tokenEndpointAuthMethod: manualTokenAuth }
+      : {}),
     // Instance-based: persist the resolved per-connection URL so the callback
     // stores it (and validates same-origin) — provider.mcpServerUrl is empty.
     ...(isInstanceProvider(provider) ? { mcpServerUrl } : {}),

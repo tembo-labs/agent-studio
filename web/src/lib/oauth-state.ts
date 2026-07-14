@@ -78,6 +78,10 @@ export type NativeMcpStatePayload = {
    *  secret by this instance, and it's stored on the connection so refresh
    *  presents the right client_secret. Absent for DCR. */
   instance?: string;
+  /** How to present the confidential client at the token endpoint.
+   *  Zoom only supports client_secret_basic; HubSpot uses client_secret_post.
+   *  Absent → client_secret_post (legacy default for manual). */
+  tokenEndpointAuthMethod?: "client_secret_post" | "client_secret_basic";
   /** dcr_confidential only: the DCR-issued client_secret, AES-256-GCM encrypted
    *  (master key, AAD = the connection's native_connection AAD), base64. The
    *  callback decrypts it for the token exchange and persists it (encrypted) on

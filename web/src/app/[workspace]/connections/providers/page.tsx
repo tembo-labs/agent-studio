@@ -28,6 +28,9 @@ const SETUP_URLS: Record<string, string> = {
     "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/integrate-with-the-remote-hubspot-mcp-server",
   gmail:
     "https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server",
+  zoom: "https://developers.zoom.us/docs/guides/tools-and-extensions/mcp/",
+  slack: "https://docs.slack.dev/ai/slack-mcp-server",
+  gong: "https://mcp.gong.io",
 };
 
 // Extra provider-specific setup beyond "create an app + register the redirect
@@ -35,6 +38,8 @@ const SETUP_URLS: Record<string, string> = {
 const SETUP_NOTES: Record<string, string> = {
   gmail:
     "In Google Cloud also enable the Gmail API and the Gmail MCP API, set the OAuth consent screen to Internal with the scope https://mail.google.com/ (full Gmail — the MCP tools require it), and choose Web application as the client type.",
+  zoom:
+    "Create a Zoom OAuth app (General app / user-managed), register the redirect URI shown on this card, and enable the MCP scopes you need (meetings, recordings, Docs, …). Zoom uses client_secret_basic — paste the Client ID and Client Secret from the app credentials page.",
 };
 
 export const dynamic = "force-dynamic";

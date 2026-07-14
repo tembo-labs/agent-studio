@@ -143,7 +143,8 @@ export async function GET(
     );
   }
   // Client authentication at the token exchange:
-  //  - manual (BYO confidential app): stored client_secret via client_secret_post.
+  //  - manual (BYO confidential app): client_secret_post (body) by default, or
+  //    client_secret_basic (HTTP Basic) when the AS only advertises that (Zoom).
   //  - dcr_confidential (Avoma): the DCR-issued secret (decrypted from state) via
   //    HTTP Basic — the spec default when the server omits the auth-method field.
   //  - dcr (public): PKCE only, no secret.
@@ -175,7 +176,15 @@ export async function GET(
         `The ${provider.displayName} OAuth app is no longer configured. Re-add it under Connections.`,
       );
     }
-    tokenParams.client_secret = byo.clientSecret;
+    if (state.tokenEndpointAuthMethod === "client_secret_basic") {
+      tokenHeaders.Authorization =
+        "Basic " +
+        Buffer.from(`${state.clientId}:${byo.clientSecret}`).toString("base64");
+      // RFC 6749: when using Basic, omit client_id/secret from the body.
+      delete tokenParams.client_id;
+    } else {
+      tokenParams.client_secret = byo.clientSecret;
+    }
   } else if (
     state.authMode === "dcr_confidential" &&
     state.clientSecretCiphertext
@@ -271,6 +280,12 @@ export async function GET(
             auth_mode: "manual",
             client_id: state.clientId,
             instance: state.instance ?? "default",
+            // Zoom etc. need Basic on refresh; HubSpot keeps post (default).
+            ...(state.tokenEndpointAuthMethod
+              ? {
+                  token_endpoint_auth_method: state.tokenEndpointAuthMethod,
+                }
+              : {}),
           }
         : state.authMode === "dcr_confidential"
           ? { auth_mode: "dcr_confidential", dcr_client_id: state.clientId }

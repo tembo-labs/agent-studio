@@ -60,7 +60,7 @@ export const CATEGORY_META: Record<ConnectionCategory, CategoryMeta> = {
   calendar: { label: "Calendar", supported: true, slugs: ["googlecalendar", "outlookcalendar", "cal"] },
   notify: { label: "Slack", supported: true, slugs: ["slack", "microsoftteams", "pagerduty"] },
   helpdesk: { label: "Helpdesk", supported: true, slugs: ["pylon", "zendesk", "intercom", "freshdesk", "front", "helpscout"] },
-  recorder: { label: "Call recorder", supported: true, slugs: ["avoma", "fathom", "gong", "fireflies", "granola"] },
+  recorder: { label: "Call recorder", supported: true, slugs: ["avoma", "fathom", "gong", "fireflies", "granola", "zoom"] },
   accounting: { label: "Accounting", supported: true, slugs: ["quickbooks", "xero", "netsuite"] },
   payments: { label: "Payments", supported: true, slugs: ["stripe", "paypal", "square"] },
   analytics: { label: "Product analytics", supported: true, slugs: ["metabase", "amplitude", "mixpanel", "posthog", "googleanalytics", "pendo", "hex"] },
