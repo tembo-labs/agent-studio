@@ -31,6 +31,7 @@ import {
 import { ConnectNativeMcpAppForm } from "../connect-native-mcp-app-form";
 import { ManualCredentialConnectForm } from "../manual-credential-connect-form";
 import { ToolkitPicker } from "../toolkit-picker";
+import { NewConnectionChooser } from "./new-connection-chooser";
 import { NativeConnectForm } from "./native-connect-form";
 import { NativeMcpProviderTable } from "./native-mcp-provider-table";
 import { NativePatConnectForm } from "./native-pat-connect-form";
@@ -304,7 +305,30 @@ export default async function NewConnectionPage({
 
   if (typeParam || providerParam) notFound();
 
-  // ── The type chooser (first page) ───────────────────────────────────
+  // ── Landing: search any provider, or pick a connection type ─────────
+  const searchable = [
+    ...catalog
+      .filter((p) => isProviderAdminEnabled(p, enableMap))
+      .map((p) => ({
+        slug: p.slug,
+        displayName: p.displayName,
+        authLabel: authModeLabel(p),
+        categoryLabel: categoryLabelForSlug(p.slug),
+        kind: "native" as const,
+        href: `${newHref}?provider=${encodeURIComponent(p.slug)}`,
+      })),
+    ...(isAdmin
+      ? listManualCredentialProviders().map((p) => ({
+          slug: p.slug,
+          displayName: p.displayName,
+          authLabel: "Manual credential",
+          categoryLabel: "",
+          kind: "manual" as const,
+          href: `${newHref}?type=manual&provider=${encodeURIComponent(p.slug)}`,
+        }))
+      : []),
+  ];
+
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-col gap-2">
@@ -313,42 +337,18 @@ export default async function NewConnectionPage({
           New connection
         </h1>
         <p className="text-foreground-weak text-base">
-          Pick a connection type.
+          Search for a provider, or pick a connection type.
         </p>
       </div>
 
       <hr className="border-[var(--color-border-weak)]" />
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <OptionCard
-          href={`${newHref}?type=native`}
-          logo={<IconApiConnection size={24} className="text-foreground-muted" />}
-          title="Native MCP"
-          sublabel="Official provider MCP servers (OAuth)"
-        />
-        <OptionCard
-          href={`${newHref}?type=composio`}
-          logo={<IconApiConnection size={24} className="text-foreground-muted" />}
-          title="Composio"
-          sublabel="300+ apps via Composio"
-        />
-        {isAdmin && (
-          <OptionCard
-            href={`${newHref}?type=manual`}
-            logo={<Glyph />}
-            title="Manual credential"
-            sublabel="Paste credentials (e.g. LinkedIn)"
-          />
-        )}
-        {isAdmin && (
-          <OptionCard
-            href={`${newHref}?type=secret`}
-            logo={<Glyph />}
-            title="Secret / API key"
-            sublabel="Static key for custom tools"
-          />
-        )}
-      </div>
+      <NewConnectionChooser
+        workspaceSlug={workspace.slug}
+        providers={searchable}
+        showManual={isAdmin}
+        showSecret={isAdmin}
+      />
     </div>
   );
 }
