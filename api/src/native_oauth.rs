@@ -166,11 +166,12 @@ const HEX_OAUTH_ORIGINS: &[&str] = &["https://app.hex.tech", "https://auth.app.h
 const PENDO_MCP_ORIGIN: &str = "https://app.pendo.io";
 const PENDO_OAUTH_ORIGINS: &[&str] = &["https://app.pendo.io"];
 const SIMILARWEB_MCP_ORIGIN: &str = "https://mcp.similarweb.com";
-const SIMILARWEB_OAUTH_ORIGINS: &[&str] =
-    &["https://mcp.similarweb.com", "https://mcp-auth.similarweb.com"];
+const SIMILARWEB_OAUTH_ORIGINS: &[&str] = &[
+    "https://mcp.similarweb.com",
+    "https://mcp-auth.similarweb.com",
+];
 const DATADOG_MCP_ORIGIN: &str = "https://mcp.datadoghq.com";
-const DATADOG_OAUTH_ORIGINS: &[&str] =
-    &["https://mcp.datadoghq.com", "https://app.datadoghq.com"];
+const DATADOG_OAUTH_ORIGINS: &[&str] = &["https://mcp.datadoghq.com", "https://app.datadoghq.com"];
 const COMMONROOM_MCP_ORIGIN: &str = "https://mcp.commonroom.io";
 const COMMONROOM_OAUTH_ORIGINS: &[&str] =
     &["https://mcp.commonroom.io", "https://login.commonroom.io"];
