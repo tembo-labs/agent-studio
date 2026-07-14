@@ -31,6 +31,7 @@ import { ConnectNativeMcpAppForm } from "../connect-native-mcp-app-form";
 import { ManualCredentialConnectForm } from "../manual-credential-connect-form";
 import { ToolkitPicker } from "../toolkit-picker";
 import { NativeConnectForm } from "./native-connect-form";
+import { NativeMcpProviderTable } from "./native-mcp-provider-table";
 import { NativePatConnectForm } from "./native-pat-connect-form";
 import { SecretAddForm } from "./secret-add-form";
 
@@ -167,26 +168,37 @@ export default async function NewConnectionPage({
   }
 
   // ── Native MCP: list the providers ──────────────────────────────────
+  // Full table view (same chrome as /connections) — not a card grid. Search,
+  // auth filter, and sortable columns live in NativeMcpProviderTable.
   if (typeParam === "native") {
-    const providerCards = catalog.filter((p) => isProviderAdminEnabled(p, enableMap));
+    const providerRows = catalog
+      .filter((p) => isProviderAdminEnabled(p, enableMap))
+      .map((p) => ({
+        slug: p.slug,
+        displayName: p.displayName,
+        authLabel: authModeLabel(p),
+        href: `${newHref}?provider=${encodeURIComponent(p.slug)}`,
+      }));
     return (
-      <FormShell back={backToTypes} title="Native MCP" logo={<IconApiConnection size={24} className="text-foreground-muted" />}>
-        <p className="text-foreground-weak text-sm">
-          Official provider MCP servers with TAS-managed OAuth. Connections are
-          yours (per-user).
-        </p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {providerCards.map((p) => (
-            <OptionCard
-              key={p.slug}
-              href={`${newHref}?provider=${encodeURIComponent(p.slug)}`}
-              logo={<McpProviderLogo slug={p.slug} label={p.displayName} size={24} />}
-              title={p.displayName}
-              sublabel={authModeLabel(p)}
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-8">
+        <div className="flex flex-col gap-2">
+          <BackLink href={newHref} label="New connection" />
+          <div className="flex items-center gap-2.5">
+            <IconApiConnection
+              size={24}
+              className="text-foreground-muted shrink-0"
             />
-          ))}
+            <h1 className="text-foreground-title text-2xl font-bold tracking-tight">
+              Native MCP
+            </h1>
+          </div>
+          <p className="text-foreground-weak text-sm">
+            Official provider MCP servers — OAuth, API token, or built-in.
+            Connections are yours (per-user). Click a row to connect.
+          </p>
         </div>
-      </FormShell>
+        <NativeMcpProviderTable rows={providerRows} />
+      </div>
     );
   }
 

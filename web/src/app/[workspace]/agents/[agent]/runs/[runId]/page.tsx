@@ -129,16 +129,10 @@ export default async function RunDetailPage({
   const locked = await isAgentLocked(workspace.id, run.agentName);
 
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;
-  const totalTokens =
-    run.tokensInput !== null && run.tokensOutput !== null
-      ? run.tokensInput + run.tokensOutput
-      : null;
-  const estimatedCost =
-    run.tokensInput !== null && run.tokensOutput !== null
-      ? estimateRunCost(run.model, run.tokensInput, run.tokensOutput)
-      : null;
   // Prompt-cache breakdown lives per-step; sum it for the run header so the
   // cache hit (read 0.1x) vs. write (1.25x) is visible without scanning steps.
+  // Also needed before cost so the header estimate prices cache halves instead
+  // of defaulting them to 0 (which undercounted when prompt caching engaged).
   const cacheReadTokens = steps.reduce(
     (sum, s) => sum + (s.cacheReadTokens ?? 0),
     0,
@@ -148,6 +142,25 @@ export default async function RunDetailPage({
     0,
   );
   const hasCache = cacheReadTokens > 0 || cacheWriteTokens > 0;
+  // Token total = uncached input + cache halves + output (same shape as the
+  // step footer). tokensInput is already uncached; cache is stored per-step.
+  const totalTokens =
+    run.tokensInput !== null && run.tokensOutput !== null
+      ? run.tokensInput + run.tokensOutput + cacheReadTokens + cacheWriteTokens
+      : null;
+  // Cache-aware recompute: uncached input @ 1x + cache read @ 0.1x + write @
+  // 1.25x. Passing only in/out (defaulting cache to 0) undercounted the header
+  // whenever prompt caching engaged — the step footer was already correct.
+  const estimatedCost =
+    run.tokensInput !== null && run.tokensOutput !== null
+      ? estimateRunCost(
+          run.model,
+          run.tokensInput,
+          run.tokensOutput,
+          cacheReadTokens,
+          cacheWriteTokens,
+        )
+      : null;
   // ScaleDown prompt compression, if this run used it. original/compressed are
   // the source-block token counts before/after compression.
   const scaledownOrig = run.scaledownOriginalTokens;
