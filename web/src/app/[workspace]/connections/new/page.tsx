@@ -49,10 +49,14 @@ export default async function NewConnectionPage({
   searchParams,
 }: {
   params: Promise<{ workspace: string }>;
-  searchParams: Promise<{ provider?: string; type?: string }>;
+  searchParams: Promise<{ provider?: string; type?: string; toolkit?: string }>;
 }) {
   const { workspace: slug } = await params;
-  const { provider: providerParam, type: typeParam } = await searchParams;
+  const {
+    provider: providerParam,
+    type: typeParam,
+    toolkit: toolkitParam,
+  } = await searchParams;
 
   const session = await getServerSession();
   if (!session) notFound();
@@ -235,6 +239,12 @@ export default async function NewConnectionPage({
           .then((k) => listAllToolkits(k))
           .catch(() => [])
       : [];
+    // Prefill from ?toolkit= (landing search deep-link).
+    const prefillToolkit =
+      typeof toolkitParam === "string" &&
+      /^[a-z0-9_-]+$/i.test(toolkitParam.trim())
+        ? toolkitParam.trim().toLowerCase()
+        : "";
     return (
       <FormShell
         back={backToTypes}
@@ -250,7 +260,11 @@ export default async function NewConnectionPage({
             <input type="hidden" name="workspace" value={workspace.slug} />
             <div className="grid gap-1.5">
               <label className="text-foreground-weak text-sm font-medium">Toolkit</label>
-              <ToolkitPicker fieldName="toolkit" catalog={toolkitCatalog} />
+              <ToolkitPicker
+                fieldName="toolkit"
+                catalog={toolkitCatalog}
+                defaultValue={prefillToolkit}
+              />
             </div>
             <div className="grid gap-1.5">
               <label htmlFor="composio-name" className="text-foreground-weak text-sm font-medium">
@@ -306,6 +320,14 @@ export default async function NewConnectionPage({
   if (typeParam || providerParam) notFound();
 
   // ── Landing: search any provider, or pick a connection type ─────────
+  // Pull Composio toolkits when a workspace key is set so search spans
+  // Native MCP + Manual + Composio (~300 toolkits; cached 1h in-process).
+  const composioToolkits: CatalogToolkit[] = composioPreview
+    ? await getWorkspaceSecretPlaintext(workspace.id, "composio_api_key")
+        .then((k) => listAllToolkits(k))
+        .catch(() => [])
+    : [];
+
   const searchable = [
     ...catalog
       .filter((p) => isProviderAdminEnabled(p, enableMap))
@@ -321,12 +343,21 @@ export default async function NewConnectionPage({
       ? listManualCredentialProviders().map((p) => ({
           slug: p.slug,
           displayName: p.displayName,
-          authLabel: "Manual credential",
+          authLabel: "Paste credentials",
           categoryLabel: "",
           kind: "manual" as const,
           href: `${newHref}?type=manual&provider=${encodeURIComponent(p.slug)}`,
         }))
       : []),
+    ...composioToolkits.map((t) => ({
+      slug: t.slug,
+      displayName: t.name,
+      authLabel: "Composio OAuth",
+      categoryLabel: "",
+      kind: "composio" as const,
+      // Prefills the Composio toolkit picker; user confirms connection name.
+      href: `${newHref}?type=composio&toolkit=${encodeURIComponent(t.slug)}`,
+    })),
   ];
 
   return (
@@ -337,7 +368,7 @@ export default async function NewConnectionPage({
           New connection
         </h1>
         <p className="text-foreground-weak text-base">
-          Search for a provider, or pick a connection type.
+          Search Native MCP, Composio, and manual credentials — or pick a type.
         </p>
       </div>
 

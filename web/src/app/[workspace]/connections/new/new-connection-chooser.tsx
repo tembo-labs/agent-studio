@@ -9,16 +9,21 @@ import { McpProviderLogo } from "@/components/mcp-provider-logo";
 import { Input } from "@/components/ui/input";
 
 // Landing chooser for Connections → New. Search jumps straight to a provider
-// (native MCP / manual credential); empty query shows the type cards.
+// across Native MCP, Manual credential, and Composio; empty query shows type cards.
 
 export type SearchableProvider = {
   slug: string;
   displayName: string;
   authLabel: string;
   categoryLabel: string;
-  /** native-mcp | manual-credential */
-  kind: "native" | "manual";
+  kind: "native" | "manual" | "composio";
   href: string;
+};
+
+const KIND_LABEL: Record<SearchableProvider["kind"], string> = {
+  native: "Native MCP",
+  manual: "Manual credential",
+  composio: "Composio",
 };
 
 export function NewConnectionChooser({
@@ -38,16 +43,33 @@ export function NewConnectionChooser({
   const needle = query.trim().toLowerCase();
   const matches = useMemo(() => {
     if (!needle) return [];
-    return providers
-      .filter(
-        (p) =>
-          p.displayName.toLowerCase().includes(needle) ||
-          p.slug.toLowerCase().includes(needle) ||
-          p.authLabel.toLowerCase().includes(needle) ||
-          p.categoryLabel.toLowerCase().includes(needle) ||
-          p.kind.includes(needle),
-      )
-      .slice(0, 40);
+    const scored = providers
+      .map((p) => {
+        const name = p.displayName.toLowerCase();
+        const slug = p.slug.toLowerCase();
+        const hay = `${name} ${slug} ${p.authLabel} ${p.categoryLabel} ${p.kind} ${KIND_LABEL[p.kind]}`.toLowerCase();
+        if (!hay.includes(needle) && !slug.includes(needle) && !name.includes(needle)) {
+          return null;
+        }
+        // Rank: exact slug > slug prefix > name prefix > substring. Native
+        // slightly before Composio on a tie so official MCPs surface first.
+        let score = 0;
+        if (slug === needle) score = 100;
+        else if (slug.startsWith(needle)) score = 80;
+        else if (name.startsWith(needle)) score = 60;
+        else if (name.includes(needle) || slug.includes(needle)) score = 40;
+        else score = 20;
+        if (p.kind === "native") score += 3;
+        else if (p.kind === "manual") score += 2;
+        else score += 1;
+        return { p, score };
+      })
+      .filter((x): x is { p: SearchableProvider; score: number } => x !== null)
+      .sort(
+        (a, b) =>
+          b.score - a.score || a.p.displayName.localeCompare(b.p.displayName),
+      );
+    return scored.map((x) => x.p).slice(0, 50);
   }, [providers, needle]);
 
   const typeMatches = useMemo(() => {
@@ -160,7 +182,7 @@ export function NewConnectionChooser({
                 <span className="text-foreground-muted normal-case tracking-normal">
                   {" "}
                   · {matches.length}
-                  {matches.length === 40 ? "+" : ""}
+                  {matches.length === 50 ? "+" : ""}
                 </span>
               )}
             </h2>
@@ -202,10 +224,10 @@ export function NewConnectionChooser({
                         </span>
                         <span className="text-foreground-muted truncate text-xs">
                           <code>{p.slug}</code>
-                          {p.categoryLabel ? ` · ${p.categoryLabel}` : ""}
                           {" · "}
-                          {p.authLabel}
-                          {p.kind === "manual" ? " · Manual credential" : ""}
+                          {KIND_LABEL[p.kind]}
+                          {p.categoryLabel ? ` · ${p.categoryLabel}` : ""}
+                          {p.authLabel ? ` · ${p.authLabel}` : ""}
                         </span>
                       </span>
                       <span className="text-foreground-weak shrink-0 text-sm font-medium whitespace-nowrap">
