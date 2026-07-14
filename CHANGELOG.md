@@ -14,6 +14,12 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+### Added
+- **PostHog native MCP provider.** Connect PostHog (`mcp.posthog.com`) as a
+  TAS-managed OAuth connection — feature flags, insights, error tracking,
+  experiments, HogQL, and the rest of PostHog's MCP tools. Dynamic Client
+  Registration; region (US/EU) is picked from the account you sign in with.
+
 ## [v2026.7.1] — Agent Library, knowledge-work skills + 9 MCP providers, Sonnet 5 default, new Tembo mark — shipped 2026-07-08
 
 ### Added

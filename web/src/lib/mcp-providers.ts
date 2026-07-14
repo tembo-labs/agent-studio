@@ -37,6 +37,7 @@ export type McpProviderSlug =
   | "fireflies"
   | "amplitude"
   | "apollo"
+  | "posthog"
   | "tembo-agent-studio";
 
 export type McpProvider = {
@@ -366,6 +367,19 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
     displayName: "Apollo",
     mcpServerUrl: "https://mcp.apollo.io/mcp",
     oauthAuthorizationServerOrigins: ["https://mcp.apollo.io"],
+  },
+  posthog: {
+    slug: "posthog",
+    displayName: "PostHog",
+    // Official hosted MCP. Protected-resource metadata advertises
+    // oauth.posthog.com as the auth server (region-routes US/EU from the
+    // account you sign in with). DCR + PKCE public client; refresh_token grant
+    // is advertised but offline_access is NOT in scopes_supported — suppress
+    // the auto-append so strict scope validation doesn't reject Connect.
+    // Docs: https://posthog.com/docs/model-context-protocol
+    mcpServerUrl: "https://mcp.posthog.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://oauth.posthog.com"],
+    omitOfflineAccess: true,
   },
   "tembo-agent-studio": {
     slug: "tembo-agent-studio",

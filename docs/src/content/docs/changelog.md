@@ -20,6 +20,208 @@ they are no longer release versions. Phase scope now lives in
 ## Unreleased
 
 ### Added
+- **PostHog native MCP provider.** Connect PostHog (`mcp.posthog.com`) as a
+  TAS-managed OAuth connection — feature flags, insights, error tracking,
+  experiments, HogQL, and the rest of PostHog's MCP tools. Dynamic Client
+  Registration; region (US/EU) is picked from the account you sign in with.
+
+## v2026.7.1 — Agent Library, knowledge-work skills + 9 MCP providers, Sonnet 5 default, new Tembo mark
+
+### Added
+- **Agent Library.** A browsable catalog of ~124 ready-made starter agents
+  across work areas (Sales, CS, RevOps, Finance, Legal, Data,
+  Product/Engineering, IT…), ranked **connection-aware** so the starters you
+  can actually run — given what you've connected — lead. Clicking a starter
+  pre-fills the New Agent form and the existing Tembo Coding Agent flow turns
+  it into a spec + PR. Starters live as one-file-per-starter YAML read at
+  runtime, composed from shared archetype prompts. Public + in-app docs page.
+- **Nine more native MCP providers.** Notion, Intercom, Atlassian (Jira),
+  Asana, monday.com, Guru, Fireflies, Amplitude, and Apollo — all confirmed
+  Dynamic Client Registration, so they're TAS-managed connections with no
+  per-customer OAuth app and are enabled by default in the picker. Harvested
+  from Anthropic's
+  [knowledge-work-plugins](https://github.com/anthropics/knowledge-work-plugins)
+  connector catalog (batch 1).
+- **Browse + install Anthropic knowledge-work skills.** The Skills install
+  page now surfaces that repo's ~95 Agent Skills as a catalog — filter by
+  work area, search, install with one click. Their `SKILL.md` format is
+  exactly what TAS already mounts, so agents pick up role-specific domain
+  expertise alongside the matching library starters.
+- **Agent Skills documented for the Coding Agent.** `/for-agents` guidance
+  now covers authoring and consuming Agent Skills.
+
+### Changed
+- **New agents default to Claude Sonnet 5** (`anthropic:claude-sonnet-5`).
+  Model guidance flips the "start on Opus, then downgrade" playbook — Sonnet 5
+  is agentic enough to be the starting point, with Opus 4.8 / Fable 5 reserved
+  for the hardest work. Sonnet 4.6 is retired from examples, docs, the sample
+  agent, and the CAP prompt.
+- **New Tembo T mark.** The app and docs favicons (and the README badge) swap
+  the old elephant-trunk logo for the new blocky-T mark, with cache-busting so
+  stale favicons refetch.
+- README refreshed to clarify setup and the project overview.
+
+### Fixed
+- Dropped the redundant "Create an agent that handles this task:" prefix on
+  library-seeded agent requests.
+
+## v2026.6.29 — More MCP providers + confidential/instance connect, Clerk triggers, schedule-from-description, graceful drain
+
+### Added
+- **Four more native MCP providers.** Amplemarket, Clay, Avoma, and Metabase
+  join the native-MCP catalog and connect in a couple of clicks.
+- **Confidential & instance-based MCP connect.** Two new connection shapes widen
+  what TAS can authorize: **confidential Dynamic Client Registration** for
+  providers that require a confidential OAuth client (this unblocked Avoma), and
+  **instance-based providers** where the user supplies part of the server URL —
+  e.g. your own Metabase host. Both keep the SSRF guards of the existing flows.
+- **Optional API key on a native-MCP connection.** A connection can now carry a
+  supplementary API key alongside its OAuth token (some providers gate write
+  actions behind a scoped key the MCP token can't grant), with a per-provider
+  note explaining **why** and **which scopes** are needed.
+- **Trigger agents from Clerk webhooks.** Inbound Clerk events (Svix-signature
+  verified) can fire an agent; the webhook signing-secret UI is now
+  provider-agnostic so other signed-webhook sources slot in.
+- **Scriptable run cancel.** `POST /api/v1/runs/[id]/cancel` kills an in-flight
+  run from the API, complementing the in-app Stop button.
+- **Auto-create a schedule from the agent description.** When you create an agent
+  whose description names a recurring schedule ("every weekday at 9am"), TAS
+  parses it and creates an enabled automation alongside the agent. Conservative —
+  prose that merely mentions a time doesn't trigger one.
+- **Timezone-aware automations (DST-correct).** Automations store an IANA
+  timezone and the scheduler evaluates each cron in that zone, so a wall-clock
+  schedule tracks daylight saving. The form gains a timezone picker (defaulting
+  to your browser zone); existing automations keep firing in UTC.
+- **Agents-owned on the Team dashboard.** Each member row shows how many agents
+  they own, with a count of unowned agents so nothing falls through the cracks.
+- **Copy button on the Definition tab** and **expandable tool-call errors** in
+  the run step timeline.
+
+### Changed
+- **Graceful shutdown.** On deploy/restart the api now **drains in-flight runs**
+  before exiting instead of killing them mid-execution.
+- The new agent file is committed next to the user's request, and inbox guidance
+  softens the OAuth-token-for-REST advice (an item now also accepts string
+  context).
+
+### Fixed
+- **Prompt-cache token accounting.** Stopped double-charging cached prompt tokens
+  and fixed live per-step input tokens under-reporting mid-run.
+- **Connect flows.** Amplemarket and Metabase reject the auto-appended
+  `offline_access` scope — no longer requested; an unset auth mode is treated as
+  DCR so those connections stay editable; runs are registered before the
+  subprocess spawns (no orphaned "running" rows on a crash at startup).
+- **Sidebar.** Failing-agent alerts are scoped to your own runs (a teammate's
+  failure no longer nags you), and the "Action needed" header no longer lingers
+  over an empty section once its cards are dismissed.
+- **LinkedIn (and any manual-credential) logo** now renders on the connections
+  list, detail, and picker instead of a generic glyph.
+
+## v2026.6.28 — Agent web search, inbox triage + links, self-documenting tool reference
+
+### Added
+- **Agent web search.** Agents can now actually search the web by declaring
+  `capabilities: [WebSearch]` — it maps to pydantic-ai's provider-adaptive web
+  search (native on Anthropic/OpenAI, local fallback otherwise). The capability
+  was documented but silently ignored by the runner before.
+- **Self-documenting tool reference.** The `/for-agents` reference now publishes
+  each native-MCP tool's full **parameter schema** (name / type / required /
+  description), not just a one-line description — so an agent author (and Tembo
+  CAP) can discover a tool's exact arguments. The `tembo-agent-studio` reference
+  is served without a token (its tools are TAS's own public API), and an instance
+  can opt the whole reference public via `TAS_FOR_AGENTS_PUBLIC`.
+- **Inbox links.** An agent can attach a clickable **Links** list to one inbox
+  item via `links: [{ label, url }]` on `produce_inbox_item` — e.g. the top 10
+  Linear tickets behind a single triage task. Links are also **auto-extracted**
+  from an item's proposed text (Markdown + bare URLs) and context payload, so the
+  list populates even when the agent didn't set the field. http(s)-only, deduped,
+  capped.
+- **Faster inbox triage.** Resolving an item now **advances to the next** one to
+  review (with an "N more in your inbox" counter); the index gains **multi-select
+  mass-dismiss**; and **Dismiss** is now always available on the item detail page
+  (previously hidden when the agent supplied one-click options).
+
+### Changed
+- **Tool caches auto-refresh.** Every native-MCP + Composio connection's cached
+  tool catalog now re-syncs on each deploy (and daily) instead of requiring a
+  manual Connections → Refresh — so new/changed tools (and their schemas) appear
+  on their own. Throttled so restarts don't re-storm provider APIs.
+- **Agent ownership on first run** and the marketing landing copy refresh.
+
+### Fixed
+- **Pending agent-create ghost cards.** A chat-to-create whose commit didn't
+  carry the reconcile marker could sit "Pending" forever and couldn't be
+  dismissed; creates now auto-reconcile once the agent file lands in the repo,
+  and Dismiss clears direct-commit creates too.
+- **Inbox checkbox hit area** — a near-miss on the row checkbox no longer opens
+  the item instead of toggling selection.
+
+### Security
+- **CodeQL batch** — least-privilege workflow `GITHUB_TOKEN`, complete
+  markdown-table escaping, and log-injection hardening.
+- **ReDoS fix** — the inbox link-extraction trailing-punctuation trim no longer
+  uses a backtracking-prone anchored regex on agent-supplied URLs.
+
+## v2026.6.27 — Stop a run, security hardening, agent owners + Definition history
+
+### Added
+- **Stop a running run.** A red **Stop run** button on the run detail page kills
+  an in-flight (queued/running) run: it transitions to a dedicated new
+  `cancelled` status (distinct from `failed`, so killed runs stay out of failure
+  dashboards/badges) and the api SIGKILLs the run's subprocess. Operator+ only.
+- **Definition tab now shows every version.** The agent's Definition tab renders
+  the live draft plus every promoted stable version (switchable), and a
+  **History** section listing every commit of the spec file on GitHub — short
+  hash, date, and author — each linking to that version on GitHub.
+- **Agent ownership.** A repo-committed agent with no owner is auto-assigned to
+  the person who first runs it (chat-created agents already had an owner), so the
+  Mine/Starred views and Locked/Fork rules attribute correctly.
+- **Marketing homepage for the docs site.** The docs root is now a restrained
+  splash landing page (replacing the bare "Redirecting…"), including a FAQ on how
+  TAS differs from Claude Managed Agents and Claude Cowork, and a live GitHub
+  star count in the header.
+
+### Changed
+- **Orphaned runs are reconciled on api boot.** A run executes as an in-memory
+  task owning a subprocess, so any run still `queued`/`running` when the api last
+  stopped (crash, deploy, restart) was orphaned and hung in `running` forever.
+  The api now marks such rows `failed` on startup with a clear reason. (Durable,
+  resumable execution remains the larger [#170](https://github.com/tembo/agent-studio/issues/170) effort.)
+
+### Security
+- **Invites are honored only for IdP-verified emails** ([#47](https://github.com/tembo/agent-studio/issues/47)) — an OAuth sign-in
+  whose provider didn't assert `email_verified` no longer auto-joins a workspace
+  by matching a pending invite.
+- **OAuth state now has a TTL** ([#46](https://github.com/tembo/agent-studio/issues/46)) and the **permissive CORS layer was dropped
+  from the api** ([#48](https://github.com/tembo/agent-studio/issues/48)) — it served only bearer-gated server-to-server routes,
+  so the open CORS was needless attack surface.
+- **Stopped logging CAP prompt payloads** ([#44](https://github.com/tembo/agent-studio/issues/44)) and **gated audit-log export on
+  admin** ([#43](https://github.com/tembo/agent-studio/issues/43)).
+- Overrode `hono` to `>=4.12.25` to clear Dependabot alerts ([#206](https://github.com/tembo/agent-studio/pull/206)).
+
+### Fixed
+- **Inbox privacy** — the Tasks Inbox was showing every member's items to all
+  members. Items are now scoped to their owner (the run's acting user, or the
+  human filer), with reads, the sidebar badge, and mutations all owner-scoped.
+
+### Dependencies
+- Routine Dependabot bumps across web, api, docs, and CI actions
+  (better-auth, lucide-react, cron-parser, tower-http, Astro, `@types/node`,
+  `@tailwindcss/postcss`, actions/checkout).
+
+## v2026.6.26 — Agent stars + forking, unified Automations, Locked agents
+
+### Added
+- **Per-agent "Locked" toggle.** Workspace admins can lock a governed agent
+  (e.g. regulated drafting): its in-app edits — Chat to edit, Improve, Fork, and
+  correction/learning capture — are removed and its Versions / Activity /
+  Learning history is hidden, so it changes only through direct repo PRs. Set on
+  the agent's Settings tab (admin-only) and audited on change.
+- **Unified agent Automations tab.** An agent's Automation tab now lists its
+  schedules, event triggers, and inbound webhooks in one sortable, filterable
+  table (matching the workspace Automations list), with a **New automation**
+  type picker (Schedule / Event trigger / Webhook) in place of the separate
+  inline forms.
 - **Agent visibility — stars + forking.** Star agents (☆ on each row) to curate
   a personal list; the agents page defaults to **Mine + Starred** (agents you own
   or starred) with a **View all** toggle, so big teams aren't staring at
@@ -39,6 +241,25 @@ they are no longer release versions. Phase scope now lives in
   and enables it by default, so the bundled samples list, view, and **run** with
   no repo or PAT. Chat-authoring / improvements (which open PRs) still need a
   connected repo.
+
+### Fixed
+- **Composio connection name mismatch** no longer triggers a false "Action
+  needed" prompt (or a failed run): when an agent pins a toolkit slot by a name
+  you authorized under a different one, your single active connection for that
+  toolkit is now used regardless of the declared name — matching native-MCP.
+- **Local sample agents** render without a connected repo — the workspace home
+  and agent pages no longer redirect to repo onboarding when
+  `TAS_LOCAL_AGENTS_DIR` is set.
+
+### Security
+- **Encrypted secrets are bound to their row** (AES-GCM AAD), so a ciphertext
+  blob can't be moved to another row and still decrypt. Non-breaking (versioned
+  blob; existing ciphertext keeps decrypting). Covers workspace secrets, native
+  + Composio connection credentials, OAuth client secrets, Slack tokens, and
+  webhook / API-key tokens.
+- **Workspace favicon route** now requires membership — unknown slugs,
+  unauthenticated, and non-member requests all return the generic default,
+  closing a workspace-existence probe.
 
 ### Documentation
 - **Example Agents** — a new docs page of copy-paste, connection-agnostic

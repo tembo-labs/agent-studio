@@ -107,6 +107,10 @@ const AMPLITUDE_MCP_ORIGIN: &str = "https://mcp.amplitude.com";
 const AMPLITUDE_OAUTH_ORIGINS: &[&str] = &["https://mcp.amplitude.com"];
 const APOLLO_MCP_ORIGIN: &str = "https://mcp.apollo.io";
 const APOLLO_OAUTH_ORIGINS: &[&str] = &["https://mcp.apollo.io"];
+// PostHog hosted MCP: auth server is oauth.posthog.com (region-routes US/EU).
+// Docs: https://posthog.com/docs/model-context-protocol
+const POSTHOG_MCP_ORIGIN: &str = "https://mcp.posthog.com";
+const POSTHOG_OAUTH_ORIGINS: &[&str] = &["https://oauth.posthog.com"];
 
 const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
@@ -128,6 +132,7 @@ const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
     (FIREFLIES_MCP_ORIGIN, FIREFLIES_OAUTH_ORIGINS),
     (AMPLITUDE_MCP_ORIGIN, AMPLITUDE_OAUTH_ORIGINS),
     (APOLLO_MCP_ORIGIN, APOLLO_OAUTH_ORIGINS),
+    (POSTHOG_MCP_ORIGIN, POSTHOG_OAUTH_ORIGINS),
 ];
 
 #[derive(Deserialize)]
