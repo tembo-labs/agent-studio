@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { McpProviderLogo } from "@/components/mcp-provider-logo";
@@ -113,12 +114,20 @@ export function NativeMcpProviderTable({
     {
       key: "connect",
       header: "",
-      thClassName: "w-[90px]",
-      tdClassName: "text-right",
-      cell: () => (
-        <span className="text-foreground-weak text-sm font-medium">
-          Connect →
-        </span>
+      align: "right",
+      // Wide enough for "Connect →" on one line (was wrapping the arrow alone
+      // and looking like a broken control). Real <Link> so click / cmd-click
+      // work even when row-level router.push is flaky.
+      thClassName: "w-[7.5rem]",
+      tdClassName: "text-right whitespace-nowrap",
+      cell: (r) => (
+        <Link
+          href={r.href}
+          className="text-foreground inline-flex items-center gap-1 whitespace-nowrap text-sm font-medium hover:underline"
+        >
+          Connect
+          <span aria-hidden>→</span>
+        </Link>
       ),
     },
   ];
