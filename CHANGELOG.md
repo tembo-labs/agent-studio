@@ -14,27 +14,33 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.7.2] — Native MCP catalog expansion, connection search, Zoom, inbox delete — shipped 2026-07-15
+
 ### Added
-- **PostHog native MCP provider.** Connect PostHog (`mcp.posthog.com`) as a
-  TAS-managed OAuth connection — feature flags, insights, error tracking,
-  experiments, HogQL, and the rest of PostHog's MCP tools. Dynamic Client
-  Registration; region (US/EU) is picked from the account you sign in with.
-- **Stripe, GitHub, and X native MCP providers.** Stripe connects via
-  TAS-managed OAuth (`mcp.stripe.com`). GitHub and X use a new **API token**
-  connect path (paste a GitHub PAT or X App-only Bearer) because their hosted
-  MCP servers don't offer third-party DCR. (Pylon was already in the catalog.)
+- **Large native MCP catalog expansion.** ~30 more hosted OAuth MCP providers
+  verified via live discovery (Anthropic knowledge-work-plugins +
+  `/.well-known` probes):
+  - **TAS-managed DCR:** PostHog, Stripe, Vercel, Canva, ClickUp, Close, Sentry,
+    Mixpanel, Granola, Dropbox, Webflow, Cloudflare, Neon, Cal.com, Klaviyo,
+    PayPal, Square, Airtable, Railway, Resend, Hex, Pendo, Similarweb, Datadog,
+    Common Room
+  - **API token:** GitHub (PAT), X (App-only Bearer)
+  - **Bring-your-own OAuth app:** Slack, Gong, Box, PagerDuty, Zoom
+    (`mcp.zoom.us`; `client_secret_basic` supported for manual token exchange)
+- **New connection search.** Landing page search spans Native MCP, Composio
+  toolkits, and manual credentials — jump straight to a provider. Composio is
+  ranked and styled as **last resort** when a native option exists (Recommended
+  vs Fallback sections, badges, quieter type card).
+- **Native MCP picker table.** Connections → New → Native MCP is a searchable,
+  filterable, sortable table (category + auth filters, Connect link).
 - **Delete dismissed inbox items.** On the Inbox **Dismissed** facet, multi-
-  select items and **Delete** them permanently (owner-scoped). Active facets
-  keep mass-**Dismiss**; *Done* stays unselectable.
-- **~25 more native MCP providers.** Hosted OAuth MCP servers verified via
-  live discovery (Anthropic knowledge-work-plugins + `/.well-known` probes):
-  Vercel, Canva, ClickUp, Close, Sentry, Mixpanel, Granola, Dropbox, Webflow,
-  Cloudflare, Neon, Cal.com, Klaviyo, PayPal, Square, Airtable, Railway, Resend,
-  Hex, Pendo, Similarweb, Datadog, Common Room (TAS-managed DCR), plus Slack,
-  Gong, Box, and PagerDuty as bring-your-own OAuth apps.
-- **Zoom native MCP (BYO OAuth).** Meetings/recordings/hub streamable MCP at
-  `mcp.zoom.us`; confidential OAuth on `zoom.us` with **client_secret_basic**
-  (manual connect path now supports Basic as well as client_secret_post).
+  select and permanently **Delete** (owner-scoped). Active facets still mass-
+  **Dismiss**; *Done* stays unselectable.
+
+### Fixed
+- **Run detail header cost** now prices prompt-cache halves (0.1× read / 1.25×
+  write) instead of undercounting when caching engages — aligned with the step
+  footer.
 
 ## [v2026.7.1] — Agent Library, knowledge-work skills + 9 MCP providers, Sonnet 5 default, new Tembo mark — shipped 2026-07-08
 
