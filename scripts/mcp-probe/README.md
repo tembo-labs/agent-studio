@@ -35,3 +35,35 @@ node generate.mjs                      # reads deep/*.json, writes gen-*.txt fra
 
 Methodology is also documented in the batch-3 header of
 `web/src/lib/mcp-providers.ts`.
+
+## Outcomes recovered from the session transcript (not in the TSV)
+
+The TSV covers the `probe.sh` runs. A second, ad-hoc probe pass (the Python
+drivers) recorded some outcomes only in the research session transcript;
+recovered here so they aren't lost:
+
+- **Registry sweep scale:** official MCP registry swept in full — 542 pages,
+  54,191 entries, 8,424 active remote servers — before filtering to the
+  candidate set.
+- **Live, anonymous `initialize` OK (no-auth candidates):** InVideo
+  (`mcp.invideo.io/mcp`).
+- **Parked with reasons:** Pipedream
+  (`remote.mcp.pipedream.net/{external_user_id}/{app}` — templated per-user
+  URL + OAuth client-credentials); Composio (`connect.composio.dev/mcp` —
+  aggregator; TAS already integrates Composio directly).
+- **Dead/nonexistent, confirmed:** `mcp.zoho.com`, `mcp.digitalocean.com`,
+  `mcp.1password.com`, `mcp.moderntreasury.com`, `mcp.typeform.com`
+  (redirects to homepage; the real endpoint `api.typeform.com/mcp` shipped in
+  batch 3), `mcp.freshworks.com` (400), `mcp.canny.io` (serves HTML, not
+  MCP), `mcp.personio.com` (403 WAF).
+
+## Queued but never probed (speculative URLs — cheap batch-4 checks)
+
+These `mcp.{vendor}.com`-pattern guesses were staged in the drivers but never
+executed; no outcome exists anywhere:
+
+BambooHR (`mcp.bamboohr.com/mcp`), Bill.com (`mcp.bill.com/mcp`), Clio
+(`mcp.clio.com/mcp`), HiBob (`mcp.hibob.com/mcp`), Juro (`mcp.juro.com/mcp`),
+Qualtrics (`mcp.qualtrics.com/mcp`), Segment (`mcp.segment.com/mcp`), Sigma
+Computing (`mcp.sigmacomputing.com/mcp`), SpotDraft
+(`mcp.spotdraft.com/mcp`).
