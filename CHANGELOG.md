@@ -54,6 +54,17 @@ they are no longer release versions. Phase scope now lives in
     docs-only servers, and vendors with no hosted server (Workday,
     Rippling, Okta, Snyk, Perplexity, Loom, Fivetran).
 
+### Changed
+- **Rust OAuth-origin allowlist is now generated from the web catalog.**
+  `api/src/native_oauth_allowlist.rs` is produced from `MCP_PROVIDERS`
+  (`web/src/lib/mcp-providers.ts`) by `npm run gen:allowlist`, replacing the
+  hand-maintained duplicate (~360 lines of consts + tuples) in
+  `native_oauth.rs`. The allowlist-sync vitest is now a staleness check on the
+  generated file instead of a per-provider drift detector — the failure mode
+  where a catalog entry lands without its Rust twin (the Dialed regression)
+  is eliminated rather than just alarmed on. No behavior change: the generated
+  table is semantically identical to the old hand list (184 origins).
+
 ## [v2026.7.2] — Native MCP catalog expansion, connection search, Zoom, inbox delete — shipped 2026-07-15
 
 ### Added

@@ -14,6 +14,7 @@ use tracing_subscriber::EnvFilter;
 mod auth;
 mod crypto;
 mod native_oauth;
+mod native_oauth_allowlist;
 mod pricing;
 mod routes;
 mod runs;

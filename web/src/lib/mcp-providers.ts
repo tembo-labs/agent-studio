@@ -223,7 +223,13 @@ export type McpProvider = {
    *  since the origin is env-derived rather than a constant. */
   mcpServerUrl: string;
   /** Exact OAuth authorization-server origins this provider is allowed
-   *  to advertise through protected-resource discovery. */
+   *  to advertise through protected-resource discovery.
+   *
+   *  Also the source of truth for the Rust token-refresher's origin
+   *  allowlist: api/src/native_oauth_allowlist.rs is GENERATED from this
+   *  field (plus mcpServerUrl's origin). After changing either, run
+   *  `npm run gen:allowlist` and commit the regenerated file — the
+   *  allowlist-sync vitest fails CI while it's stale. */
   oauthAuthorizationServerOrigins: string[];
   /**
    * How TAS obtains an OAuth client for this provider:
