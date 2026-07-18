@@ -14,6 +14,46 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+### Added
+- **Native MCP catalog batch 3: 136 more providers.** Harvested from the
+  official MCP registry (54k entries swept), the claude.com/connectors
+  directory, and community remote-MCP lists; every endpoint live-probed
+  (MCP `initialize` → `/.well-known/oauth-protected-resource` →
+  auth-server metadata → `registration_endpoint`) on 2026-07-18:
+  - **TAS-managed DCR (123):** sales/GTM (Outreach, Salesloft, ZoomInfo,
+    Lusha, Hunter, Instantly, Crossbeam, Harmonic, Chili Piper, Day AI,
+    Clarify, Staircase AI), support/CX (Zendesk, Help Scout, Gorgias, Plain,
+    Lorikeet, Unthread, Enterpret, Dovetail, Missive), meetings (Otter.ai,
+    Grain, Krisp, Circleback, tl;dv), finance (Ramp, Brex, Mercury,
+    Expensify, Navan, Carta, Digits, GoCardless, Mercado Pago), market
+    intelligence (PitchBook, Morningstar, CB Insights, Quartr, Daloopa,
+    Consensus), HR/recruiting (Gusto, Deel, Ashby, Workable, Metaview,
+    Indeed, Udemy Business), compliance/e-sign (Vanta, Drata, SignNow),
+    productivity/design (Figma, Miro, Lucid, Productboard, Aha!, Shortcut,
+    Todoist, Teamwork, Calendly, Superhuman Mail, Craft, Mem, Gamma, Pitch,
+    Eraser, Jotform, Typeform, SurveyMonkey, Egnyte), marketing/content
+    (Mailchimp, Customer.io, Ahrefs, Semrush, Cloudinary, Contentful,
+    Sanity, Wix, WordPress.com, GitBook, Mintlify, DeepL), dev/infra
+    (GitLab, Supabase, Netlify, Heroku, Buildkite, Grafana, New Relic,
+    Honeycomb, incident.io, Rootly, BugSnag, LaunchDarkly, PlanetScale,
+    Prisma Postgres, InstantDB, Algolia, Statsig, Postman, Semgrep, WorkOS,
+    Stytch, Mux, Knock, Lovable, Retool, Telnyx, Jam, Globalping), data/AI
+    (Airbyte, MotherDuck, Monte Carlo, Atlan, Hugging Face), and
+    automation/web (Zapier, Make, IFTTT, Exa, Tavily, Firecrawl, Apify,
+    Bright Data).
+  - **Bring-your-own OAuth app (12):** DocuSign, Xero, Front, Smartsheet,
+    MongoDB Atlas, CircleCI, Chargebee, BigQuery (Google manual client,
+    like Gmail), Ironclad, Harvey, Tableau, Shopify.
+  - **API token (1):** Render (API key as Bearer, like GitHub).
+  - Agent Library categories now recognize the new providers, and the
+    long-tail **ATS / recruiting**, **HRIS**, **E-signature**, and
+    **Survey** categories flip to connectable.
+  - Not added (with reasons): per-tenant instance-scoped servers
+    (Salesforce, Snowflake, Databricks, ServiceNow, NetSuite, Glean, dbt,
+    Elastic…), OAuth `client_credentials`-only (Plaid), unauthenticated /
+    docs-only servers, and vendors with no hosted server (Workday,
+    Rippling, Okta, Snyk, Perplexity, Loom, Fivetran).
+
 ## [v2026.7.2] — Native MCP catalog expansion, connection search, Zoom, inbox delete — shipped 2026-07-15
 
 ### Added
