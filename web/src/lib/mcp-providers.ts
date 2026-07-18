@@ -71,6 +71,146 @@ export type McpProviderSlug =
   | "pagerduty"
   | "slack"
   | "zoom"
+  // Batch 2026-07 (#3): hosted MCP servers harvested from the official MCP
+  // registry (54k entries swept), the claude.com/connectors directory, and
+  // community remote-MCP lists — every endpoint live-probed (initialize +
+  // /.well-known discovery + registration_endpoint) on 2026-07-18.
+  | "outreach"
+  | "salesloft"
+  | "zoominfo"
+  | "lusha"
+  | "hunter"
+  | "instantly"
+  | "crossbeam"
+  | "harmonic"
+  | "chilipiper"
+  | "dayai"
+  | "clarify"
+  | "staircase"
+  | "zendesk"
+  | "helpscout"
+  | "gorgias"
+  | "plain"
+  | "lorikeet"
+  | "unthread"
+  | "enterpret"
+  | "dovetail"
+  | "missive"
+  | "otter"
+  | "grain"
+  | "krisp"
+  | "circleback"
+  | "tldv"
+  | "ramp"
+  | "brex"
+  | "mercury"
+  | "expensify"
+  | "navan"
+  | "carta"
+  | "digits"
+  | "gocardless"
+  | "mercadopago"
+  | "pitchbook"
+  | "morningstar"
+  | "cbinsights"
+  | "quartr"
+  | "daloopa"
+  | "consensus"
+  | "gusto"
+  | "deel"
+  | "ashby"
+  | "workable"
+  | "metaview"
+  | "indeed"
+  | "udemy"
+  | "signnow"
+  | "vanta"
+  | "drata"
+  | "figma"
+  | "miro"
+  | "lucid"
+  | "productboard"
+  | "aha"
+  | "shortcut"
+  | "todoist"
+  | "teamwork"
+  | "calendly"
+  | "superhuman"
+  | "craft"
+  | "mem"
+  | "gamma"
+  | "pitch"
+  | "eraser"
+  | "jotform"
+  | "typeform"
+  | "surveymonkey"
+  | "egnyte"
+  | "mailchimp"
+  | "customerio"
+  | "ahrefs"
+  | "semrush"
+  | "cloudinary"
+  | "contentful"
+  | "sanity"
+  | "wix"
+  | "wordpress"
+  | "gitbook"
+  | "mintlify"
+  | "deepl"
+  | "gitlab"
+  | "supabase"
+  | "netlify"
+  | "heroku"
+  | "buildkite"
+  | "grafana"
+  | "newrelic"
+  | "honeycomb"
+  | "incidentio"
+  | "rootly"
+  | "bugsnag"
+  | "launchdarkly"
+  | "planetscale"
+  | "prisma"
+  | "instantdb"
+  | "algolia"
+  | "statsig"
+  | "postman"
+  | "semgrep"
+  | "workos"
+  | "stytch"
+  | "mux"
+  | "knock"
+  | "lovable"
+  | "retool"
+  | "telnyx"
+  | "jam"
+  | "globalping"
+  | "airbyte"
+  | "motherduck"
+  | "montecarlo"
+  | "atlan"
+  | "huggingface"
+  | "zapier"
+  | "make"
+  | "ifttt"
+  | "exa"
+  | "tavily"
+  | "firecrawl"
+  | "apify"
+  | "brightdata"
+  | "docusign"
+  | "xero"
+  | "front"
+  | "smartsheet"
+  | "mongodb"
+  | "circleci"
+  | "chargebee"
+  | "bigquery"
+  | "ironclad"
+  | "harvey"
+  | "tableau"
+  | "shopify"
+  | "render"
   | "tembo-agent-studio";
 
 export type McpProvider = {
@@ -83,7 +223,13 @@ export type McpProvider = {
    *  since the origin is env-derived rather than a constant. */
   mcpServerUrl: string;
   /** Exact OAuth authorization-server origins this provider is allowed
-   *  to advertise through protected-resource discovery. */
+   *  to advertise through protected-resource discovery.
+   *
+   *  Also the source of truth for the Rust token-refresher's origin
+   *  allowlist: api/src/native_oauth_allowlist.rs is GENERATED from this
+   *  field (plus mcpServerUrl's origin). After changing either, run
+   *  `npm run gen:allowlist` and commit the regenerated file — the
+   *  allowlist-sync vitest fails CI while it's stale. */
   oauthAuthorizationServerOrigins: string[];
   /**
    * How TAS obtains an OAuth client for this provider:
@@ -717,6 +863,1024 @@ export const MCP_PROVIDERS: Record<McpProviderSlug, McpProvider> = {
       "https://mcp-us.zoom.us",
     ],
     authMode: "manual",
+  },
+  // ── Batch 2026-07 (#3): registry + connectors-directory sweep ──
+  // Endpoints + auth verified by live probe on 2026-07-18: POST initialize →
+  // 401 challenge → protected-resource metadata → auth-server metadata with a
+  // registration_endpoint (DCR) unless marked authMode manual/pat. Origin
+  // lists are the union of the advertised authorization server plus the
+  // authorize/token/registration endpoint origins (some differ, like Fathom).
+  // Several DCR servers advertise only confidential token auth
+  // (client_secret_post/basic) — the dcr_confidential path handles those, as
+  // with Avoma. offline_access is left at the default; add omitOfflineAccess
+  // reactively if a server strictly rejects it at Connect (the Amplemarket
+  // failure mode). Connect-verify each on the dogfood instance before
+  // relying on it.
+  // ── Sales / GTM ──
+  outreach: {
+    slug: "outreach",
+    displayName: "Outreach",
+    // Requires a licensed seat with the Amplify add-on; connects fine, tools
+    // 403 without it.
+    mcpServerUrl: "https://api.outreach.io/mcp/",
+    oauthAuthorizationServerOrigins: ["https://api.outreach.io"],
+  },
+  salesloft: {
+    slug: "salesloft",
+    displayName: "Salesloft",
+    // Requires the Salesloft Agentic add-on (admin-enabled).
+    mcpServerUrl: "https://mcp.salesloft.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://accounts.salesloft.com",
+      "https://mcp.salesloft.com",
+    ],
+  },
+  zoominfo: {
+    slug: "zoominfo",
+    displayName: "ZoomInfo",
+    mcpServerUrl: "https://mcp.zoominfo.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.zoominfo.com",
+      "https://okta-login.zoominfo.com",
+    ],
+  },
+  lusha: {
+    slug: "lusha",
+    displayName: "Lusha",
+    mcpServerUrl: "https://mcp.lusha.com/mcp/claude",
+    oauthAuthorizationServerOrigins: ["https://auth.lusha.com"],
+  },
+  hunter: {
+    slug: "hunter",
+    displayName: "Hunter",
+    mcpServerUrl: "https://mcp.hunter.io/mcp",
+    oauthAuthorizationServerOrigins: ["https://hunter.io"],
+  },
+  instantly: {
+    slug: "instantly",
+    displayName: "Instantly",
+    mcpServerUrl: "https://mcp.instantly.ai/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.instantly.ai"],
+  },
+  crossbeam: {
+    slug: "crossbeam",
+    displayName: "Crossbeam",
+    // MCP endpoint is the origin root (like Pylon).
+    mcpServerUrl: "https://mcp.crossbeam.com/",
+    oauthAuthorizationServerOrigins: ["https://mcp.crossbeam.com"],
+  },
+  harmonic: {
+    slug: "harmonic",
+    displayName: "Harmonic",
+    // MCP endpoint is the origin root (like Pylon).
+    mcpServerUrl: "https://mcp.api.harmonic.ai/",
+    oauthAuthorizationServerOrigins: ["https://mcp.api.harmonic.ai"],
+  },
+  chilipiper: {
+    slug: "chilipiper",
+    displayName: "Chili Piper",
+    mcpServerUrl: "https://fire.chilipiper.com/api/fire-edge/v1/org/mcp",
+    oauthAuthorizationServerOrigins: ["https://fire.chilipiper.com"],
+  },
+  dayai: {
+    slug: "dayai",
+    displayName: "Day AI",
+    mcpServerUrl: "https://day.ai/api/mcp",
+    oauthAuthorizationServerOrigins: ["https://day.ai"],
+  },
+  clarify: {
+    slug: "clarify",
+    displayName: "Clarify",
+    mcpServerUrl: "https://api.clarify.ai/mcp",
+    oauthAuthorizationServerOrigins: ["https://auth1.clarify.ai"],
+  },
+  staircase: {
+    slug: "staircase",
+    displayName: "Staircase AI",
+    // Gainsight's customer-intelligence product.
+    mcpServerUrl: "https://mcp.staircase.ai/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.staircase.ai"],
+  },
+  // ── Support / CX ──
+  zendesk: {
+    slug: "zendesk",
+    displayName: "Zendesk",
+    // Live with DCR but Zendesk's own comms describe MCP as early-access —
+    // expect account gating.
+    mcpServerUrl: "https://mcp.zendesk.com/api/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.zendesk.com"],
+  },
+  helpscout: {
+    slug: "helpscout",
+    displayName: "Help Scout",
+    // Beta endpoint (mcp.helpscout.net).
+    mcpServerUrl: "https://mcp.helpscout.net/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.helpscout.net"],
+  },
+  gorgias: {
+    slug: "gorgias",
+    displayName: "Gorgias",
+    mcpServerUrl: "https://mcp.gorgias.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.gorgias.com"],
+  },
+  plain: {
+    slug: "plain",
+    displayName: "Plain",
+    mcpServerUrl: "https://mcp.plain.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://signin.auth.plain.com"],
+  },
+  lorikeet: {
+    slug: "lorikeet",
+    displayName: "Lorikeet",
+    mcpServerUrl: "https://api.lorikeetcx.ai/v1/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.lorikeetcx.ai",
+      "https://app.lorikeetcx.ai",
+    ],
+  },
+  unthread: {
+    slug: "unthread",
+    displayName: "Unthread",
+    mcpServerUrl: "https://app.unthread.io/api/mcp",
+    oauthAuthorizationServerOrigins: ["https://app.unthread.io"],
+  },
+  enterpret: {
+    slug: "enterpret",
+    displayName: "Enterpret",
+    mcpServerUrl: "https://wisdom-api.enterpret.com/server/mcp",
+    oauthAuthorizationServerOrigins: ["https://oauth.enterpret.com"],
+  },
+  dovetail: {
+    slug: "dovetail",
+    displayName: "Dovetail",
+    mcpServerUrl: "https://dovetail.com/api/mcp",
+    oauthAuthorizationServerOrigins: ["https://auth.dovetail.com"],
+  },
+  missive: {
+    slug: "missive",
+    displayName: "Missive",
+    mcpServerUrl: "https://mcp.missiveapp.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://auth.missiveapp.com"],
+  },
+  // ── Meeting intelligence ──
+  otter: {
+    slug: "otter",
+    displayName: "Otter.ai",
+    mcpServerUrl: "https://mcp.otter.ai/mcp",
+    oauthAuthorizationServerOrigins: ["https://otter.ai"],
+  },
+  grain: {
+    slug: "grain",
+    displayName: "Grain",
+    mcpServerUrl: "https://api.grain.com/_/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.grain.com",
+      "https://grain.com",
+    ],
+  },
+  krisp: {
+    slug: "krisp",
+    displayName: "Krisp",
+    mcpServerUrl: "https://mcp.krisp.ai/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.krisp.ai",
+      "https://mcp.krisp.ai",
+    ],
+  },
+  circleback: {
+    slug: "circleback",
+    displayName: "Circleback",
+    mcpServerUrl: "https://app.circleback.ai/api/mcp",
+    oauthAuthorizationServerOrigins: ["https://app.circleback.ai"],
+  },
+  tldv: {
+    slug: "tldv",
+    displayName: "tl;dv",
+    mcpServerUrl: "https://mcp.tldv.io/mcp",
+    oauthAuthorizationServerOrigins: ["https://keycloak.tldv.io"],
+  },
+  // ── Finance / spend / payments ──
+  ramp: {
+    slug: "ramp",
+    displayName: "Ramp",
+    // Write actions (approve reimbursements, edit txns) honor Ramp's admin
+    // access controls.
+    mcpServerUrl: "https://mcp.ramp.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.ramp.com",
+      "https://mcp.ramp.com",
+    ],
+  },
+  brex: {
+    slug: "brex",
+    displayName: "Brex",
+    mcpServerUrl: "https://api.brex.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://accounts-api.brex.com",
+      "https://api.brex.com",
+    ],
+  },
+  mercury: {
+    slug: "mercury",
+    displayName: "Mercury",
+    mcpServerUrl: "https://mcp.mercury.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.mercury.com"],
+  },
+  expensify: {
+    slug: "expensify",
+    displayName: "Expensify",
+    mcpServerUrl: "https://mcp.expensify.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://www.expensify.com"],
+  },
+  navan: {
+    slug: "navan",
+    displayName: "Navan",
+    mcpServerUrl: "https://mcp.navan.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://login.navan.com"],
+  },
+  carta: {
+    slug: "carta",
+    displayName: "Carta",
+    mcpServerUrl: "https://mcp.app.carta.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.app.carta.com"],
+  },
+  digits: {
+    slug: "digits",
+    displayName: "Digits",
+    mcpServerUrl: "https://api.digits.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.digits.com"],
+  },
+  gocardless: {
+    slug: "gocardless",
+    displayName: "GoCardless",
+    mcpServerUrl: "https://mcp.gocardless.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.gocardless.com"],
+  },
+  mercadopago: {
+    slug: "mercadopago",
+    displayName: "Mercado Pago",
+    mcpServerUrl: "https://mcp.mercadopago.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://auth.mercadopago.com",
+      "https://mcp.mercadopago.com",
+    ],
+  },
+  // ── Financial & market intelligence ──
+  pitchbook: {
+    slug: "pitchbook",
+    displayName: "PitchBook",
+    // Requires a PitchBook Premium seat.
+    mcpServerUrl: "https://premium.mcp.pitchbook.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://premium.mcp.pitchbook.com"],
+  },
+  morningstar: {
+    slug: "morningstar",
+    displayName: "Morningstar",
+    mcpServerUrl: "https://mcp.morningstar.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.morningstar.com"],
+  },
+  cbinsights: {
+    slug: "cbinsights",
+    displayName: "CB Insights",
+    mcpServerUrl: "https://mcp.cbinsights.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.cbinsights.com"],
+  },
+  quartr: {
+    slug: "quartr",
+    displayName: "Quartr",
+    mcpServerUrl: "https://mcp.quartr.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.quartr.com"],
+  },
+  daloopa: {
+    slug: "daloopa",
+    displayName: "Daloopa",
+    mcpServerUrl: "https://mcp.daloopa.com/server/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.daloopa.com"],
+  },
+  consensus: {
+    slug: "consensus",
+    displayName: "Consensus",
+    // Scientific-paper search/synthesis.
+    mcpServerUrl: "https://mcp.consensus.app/mcp",
+    oauthAuthorizationServerOrigins: ["https://consensus.app"],
+  },
+  // ── HR / recruiting / learning ──
+  gusto: {
+    slug: "gusto",
+    displayName: "Gusto",
+    // Read-only tools; OAuth scoped by data category.
+    mcpServerUrl: "https://mcp.api.gusto.com/anthropic",
+    oauthAuthorizationServerOrigins: ["https://mcp.api.gusto.com"],
+  },
+  deel: {
+    slug: "deel",
+    displayName: "Deel",
+    mcpServerUrl: "https://api.letsdeel.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.letsdeel.com"],
+  },
+  ashby: {
+    slug: "ashby",
+    displayName: "Ashby",
+    mcpServerUrl: "https://mcp.ashbyhq.com/mcp/v1",
+    oauthAuthorizationServerOrigins: ["https://mcp-auth.ashbyhq.com"],
+  },
+  workable: {
+    slug: "workable",
+    displayName: "Workable",
+    mcpServerUrl: "https://mcp.workable.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://mcp.workable.com",
+      "https://workable.com",
+    ],
+  },
+  metaview: {
+    slug: "metaview",
+    displayName: "Metaview",
+    mcpServerUrl: "https://mcp.metaview.ai/mcp",
+    oauthAuthorizationServerOrigins: ["https://auth.metaview.ai"],
+  },
+  indeed: {
+    slug: "indeed",
+    displayName: "Indeed",
+    mcpServerUrl: "https://mcp.indeed.com/claude/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://apis.indeed.com",
+      "https://secure.indeed.com",
+    ],
+  },
+  udemy: {
+    slug: "udemy",
+    displayName: "Udemy Business",
+    mcpServerUrl: "https://api.udemy.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.udemy.com"],
+  },
+  // ── Legal / compliance ──
+  signnow: {
+    slug: "signnow",
+    displayName: "SignNow",
+    mcpServerUrl: "https://mcp-server.signnow.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp-server.signnow.com"],
+  },
+  vanta: {
+    slug: "vanta",
+    displayName: "Vanta",
+    mcpServerUrl: "https://mcp.vanta.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.vanta.com",
+      "https://app.vanta.com",
+      "https://mcp.vanta.com",
+    ],
+  },
+  drata: {
+    slug: "drata",
+    displayName: "Drata",
+    mcpServerUrl: "https://mcp.drata.com/mcp/",
+    oauthAuthorizationServerOrigins: [
+      "https://drata-prod.us.auth0.com",
+      "https://mcp.drata.com",
+    ],
+  },
+  // ── Productivity / PM / design ──
+  figma: {
+    slug: "figma",
+    displayName: "Figma",
+    // All plans; Starter/view-only seats are capped at ~6 tool calls/month.
+    mcpServerUrl: "https://mcp.figma.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.figma.com",
+      "https://www.figma.com",
+    ],
+  },
+  miro: {
+    slug: "miro",
+    displayName: "Miro",
+    // Beta; Enterprise teams need admin enablement. MCP endpoint is the origin
+    // root.
+    mcpServerUrl: "https://mcp.miro.com/",
+    oauthAuthorizationServerOrigins: ["https://mcp.miro.com"],
+  },
+  lucid: {
+    slug: "lucid",
+    displayName: "Lucid",
+    mcpServerUrl: "https://mcp.lucid.app/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.lucid.app"],
+  },
+  productboard: {
+    slug: "productboard",
+    displayName: "Productboard",
+    mcpServerUrl: "https://mcp.productboard.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.productboard.com"],
+  },
+  aha: {
+    slug: "aha",
+    displayName: "Aha!",
+    mcpServerUrl: "https://mcp.aha.io/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.aha.io"],
+  },
+  shortcut: {
+    slug: "shortcut",
+    displayName: "Shortcut",
+    mcpServerUrl: "https://mcp.shortcut.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.app.shortcut.com"],
+  },
+  todoist: {
+    slug: "todoist",
+    displayName: "Todoist",
+    mcpServerUrl: "https://ai.todoist.net/mcp",
+    oauthAuthorizationServerOrigins: ["https://todoist.com"],
+  },
+  teamwork: {
+    slug: "teamwork",
+    displayName: "Teamwork",
+    // MCP endpoint is the origin root.
+    mcpServerUrl: "https://mcp.ai.teamwork.com/",
+    oauthAuthorizationServerOrigins: [
+      "https://teamwork.com",
+      "https://www.teamwork.com",
+    ],
+  },
+  calendly: {
+    slug: "calendly",
+    displayName: "Calendly",
+    // MCP endpoint is the origin root; works on free plans.
+    mcpServerUrl: "https://mcp.calendly.com/",
+    oauthAuthorizationServerOrigins: ["https://calendly.com"],
+  },
+  superhuman: {
+    slug: "superhuman",
+    displayName: "Superhuman Mail",
+    mcpServerUrl: "https://mcp.mail.superhuman.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.auth.mail.superhuman.com"],
+  },
+  craft: {
+    slug: "craft",
+    displayName: "Craft",
+    mcpServerUrl: "https://mcp.craft.do/my/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.craft.do"],
+  },
+  mem: {
+    slug: "mem",
+    displayName: "Mem",
+    mcpServerUrl: "https://mcp.mem.ai/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.mem.ai",
+      "https://mem.ai",
+    ],
+  },
+  gamma: {
+    slug: "gamma",
+    displayName: "Gamma",
+    mcpServerUrl: "https://mcp.gamma.app/mcp",
+    oauthAuthorizationServerOrigins: ["https://auth.gamma.app"],
+  },
+  pitch: {
+    slug: "pitch",
+    displayName: "Pitch",
+    mcpServerUrl: "https://mcp.pitch.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://auth.pitch.com"],
+  },
+  eraser: {
+    slug: "eraser",
+    displayName: "Eraser",
+    mcpServerUrl: "https://app.eraser.io/api/mcp",
+    oauthAuthorizationServerOrigins: ["https://app.eraser.io"],
+  },
+  jotform: {
+    slug: "jotform",
+    displayName: "Jotform",
+    mcpServerUrl: "https://mcp.jotform.com/mcp-app",
+    oauthAuthorizationServerOrigins: ["https://oauth2.jotform.com"],
+  },
+  typeform: {
+    slug: "typeform",
+    displayName: "Typeform",
+    // US endpoint; EU accounts use api.eu.typeform.com (not cataloged yet).
+    mcpServerUrl: "https://api.typeform.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://admin.typeform.com",
+      "https://api.typeform.com",
+    ],
+  },
+  surveymonkey: {
+    slug: "surveymonkey",
+    displayName: "SurveyMonkey",
+    mcpServerUrl: "https://mcp.surveymonkey.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.surveymonkey.com"],
+  },
+  egnyte: {
+    slug: "egnyte",
+    displayName: "Egnyte",
+    mcpServerUrl: "https://mcp-server.egnyte.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp-oauth.egnyte.com"],
+  },
+  // ── Marketing / content / CMS ──
+  mailchimp: {
+    slug: "mailchimp",
+    displayName: "Mailchimp",
+    mcpServerUrl: "https://ai-inc.mailchimp.com/claude/mcp/v2",
+    oauthAuthorizationServerOrigins: ["https://ai-inc.mailchimp.com"],
+  },
+  customerio: {
+    slug: "customerio",
+    displayName: "Customer.io",
+    mcpServerUrl: "https://mcp.customer.io/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.customer.io"],
+  },
+  ahrefs: {
+    slug: "ahrefs",
+    displayName: "Ahrefs",
+    mcpServerUrl: "https://api.ahrefs.com/mcp/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://ahrefs.com",
+      "https://api.ahrefs.com",
+      "https://app.ahrefs.com",
+    ],
+  },
+  semrush: {
+    slug: "semrush",
+    displayName: "Semrush",
+    mcpServerUrl: "https://mcp.semrush.com/claude/v1/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.semrush.com",
+      "https://oauth.semrush.com",
+    ],
+  },
+  cloudinary: {
+    slug: "cloudinary",
+    displayName: "Cloudinary",
+    // Asset-management server (their MCP suite has several; this is the
+    // primary).
+    mcpServerUrl: "https://asset-management.mcp.cloudinary.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://asset-management.mcp.cloudinary.com"],
+  },
+  contentful: {
+    slug: "contentful",
+    displayName: "Contentful",
+    mcpServerUrl: "https://mcp.contentful.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.contentful.com"],
+  },
+  sanity: {
+    slug: "sanity",
+    displayName: "Sanity",
+    mcpServerUrl: "https://mcp.sanity.io/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.sanity.io"],
+  },
+  wix: {
+    slug: "wix",
+    displayName: "Wix",
+    mcpServerUrl: "https://mcp.wix.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.wix.com"],
+  },
+  wordpress: {
+    slug: "wordpress",
+    displayName: "WordPress.com",
+    // WordPress.com-hosted sites only (public-api.wordpress.com), not
+    // self-hosted WP.
+    mcpServerUrl: "https://public-api.wordpress.com/wpcom/v2/mcp/v1",
+    oauthAuthorizationServerOrigins: ["https://public-api.wordpress.com"],
+  },
+  gitbook: {
+    slug: "gitbook",
+    displayName: "GitBook",
+    mcpServerUrl: "https://mcp.gitbook.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://oauth.gitbook.com"],
+  },
+  mintlify: {
+    slug: "mintlify",
+    displayName: "Mintlify",
+    mcpServerUrl: "https://mcp.mintlify.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.mintlify.com"],
+  },
+  deepl: {
+    slug: "deepl",
+    displayName: "DeepL",
+    // Seat-based plans; fair-usage limits.
+    mcpServerUrl: "https://mcp.deepl.com/v1/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.deepl.com"],
+  },
+  // ── Dev / infra / observability ──
+  gitlab: {
+    slug: "gitlab",
+    displayName: "GitLab",
+    // gitlab.com only; self-managed instances would need an instance-based
+    // entry.
+    mcpServerUrl: "https://gitlab.com/api/v4/mcp",
+    oauthAuthorizationServerOrigins: ["https://gitlab.com"],
+  },
+  supabase: {
+    slug: "supabase",
+    displayName: "Supabase",
+    // Supports ?read_only=true and ?project_ref= query params on the MCP URL.
+    mcpServerUrl: "https://mcp.supabase.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.supabase.com"],
+  },
+  netlify: {
+    slug: "netlify",
+    displayName: "Netlify",
+    mcpServerUrl: "https://netlify-mcp.netlify.app/mcp",
+    oauthAuthorizationServerOrigins: ["https://netlify-mcp.netlify.app"],
+  },
+  heroku: {
+    slug: "heroku",
+    displayName: "Heroku",
+    mcpServerUrl: "https://mcp.heroku.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.heroku.com"],
+  },
+  buildkite: {
+    slug: "buildkite",
+    displayName: "Buildkite",
+    // A read-only variant exists at /mcp/readonly.
+    mcpServerUrl: "https://mcp.buildkite.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.buildkite.com"],
+  },
+  grafana: {
+    slug: "grafana",
+    displayName: "Grafana",
+    // Grafana Cloud only (self-hosted OSS uses a local server).
+    mcpServerUrl: "https://mcp.grafana.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.grafana.com"],
+  },
+  newrelic: {
+    slug: "newrelic",
+    displayName: "New Relic",
+    // US endpoint; EU is mcp.eu.newrelic.com. Not permitted for FedRAMP/HIPAA
+    // accounts.
+    mcpServerUrl: "https://mcp.newrelic.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://login.newrelic.com",
+      "https://mcp.newrelic.com",
+    ],
+  },
+  honeycomb: {
+    slug: "honeycomb",
+    displayName: "Honeycomb",
+    // Requires Honeycomb Intelligence enabled; EU is mcp.eu1.honeycomb.io.
+    mcpServerUrl: "https://mcp.honeycomb.io/mcp",
+    oauthAuthorizationServerOrigins: ["https://ui.honeycomb.io"],
+  },
+  incidentio: {
+    slug: "incidentio",
+    displayName: "incident.io",
+    mcpServerUrl: "https://mcp.incident.io/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://app.incident.io",
+      "https://mcp.incident.io",
+    ],
+  },
+  rootly: {
+    slug: "rootly",
+    displayName: "Rootly",
+    // SSE endpoint (/sse) — no streamable-http path advertised.
+    mcpServerUrl: "https://mcp.rootly.com/sse",
+    oauthAuthorizationServerOrigins: ["https://rootly.com"],
+  },
+  bugsnag: {
+    slug: "bugsnag",
+    displayName: "BugSnag",
+    mcpServerUrl: "https://bugsnag.mcp.smartbear.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://oauth.bugsnag.com"],
+  },
+  launchdarkly: {
+    slug: "launchdarkly",
+    displayName: "LaunchDarkly",
+    // Product-area servers under /mcp/{area}; this is the core flags server.
+    // EU/federal instances unsupported.
+    mcpServerUrl: "https://mcp.launchdarkly.com/mcp/launchdarkly",
+    oauthAuthorizationServerOrigins: [
+      "https://app.launchdarkly.com",
+      "https://mcp.launchdarkly.com",
+    ],
+  },
+  planetscale: {
+    slug: "planetscale",
+    displayName: "PlanetScale",
+    mcpServerUrl: "https://mcp.pscale.dev/mcp/planetscale",
+    oauthAuthorizationServerOrigins: [
+      "https://app.planetscale.com",
+      "https://auth.planetscale.com",
+      "https://mcp.pscale.dev",
+    ],
+  },
+  prisma: {
+    slug: "prisma",
+    displayName: "Prisma Postgres",
+    mcpServerUrl: "https://mcp.prisma.io/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://auth.prisma.io",
+      "https://mcp.prisma.io",
+    ],
+  },
+  instantdb: {
+    slug: "instantdb",
+    displayName: "InstantDB",
+    mcpServerUrl: "https://mcp.instantdb.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.instantdb.com"],
+  },
+  algolia: {
+    slug: "algolia",
+    displayName: "Algolia",
+    mcpServerUrl: "https://mcp.algolia.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://dashboard.algolia.com"],
+  },
+  statsig: {
+    slug: "statsig",
+    displayName: "Statsig",
+    mcpServerUrl: "https://api.statsig.com/v1/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.statsig.com"],
+  },
+  postman: {
+    slug: "postman",
+    displayName: "Postman",
+    // A trimmed tool surface exists at /minimal.
+    mcpServerUrl: "https://mcp.postman.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.postman.com"],
+  },
+  semgrep: {
+    slug: "semgrep",
+    displayName: "Semgrep",
+    mcpServerUrl: "https://mcp.semgrep.ai/mcp",
+    oauthAuthorizationServerOrigins: ["https://login.semgrep.dev"],
+  },
+  workos: {
+    slug: "workos",
+    displayName: "WorkOS",
+    mcpServerUrl: "https://mcp.workos.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://signin.workos.com"],
+  },
+  stytch: {
+    slug: "stytch",
+    displayName: "Stytch",
+    // Auth server is a per-tenant customers.stytch.com origin (their own DCR
+    // tenant).
+    mcpServerUrl: "https://mcp.stytch.dev/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://rustic-kilogram-6347.customers.stytch.com",
+      "https://stytch.com",
+    ],
+  },
+  mux: {
+    slug: "mux",
+    displayName: "Mux",
+    // MCP endpoint is the origin root.
+    mcpServerUrl: "https://mcp.mux.com/",
+    oauthAuthorizationServerOrigins: ["https://auth.mux.com"],
+  },
+  knock: {
+    slug: "knock",
+    displayName: "Knock",
+    mcpServerUrl: "https://mcp.knock.app/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.knock.app"],
+  },
+  lovable: {
+    slug: "lovable",
+    displayName: "Lovable",
+    // MCP endpoint is the origin root.
+    mcpServerUrl: "https://mcp.lovable.dev/",
+    oauthAuthorizationServerOrigins: ["https://lovable.dev"],
+  },
+  retool: {
+    slug: "retool",
+    displayName: "Retool",
+    mcpServerUrl: "https://mcp.retool.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.retool.com"],
+  },
+  telnyx: {
+    slug: "telnyx",
+    displayName: "Telnyx",
+    mcpServerUrl: "https://api.telnyx.com/v2/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.telnyx.com"],
+  },
+  jam: {
+    slug: "jam",
+    displayName: "Jam",
+    mcpServerUrl: "https://mcp.jam.dev/mcp",
+    oauthAuthorizationServerOrigins: ["https://api.jam.dev"],
+  },
+  globalping: {
+    slug: "globalping",
+    displayName: "Globalping",
+    mcpServerUrl: "https://mcp.globalping.dev/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.globalping.dev"],
+  },
+  // ── Data / AI ──
+  airbyte: {
+    slug: "airbyte",
+    displayName: "Airbyte",
+    // Airbyte Agents account (app.airbyte.ai).
+    mcpServerUrl: "https://mcp.airbyte.ai/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.airbyte.ai"],
+  },
+  motherduck: {
+    slug: "motherduck",
+    displayName: "MotherDuck",
+    mcpServerUrl: "https://api.motherduck.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp-auth.motherduck.com"],
+  },
+  montecarlo: {
+    slug: "montecarlo",
+    displayName: "Monte Carlo",
+    mcpServerUrl: "https://integrations.getmontecarlo.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://auth.getmontecarlo.com"],
+  },
+  atlan: {
+    slug: "atlan",
+    displayName: "Atlan",
+    mcpServerUrl: "https://mcp.atlan.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.atlan.com"],
+  },
+  huggingface: {
+    slug: "huggingface",
+    displayName: "Hugging Face",
+    mcpServerUrl: "https://huggingface.co/mcp",
+    oauthAuthorizationServerOrigins: ["https://huggingface.co"],
+  },
+  // ── Automation / web data / search ──
+  zapier: {
+    slug: "zapier",
+    displayName: "Zapier",
+    // Proxies 9k+ app actions; users curate the tool list at mcp.zapier.com.
+    mcpServerUrl: "https://mcp.zapier.com/api/mcp/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.zapier.com"],
+  },
+  make: {
+    slug: "make",
+    displayName: "Make",
+    // MCP endpoint is the origin root.
+    mcpServerUrl: "https://mcp.make.com/",
+    oauthAuthorizationServerOrigins: ["https://www.make.com"],
+  },
+  ifttt: {
+    slug: "ifttt",
+    displayName: "IFTTT",
+    mcpServerUrl: "https://ifttt.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://ifttt.com"],
+  },
+  exa: {
+    slug: "exa",
+    displayName: "Exa",
+    mcpServerUrl: "https://mcp.exa.ai/mcp",
+    oauthAuthorizationServerOrigins: ["https://auth.exa.ai"],
+  },
+  tavily: {
+    slug: "tavily",
+    displayName: "Tavily",
+    mcpServerUrl: "https://mcp.tavily.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://mcp.tavily.com"],
+  },
+  firecrawl: {
+    slug: "firecrawl",
+    displayName: "Firecrawl",
+    mcpServerUrl: "https://mcp.firecrawl.dev/mcp",
+    oauthAuthorizationServerOrigins: ["https://www.firecrawl.dev"],
+  },
+  apify: {
+    slug: "apify",
+    displayName: "Apify",
+    // MCP endpoint is the origin root.
+    mcpServerUrl: "https://mcp.apify.com/",
+    oauthAuthorizationServerOrigins: [
+      "https://console-backend.apify.com",
+      "https://console.apify.com",
+    ],
+  },
+  brightdata: {
+    slug: "brightdata",
+    displayName: "Bright Data",
+    mcpServerUrl: "https://mcp.brightdata.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://brightdata.com"],
+  },
+  // ── Bring-your-own OAuth app (no DCR) ──
+  docusign: {
+    slug: "docusign",
+    displayName: "DocuSign",
+    // Open beta; confidential authorization-code clients only (no DCR).
+    mcpServerUrl: "https://mcp.docusign.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://account.docusign.com",
+      "https://mcp.docusign.com",
+    ],
+    authMode: "manual",
+  },
+  xero: {
+    slug: "xero",
+    displayName: "Xero",
+    // Standard Xero OAuth app (no DCR).
+    mcpServerUrl: "https://mcp.xero.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://identity.xero.com",
+      "https://login.xero.com",
+    ],
+    authMode: "manual",
+  },
+  front: {
+    slug: "front",
+    displayName: "Front",
+    // Open beta; create a Front developer OAuth app (confidential).
+    mcpServerUrl: "https://mcp.frontapp.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://app.frontapp.com"],
+    authMode: "manual",
+  },
+  smartsheet: {
+    slug: "smartsheet",
+    displayName: "Smartsheet",
+    mcpServerUrl: "https://mcp.smartsheet.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.smartsheet.com",
+      "https://app.smartsheet.com",
+      "https://mcp.smartsheet.com",
+    ],
+    authMode: "manual",
+  },
+  mongodb: {
+    slug: "mongodb",
+    displayName: "MongoDB Atlas",
+    mcpServerUrl: "https://mcp.mongodb.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://authorize.mongodb.com",
+      "https://cloud.mongodb.com",
+    ],
+    authMode: "manual",
+  },
+  circleci: {
+    slug: "circleci",
+    displayName: "CircleCI",
+    mcpServerUrl: "https://mcp.circleci.com/v1/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://app.circleci.com",
+      "https://circleci.com",
+      "https://mcp.circleci.com",
+    ],
+    authMode: "manual",
+  },
+  chargebee: {
+    slug: "chargebee",
+    displayName: "Chargebee",
+    // Central endpoint; Chargebee also hosts per-site custom servers (not
+    // cataloged).
+    mcpServerUrl: "https://mcp.chargebee.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://app.chargebee.com"],
+    authMode: "manual",
+  },
+  bigquery: {
+    slug: "bigquery",
+    displayName: "BigQuery",
+    // Google OAuth like Gmail: manual confidential client + offline access
+    // params.
+    mcpServerUrl: "https://bigquery.googleapis.com/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://accounts.google.com",
+      "https://oauth2.googleapis.com",
+    ],
+    authMode: "manual",
+    authorizeParams: { access_type: "offline", prompt: "consent" },
+  },
+  ironclad: {
+    slug: "ironclad",
+    displayName: "Ironclad",
+    // NA1 region endpoint.
+    mcpServerUrl: "https://mcp.na1.ironcladapp.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://ironcladapp.com"],
+    authMode: "manual",
+  },
+  harvey: {
+    slug: "harvey",
+    displayName: "Harvey",
+    mcpServerUrl: "https://api.harvey.ai/hosted_mcp/mcp",
+    oauthAuthorizationServerOrigins: [
+      "https://api.harvey.ai",
+      "https://harvey-ai.us.auth0.com",
+    ],
+    authMode: "manual",
+  },
+  tableau: {
+    slug: "tableau",
+    displayName: "Tableau",
+    // Tableau Cloud only; rolling out through 2026.2.
+    mcpServerUrl: "https://mcp.tableau.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://sso.online.tableau.com"],
+    authMode: "manual",
+  },
+  shopify: {
+    slug: "shopify",
+    displayName: "Shopify",
+    // Admin setup server; per-store storefront MCP is separate and
+    // unauthenticated.
+    mcpServerUrl: "https://setup.shopify.com/mcp",
+    oauthAuthorizationServerOrigins: ["https://setup.shopify.com"],
+    authMode: "manual",
+  },
+  // ── API token ──
+  render: {
+    slug: "render",
+    displayName: "Render",
+    // Hosted MCP authenticates with a Render API key as the Bearer (no DCR,
+    // no OAuth-app product) — PAT mode like GitHub. Docs:
+    // https://render.com/docs/mcp-server
+    mcpServerUrl: "https://mcp.render.com/mcp",
+    oauthAuthorizationServerOrigins: [],
+    authMode: "pat",
+    patHint:
+      "Paste a Render API key (Dashboard → Account Settings → API Keys). It is broadly scoped to your workspaces, so prefer a dedicated account/key for agents.",
   },
   "tembo-agent-studio": {
     slug: "tembo-agent-studio",

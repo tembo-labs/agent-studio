@@ -36,217 +36,11 @@ use crate::crypto::MasterKey;
 /// first tool call.
 const REFRESH_SKEW_SECS: i64 = 120;
 
-// Native-MCP providers TAS can refresh tokens for, as
-// (mcp_server_url origin → allowed OAuth authorization-server origins).
-// MUST mirror the web catalog in web/src/lib/mcp-providers.ts
-// (mcpServerUrl + oauthAuthorizationServerOrigins) — keep both in sync
-// when adding a provider, or refreshes for the new provider abort and its
-// short-lived tokens 401 mid-run.
-const ATTIO_MCP_ORIGIN: &str = "https://mcp.attio.com";
-const ATTIO_OAUTH_ORIGINS: &[&str] = &["https://app.attio.com"];
-const PYLON_MCP_ORIGIN: &str = "https://mcp.usepylon.com";
-const PYLON_OAUTH_ORIGINS: &[&str] = &["https://o.auth.usepylon.com"];
-// HubSpot advertises its auth server as the MCP origin itself and uses a
-// CONFIDENTIAL client (no DCR) — the refresh below presents client_id +
-// client_secret from workspace_native_oauth_client when the connection's
-// metadata says auth_mode=manual.
-const HUBSPOT_MCP_ORIGIN: &str = "https://mcp.hubspot.com";
-const HUBSPOT_OAUTH_ORIGINS: &[&str] = &["https://mcp.hubspot.com"];
-// Fathom's auth server is api.fathom.ai but its authorize endpoint lives on
-// fathom.video — both origins are allowed (matches the web catalog).
-const FATHOM_MCP_ORIGIN: &str = "https://api.fathom.ai";
-const FATHOM_OAUTH_ORIGINS: &[&str] = &["https://api.fathom.ai", "https://fathom.video"];
-// Dialed advertises its auth server as the apex (also the MCP origin).
-const DIALED_MCP_ORIGIN: &str = "https://dialed.day";
-const DIALED_OAUTH_ORIGINS: &[&str] = &["https://dialed.day"];
-// Linear advertises its auth server as the MCP origin itself (DCR, public
-// client, read+write scopes). Docs: https://linear.app/docs/mcp
-const LINEAR_MCP_ORIGIN: &str = "https://mcp.linear.app";
-const LINEAR_OAUTH_ORIGINS: &[&str] = &["https://mcp.linear.app"];
-// Amplemarket advertises its auth server as https://app.amplemarket.com (DCR,
-// public client, PKCE S256, scopes mcp:read/mcp:write) — TAS-managed, like Attio.
-const AMPLEMARKET_MCP_ORIGIN: &str = "https://mcp.amplemarket.com";
-const AMPLEMARKET_OAUTH_ORIGINS: &[&str] = &["https://app.amplemarket.com"];
-// Clay advertises api.clay.com as its auth server (DCR, public client, PKCE S256,
-// scope "mcp"), but its authorize endpoint lives on app.clay.com while
-// token/registration sit on api.clay.com — both origins allowed (like Fathom).
-const CLAY_MCP_ORIGIN: &str = "https://api.clay.com";
-const CLAY_OAUTH_ORIGINS: &[&str] = &["https://api.clay.com", "https://app.clay.com"];
-// Avoma advertises its auth server as https://prod-api.avoma.com (DCR, PKCE S256,
-// refresh_token grant; external_api:* scopes via the catalog scopeOverride).
-const AVOMA_MCP_ORIGIN: &str = "https://mcp.avoma.com";
-const AVOMA_OAUTH_ORIGINS: &[&str] = &["https://prod-api.avoma.com"];
-// Gmail (Google Workspace MCP) is a confidential/manual client on standard
-// Google OAuth: the auth server is accounts.google.com but its TOKEN endpoint
-// lives on a separate origin (oauth2.googleapis.com) — both must be trusted so
-// the refresh-before-use sweep can renew the access token.
-const GMAIL_MCP_ORIGIN: &str = "https://gmailmcp.googleapis.com";
-const GMAIL_OAUTH_ORIGINS: &[&str] = &[
-    "https://accounts.google.com",
-    "https://oauth2.googleapis.com",
-];
-// Batch sourced from anthropics/knowledge-work-plugins .mcp.json; each confirmed
-// DCR (registration_endpoint at the MCP origin's auth-server metadata). Must
-// stay in lockstep with the web catalog (mcp-providers.ts).
-const NOTION_MCP_ORIGIN: &str = "https://mcp.notion.com";
-const NOTION_OAUTH_ORIGINS: &[&str] = &["https://mcp.notion.com"];
-const INTERCOM_MCP_ORIGIN: &str = "https://mcp.intercom.com";
-const INTERCOM_OAUTH_ORIGINS: &[&str] = &["https://mcp.intercom.com"];
-const ATLASSIAN_MCP_ORIGIN: &str = "https://mcp.atlassian.com";
-const ATLASSIAN_OAUTH_ORIGINS: &[&str] =
-    &["https://mcp.atlassian.com", "https://cf.mcp.atlassian.com"];
-const ASANA_MCP_ORIGIN: &str = "https://mcp.asana.com";
-const ASANA_OAUTH_ORIGINS: &[&str] = &["https://mcp.asana.com"];
-const MONDAY_MCP_ORIGIN: &str = "https://mcp.monday.com";
-const MONDAY_OAUTH_ORIGINS: &[&str] = &["https://mcp.monday.com"];
-const GURU_MCP_ORIGIN: &str = "https://mcp.api.getguru.com";
-const GURU_OAUTH_ORIGINS: &[&str] = &["https://mcp.api.getguru.com"];
-const FIREFLIES_MCP_ORIGIN: &str = "https://api.fireflies.ai";
-const FIREFLIES_OAUTH_ORIGINS: &[&str] = &["https://api.fireflies.ai"];
-const AMPLITUDE_MCP_ORIGIN: &str = "https://mcp.amplitude.com";
-const AMPLITUDE_OAUTH_ORIGINS: &[&str] = &["https://mcp.amplitude.com"];
-const APOLLO_MCP_ORIGIN: &str = "https://mcp.apollo.io";
-const APOLLO_OAUTH_ORIGINS: &[&str] = &["https://mcp.apollo.io"];
-// PostHog hosted MCP: auth server is oauth.posthog.com (region-routes US/EU).
-// Docs: https://posthog.com/docs/model-context-protocol
-const POSTHOG_MCP_ORIGIN: &str = "https://mcp.posthog.com";
-const POSTHOG_OAUTH_ORIGINS: &[&str] = &["https://oauth.posthog.com"];
-// Stripe hosted MCP: issuer is access.stripe.com/mcp; metadata also on mcp.stripe.com.
-// Docs: https://docs.stripe.com/mcp
-const STRIPE_MCP_ORIGIN: &str = "https://mcp.stripe.com";
-const STRIPE_OAUTH_ORIGINS: &[&str] = &["https://access.stripe.com", "https://mcp.stripe.com"];
-// ── Hosted OAuth MCP batch (must match web/src/lib/mcp-providers.ts) ──
-const VERCEL_MCP_ORIGIN: &str = "https://mcp.vercel.com";
-const VERCEL_OAUTH_ORIGINS: &[&str] = &["https://mcp.vercel.com", "https://vercel.com"];
-const CANVA_MCP_ORIGIN: &str = "https://mcp.canva.com";
-const CANVA_OAUTH_ORIGINS: &[&str] = &["https://mcp.canva.com"];
-const CLICKUP_MCP_ORIGIN: &str = "https://mcp.clickup.com";
-const CLICKUP_OAUTH_ORIGINS: &[&str] = &["https://mcp.clickup.com"];
-const CLOSE_MCP_ORIGIN: &str = "https://mcp.close.com";
-const CLOSE_OAUTH_ORIGINS: &[&str] = &[
-    "https://mcp.close.com",
-    "https://api.close.com",
-    "https://app.close.com",
-];
-const SENTRY_MCP_ORIGIN: &str = "https://mcp.sentry.dev";
-const SENTRY_OAUTH_ORIGINS: &[&str] = &["https://mcp.sentry.dev"];
-const MIXPANEL_MCP_ORIGIN: &str = "https://mcp.mixpanel.com";
-const MIXPANEL_OAUTH_ORIGINS: &[&str] = &["https://mcp.mixpanel.com", "https://mixpanel.com"];
-const GRANOLA_MCP_ORIGIN: &str = "https://mcp.granola.ai";
-const GRANOLA_OAUTH_ORIGINS: &[&str] = &["https://mcp.granola.ai", "https://mcp-auth.granola.ai"];
-const DROPBOX_MCP_ORIGIN: &str = "https://mcp.dropbox.com";
-const DROPBOX_OAUTH_ORIGINS: &[&str] = &[
-    "https://mcp.dropbox.com",
-    "https://www.dropbox.com",
-    "https://api.dropboxapi.com",
-];
-const WEBFLOW_MCP_ORIGIN: &str = "https://mcp.webflow.com";
-const WEBFLOW_OAUTH_ORIGINS: &[&str] = &["https://mcp.webflow.com"];
-const CLOUDFLARE_MCP_ORIGIN: &str = "https://mcp.cloudflare.com";
-const CLOUDFLARE_OAUTH_ORIGINS: &[&str] = &["https://mcp.cloudflare.com"];
-const NEON_MCP_ORIGIN: &str = "https://mcp.neon.tech";
-const NEON_OAUTH_ORIGINS: &[&str] = &["https://mcp.neon.tech"];
-const CAL_MCP_ORIGIN: &str = "https://mcp.cal.com";
-const CAL_OAUTH_ORIGINS: &[&str] = &["https://mcp.cal.com"];
-const KLAVIYO_MCP_ORIGIN: &str = "https://mcp.klaviyo.com";
-const KLAVIYO_OAUTH_ORIGINS: &[&str] = &["https://mcp.klaviyo.com"];
-const PAYPAL_MCP_ORIGIN: &str = "https://mcp.paypal.com";
-const PAYPAL_OAUTH_ORIGINS: &[&str] = &["https://mcp.paypal.com"];
-const SQUARE_MCP_ORIGIN: &str = "https://mcp.squareup.com";
-const SQUARE_OAUTH_ORIGINS: &[&str] = &["https://mcp.squareup.com"];
-const AIRTABLE_MCP_ORIGIN: &str = "https://mcp.airtable.com";
-const AIRTABLE_OAUTH_ORIGINS: &[&str] = &["https://mcp.airtable.com", "https://airtable.com"];
-const RAILWAY_MCP_ORIGIN: &str = "https://mcp.railway.app";
-const RAILWAY_OAUTH_ORIGINS: &[&str] =
-    &["https://mcp.railway.app", "https://backboard.railway.com"];
-const RESEND_MCP_ORIGIN: &str = "https://mcp.resend.com";
-const RESEND_OAUTH_ORIGINS: &[&str] = &["https://mcp.resend.com", "https://api.resend.com"];
-const HEX_MCP_ORIGIN: &str = "https://app.hex.tech";
-const HEX_OAUTH_ORIGINS: &[&str] = &["https://app.hex.tech", "https://auth.app.hex.tech"];
-const PENDO_MCP_ORIGIN: &str = "https://app.pendo.io";
-const PENDO_OAUTH_ORIGINS: &[&str] = &["https://app.pendo.io"];
-const SIMILARWEB_MCP_ORIGIN: &str = "https://mcp.similarweb.com";
-const SIMILARWEB_OAUTH_ORIGINS: &[&str] = &[
-    "https://mcp.similarweb.com",
-    "https://mcp-auth.similarweb.com",
-];
-const DATADOG_MCP_ORIGIN: &str = "https://mcp.datadoghq.com";
-const DATADOG_OAUTH_ORIGINS: &[&str] = &["https://mcp.datadoghq.com", "https://app.datadoghq.com"];
-const COMMONROOM_MCP_ORIGIN: &str = "https://mcp.commonroom.io";
-const COMMONROOM_OAUTH_ORIGINS: &[&str] =
-    &["https://mcp.commonroom.io", "https://login.commonroom.io"];
-const GONG_MCP_ORIGIN: &str = "https://mcp.gong.io";
-const GONG_OAUTH_ORIGINS: &[&str] = &["https://mcp.gong.io", "https://app.gong.io"];
-const BOX_MCP_ORIGIN: &str = "https://mcp.box.com";
-const BOX_OAUTH_ORIGINS: &[&str] = &[
-    "https://mcp.box.com",
-    "https://api.box.com",
-    "https://account.box.com",
-];
-const PAGERDUTY_MCP_ORIGIN: &str = "https://mcp.pagerduty.com";
-const PAGERDUTY_OAUTH_ORIGINS: &[&str] =
-    &["https://mcp.pagerduty.com", "https://app.pagerduty.com"];
-const SLACK_MCP_ORIGIN: &str = "https://mcp.slack.com";
-const SLACK_OAUTH_ORIGINS: &[&str] = &["https://mcp.slack.com", "https://slack.com"];
-// Zoom meetings MCP (streamable); AS is zoom.us (client_secret_basic only).
-const ZOOM_MCP_ORIGIN: &str = "https://mcp.zoom.us";
-const ZOOM_OAUTH_ORIGINS: &[&str] = &[
-    "https://zoom.us",
-    "https://mcp.zoom.us",
-    "https://mcp-us.zoom.us",
-];
-
-const NATIVE_MCP_OAUTH_ALLOWLIST: &[(&str, &[&str])] = &[
-    (ATTIO_MCP_ORIGIN, ATTIO_OAUTH_ORIGINS),
-    (PYLON_MCP_ORIGIN, PYLON_OAUTH_ORIGINS),
-    (HUBSPOT_MCP_ORIGIN, HUBSPOT_OAUTH_ORIGINS),
-    (FATHOM_MCP_ORIGIN, FATHOM_OAUTH_ORIGINS),
-    (DIALED_MCP_ORIGIN, DIALED_OAUTH_ORIGINS),
-    (LINEAR_MCP_ORIGIN, LINEAR_OAUTH_ORIGINS),
-    (AMPLEMARKET_MCP_ORIGIN, AMPLEMARKET_OAUTH_ORIGINS),
-    (CLAY_MCP_ORIGIN, CLAY_OAUTH_ORIGINS),
-    (AVOMA_MCP_ORIGIN, AVOMA_OAUTH_ORIGINS),
-    (GMAIL_MCP_ORIGIN, GMAIL_OAUTH_ORIGINS),
-    (NOTION_MCP_ORIGIN, NOTION_OAUTH_ORIGINS),
-    (INTERCOM_MCP_ORIGIN, INTERCOM_OAUTH_ORIGINS),
-    (ATLASSIAN_MCP_ORIGIN, ATLASSIAN_OAUTH_ORIGINS),
-    (ASANA_MCP_ORIGIN, ASANA_OAUTH_ORIGINS),
-    (MONDAY_MCP_ORIGIN, MONDAY_OAUTH_ORIGINS),
-    (GURU_MCP_ORIGIN, GURU_OAUTH_ORIGINS),
-    (FIREFLIES_MCP_ORIGIN, FIREFLIES_OAUTH_ORIGINS),
-    (AMPLITUDE_MCP_ORIGIN, AMPLITUDE_OAUTH_ORIGINS),
-    (APOLLO_MCP_ORIGIN, APOLLO_OAUTH_ORIGINS),
-    (POSTHOG_MCP_ORIGIN, POSTHOG_OAUTH_ORIGINS),
-    (STRIPE_MCP_ORIGIN, STRIPE_OAUTH_ORIGINS),
-    (VERCEL_MCP_ORIGIN, VERCEL_OAUTH_ORIGINS),
-    (CANVA_MCP_ORIGIN, CANVA_OAUTH_ORIGINS),
-    (CLICKUP_MCP_ORIGIN, CLICKUP_OAUTH_ORIGINS),
-    (CLOSE_MCP_ORIGIN, CLOSE_OAUTH_ORIGINS),
-    (SENTRY_MCP_ORIGIN, SENTRY_OAUTH_ORIGINS),
-    (MIXPANEL_MCP_ORIGIN, MIXPANEL_OAUTH_ORIGINS),
-    (GRANOLA_MCP_ORIGIN, GRANOLA_OAUTH_ORIGINS),
-    (DROPBOX_MCP_ORIGIN, DROPBOX_OAUTH_ORIGINS),
-    (WEBFLOW_MCP_ORIGIN, WEBFLOW_OAUTH_ORIGINS),
-    (CLOUDFLARE_MCP_ORIGIN, CLOUDFLARE_OAUTH_ORIGINS),
-    (NEON_MCP_ORIGIN, NEON_OAUTH_ORIGINS),
-    (CAL_MCP_ORIGIN, CAL_OAUTH_ORIGINS),
-    (KLAVIYO_MCP_ORIGIN, KLAVIYO_OAUTH_ORIGINS),
-    (PAYPAL_MCP_ORIGIN, PAYPAL_OAUTH_ORIGINS),
-    (SQUARE_MCP_ORIGIN, SQUARE_OAUTH_ORIGINS),
-    (AIRTABLE_MCP_ORIGIN, AIRTABLE_OAUTH_ORIGINS),
-    (RAILWAY_MCP_ORIGIN, RAILWAY_OAUTH_ORIGINS),
-    (RESEND_MCP_ORIGIN, RESEND_OAUTH_ORIGINS),
-    (HEX_MCP_ORIGIN, HEX_OAUTH_ORIGINS),
-    (PENDO_MCP_ORIGIN, PENDO_OAUTH_ORIGINS),
-    (SIMILARWEB_MCP_ORIGIN, SIMILARWEB_OAUTH_ORIGINS),
-    (DATADOG_MCP_ORIGIN, DATADOG_OAUTH_ORIGINS),
-    (COMMONROOM_MCP_ORIGIN, COMMONROOM_OAUTH_ORIGINS),
-    (GONG_MCP_ORIGIN, GONG_OAUTH_ORIGINS),
-    (BOX_MCP_ORIGIN, BOX_OAUTH_ORIGINS),
-    (PAGERDUTY_MCP_ORIGIN, PAGERDUTY_OAUTH_ORIGINS),
-    (SLACK_MCP_ORIGIN, SLACK_OAUTH_ORIGINS),
-    (ZOOM_MCP_ORIGIN, ZOOM_OAUTH_ORIGINS),
-];
+// The (mcp_server_url origin → allowed OAuth authorization-server origins)
+// allowlist lives in native_oauth_allowlist.rs, GENERATED from the web catalog
+// (web/src/lib/mcp-providers.ts) by web/scripts/gen-native-oauth-allowlist.ts.
+// Never edit it by hand — regenerate with `npm run gen:allowlist` in web/.
+use crate::native_oauth_allowlist::NATIVE_MCP_OAUTH_ALLOWLIST;
 
 #[derive(Deserialize)]
 struct ProtectedResourceMeta {
@@ -801,21 +595,27 @@ mod tests {
 
     #[test]
     fn enforces_https_and_allowed_oauth_origin() {
+        // Resolve Attio's allowed origins through the generated allowlist, so
+        // this also exercises the table lookup against real generated data.
+        let attio_oauth_origins = allowed_oauth_origins_for_mcp_origin("https://mcp.attio.com")
+            .expect("attio is in the generated allowlist");
+        assert_eq!(attio_oauth_origins, ["https://app.attio.com"]);
+
         assert!(parse_trusted_oauth_url(
             "https://app.attio.com/oidc/token",
-            ATTIO_OAUTH_ORIGINS,
+            attio_oauth_origins,
             "token endpoint"
         )
         .is_ok());
         assert!(parse_trusted_oauth_url(
             "http://app.attio.com/oidc/token",
-            ATTIO_OAUTH_ORIGINS,
+            attio_oauth_origins,
             "token endpoint"
         )
         .is_err());
         assert!(parse_trusted_oauth_url(
             "https://evil.example/oidc/token",
-            ATTIO_OAUTH_ORIGINS,
+            attio_oauth_origins,
             "token endpoint"
         )
         .is_err());

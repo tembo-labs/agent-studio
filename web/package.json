@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "gen:docs": "node scripts/gen-docs.mjs",
+    "gen:allowlist": "tsx scripts/gen-native-oauth-allowlist.ts",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
