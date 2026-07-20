@@ -14,6 +14,8 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.7.3] — pydantic-ai 2.x runner, WebSearch run + agent-change dispatch fixes, catalog batch 3 — shipped 2026-07-20
+
 ### Added
 - **Native MCP catalog batch 3: 136 more providers.** Harvested from the
   official MCP registry (54k entries swept), the claude.com/connectors
@@ -54,7 +56,28 @@ they are no longer release versions. Phase scope now lives in
     docs-only servers, and vendors with no hosted server (Workday,
     Rippling, Okta, Snyk, Perplexity, Loom, Fivetran).
 
+### Fixed
+- **WebSearch agent runs on Claude no longer fail with a 400.** Anthropic now
+  routinely pauses long server-tool turns (`stop_reason: pause_turn`), which
+  pydantic-ai 1.x replayed malformed — every run of a `WebSearch`-capability
+  agent died with *"`web_search` tool use … without a corresponding
+  `web_search_tool_result` block"* from 2026-07-16 on. The bundled runner is
+  now pydantic-ai **2.13.0**, which continues paused turns natively. Also
+  drops the sequential-tool-calls default for WebSearch agents on Anthropic
+  models (the API rejects `disable_parallel_tool_use` combined with the new
+  web_search tool's programmatic tool calling).
+- **Agent-change submissions work again.** Tembo CAP renamed its public task
+  route from `/public-api/task` to `/public-api/session` (2026-07-16) with no
+  alias, so every chat-edit / improve / create dispatch since then failed with
+  *"invalid request path"*. TAS now calls the new endpoint.
+- **Agent-change dispatch errors are self-describing.** The REST/MCP path
+  reported CAP failures as an opaque `(http)`; it now includes the upstream
+  HTTP status and response body.
+
 ### Changed
+- **Runner: pydantic-ai 1.102.0 → 2.13.0.** Spec `instrument: true` and
+  ScaleDown compression now attach as pydantic-ai capabilities
+  (`Instrumentation` / `ProcessHistory`); behavior is otherwise unchanged.
 - **Rust OAuth-origin allowlist is now generated from the web catalog.**
   `api/src/native_oauth_allowlist.rs` is produced from `MCP_PROVIDERS`
   (`web/src/lib/mcp-providers.ts`) by `npm run gen:allowlist`, replacing the

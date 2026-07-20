@@ -19,6 +19,80 @@ they are no longer release versions. Phase scope now lives in
 
 ## Unreleased
 
+## v2026.7.3 — pydantic-ai 2.x runner, WebSearch run + agent-change dispatch fixes, catalog batch 3
+
+### Added
+- **Native MCP catalog batch 3: 136 more providers.** Harvested from the
+  official MCP registry (54k entries swept), the claude.com/connectors
+  directory, and community remote-MCP lists; every endpoint live-probed
+  (MCP `initialize` → `/.well-known/oauth-protected-resource` →
+  auth-server metadata → `registration_endpoint`) on 2026-07-18:
+  - **TAS-managed DCR (123):** sales/GTM (Outreach, Salesloft, ZoomInfo,
+    Lusha, Hunter, Instantly, Crossbeam, Harmonic, Chili Piper, Day AI,
+    Clarify, Staircase AI), support/CX (Zendesk, Help Scout, Gorgias, Plain,
+    Lorikeet, Unthread, Enterpret, Dovetail, Missive), meetings (Otter.ai,
+    Grain, Krisp, Circleback, tl;dv), finance (Ramp, Brex, Mercury,
+    Expensify, Navan, Carta, Digits, GoCardless, Mercado Pago), market
+    intelligence (PitchBook, Morningstar, CB Insights, Quartr, Daloopa,
+    Consensus), HR/recruiting (Gusto, Deel, Ashby, Workable, Metaview,
+    Indeed, Udemy Business), compliance/e-sign (Vanta, Drata, SignNow),
+    productivity/design (Figma, Miro, Lucid, Productboard, Aha!, Shortcut,
+    Todoist, Teamwork, Calendly, Superhuman Mail, Craft, Mem, Gamma, Pitch,
+    Eraser, Jotform, Typeform, SurveyMonkey, Egnyte), marketing/content
+    (Mailchimp, Customer.io, Ahrefs, Semrush, Cloudinary, Contentful,
+    Sanity, Wix, WordPress.com, GitBook, Mintlify, DeepL), dev/infra
+    (GitLab, Supabase, Netlify, Heroku, Buildkite, Grafana, New Relic,
+    Honeycomb, incident.io, Rootly, BugSnag, LaunchDarkly, PlanetScale,
+    Prisma Postgres, InstantDB, Algolia, Statsig, Postman, Semgrep, WorkOS,
+    Stytch, Mux, Knock, Lovable, Retool, Telnyx, Jam, Globalping), data/AI
+    (Airbyte, MotherDuck, Monte Carlo, Atlan, Hugging Face), and
+    automation/web (Zapier, Make, IFTTT, Exa, Tavily, Firecrawl, Apify,
+    Bright Data).
+  - **Bring-your-own OAuth app (12):** DocuSign, Xero, Front, Smartsheet,
+    MongoDB Atlas, CircleCI, Chargebee, BigQuery (Google manual client,
+    like Gmail), Ironclad, Harvey, Tableau, Shopify.
+  - **API token (1):** Render (API key as Bearer, like GitHub).
+  - Agent Library categories now recognize the new providers, and the
+    long-tail **ATS / recruiting**, **HRIS**, **E-signature**, and
+    **Survey** categories flip to connectable.
+  - Not added (with reasons): per-tenant instance-scoped servers
+    (Salesforce, Snowflake, Databricks, ServiceNow, NetSuite, Glean, dbt,
+    Elastic…), OAuth `client_credentials`-only (Plaid), unauthenticated /
+    docs-only servers, and vendors with no hosted server (Workday,
+    Rippling, Okta, Snyk, Perplexity, Loom, Fivetran).
+
+### Fixed
+- **WebSearch agent runs on Claude no longer fail with a 400.** Anthropic now
+  routinely pauses long server-tool turns (`stop_reason: pause_turn`), which
+  pydantic-ai 1.x replayed malformed — every run of a `WebSearch`-capability
+  agent died with *"`web_search` tool use … without a corresponding
+  `web_search_tool_result` block"* from 2026-07-16 on. The bundled runner is
+  now pydantic-ai **2.13.0**, which continues paused turns natively. Also
+  drops the sequential-tool-calls default for WebSearch agents on Anthropic
+  models (the API rejects `disable_parallel_tool_use` combined with the new
+  web_search tool's programmatic tool calling).
+- **Agent-change submissions work again.** Tembo CAP renamed its public task
+  route from `/public-api/task` to `/public-api/session` (2026-07-16) with no
+  alias, so every chat-edit / improve / create dispatch since then failed with
+  *"invalid request path"*. TAS now calls the new endpoint.
+- **Agent-change dispatch errors are self-describing.** The REST/MCP path
+  reported CAP failures as an opaque `(http)`; it now includes the upstream
+  HTTP status and response body.
+
+### Changed
+- **Runner: pydantic-ai 1.102.0 → 2.13.0.** Spec `instrument: true` and
+  ScaleDown compression now attach as pydantic-ai capabilities
+  (`Instrumentation` / `ProcessHistory`); behavior is otherwise unchanged.
+- **Rust OAuth-origin allowlist is now generated from the web catalog.**
+  `api/src/native_oauth_allowlist.rs` is produced from `MCP_PROVIDERS`
+  (`web/src/lib/mcp-providers.ts`) by `npm run gen:allowlist`, replacing the
+  hand-maintained duplicate (~360 lines of consts + tuples) in
+  `native_oauth.rs`. The allowlist-sync vitest is now a staleness check on the
+  generated file instead of a per-provider drift detector — the failure mode
+  where a catalog entry lands without its Rust twin (the Dialed regression)
+  is eliminated rather than just alarmed on. No behavior change: the generated
+  table is semantically identical to the old hand list (184 origins).
+
 ## v2026.7.2 — Native MCP catalog expansion, connection search, Zoom, inbox delete
 
 ### Added
