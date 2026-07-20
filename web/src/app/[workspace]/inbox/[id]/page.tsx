@@ -92,6 +92,17 @@ export default async function InboxItemPage({
         )}
         <p className="text-foreground-weak text-sm">
           Created <LocalTime iso={item.createdAt.toISOString()} style="relative" />
+          {item.producedByRunId && item.producedByAgentName && (
+            <>
+              {" · "}
+              <Link
+                href={`/${workspace.slug}/agents/${item.producedByAgentName}/runs/${item.producedByRunId}`}
+                className="text-foreground font-medium hover:underline"
+              >
+                {item.producedByAgentName} run
+              </Link>
+            </>
+          )}
         </p>
         {!resolved && (
           <p className="text-foreground-muted text-sm">

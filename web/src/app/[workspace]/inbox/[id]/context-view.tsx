@@ -5,6 +5,27 @@
 
 import type { ReactNode } from "react";
 
+import { Markdown } from "@/components/markdown";
+
+// Agents routinely put Markdown in context fields (the digest agents write
+// whole documents). Only strings that clearly use markdown syntax are routed
+// through the Markdown renderer — plain text keeps `whitespace-pre-wrap`,
+// because markdown collapses single newlines and would mangle the line
+// breaks of ordinary multiline values.
+const MARKDOWN_MARKERS = [
+  /^#{1,6}\s/m, // heading
+  /\*\*[^*\n]+\*\*/, // bold
+  /^\s*[-*+]\s+\S/m, // bullet list
+  /^\s*\d+\.\s+\S/m, // ordered list
+  /\[[^\]\n]+\]\([^)\s]+\)/, // link
+  /^```/m, // fenced code
+  /^>\s/m, // blockquote
+];
+
+export function looksLikeMarkdown(s: string): boolean {
+  return MARKDOWN_MARKERS.some((re) => re.test(s));
+}
+
 function humanizeKey(key: string): string {
   return key
     .replace(/[_-]+/g, " ")
@@ -37,6 +58,9 @@ function Value({ value }: { value: unknown }): ReactNode {
           {value}
         </a>
       );
+    }
+    if (looksLikeMarkdown(value)) {
+      return <Markdown>{value}</Markdown>;
     }
     return <span className="whitespace-pre-wrap">{value}</span>;
   }
