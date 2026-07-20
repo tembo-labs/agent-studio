@@ -44,9 +44,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # version bumps go through PR review so we can vet the changelog.
 ENV PYDANTIC_AI_VENV=/opt/pydantic-ai
 ENV PYDANTIC_AI_PY="${PYDANTIC_AI_VENV}/bin/python3"
-# `[mcp]` pulls in the MCP client deps so MCPServerStreamableHTTP is
-# available — that's how Composio exposes its toolkits to pydantic-ai
-# at run time. `composio` is the Python SDK we use to spin up a
+# pydantic-ai 2.x bundles the MCP client deps (MCPToolset) by default —
+# that's how Composio exposes its toolkits to pydantic-ai at run time.
+# 2.10.0+ is required for Anthropic `pause_turn` continuation: without it,
+# WebSearch runs on Claude die with a 400 ("web_search tool use without a
+# corresponding web_search_tool_result block") when the API pauses a long
+# server-tool turn. `composio` is the Python SDK we use to spin up a
 # Composio session keyed by workspace + toolkit list and read the
 # MCP URL back. All three are pinned so a rebuild of a given image
 # tag is reproducible — Composio in particular ships frequently and
@@ -54,7 +57,7 @@ ENV PYDANTIC_AI_PY="${PYDANTIC_AI_VENV}/bin/python3"
 # rebuild. Rev versions via PR so we can vet the changelog.
 RUN python3 -m venv "${PYDANTIC_AI_VENV}" && \
     "${PYDANTIC_AI_VENV}/bin/pip" install --no-cache-dir \
-        'pydantic-ai[mcp]==1.102.0' pyyaml==6.0.2 composio==0.13.1 \
+        'pydantic-ai==2.13.0' pyyaml==6.0.2 composio==0.13.1 \
         pydantic-ai-skills==0.11.0
 
 # Extra deps for agent sidecar tool modules (`tools_module:`). Ships

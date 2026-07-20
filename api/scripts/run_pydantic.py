@@ -1120,9 +1120,6 @@ def build_agent(
     retries = spec.get("retries")
     if isinstance(retries, int):
         kwargs["retries"] = retries
-    instrument = spec.get("instrument")
-    if isinstance(instrument, bool):
-        kwargs["instrument"] = instrument
     if toolsets:
         kwargs["toolsets"] = toolsets
     # Sidecar Python functions from the agent's `tools_module:`. These
@@ -1138,6 +1135,13 @@ def build_agent(
     capabilities = _build_capabilities(spec)
     if capabilities:
         kwargs["capabilities"] = capabilities
+
+    # `instrument: true` — pydantic-ai 2.x replaced Agent(instrument=...) with
+    # the Instrumentation capability.
+    if spec.get("instrument") is True:
+        from pydantic_ai.capabilities import Instrumentation
+
+        kwargs.setdefault("capabilities", []).append(Instrumentation())
 
     # ScaleDown prompt compression — opt-in per agent via `scaledown:`, and only
     # when the workspace set a key. Any non-`off` mode attaches a history
@@ -1155,12 +1159,13 @@ def build_agent(
             file=sys.stderr,
         )
         if sd_enabled and _scaledown_key():
-            kwargs["history_processors"] = [
-                _make_scaledown_processor(sd_rate, sd_min_chars)
-            ]
+            from pydantic_ai.capabilities import ProcessHistory
+
+            kwargs.setdefault("capabilities", []).append(
+                ProcessHistory(_make_scaledown_processor(sd_rate, sd_min_chars))
+            )
     except Exception as e:  # noqa: BLE001 — never block a run on compression setup
         print(f"[scaledown] setup skipped: {e}", file=sys.stderr)
-        kwargs.pop("history_processors", None)
 
     return Agent(model, **kwargs)
 
@@ -1170,8 +1175,7 @@ def build_composio_toolset(
 ):
     """Create a Composio Tool Router session for the declared toolkits
     and wrap it in an MCPToolset so pydantic-ai can call the tools.
-    (`MCPToolset` is the v1.x replacement for `MCPServerStreamableHTTP`;
-    streamable HTTP is its default transport for HTTP URLs.)
+    (Streamable HTTP is `MCPToolset`'s default transport for HTTP URLs.)
 
     Only entries with source="composio" are folded into the session;
     native-MCP entries are handled by `build_native_mcp_toolsets`

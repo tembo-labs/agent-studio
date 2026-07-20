@@ -100,6 +100,34 @@ def test_build_agent_attaches_websearch_capability() -> None:
     assert isinstance(agent, Agent)
 
 
+def test_build_agent_with_scaledown_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    # scaledown attaches its compressor as a ProcessHistory capability
+    # (pydantic-ai 2.x dropped Agent(history_processors=...)).
+    monkeypatch.setenv("TAS_SCALEDOWN_API_KEY", "test-scaledown-key")
+    agent = run_pydantic.build_agent(
+        {
+            "name": "compressed",
+            "model": "anthropic:claude-sonnet-4-5",
+            "instructions": "Reply briefly.",
+            "scaledown": {"mode": "on"},
+        }
+    )
+    assert isinstance(agent, Agent)
+
+
+def test_build_agent_with_instrument_true() -> None:
+    # `instrument: true` maps to the Instrumentation capability in 2.x.
+    agent = run_pydantic.build_agent(
+        {
+            "name": "instrumented",
+            "model": "anthropic:claude-sonnet-4-5",
+            "instructions": "Reply briefly.",
+            "instrument": True,
+        }
+    )
+    assert isinstance(agent, Agent)
+
+
 def test_uncached_input_excludes_cache_halves() -> None:
     from types import SimpleNamespace
 
