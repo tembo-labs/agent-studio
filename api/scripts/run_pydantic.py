@@ -1082,15 +1082,38 @@ def build_agent(
     name = spec.get("name")
     if isinstance(name, str) and name.strip():
         kwargs["name"] = name
+    # Provider-adaptive capabilities from `capabilities:` (e.g. WebSearch).
+    # Built before model settings because WebSearch changes which settings are
+    # legal (see below).
+    capabilities = _build_capabilities(spec)
+    has_web_search = any(type(c).__name__ == "WebSearch" for c in capabilities)
+
     # Default to SEQUENTIAL tool calls. parallel_tool_calls=False is a real,
     # API-level limiter (OpenAI parallel_tool_calls / Anthropic
     # disable_parallel_tool_use): the model emits one tool call per turn instead
     # of fanning out many at once, which is what was getting Attio (and other
     # providers) rate-limited. An agent that genuinely needs parallel calls can
     # opt back in with model_settings.parallel_tool_calls: true in its spec.
+    # EXCEPT WebSearch on Anthropic: the current web_search tool runs with
+    # server-side programmatic tool calling, and the API rejects
+    # `tool_choice.disable_parallel_tool_use: true` combined with it (400) as
+    # soon as the agent also has any client/MCP tool. Skip the default there —
+    # pydantic-ai only emits disable_parallel_tool_use when the key is present.
+    anthropic_web_search = (
+        has_web_search and isinstance(model, str) and model.startswith("anthropic:")
+    )
     model_settings = spec.get("model_settings")
     ms = dict(model_settings) if isinstance(model_settings, dict) else {}
-    ms.setdefault("parallel_tool_calls", False)
+    if not anthropic_web_search:
+        ms.setdefault("parallel_tool_calls", False)
+    elif "parallel_tool_calls" in ms:
+        print(
+            "[capabilities] WebSearch on Anthropic is incompatible with the "
+            "parallel_tool_calls setting (programmatic tool calling); "
+            "dropping it for this run",
+            file=sys.stderr,
+        )
+        ms.pop("parallel_tool_calls", None)
     # Anthropic prompt caching. An agentic run re-sends the whole prompt every
     # step; without caching the big static prefix — system instructions + the
     # MCP/Composio tool schemas — is re-billed at full input rate on each of the
@@ -1129,10 +1152,7 @@ def build_agent(
     if tools:
         kwargs["tools"] = tools
 
-    # Provider-adaptive capabilities from `capabilities:` (e.g. WebSearch).
-    # These are model-side abilities (not MCP/sidecar) — pydantic-ai uses the
-    # provider's native implementation where available, with a local fallback.
-    capabilities = _build_capabilities(spec)
+    # Capabilities were built up top (before model settings); attach them here.
     if capabilities:
         kwargs["capabilities"] = capabilities
 
