@@ -12,11 +12,13 @@ import type { CommitMode } from "@/lib/commit-mode-constants";
 
 // Thin client for the Tembo Coding Agent Platform task API. The task
 // endpoints live under the **/public-api** namespace and authenticate
-// with the workspace's Tembo API key as `Authorization: Bearer` — the
-// bare `/task/create` path hits a different internal auth gate that
-// rejects the public key ("Invalid token"). POSTs a free-text prompt +
-// repo URL to POST /public-api/task/create and returns a task record
-// with an htmlUrl the user can follow; the task is what opens the PR.
+// with the workspace's Tembo API key as `Authorization: Bearer`. POSTs
+// a free-text prompt + repo URL to POST /public-api/session/create and
+// returns a task record with an htmlUrl the user can follow; the task
+// is what opens the PR. CAP renamed the mount from /public-api/task to
+// /public-api/session with no alias (tembo/monorepo#9519, 2026-07-16);
+// the old path falls through to a catch-all that 400s with
+// {"error":{"message":"invalid request path"}}.
 
 const DEFAULT_TEMBO_API_URL = "https://api.tembo.io";
 
@@ -61,7 +63,7 @@ export async function createTemboTask(args: {
     queueRightAway: true,
   };
 
-  const url = `${baseUrl}/public-api/task/create`;
+  const url = `${baseUrl}/public-api/session/create`;
   // Breadcrumb only — never log `body`: it embeds the prompt (run input/output,
   // user data) and would leak to plaintext container logs / aggregators (#44).
   console.log("[cap] POST", url);
