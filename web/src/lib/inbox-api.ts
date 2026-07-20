@@ -78,6 +78,9 @@ export interface InboxItem {
   assigneeKind: InboxAssigneeKind | null;
   assigneeId: string | null;
   producedByRunId: string | null;
+  /** Agent that produced this item (from the producing run). Null for
+   *  human/source-created items. Used to deep-link the run. */
+  producedByAgentName: string | null;
   improvementId: string | null;
   signalConsumedAt: Date | null;
   // Null when produced by an agent/source/system rather than a person.
@@ -110,6 +113,7 @@ type Row = {
   assignee_kind: InboxAssigneeKind | null;
   assignee_id: string | null;
   produced_by_run_id: string | null;
+  produced_by_agent_name: string | null;
   improvement_id: string | null;
   signal_consumed_at: Date | null;
   created_by: string | null;
@@ -140,6 +144,7 @@ function rowToInboxItem(r: Row): InboxItem {
     assigneeKind: r.assignee_kind,
     assigneeId: r.assignee_id,
     producedByRunId: r.produced_by_run_id,
+    producedByAgentName: r.produced_by_agent_name,
     improvementId: r.improvement_id,
     signalConsumedAt: r.signal_consumed_at,
     createdBy: r.created_by,
@@ -161,9 +166,12 @@ const COLUMNS = `
   i.assignee_kind, i.assignee_id, i.produced_by_run_id, i.improvement_id,
   i.signal_consumed_at, i.created_by,
   u.name AS created_by_name, u.email AS created_by_email,
+  r.agent_name AS produced_by_agent_name,
   i.created_at, i.updated_at, i.resolved_at, i.snoozed_until
 `;
-const FROM_JOIN = `FROM inbox_item i LEFT JOIN "user" u ON u.id = i.created_by`;
+const FROM_JOIN = `FROM inbox_item i
+  LEFT JOIN "user" u ON u.id = i.created_by
+  LEFT JOIN run r ON r.id = i.produced_by_run_id`;
 
 export interface CreateInboxItemInput {
   workspaceId: string;
@@ -247,7 +255,8 @@ export async function createInboxItem(
      )
      SELECT ${COLUMNS}
      FROM upserted i
-     LEFT JOIN "user" u ON u.id = i.created_by`,
+     LEFT JOIN "user" u ON u.id = i.created_by
+     LEFT JOIN run r ON r.id = i.produced_by_run_id`,
     [
       input.workspaceId,
       input.source,

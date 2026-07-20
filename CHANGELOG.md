@@ -14,6 +14,11 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+### Added
+- **Inbox item detail: markdown context + run link.** Context fields that
+  contain Markdown (agent digests) now render formatted instead of as raw
+  text, and the header links to the run that produced the item.
+
 ## [v2026.7.3] — pydantic-ai 2.x runner, WebSearch run + agent-change dispatch fixes, catalog batch 3 — shipped 2026-07-20
 
 ### Added
