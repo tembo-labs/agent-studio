@@ -100,6 +100,43 @@ def test_build_agent_attaches_websearch_capability() -> None:
     assert isinstance(agent, Agent)
 
 
+def test_websearch_on_anthropic_skips_parallel_tool_calls_setting() -> None:
+    # Anthropic's web_search tool uses server-side programmatic tool calling,
+    # which the API rejects in combination with disable_parallel_tool_use
+    # (400 as soon as the agent also has a client/MCP tool). The sequential
+    # default must not apply — and an explicit spec value must be dropped —
+    # for WebSearch agents on Anthropic, while non-WebSearch agents keep it.
+    ws = run_pydantic.build_agent(
+        {
+            "name": "searcher",
+            "model": "anthropic:claude-sonnet-5",
+            "instructions": "Search.",
+            "capabilities": ["WebSearch"],
+        }
+    )
+    assert "parallel_tool_calls" not in ws.model_settings
+
+    ws_explicit = run_pydantic.build_agent(
+        {
+            "name": "searcher-explicit",
+            "model": "anthropic:claude-sonnet-5",
+            "instructions": "Search.",
+            "capabilities": ["WebSearch"],
+            "model_settings": {"parallel_tool_calls": False},
+        }
+    )
+    assert "parallel_tool_calls" not in ws_explicit.model_settings
+
+    plain = run_pydantic.build_agent(
+        {
+            "name": "plain",
+            "model": "anthropic:claude-sonnet-5",
+            "instructions": "Reply.",
+        }
+    )
+    assert plain.model_settings["parallel_tool_calls"] is False
+
+
 def test_build_agent_with_scaledown_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     # scaledown attaches its compressor as a ProcessHistory capability
     # (pydantic-ai 2.x dropped Agent(history_processors=...)).
