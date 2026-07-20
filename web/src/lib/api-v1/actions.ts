@@ -446,10 +446,22 @@ async function finishTask(args: {
     },
   });
   if (!res.ok) {
-    const status = res.error.kind === "http" && (res.error.status === 401 || res.error.status === 403)
-      ? 502
-      : 502;
-    return { ok: false, status, error: `Tembo Coding Agent rejected the request (${res.error.kind})` };
+    // Include the upstream status + response body so a failing dispatch is
+    // diagnosable from the caller's error alone. Kind-only ("http") proved
+    // undebuggable in the field. Returning the body to the authorized caller
+    // matches what the chat UI already shows (formatCapError); it's LOGGING
+    // the body that #44 forbids — it can echo the submitted prompt.
+    const detail =
+      res.error.kind === "http"
+        ? `HTTP ${res.error.status}: ${res.error.body.slice(0, 300) || "(no body)"}`
+        : res.error.kind === "network"
+          ? `network: ${res.error.message}`
+          : res.error.kind;
+    return {
+      ok: false,
+      status: 502,
+      error: `Tembo Coding Agent rejected the request (${detail})`,
+    };
   }
 
   if (args.ctx.workspace.commitMode === "direct") {
