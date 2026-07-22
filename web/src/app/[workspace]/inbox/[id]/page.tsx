@@ -165,7 +165,7 @@ export default async function InboxItemPage({
         looksLikeMarkdown(doc) ? (
           <Markdown size="lg">{doc}</Markdown>
         ) : (
-          <p className="text-foreground text-[19px] leading-[1.6] whitespace-pre-wrap">
+          <p className="text-foreground text-lg leading-[1.6] whitespace-pre-wrap">
             {doc}
           </p>
         )
