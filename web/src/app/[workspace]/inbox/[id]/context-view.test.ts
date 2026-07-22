@@ -13,6 +13,13 @@ describe("looksLikeMarkdown", () => {
     );
     expect(looksLikeMarkdown("```\ncode\n```")).toBe(true);
     expect(looksLikeMarkdown("> quoted")).toBe(true);
+    // GFM table via its delimiter row (register agents emit table-only docs).
+    expect(
+      looksLikeMarkdown("| A | B |\n| --- | --- |\n| 1 | 2 |"),
+    ).toBe(true);
+    expect(looksLikeMarkdown("| A | B |\n| :--- | ---: |\n| 1 | 2 |")).toBe(
+      true,
+    );
   });
 
   it("leaves plain text alone", () => {
@@ -24,24 +31,28 @@ describe("looksLikeMarkdown", () => {
     expect(looksLikeMarkdown("https://example.com/thing")).toBe(false);
     // Asterisks/underscores mid-word (identifiers, emphasis-less text).
     expect(looksLikeMarkdown("snake_case and 2*3=6")).toBe(false);
+    // A pipe in prose is not a table — only the delimiter row counts.
+    expect(looksLikeMarkdown("either a | b works\nfoo | bar")).toBe(false);
   });
 });
 
 describe("documentText", () => {
   const digest = "**Digest — last 30 days**\n\n- [move](https://example.com)";
 
-  it("returns the text for a { text } markdown context", () => {
+  it("returns the text for any text-only context, markdown or plain", () => {
     expect(documentText({ text: digest })).toBe(digest);
+    // Plain text is still a document — the page picks pre-wrap rendering for
+    // it, but it must not fall back to the boxed labeled-fields view.
+    expect(documentText({ text: "line one\nline two" })).toBe(
+      "line one\nline two",
+    );
   });
 
-  it("returns null for plain text (line breaks need pre-wrap)", () => {
-    expect(documentText({ text: "line one\nline two" })).toBeNull();
-  });
-
-  it("returns null for structured payloads", () => {
+  it("returns null for structured payloads and empty text", () => {
     expect(documentText({ text: digest, severity: "high" })).toBeNull();
     expect(documentText({ subject: digest })).toBeNull();
     expect(documentText({ text: 42 } as never)).toBeNull();
+    expect(documentText({ text: "  " })).toBeNull();
     expect(documentText({})).toBeNull();
   });
 });

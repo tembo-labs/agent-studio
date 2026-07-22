@@ -15,7 +15,7 @@ import { getServerSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { getWorkspaceBySlug } from "@/lib/workspace";
 
-import { ContextView, documentText } from "./context-view";
+import { ContextView, documentText, looksLikeMarkdown } from "./context-view";
 import { ReviewForm } from "./review-form";
 
 export const dynamic = "force-dynamic";
@@ -158,9 +158,17 @@ export default async function InboxItemPage({
       </div>
 
       {doc ? (
-        // A pure-markdown context (the digest agents) reads like an article:
-        // full-width prose at reading size, no box, no "Context" chrome.
-        <Markdown size="lg">{doc}</Markdown>
+        // A text-only context (digests, registers, reports) reads like an
+        // article: full-width prose at reading size, no box, no "Context"
+        // chrome. The markdown sniff only picks the renderer — plain text
+        // keeps pre-wrap so its line breaks survive.
+        looksLikeMarkdown(doc) ? (
+          <Markdown size="lg">{doc}</Markdown>
+        ) : (
+          <p className="text-foreground text-[19px] leading-[1.6] whitespace-pre-wrap">
+            {doc}
+          </p>
+        )
       ) : (
         <section className="flex flex-col gap-2">
           <h2 className="text-foreground text-sm font-semibold uppercase tracking-wide">

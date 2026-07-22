@@ -47,7 +47,20 @@ export function Markdown({ children, className, size = "sm" }: Props) {
         className,
       )}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // Register-style agents emit tables with 10+ columns; scroll them
+          // horizontally instead of blowing out the reading column.
+          table: (props) => (
+            <div className="overflow-x-auto">
+              <table {...props} />
+            </div>
+          ),
+        }}
+      >
+        {children}
+      </ReactMarkdown>
     </div>
   );
 }
