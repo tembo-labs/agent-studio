@@ -20,24 +20,28 @@ const MARKDOWN_MARKERS = [
   /\[[^\]\n]+\]\([^)\s]+\)/, // link
   /^```/m, // fenced code
   /^>\s/m, // blockquote
+  // GFM table — match the delimiter row (`| --- | :--- |`), not just any
+  // pipe-bearing line, so prose that happens to contain "a | b" stays plain.
+  /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{0,}:?\s*\|?\s*$/m,
 ];
 
 export function looksLikeMarkdown(s: string): boolean {
   return MARKDOWN_MARKERS.some((re) => re.test(s));
 }
 
-// A context of exactly `{ text: "<markdown>" }` is a document, not a payload —
-// it's what produce_inbox_item stores when the producer passes a plain string,
-// and the digest agents write whole newsletters that way. Returns the text so
-// the item page can render it as full-width prose instead of a labeled field
-// inside a box; anything else (structured payloads, plain non-markdown text
-// whose line breaks need pre-wrap) returns null and keeps the fields view.
+// A context of exactly `{ text: "..." }` is a document, not a payload — it's
+// what produce_inbox_item stores when the producer passes a plain string, and
+// the digest/register agents write whole reports that way. Returns the text so
+// the item page can render it as full-width prose (no box, no CONTEXT/TEXT
+// chrome) — every text-only item gets the same treatment, whether or not it
+// uses markdown syntax. Structured multi-field payloads return null and keep
+// the labeled-fields view.
 export function documentText(context: Record<string, unknown>): string | null {
   if (!isPlainObject(context)) return null;
   const keys = Object.keys(context);
   if (keys.length !== 1 || keys[0] !== "text") return null;
   const text = context.text;
-  if (typeof text !== "string" || !looksLikeMarkdown(text)) return null;
+  if (typeof text !== "string" || text.trim() === "") return null;
   return text;
 }
 

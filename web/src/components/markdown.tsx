@@ -21,12 +21,12 @@ type Props = {
 };
 
 // `sm` matches the surrounding "small body copy" we use for inline content.
-// `lg` is for long-form reading (inbox digests): sized like the tembo.io blog
-// (19px body on a ~1.6 line-height, em-scaled headings via prose-lg), where
-// the text IS the page rather than a field inside it.
+// `lg` is for long-form reading (inbox digests) where the text IS the page
+// rather than a field inside it: 18px body on a 1.6 line-height (a notch
+// under the tembo.io blog's 19px, which reads oversized inside app chrome).
 const SIZE_CLASSES = {
   sm: "prose-sm",
-  lg: "prose-lg text-[19px] leading-[1.6] prose-headings:font-semibold",
+  lg: "prose-lg leading-[1.6] prose-headings:font-semibold",
 };
 
 export function Markdown({ children, className, size = "sm" }: Props) {
@@ -47,7 +47,20 @@ export function Markdown({ children, className, size = "sm" }: Props) {
         className,
       )}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // Register-style agents emit tables with 10+ columns; scroll them
+          // horizontally instead of blowing out the reading column.
+          table: (props) => (
+            <div className="overflow-x-auto">
+              <table {...props} />
+            </div>
+          ),
+        }}
+      >
+        {children}
+      </ReactMarkdown>
     </div>
   );
 }
