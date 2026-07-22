@@ -26,6 +26,21 @@ export function looksLikeMarkdown(s: string): boolean {
   return MARKDOWN_MARKERS.some((re) => re.test(s));
 }
 
+// A context of exactly `{ text: "<markdown>" }` is a document, not a payload —
+// it's what produce_inbox_item stores when the producer passes a plain string,
+// and the digest agents write whole newsletters that way. Returns the text so
+// the item page can render it as full-width prose instead of a labeled field
+// inside a box; anything else (structured payloads, plain non-markdown text
+// whose line breaks need pre-wrap) returns null and keeps the fields view.
+export function documentText(context: Record<string, unknown>): string | null {
+  if (!isPlainObject(context)) return null;
+  const keys = Object.keys(context);
+  if (keys.length !== 1 || keys[0] !== "text") return null;
+  const text = context.text;
+  if (typeof text !== "string" || !looksLikeMarkdown(text)) return null;
+  return text;
+}
+
 function humanizeKey(key: string): string {
   return key
     .replace(/[_-]+/g, " ")

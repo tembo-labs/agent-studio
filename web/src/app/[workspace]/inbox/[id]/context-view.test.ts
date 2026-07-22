@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { looksLikeMarkdown } from "./context-view";
+import { documentText, looksLikeMarkdown } from "./context-view";
 
 describe("looksLikeMarkdown", () => {
   it("detects common markdown constructs", () => {
@@ -24,5 +24,24 @@ describe("looksLikeMarkdown", () => {
     expect(looksLikeMarkdown("https://example.com/thing")).toBe(false);
     // Asterisks/underscores mid-word (identifiers, emphasis-less text).
     expect(looksLikeMarkdown("snake_case and 2*3=6")).toBe(false);
+  });
+});
+
+describe("documentText", () => {
+  const digest = "**Digest — last 30 days**\n\n- [move](https://example.com)";
+
+  it("returns the text for a { text } markdown context", () => {
+    expect(documentText({ text: digest })).toBe(digest);
+  });
+
+  it("returns null for plain text (line breaks need pre-wrap)", () => {
+    expect(documentText({ text: "line one\nline two" })).toBeNull();
+  });
+
+  it("returns null for structured payloads", () => {
+    expect(documentText({ text: digest, severity: "high" })).toBeNull();
+    expect(documentText({ subject: digest })).toBeNull();
+    expect(documentText({ text: 42 } as never)).toBeNull();
+    expect(documentText({})).toBeNull();
   });
 });

@@ -17,17 +17,26 @@ import { cn } from "@/lib/utils";
 type Props = {
   children: string;
   className?: string;
+  size?: "sm" | "lg";
 };
 
-export function Markdown({ children, className }: Props) {
+// `sm` matches the surrounding "small body copy" we use for inline content.
+// `lg` is for long-form reading (inbox digests): sized like the tembo.io blog
+// (19px body on a ~1.6 line-height, em-scaled headings via prose-lg), where
+// the text IS the page rather than a field inside it.
+const SIZE_CLASSES = {
+  sm: "prose-sm",
+  lg: "prose-lg text-[19px] leading-[1.6] prose-headings:font-semibold",
+};
+
+export function Markdown({ children, className, size = "sm" }: Props) {
   return (
     <div
       className={cn(
-        // Tailwind Typography handles most of the rendering. `prose-sm`
-        // matches the surrounding "small body copy" we use elsewhere
-        // for inline content; `max-w-none` lets it stretch to the
-        // container.
-        "prose prose-sm dark:prose-invert max-w-none",
+        // Tailwind Typography handles most of the rendering; `max-w-none`
+        // lets it stretch to the container.
+        "prose dark:prose-invert max-w-none",
+        SIZE_CLASSES[size],
         // Strip Typography's default margins around code blocks so
         // they sit flush like our existing <pre> blocks. Inline code
         // gets a subtle surface tint for legibility.
