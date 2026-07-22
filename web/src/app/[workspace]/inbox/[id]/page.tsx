@@ -1,16 +1,59 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { IconChevronDownSmall } from "central-icons";
 
 import { LocalTime } from "@/components/local-time";
+import { Markdown } from "@/components/markdown";
 import { McpProviderLogo } from "@/components/mcp-provider-logo";
-import { getInboxItem, listInboxItems, type InboxItem } from "@/lib/inbox-api";
+import {
+  getInboxItem,
+  listInboxItems,
+  type InboxItem,
+  type InboxLink,
+} from "@/lib/inbox-api";
 import { getServerSession } from "@/lib/session";
+import { cn } from "@/lib/utils";
 import { getWorkspaceBySlug } from "@/lib/workspace";
 
-import { ContextView } from "./context-view";
+import { ContextView, documentText } from "./context-view";
 import { ReviewForm } from "./review-form";
 
 export const dynamic = "force-dynamic";
+
+// Past this many links the list collapses behind a "Links (N)" disclosure —
+// a digest citing 20 sources shouldn't dominate the page, while a triage item
+// pointing at a handful of tickets keeps them all visible.
+const LINKS_COLLAPSE_THRESHOLD = 5;
+
+function LinksList({
+  links,
+  className,
+}: {
+  links: InboxLink[];
+  className?: string;
+}) {
+  return (
+    <ul
+      className={cn(
+        "bg-surface-secondary flex flex-col gap-1 rounded-lg border border-[var(--color-border-weak)] p-4",
+        className,
+      )}
+    >
+      {links.map((link, i) => (
+        <li key={`${link.url}-${i}`}>
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-foreground inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
+          >
+            {link.label ?? link.url} ↗
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 // Drop currently-snoozed items (snoozed_until in the future) from the triage
 // queue. Module-scope so `Date.now()` stays out of the server component's render.
@@ -42,6 +85,7 @@ export default async function InboxItemPage({
   if (!item) notFound();
 
   const resolved = item.status === "done" || item.status === "dismissed";
+  const doc = documentText(item.context);
 
   // For an active item, find the next one to triage so resolving this one
   // advances the user through their queue (and show how many remain). "Next" is
@@ -113,36 +157,44 @@ export default async function InboxItemPage({
         )}
       </div>
 
-      {item.links && item.links.length > 0 && (
+      {doc ? (
+        // A pure-markdown context (the digest agents) reads like an article:
+        // full-width prose at reading size, no box, no "Context" chrome.
+        <Markdown size="lg">{doc}</Markdown>
+      ) : (
         <section className="flex flex-col gap-2">
           <h2 className="text-foreground text-sm font-semibold uppercase tracking-wide">
-            Links
+            Context
           </h2>
-          <ul className="bg-surface-secondary flex flex-col gap-1 rounded-lg border border-[var(--color-border-weak)] p-4">
-            {item.links.map((link, i) => (
-              <li key={`${link.url}-${i}`}>
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-foreground inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
-                >
-                  {link.label ?? link.url} ↗
-                </a>
-              </li>
-            ))}
-          </ul>
+          <div className="bg-surface-secondary rounded-lg border border-[var(--color-border-weak)] p-4">
+            <ContextView context={item.context} />
+          </div>
         </section>
       )}
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-foreground text-sm font-semibold uppercase tracking-wide">
-          Context
-        </h2>
-        <div className="bg-surface-secondary rounded-lg border border-[var(--color-border-weak)] p-4">
-          <ContextView context={item.context} />
-        </div>
-      </section>
+      {item.links && item.links.length > 0 && (
+        <section className="flex flex-col gap-2">
+          {item.links.length > LINKS_COLLAPSE_THRESHOLD ? (
+            <details className="group">
+              <summary className="text-foreground flex w-fit cursor-pointer list-none items-center gap-1 text-sm font-semibold uppercase tracking-wide [&::-webkit-details-marker]:hidden">
+                Links ({item.links.length})
+                <IconChevronDownSmall
+                  aria-hidden
+                  className="text-foreground-muted h-3.5 w-3.5 -rotate-90 transition-transform group-open:rotate-0"
+                />
+              </summary>
+              <LinksList links={item.links} className="mt-2" />
+            </details>
+          ) : (
+            <>
+              <h2 className="text-foreground text-sm font-semibold uppercase tracking-wide">
+                Links
+              </h2>
+              <LinksList links={item.links} />
+            </>
+          )}
+        </section>
+      )}
 
       {resolved ? (
         <section className="flex flex-col gap-2">

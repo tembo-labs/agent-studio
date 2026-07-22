@@ -423,7 +423,10 @@ export function buildMcpServer(
         "without one it sits 'open' for someone to pick up. To point one item at " +
         "several things to review (e.g. the top 10 Linear triage tickets as one " +
         "task), pass `links: [{ label, url }]` — they render as a clickable list, " +
-        "preferable to a Markdown link list in proposedActionText. Returns the item.",
+        "preferable to a Markdown link list in proposedActionText. For a narrative " +
+        "digest, pass the document as a plain-string Markdown `context` (rendered " +
+        "full-width at reading size) with sources linked inline, and mirror them " +
+        "in `links`. Returns the item.",
       inputSchema: {
         itemType: z
           .string()
@@ -449,7 +452,13 @@ export function buildMcpServer(
         context: z
           .union([z.record(z.string(), z.unknown()), z.string()])
           .optional()
-          .describe("The raw payload to review — a JSON object, or a plain string (stored as { text })."),
+          .describe(
+            "The raw payload to review — a JSON object (rendered as labeled " +
+            "fields), or a plain string (stored as { text }). A plain string " +
+            "that is Markdown renders as a full-width document — write " +
+            "digests/newsletters this way, most important items first, with " +
+            "every claim's source linked inline.",
+          ),
         proposedActionText: z.string().optional().describe("Your proposed reply / decision."),
         proposedActionFields: z.record(z.string(), z.unknown()).optional().describe("Structured proposal params."),
         options: z
@@ -493,8 +502,10 @@ export function buildMcpServer(
           .optional()
           .describe(
             "Deep links for the human to open, one row each — e.g. the Linear tickets " +
-            "behind a single triage item. Rendered as a clickable 'Links' list on the " +
-            "item (separate from the single `url` source link). Non-http(s) urls are dropped.",
+            "behind a single triage item. Rendered as a clickable 'Links' list below " +
+            "the context (separate from the single `url` source link; collapses " +
+            "behind a count past 5 links, so a long source list stays out of the " +
+            "way). Non-http(s) urls are dropped.",
           ),
       },
     },
