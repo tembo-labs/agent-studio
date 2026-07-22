@@ -102,10 +102,19 @@ jobs:
           rw() {
             # Project tokens authenticate via the Project-Access-Token
             # header (Authorization: Bearer is for account/team tokens).
-            curl -fsS https://backboard.railway.app/graphql/v2 \
+            local res
+            res=$(curl -fsS https://backboard.railway.app/graphql/v2 \
               -H "Project-Access-Token: $RAILWAY_TOKEN" \
               -H "Content-Type: application/json" \
-              -d "$1"
+              -d "$1")
+            echo "$res"
+            # GraphQL reports failures in-band with HTTP 200, so curl -f
+            # alone can't catch them (an expired Railway plan once left this
+            # step green while deploying nothing).
+            if jq -e '(.errors // []) | length > 0' <<<"$res" >/dev/null; then
+              echo "::error::Railway API returned errors — deploy did not happen"
+              return 1
+            fi
           }
           echo "Pinning $SERVICE_ID → $IMAGE"
           # Pin to the immutable digest (not :edge) so Railway always
