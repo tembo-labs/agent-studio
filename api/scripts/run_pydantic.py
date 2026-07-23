@@ -381,7 +381,7 @@ def make_stream_handler():
                             },
                         )
                 elif name == "FunctionToolResultEvent":
-                    res = getattr(event, "result", None)
+                    res = getattr(event, "part", None) or getattr(event, "result", None)
                     cid = getattr(res, "tool_call_id", None) or getattr(
                         event, "tool_call_id", None
                     )
