@@ -14,10 +14,35 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.7.4] — Inbox reading view for digests, markdown context + run links, quieter Slack threads — shipped 2026-07-24
+
 ### Added
 - **Inbox item detail: markdown context + run link.** Context fields that
   contain Markdown (agent digests) now render formatted instead of as raw
   text, and the header links to the run that produced the item.
+- **Newsletter-style reading view for text-only inbox items.** Any text-only
+  context (the `{ text }` shape `produce_inbox_item` stores for plain-string
+  contexts) now renders as an unboxed full-width document at reading size
+  (18px/1.6) with no CONTEXT/TEXT chrome — the markdown sniff only picks the
+  renderer (Markdown vs pre-wrap), so table-only markdown can no longer fall
+  back to the boxed fields view. GFM tables are recognized and wide tables
+  scroll horizontally. Structured contexts keep the boxed labeled-fields view.
+- **Links rollup on inbox items.** The Links section moves below the content
+  and collapses behind a "Links (N)" disclosure past 5 entries, so a digest
+  citing 20 sources no longer opens with a wall of links while short triage
+  lists stay fully visible. `produce_inbox_item`'s descriptions now steer
+  producers to inline markdown sources for narrative digests.
+
+### Fixed
+- **Slack: untagged thread replies no longer trigger the which-agent menu.**
+  A plain reply inside a bot DM thread (e.g. answering a daily brief with
+  `Y`) used to post the "Tell me which agent to run…" menu on top of any
+  custom listener already answering that thread. Untagged thread replies are
+  now left to the thread's listener; explicit `@agent` mentions in a thread
+  still launch their agent, and plain top-level DMs are unchanged.
+- **Internal deploy CI: Railway GraphQL errors now fail the job.** Railway
+  reports failures in-band with HTTP 200, so `curl -f` never tripped — an
+  expired plan left the deploy step green while deploying nothing.
 
 ## [v2026.7.3] — pydantic-ai 2.x runner, WebSearch run + agent-change dispatch fixes, catalog batch 3 — shipped 2026-07-20
 
