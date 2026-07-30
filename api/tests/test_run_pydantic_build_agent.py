@@ -42,7 +42,10 @@ def provider_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     ],
 )
 def test_build_agent_constructs_provider_models(spec: dict) -> None:
-    assert isinstance(run_pydantic.build_agent(spec), Agent)
+    agent = run_pydantic.build_agent(spec)
+
+    assert isinstance(agent, Agent)
+    assert "get_run_datetime" in agent._function_toolset.tools
 
 
 def test_build_agent_constructs_with_tools_module() -> None:
@@ -67,6 +70,35 @@ tools = [echo]
     )
 
     assert isinstance(agent, Agent)
+    assert set(agent._function_toolset.tools) == {"get_run_datetime", "echo"}
+
+
+def test_get_run_datetime_returns_stable_local_run_date(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TAS_RUN_STARTED_AT", "2026-07-28T07:15:30.123Z")
+
+    pacific = run_pydantic.get_run_datetime("America/Los_Angeles")
+    utc = run_pydantic.get_run_datetime()
+
+    assert pacific == {
+        "run_started_at": "2026-07-28T07:15:30.123000Z",
+        "timezone": "America/Los_Angeles",
+        "local_datetime": "2026-07-28T00:15:30.123000-07:00",
+        "local_date": "2026-07-28",
+        "local_time": "00:15:30.123000",
+    }
+    assert utc["run_started_at"] == pacific["run_started_at"]
+    assert utc["local_date"] == "2026-07-28"
+
+
+def test_get_run_datetime_rejects_unknown_timezone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TAS_RUN_STARTED_AT", "2026-07-28T07:15:30Z")
+
+    with pytest.raises(ValueError, match="unknown IANA timezone"):
+        run_pydantic.get_run_datetime("Pacific/Atlantis")
 
 
 def test_build_capabilities_maps_websearch() -> None:

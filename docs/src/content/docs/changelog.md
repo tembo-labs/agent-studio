@@ -19,6 +19,12 @@ they are no longer release versions. Phase scope now lives in
 
 ## Unreleased
 
+### Added
+- **Built-in run date/time tool.** Every Pydantic agent can call
+  `get_run_datetime` without adding a connection. It returns the stable run-start
+  instant and local date/time fields for a requested IANA timezone, giving
+  scheduled agents a reliable basis for relative windows and date-based dedup.
+
 ## v2026.7.4 — Inbox reading view for digests, markdown context + run links, quieter Slack threads
 
 ### Added

@@ -80,6 +80,15 @@ Your connected repo also carries an authoring guide (`AGENTS.md` and per-framewo
 `AGENT_GUIDE.md`) that TAS keeps current — that's the canonical, always-up-to-date
 field reference for coding agents.
 
+### Built-in run date and time
+
+Every Pydantic agent has a **`get_run_datetime`** tool; no connection or agent
+file setting is required. Use it for relative date windows, date-based deduplication,
+and any task that depends on "today." It returns the UTC instant when the run
+entered `running`, plus local date/time fields in an optional IANA timezone such
+as `America/Los_Angeles`. The instant stays fixed for the entire run, including
+runs that cross midnight.
+
 ## Choosing a model
 
 Model choice is a cost/reliability tradeoff:
