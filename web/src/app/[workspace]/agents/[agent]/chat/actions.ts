@@ -8,11 +8,12 @@ import {
 } from "@/lib/auth-server";
 import {
   buildChatEditPrompt,
-  createTemboTask,
+  dispatchTemboTask,
   type CapError,
 } from "@/lib/cap-api";
 import {
   createImprovement,
+  getLatestTemboTaskForAgent,
   improvementMarker,
   setImprovementCommitted,
   setImprovementTask,
@@ -66,6 +67,10 @@ export async function chatSubmitAction(args: {
     };
   }
   const canonicalName = agent.spec.name;
+  const existingTask = await getLatestTemboTaskForAgent(
+    workspace.id,
+    canonicalName,
+  );
 
   const repo = await getWorkspaceRepo(workspace.id);
   if (!repo) {
@@ -111,8 +116,9 @@ export async function chatSubmitAction(args: {
     )),
   });
 
-  const res = await createTemboTask({
+  const res = await dispatchTemboTask({
     apiKey,
+    existingTask,
     input: {
       prompt,
       repositoryUrl: `https://github.com/${repo.owner}/${repo.name}`,
