@@ -18,6 +18,15 @@ export function aadWorkspaceSecret(workspaceId: string, kind: string): string {
   return `workspace_secret${SEP}${workspaceId}${SEP}${kind}`;
 }
 
+/** `workspace_user_secret`, keyed by (workspace_id, user_id, kind). */
+export function aadWorkspaceUserSecret(
+  workspaceId: string,
+  userId: string,
+  kind: string,
+): string {
+  return `workspace_user_secret${SEP}${workspaceId}${SEP}${userId}${SEP}${kind}`;
+}
+
 /** `workspace_secret_connection` row, keyed by (workspace_id, slug). */
 export function aadSecretConnection(
   workspaceId: string,

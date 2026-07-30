@@ -1,12 +1,14 @@
 import { notFound } from "next/navigation";
 
 import { Section } from "@/components/section";
+import { authorizeWorkspace } from "@/lib/auth-server";
+import { getPersonalTemboPreview } from "@/lib/tembo-credentials";
 import {
-  getWorkspaceBySlug,
   getWorkspaceSecretPreview,
 } from "@/lib/workspace";
 
 import { ChangeModeSetting } from "../change-mode-setting";
+import { PersonalTemboKeyForm } from "../personal-tembo-key-form";
 import { SecretKeyForm } from "../secret-key-form";
 
 export const dynamic = "force-dynamic";
@@ -22,28 +24,47 @@ export default async function TemboSettingsPage({
   params: Promise<{ workspace: string }>;
 }) {
   const { workspace: slug } = await params;
-  const workspace = await getWorkspaceBySlug(slug);
-  if (!workspace) notFound();
+  const auth = await authorizeWorkspace(slug);
+  if (!auth.ok) notFound();
+  const { workspace, userId } = auth;
 
-  const temboPreview = await getWorkspaceSecretPreview(
-    workspace.id,
-    "tembo_api_key",
-  );
+  const [personalPreview, temboPreview] = await Promise.all([
+    getPersonalTemboPreview(workspace.id, userId),
+    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
+  ]);
 
   return (
     <div className="divide-y divide-[var(--color-border-weak)]">
       <div className="pb-6 first:pt-0">
         <Section
-          title="Tembo API key"
+          title="Your Tembo account"
+          description="Connect your own Tembo API key so coding-agent sessions and pull requests use your Tembo identity. If you do not connect one, TAS uses the workspace fallback account below."
+        >
+          <PersonalTemboKeyForm
+            workspaceSlug={workspace.slug}
+            preview={
+              personalPreview
+                ? {
+                    last4: personalPreview.last4,
+                    updatedAt: personalPreview.updatedAt.toISOString(),
+                  }
+                : null
+            }
+          />
+        </Section>
+      </div>
+
+      <div className="py-6">
+        <Section
+          title="Workspace fallback account"
           description={
             <>
-              Powers chat-to-PR authoring (new agents, chat-to-edit, Improve)
-              through the Tembo Coding Agent. Not needed to run agents. Scoped
-              to{" "}
+              Used for members who have not connected their own Tembo account.
+              This preserves shared chat-to-PR authoring for{" "}
               <span className="text-foreground font-medium">
                 {workspace.name}
               </span>{" "}
-              only.
+              and is not needed to run agents.
             </>
           }
         >

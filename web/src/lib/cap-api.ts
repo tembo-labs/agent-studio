@@ -49,6 +49,46 @@ export type CapError =
   | { kind: "http"; status: number; body: string; url: string }
   | { kind: "network"; message: string };
 
+export type TemboAccountResult =
+  | { ok: true; userId: string; orgId: string }
+  | { ok: false; error: "invalid" | "network"; detail?: string };
+
+export async function validateTemboApiKey(
+  apiKey: string,
+): Promise<TemboAccountResult> {
+  const baseUrl = process.env.TEMBO_API_URL ?? DEFAULT_TEMBO_API_URL;
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/public-api/me`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      cache: "no-store",
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: "network",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: res.status === 401 || res.status === 403 ? "invalid" : "network",
+      detail: `Tembo returned ${res.status}`,
+    };
+  }
+
+  const body = (await res.json().catch(() => null)) as {
+    userId?: unknown;
+    orgId?: unknown;
+  } | null;
+  if (typeof body?.userId !== "string" || typeof body.orgId !== "string") {
+    return { ok: false, error: "invalid" };
+  }
+  return { ok: true, userId: body.userId, orgId: body.orgId };
+}
+
 export async function createTemboTask(args: {
   apiKey: string;
   input: CreateTaskInput;

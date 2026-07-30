@@ -10,9 +10,9 @@ import { getAgentOwner, getStableVersion } from "@/lib/agent-versions";
 import { toolkitLabel } from "@/lib/composio-label";
 import { getMcpProvider } from "@/lib/mcp-providers";
 import { meetsMinRole } from "@/lib/rbac";
+import { isTemboConfiguredForUser } from "@/lib/tembo-credentials";
 import {
   getWorkspaceRole,
-  isTemboConfigured,
   listWorkspaceMembers,
 } from "@/lib/workspace";
 
@@ -47,7 +47,7 @@ export default async function AgentLayout({
   const [currentUserRole, temboConfigured, stable, owner, allMembers] =
     await Promise.all([
       getWorkspaceRole(workspace.id, session.user.id),
-      isTemboConfigured(workspace.id),
+      isTemboConfiguredForUser(workspace.id, session.user.id),
       getStableVersion(workspace.id, canonicalName),
       getAgentOwner(workspace.id, canonicalName),
       listWorkspaceMembers(workspace.id),

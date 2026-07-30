@@ -19,7 +19,8 @@ import {
   listToolCallsForRun,
 } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
-import { getWorkspaceBySlug, isTemboConfigured } from "@/lib/workspace";
+import { isTemboConfiguredForUser } from "@/lib/tembo-credentials";
+import { getWorkspaceBySlug } from "@/lib/workspace";
 
 import { CancelRunButton } from "./cancel-run-button";
 import { CopyOutputButton } from "./copy-output-button";
@@ -125,7 +126,10 @@ export default async function RunDetailPage({
   // "Improve the Agent" opens a Tembo CAP task — hide it when no Tembo
   // API key is set (the run + its output still render), or when the agent is
   // locked (#12: no user-driven edits — changes go through repo PRs).
-  const temboConfigured = await isTemboConfigured(workspace.id);
+  const temboConfigured = await isTemboConfiguredForUser(
+    workspace.id,
+    session.user.id,
+  );
   const locked = await isAgentLocked(workspace.id, run.agentName);
 
   const agentHref = `/${workspace.slug}/agents/${encodeURIComponent(run.agentName)}`;

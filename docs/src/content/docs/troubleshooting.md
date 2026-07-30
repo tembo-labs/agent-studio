@@ -35,7 +35,9 @@ The sibling `.py` is missing from the repo, or it doesn't export a non-empty
 
 **"Improve the Agent" seems to do nothing.**
 Usually a stale browser tab from a previous deployment — hard-refresh and retry.
-Confirm a Tembo API key is set in [Settings](/agent-studio/settings/).
+Confirm either your personal Tembo account or the workspace fallback account is
+connected in [Settings](/agent-studio/settings/). If work appears under the
+fallback account, connect your own Tembo API key before submitting again.
 
 **The wrong tool slug / tools don't appear.**
 Composio and Native MCP use different slugs for the same provider — make sure the
