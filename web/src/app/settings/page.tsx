@@ -8,10 +8,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getInstanceNameFromEnv } from "@/lib/config";
+import { getInstanceNameFromEnv, getPublicOrigin } from "@/lib/config";
 import { authorizeInstance } from "@/lib/instance";
+import { listInstanceAdmins } from "@/lib/instance-admins";
 import { getStoredInstanceName } from "@/lib/instance-settings";
 
+import { AdminsSection } from "./admins-section";
 import { InstanceNameForm } from "./instance-name-form";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +29,7 @@ export default async function InstanceSettingsPage() {
 
   const storedName = await getStoredInstanceName();
   const envFallback = getInstanceNameFromEnv();
+  const admins = await listInstanceAdmins();
 
   return (
     <main className="bg-surface min-h-screen px-6 py-10">
@@ -61,6 +64,29 @@ export default async function InstanceSettingsPage() {
             <InstanceNameForm
               initialName={storedName ?? ""}
               envFallback={envFallback}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="w-full p-3">
+          <CardHeader className="flex-col items-start gap-1 px-1 pb-3 pt-1">
+            <CardTitle className="text-foreground-title text-base">
+              Instance admins
+            </CardTitle>
+            <CardDescription>
+              Who can sign in to this instance, create workspaces, and manage
+              these settings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-1 pb-1">
+            <AdminsSection
+              admins={admins.map(({ email, source, addedByName }) => ({
+                email,
+                source,
+                addedByName,
+              }))}
+              currentEmail={auth.email}
+              signInUrl={getPublicOrigin()}
             />
           </CardContent>
         </Card>

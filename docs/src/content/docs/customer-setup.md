@@ -105,6 +105,9 @@ Generate each with `openssl rand -base64 32`:
   name** before signing in.
 - [ ] **Sign in** with an email listed in `INSTANCE_ADMIN_EMAILS`. You become the
   first user and the instance admin.
+- [ ] *(Optional)* **Hand setup to someone else** — add their email under
+  **Instance settings → Instance admins** and share the URL. They can sign in
+  immediately with full instance-admin access; no env edit needed.
 - [ ] **Create your first workspace** (only instance admins can create
   workspaces).
 

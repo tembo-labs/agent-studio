@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { isInstanceAdminEmail } from "@/lib/instance";
+import { isInstanceAdmin as checkInstanceAdmin } from "@/lib/instance";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
 
@@ -35,7 +35,7 @@ export default async function SettingsLayout({
   if (!workspace) notFound();
   if (!(await userIsMember(workspace.id, session.user.id))) notFound();
 
-  const isInstanceAdmin = isInstanceAdminEmail(session.user.email);
+  const isInstanceAdmin = await checkInstanceAdmin(session.user.email);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">

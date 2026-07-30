@@ -28,9 +28,11 @@ to inspect connections, automations, and runs before offboarding someone.
 ## Instance admins
 
 Above workspace roles, **instance admins** are bootstrapped from
-`INSTANCE_ADMIN_EMAILS` at deploy time. An instance admin can:
+`INSTANCE_ADMIN_EMAILS` at deploy time; existing instance admins can add more
+in-app under top-level **Settings**. An instance admin can:
 
 - Set the instance name and branding (top-level **Settings**)
+- Add and remove other instance admins (top-level **Settings**)
 - **Create workspaces** (only instance admins see "Create workspace")
 - Access any workspace they're a member of with their assigned workspace role
 
