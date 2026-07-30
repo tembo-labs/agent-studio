@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { dispatchTemboTask } from "@/lib/cap-api";
+import { dispatchTemboTask, validateTemboApiKey } from "@/lib/cap-api";
 
 const input = {
   prompt: "Update the agent instructions",
@@ -8,16 +8,16 @@ const input = {
   targetBranch: "main",
 };
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
 describe("dispatchTemboTask", () => {
   beforeEach(() => {
     vi.stubEnv("TEMBO_API_URL", "https://api.example.test");
     vi.spyOn(console, "log").mockImplementation(() => undefined);
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
   });
 
   it("creates a new session when there is no prior agent task", async () => {
@@ -113,5 +113,44 @@ describe("dispatchTemboTask", () => {
       "https://api.example.test/session/missing-session/message",
       "https://api.example.test/public-api/session/create",
     ]);
+  });
+});
+
+describe("validateTemboApiKey", () => {
+  it("returns the Tembo account identity for a valid key", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ userId: "user-1", orgId: "org-1" }), {
+        status: 200,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(validateTemboApiKey("secret-key")).resolves.toEqual({
+      ok: true,
+      userId: "user-1",
+      orgId: "org-1",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.tembo.io/public-api/me",
+      expect.objectContaining({
+        headers: { Authorization: "Bearer secret-key" },
+      }),
+    );
+  });
+
+  it("rejects a response without an authenticated identity", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ userId: null, orgId: null }), {
+          status: 200,
+        }),
+      ),
+    );
+
+    await expect(validateTemboApiKey("bad-key")).resolves.toEqual({
+      ok: false,
+      error: "invalid",
+    });
   });
 });

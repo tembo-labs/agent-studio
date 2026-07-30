@@ -27,6 +27,7 @@ import {
   buildCreateAgentPrompt,
   dispatchTemboTask,
 } from "@/lib/cap-api";
+import { resolveTemboCredential } from "@/lib/tembo-credentials";
 import { buildPromptConnectionContext } from "@/lib/prompt-connections";
 import {
   findMissingConnections,
@@ -60,7 +61,6 @@ import { suggestSlug } from "@/lib/slugify";
 import {
   getWorkspaceById,
   getWorkspaceRepo,
-  getWorkspaceSecretPlaintext,
   listWorkspaceMembers,
 } from "@/lib/workspace";
 import { setAgentOwner } from "@/lib/agent-versions";
@@ -304,12 +304,16 @@ export async function requestAgentChange(
   if (!repo) {
     return { ok: false, status: 409, error: "no repository connected to this workspace" };
   }
-  const apiKey = await getWorkspaceSecretPlaintext(ctx.workspace.id, "tembo_api_key");
-  if (!apiKey) {
+  const temboCredential = await resolveTemboCredential(
+    ctx.workspace.id,
+    ctx.userId,
+  );
+  if (!temboCredential) {
     return {
       ok: false,
       status: 409,
-      error: "no Tembo API key set for this workspace (Settings → Tembo Coding Agent)",
+      error:
+        "no personal or workspace fallback Tembo account is connected (Settings → Tembo Coding Agent)",
     };
   }
   const repositoryUrl = `https://github.com/${repo.owner}/${repo.name}`;
@@ -370,7 +374,7 @@ export async function requestAgentChange(
     });
     return finishTask({
       ctx,
-      apiKey,
+      apiKey: temboCredential.apiKey,
       repositoryUrl,
       repo,
       rowId: row.id,
@@ -438,7 +442,16 @@ export async function requestAgentChange(
       Math.floor(Date.now() / 1000),
     )),
   });
-  return finishTask({ ctx, apiKey, repositoryUrl, repo, rowId: row.id, prompt, kind, agentPath });
+  return finishTask({
+    ctx,
+    apiKey: temboCredential.apiKey,
+    repositoryUrl,
+    repo,
+    rowId: row.id,
+    prompt,
+    kind,
+    agentPath,
+  });
 }
 
 /** Shared tail: POST the task to CAP, record it on the improvement row, return. */

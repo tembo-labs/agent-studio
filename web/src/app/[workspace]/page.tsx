@@ -15,12 +15,12 @@ import { getMcpProvider } from "@/lib/mcp-providers";
 import { meetsMinRole } from "@/lib/rbac";
 import { listAgentSubAgentEdges, listAgentSummaries30d } from "@/lib/runs-db";
 import { getServerSession } from "@/lib/session";
+import { isTemboConfiguredForUser } from "@/lib/tembo-credentials";
 import { listAgents } from "@/lib/workspace-agents";
 import {
   getWorkspaceBySlug,
   getWorkspaceRepo,
   getWorkspaceRole,
-  getWorkspaceSecretPreview,
 } from "@/lib/workspace";
 
 import {
@@ -57,14 +57,14 @@ export default async function WorkspacePage({
   }
 
   const [
-    apiKeyPreview,
+    temboConfigured,
     agentsResult,
     pendingStored,
     currentUserRole,
     starredNames,
     ownedNames,
   ] = await Promise.all([
-    getWorkspaceSecretPreview(workspace.id, "tembo_api_key"),
+    isTemboConfiguredForUser(workspace.id, session.user.id),
     listAgents(workspace.id),
     listPendingCreatesForWorkspace(workspace.id),
     getWorkspaceRole(workspace.id, session.user.id),
@@ -276,23 +276,23 @@ export default async function WorkspacePage({
         </div>
       )}
 
-      {!apiKeyPreview && (
+      {!temboConfigured && (
         <div className="bg-surface-raised border-border flex flex-col gap-2 rounded-lg border p-4">
           <h2 className="text-foreground text-sm font-medium">
-            Add your Tembo API key
+            Connect a Tembo account
           </h2>
           <p className="text-foreground-weak text-base">
-            A Tembo API key powers chat-to-PR authoring — creating, editing,
-            and improving agents through Tembo. Until it&apos;s set, those
-            features stay hidden. (Running an existing agent uses your
-            Anthropic or OpenAI key, set separately.)
+            Connect your personal Tembo account, or ask an admin to configure
+            the workspace fallback account, to create, edit, and improve agents
+            through Tembo. Running an existing agent uses your Anthropic or
+            OpenAI key separately.
           </p>
           <div>
             <Link
-              href={`/${workspace.slug}/settings`}
+              href={`/${workspace.slug}/settings/tembo`}
               className="text-foreground hover:underline text-sm font-medium"
             >
-              Add it in Settings →
+              Open Tembo settings →
             </Link>
           </div>
         </div>
@@ -307,7 +307,7 @@ export default async function WorkspacePage({
         <AgentsInventory
           agents={inventoryAgents}
           newAgentHref={`/${workspace.slug}/agents/new`}
-          canCreate={canEdit && Boolean(apiKeyPreview)}
+          canCreate={canEdit && temboConfigured}
           workspaceSlug={workspace.slug}
           canEdit={canEdit}
         />
