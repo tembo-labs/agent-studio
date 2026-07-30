@@ -19,10 +19,8 @@ import {
   setImprovementTask,
 } from "@/lib/improvements-api";
 import { cancelRun, getRun } from "@/lib/runs-api";
-import {
-  getWorkspaceRepo,
-  getWorkspaceSecretPlaintext,
-} from "@/lib/workspace";
+import { resolveTemboCredential } from "@/lib/tembo-credentials";
+import { getWorkspaceRepo } from "@/lib/workspace";
 
 export type ImproveResult =
   | {
@@ -63,12 +61,12 @@ export async function improveAgentAction(args: {
     };
   }
 
-  const apiKey = await getWorkspaceSecretPlaintext(workspace.id, "tembo_api_key");
-  if (!apiKey) {
+  const temboCredential = await resolveTemboCredential(workspace.id, userId);
+  if (!temboCredential) {
     return {
       ok: false,
       error:
-        "Tembo API key not set for this workspace. Add it in Settings → Tembo API key.",
+        "Connect your Tembo account or ask an admin to configure the workspace fallback account in Settings → Tembo Coding Agent.",
     };
   }
 
@@ -97,7 +95,7 @@ export async function improveAgentAction(args: {
   });
 
   const res = await createTemboTask({
-    apiKey,
+    apiKey: temboCredential.apiKey,
     input: {
       prompt,
       repositoryUrl: `https://github.com/${repo.owner}/${repo.name}`,
@@ -174,7 +172,7 @@ export async function cancelRunAction(args: {
 function formatCapError(error: CapError): string {
   switch (error.kind) {
     case "missing_tembo_key":
-      return "Tembo API key not set for this workspace. Add it under Settings → Tembo Coding Agent.";
+      return "Connect your Tembo account or ask an admin to configure the workspace fallback account under Settings → Tembo Coding Agent.";
     case "http":
       if (error.status === 401 || error.status === 403) {
         return "Tembo rejected the API key (it may have been rotated or revoked). Update it under Settings → Tembo Coding Agent.";
