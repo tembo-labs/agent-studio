@@ -25,7 +25,7 @@ import { lookupUserByEmail, postMessage } from "@/lib/slack-api";
 import {
   buildChatEditPrompt,
   buildCreateAgentPrompt,
-  createTemboTask,
+  dispatchTemboTask,
 } from "@/lib/cap-api";
 import { resolveTemboCredential } from "@/lib/tembo-credentials";
 import { buildPromptConnectionContext } from "@/lib/prompt-connections";
@@ -36,6 +36,7 @@ import {
 import { validateCron } from "@/lib/cron";
 import {
   createImprovement,
+  getLatestTemboTaskForAgent,
   improvementMarker,
   setImprovementCommitted,
   setImprovementTask,
@@ -345,6 +346,10 @@ export async function requestAgentChange(
     kind = "edit";
     agentName = found.agent.spec.name;
     agentPath = found.agent.path;
+    const existingTask = await getLatestTemboTaskForAgent(
+      ctx.workspace.id,
+      agentName,
+    );
     const row = await createImprovement({
       workspaceId: ctx.workspace.id,
       runId: null,
@@ -376,6 +381,7 @@ export async function requestAgentChange(
       prompt,
       kind,
       agentPath,
+      existingTask,
     });
   }
 
@@ -458,9 +464,11 @@ async function finishTask(args: {
   prompt: string;
   kind: "edit" | "create";
   agentPath: string;
+  existingTask?: { taskId: string; htmlUrl: string } | null;
 }): Promise<{ ok: true; result: RequestAgentChangeResult } | ActionFailure> {
-  const res = await createTemboTask({
+  const res = await dispatchTemboTask({
     apiKey: args.apiKey,
+    existingTask: args.existingTask,
     input: {
       prompt: args.prompt,
       repositoryUrl: args.repositoryUrl,
