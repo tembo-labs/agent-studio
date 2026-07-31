@@ -17,7 +17,7 @@
     "test:bdd:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
-    "@base-ui/react": "^1.5.0",
+    "@base-ui/react": "^1.6.0",
     "@composio/core": "^0.13.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@radix-ui/react-alert-dialog": "^1.1.20",
