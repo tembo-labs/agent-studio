@@ -18,8 +18,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.8))(react@19.2.8)
       '@composio/core':
-        specifier: ^0.13.1
-        version: 0.13.1(zod@4.4.3)
+        specifier: ^0.14.0
+        version: 0.14.0(zod@4.4.3)
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.30.0(zod@4.4.3)
@@ -465,16 +465,16 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
-  '@composio/client@0.1.0-alpha.74':
-    resolution: {integrity: sha512-/EHJsFxCpWfRxNvXURRrGVZfJSltSpN4Gkd9M9Cl5gPOirG+NpbXf2B8d4B72H87m7cnOguMKjOH42ogQ84/Ww==}
+  '@composio/client@0.1.0-alpha.75':
+    resolution: {integrity: sha512-bS2yYAkgieeVGxqmkBUmtRKa6bojLhLnA/OJM8BdYvlsR0HST57aCCg9NCqYIvYQd3L08ZKzOWeGqIqzHu/2tQ==}
 
-  '@composio/core@0.13.1':
-    resolution: {integrity: sha512-bC64PJG3RBeuezihfZV/9qJMd1LyzUEFN1tVHTWh32n/muUMr5I33nN6Mezhtkl4+ffBJ8IZ/mNt9tEQKFB/sw==}
+  '@composio/core@0.14.0':
+    resolution: {integrity: sha512-6gf1cmmUoD++la7u9sfqK6Xs0KLLBFfZ77kcjvuNH+QUM9r3HbsPrb9hVWtoihmNMQ4h6G4o7JHTrMi7GLr37w==}
     peerDependencies:
-      zod: ^3.25 || ^4
+      zod: '>=3.25.76 <5'
 
-  '@composio/json-schema-to-zod@0.2.0':
-    resolution: {integrity: sha512-P7ym7+1NCN2cDVlSOGTINY6KjZ/d162uc+0LChYcy3d5RAAacgHiGU7ZJF+5pUJHbIivsfAC/4PdjVdsfmHdeA==}
+  '@composio/json-schema-to-zod@0.2.1':
+    resolution: {integrity: sha512-ezIaQoXdqWJXFaI8+gTShpj8YZcRdSnLkA1hgzx1+kn2Bi1SXOtXjghoQDy2ZBYIOCefRXGmyaPl52+idjS9wA==}
     peerDependencies:
       zod: '>=3.25.76 <5'
 
@@ -5339,12 +5339,12 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@composio/client@0.1.0-alpha.74': {}
+  '@composio/client@0.1.0-alpha.75': {}
 
-  '@composio/core@0.13.1(zod@4.4.3)':
+  '@composio/core@0.14.0(zod@4.4.3)':
     dependencies:
-      '@composio/client': 0.1.0-alpha.74
-      '@composio/json-schema-to-zod': 0.2.0(zod@4.4.3)
+      '@composio/client': 0.1.0-alpha.75
+      '@composio/json-schema-to-zod': 0.2.1(zod@4.4.3)
       '@types/json-schema': 7.0.15
       openai: 6.49.0(zod@4.4.3)
       picocolors: 1.1.1
@@ -5358,7 +5358,7 @@ snapshots:
       - '@smithy/signature-v4'
       - ws
 
-  '@composio/json-schema-to-zod@0.2.0(zod@4.4.3)':
+  '@composio/json-schema-to-zod@0.2.1(zod@4.4.3)':
     dependencies:
       zod: 4.4.3
 
