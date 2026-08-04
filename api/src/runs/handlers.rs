@@ -50,13 +50,13 @@ pub struct CreateRunRequest {
     /// Optional sidecar Python module (the Pydantic agent's
     /// `tools_module:`) whose functions the wrapper exposes to the
     /// model as tools. The web layer reads it from the repo at dispatch
-    /// time; transient like spec_content (not persisted on the run row).
+    /// time; persisted with spec_content so an interrupted run can recover.
     #[serde(default)]
     pub tools_module_content: Option<String>,
     /// Files of the Agent Skills the agent opts into, as
     /// `{ repoPath: content }`. The web layer reads them from the repo at
     /// dispatch; the wrapper materializes them and mounts pydantic-ai-skills.
-    /// Transient like spec_content (not persisted on the run row).
+    /// Persisted with the launch envelope for recovery.
     #[serde(default)]
     pub skills_content: Option<std::collections::HashMap<String, String>>,
     /// Where the run came from. Defaults to "manual" so existing
@@ -115,13 +115,44 @@ pub async fn create_run(
             return Err((StatusCode::BAD_REQUEST, format!("unknown trigger: {other}")));
         }
     };
+    let framework = req
+        .framework
+        .as_deref()
+        .map(parse_framework)
+        .unwrap_or(runner::Framework::Pydantic);
+    let framework_name = match framework {
+        runner::Framework::Pydantic => "pydantic-agentspec",
+        runner::Framework::CargoAi => "cargo-ai",
+    };
+    let spec_format = match req.spec_format.as_deref() {
+        Some("yaml") => runner::SpecFormat::Yaml,
+        None | Some("json") => runner::SpecFormat::Json,
+        Some(other) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("unknown spec_format: {other}"),
+            ));
+        }
+    };
+    let spec_format_name = match spec_format {
+        runner::SpecFormat::Yaml => "yaml",
+        runner::SpecFormat::Json => "json",
+    };
+    let skills_json = req
+        .skills_content
+        .as_ref()
+        .map(|skills| serde_json::json!(skills));
 
     sqlx::query(
         r#"INSERT INTO run
             (id, workspace_id, agent_name, agent_path, model, status,
              created_by, user_message, trigger, automation_id,
-             agent_version_id, agent_version_label, parent_run_id)
-            VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8, $9, $10, $11, $12)"#,
+             agent_version_id, agent_version_label, parent_run_id,
+             execution_framework, execution_spec_content,
+             execution_spec_format, execution_tools_module_content,
+             execution_skills_content)
+            VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8, $9, $10, $11, $12,
+                    $13, $14, $15, $16, $17)"#,
     )
     .bind(run_id)
     .bind(req.workspace_id)
@@ -135,6 +166,11 @@ pub async fn create_run(
     .bind(req.agent_version_id)
     .bind(&req.agent_version_label)
     .bind(req.parent_run_id)
+    .bind(framework_name)
+    .bind(req.spec_content.as_deref())
+    .bind(spec_format_name)
+    .bind(req.tools_module_content.as_deref())
+    .bind(skills_json)
     .execute(&state.db)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("db insert: {e}")))?;
@@ -142,26 +178,9 @@ pub async fn create_run(
     let task_state = state.clone();
     let model = req.model;
     let workspace_id = req.workspace_id;
-    let framework = req
-        .framework
-        .as_deref()
-        .map(parse_framework)
-        .unwrap_or(runner::Framework::Pydantic);
     let spec_content = req.spec_content;
     let tools_module_content = req.tools_module_content;
     let skills_content = req.skills_content;
-    let spec_format = match req.spec_format.as_deref() {
-        Some("yaml") => runner::SpecFormat::Yaml,
-        // JSON is the default so cargo-ai callers (which never
-        // bothered with this field) keep working without changes.
-        None | Some("json") => runner::SpecFormat::Json,
-        Some(other) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!("unknown spec_format: {other}"),
-            ));
-        }
-    };
 
     let cancel = CancellationToken::new();
     state
@@ -184,6 +203,8 @@ pub async fn create_run(
                 spec_format,
                 tools_module_content,
                 skills_content,
+                message_history: None,
+                started_at: None,
             },
             cancel,
         )
@@ -230,6 +251,9 @@ pub struct RunRecord {
     pub automation_id: Option<Uuid>,
     pub agent_version_id: Option<Uuid>,
     pub agent_version_label: Option<String>,
+    /// Number of times this run was reconstructed after an API restart.
+    pub resume_count: i32,
+    pub resumed_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -247,7 +271,8 @@ pub async fn get_run(
                   output, streamed_output, error_message, created_by, created_at,
                   started_at, completed_at, tokens_input, tokens_output,
                   scaledown_original_tokens, scaledown_compressed_tokens,
-                  trigger, automation_id, agent_version_id, agent_version_label
+                  trigger, automation_id, agent_version_id, agent_version_label,
+                  resume_count, resumed_at
              FROM run
              WHERE id = $1 AND workspace_id = $2"#,
     )

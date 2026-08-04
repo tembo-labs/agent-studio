@@ -19,6 +19,14 @@ they are no longer release versions. Phase scope now lives in
 
 ## Unreleased
 
+### Added
+- **Durable Pydantic runs.** Pydantic executions now persist their immutable
+  launch envelope and checkpoint typed message history at every model/tool node.
+  Runs interrupted by an API or host restart resume from the last acknowledged
+  checkpoint, preserve the original run clock and completed-step usage, and
+  show a **Resumed** indicator on run detail. Cargo AI and legacy runs remain
+  explicit interruption failures because they have no safe replay boundary.
+
 ## v2026.8.1 — Password management for email/password instances, in-app instance admins, personal Tembo identity
 
 ### Added

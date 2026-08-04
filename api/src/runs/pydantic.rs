@@ -38,6 +38,7 @@ const STEPS_SENTINEL: &str = "__TAS_STEPS__:";
 // Streaming sentinels the wrapper flushes DURING the run (see run_pydantic.py).
 const DELTA_SENTINEL: &str = "__TAS_DELTA__:";
 const PROGRESS_SENTINEL: &str = "__TAS_PROGRESS__:";
+const CHECKPOINT_SENTINEL: &str = "__TAS_CHECKPOINT__:";
 const STALE_CONNECTION_MARKER: &str = "__TAS_STALE_CONNECTION__:";
 const SCALEDOWN_SENTINEL: &str = "__TAS_SCALEDOWN__:";
 // How often (at most) to flush reconstructed live output to the run row.
@@ -130,6 +131,9 @@ struct StepJson {
 pub struct PydanticArgs<'a> {
     /// Raw spec content as it sits in the repo (YAML or JSON).
     pub spec_content: &'a str,
+    /// Typed pydantic-ai ModelMessage history recovered from the latest
+    /// acknowledged checkpoint. None for a first attempt.
+    pub message_history: Option<&'a serde_json::Value>,
     /// Spec format — drives the wrapper's `--fmt` flag. The runner
     /// knows this from the file extension.
     pub spec_format: SpecFormat,
@@ -273,6 +277,7 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
         .arg(args.user_message)
         .env_clear()
         .env("PATH", "/usr/local/bin:/usr/bin:/bin")
+        .env("TAS_CHECKPOINT_ACK", "1")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -339,18 +344,24 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
 
     let mut child = cmd.spawn().context("failed to spawn pydantic-ai wrapper")?;
 
-    // Write the spec to stdin, then drop it so the pipe closes (EOF) and the
-    // wrapper's stdin read returns.
-    {
-        let mut stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| anyhow!("pydantic-ai wrapper stdin not captured"))?;
-        stdin
-            .write_all(args.spec_content.as_bytes())
-            .await
-            .context("failed to write spec to pydantic-ai wrapper stdin")?;
-    }
+    // The first stdin line is the immutable launch envelope. Keep the pipe open
+    // afterwards: each checkpoint blocks the Python graph until we acknowledge
+    // that its history line has been handled on this channel.
+    let mut checkpoint_ack = child
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow!("pydantic-ai wrapper stdin not captured"))?;
+    let envelope = serde_json::json!({
+        "spec_content": args.spec_content,
+        "message_history": args.message_history,
+    });
+    let mut envelope_bytes =
+        serde_json::to_vec(&envelope).context("failed to serialize pydantic-ai runner input")?;
+    envelope_bytes.push(b'\n');
+    checkpoint_ack
+        .write_all(&envelope_bytes)
+        .await
+        .context("failed to write pydantic-ai runner input")?;
 
     let stdout = child
         .stdout
@@ -399,7 +410,16 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
     let mut reader = BufReader::new(stdout);
     let mut line_buf: Vec<u8> = Vec::new();
     let mut last_flush = tokio::time::Instant::now();
-    let mut tool_ordinal: i32 = 0;
+    // Resume after the live rows preserved from the previous process. The
+    // terminal authoritative history reconciliation will rewrite the complete
+    // set, but live inserts must not collide while this attempt is running.
+    let mut tool_ordinal: i32 = sqlx::query_scalar(
+        "SELECT COALESCE(MAX(ordinal) + 1, 0) FROM run_tool_call WHERE run_id = $1",
+    )
+    .bind(args.run_id)
+    .fetch_one(args.db)
+    .await
+    .unwrap_or(0);
     let mut id_to_ordinal: HashMap<String, i32> = HashMap::new();
     let mut steps_seen: HashSet<i32> = HashSet::new();
     // Per-step accumulated text (the model's narration / final answer) and which
@@ -428,8 +448,16 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
             break;
         }
         let line = String::from_utf8_lossy(&line_buf);
-        full.push_str(&line);
         let trimmed = line.trim_end_matches(['\n', '\r']);
+        if let Some(json) = trimmed.strip_prefix(CHECKPOINT_SENTINEL) {
+            persist_checkpoint(args.db, args.run_id, json).await;
+            checkpoint_ack
+                .write_all(b"checkpoint\n")
+                .await
+                .context("acknowledging pydantic-ai checkpoint")?;
+            continue;
+        }
+        full.push_str(&line);
         if let Some(json) = trimmed.strip_prefix(DELTA_SENTINEL) {
             if let Ok(d) = serde_json::from_str::<DeltaJson>(json) {
                 let step = d.step.unwrap_or(0).max(0);
@@ -527,6 +555,31 @@ async fn live_ensure_step(db: &sqlx::PgPool, run_id: Uuid, step: i32) {
     .bind(step)
     .execute(db)
     .await;
+}
+
+async fn persist_checkpoint(db: &sqlx::PgPool, run_id: Uuid, raw: &str) {
+    let history = match serde_json::from_str::<serde_json::Value>(raw) {
+        Ok(serde_json::Value::Array(items)) => serde_json::Value::Array(items),
+        Ok(_) => {
+            tracing::warn!(run_id = %run_id, "ignored non-array run checkpoint");
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(run_id = %run_id, ?e, "failed to parse run checkpoint");
+            return;
+        }
+    };
+    if let Err(e) = sqlx::query(
+        "UPDATE run SET message_history = $1, checkpointed_at = now() \
+         WHERE id = $2 AND status = 'running'",
+    )
+    .bind(history)
+    .bind(run_id)
+    .execute(db)
+    .await
+    {
+        tracing::warn!(run_id = %run_id, ?e, "failed to persist run checkpoint");
+    }
 }
 
 async fn live_insert_tool_call(
@@ -790,6 +843,7 @@ fn parse_output(stdout: &str) -> PydanticResult {
             || line.starts_with(STEPS_SENTINEL)
             || line.starts_with(DELTA_SENTINEL)
             || line.starts_with(PROGRESS_SENTINEL)
+            || line.starts_with(CHECKPOINT_SENTINEL)
             || line.starts_with(SCALEDOWN_SENTINEL)
         {
             continue;
@@ -1008,6 +1062,7 @@ mod tests {
         let stdout = "__TAS_PROGRESS__:{\"kind\":\"tool_call\",\"name\":\"list-records\"}\n\
             __TAS_DELTA__:{\"t\":\"Hel\"}\n\
             __TAS_DELTA__:{\"t\":\"lo.\"}\n\
+            __TAS_CHECKPOINT__:[]\n\
             Hello.\n\
             __TAS_USAGE__:{\"input_tokens\":5,\"output_tokens\":2}\n";
         let result = parse_output(stdout);
