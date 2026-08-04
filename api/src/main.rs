@@ -200,3 +200,34 @@ async fn drain_runs(run_cancels: &RunCancels, timeout: Duration) {
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
 }
+
+#[cfg(test)]
+mod migration_tests {
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn migration_versions_are_unique() {
+        let migrations = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("migrations");
+        let mut versions = BTreeMap::<u64, String>::new();
+
+        for entry in std::fs::read_dir(migrations).expect("read migrations directory") {
+            let name = entry
+                .expect("read migration entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned();
+            if !name.ends_with(".sql") {
+                continue;
+            }
+            let version = name
+                .split_once('_')
+                .expect("migration filename must start with a numeric version")
+                .0
+                .parse::<u64>()
+                .expect("migration version must be numeric");
+            if let Some(existing) = versions.insert(version, name.clone()) {
+                panic!("duplicate migration version {version}: {existing} and {name}");
+            }
+        }
+    }
+}
