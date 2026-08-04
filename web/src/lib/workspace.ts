@@ -744,17 +744,6 @@ export async function getWorkspaceSecretPreview(
 }
 
 /**
- * Whether the workspace has a Tembo API key set. Tembo CAP features
- * (chat-to-create, chat-to-edit, "Improve the Agent") can't run without
- * it, so the UI hides those affordances when this is false.
- */
-export async function isTemboConfigured(workspaceId: string): Promise<boolean> {
-  return (
-    (await getWorkspaceSecretPreview(workspaceId, "tembo_api_key")) !== null
-  );
-}
-
-/**
  * Returns the decrypted secret. Runtime use only — never serialize to a
  * client. Throws if the secret does not exist for (workspace, kind).
  */

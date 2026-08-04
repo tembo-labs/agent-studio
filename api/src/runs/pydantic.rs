@@ -20,6 +20,7 @@
 //! transcript stays clean and the token columns get populated.
 
 use anyhow::{anyhow, Context};
+use chrono::{DateTime, SecondsFormat, Utc};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::process::Stdio;
@@ -189,6 +190,10 @@ pub struct PydanticArgs<'a> {
     /// id no longer matches a connection that user owns.
     pub workspace_id: Uuid,
     pub acting_user_id: &'a str,
+    /// The instant this run entered `running`, also persisted on the run row.
+    /// Surfaced as `TAS_RUN_STARTED_AT` so the built-in clock tool returns one
+    /// stable reference time throughout the run.
+    pub run_started_at: DateTime<Utc>,
     /// The run row to stream partial output into while it's still running.
     pub run_id: Uuid,
     pub db: &'a sqlx::PgPool,
@@ -276,6 +281,11 @@ async fn spawn_and_wait(args: &PydanticArgs<'_>) -> anyhow::Result<std::process:
     // the tembo-agent-studio MCP toolset only, so that a trigger_run call made
     // from inside this run records this run as the new run's parent.
     cmd.env("TAS_RUN_ID", args.run_id.to_string());
+    cmd.env(
+        "TAS_RUN_STARTED_AT",
+        args.run_started_at
+            .to_rfc3339_opts(SecondsFormat::Millis, true),
+    );
 
     // Provider keys flow in via env so the wrapper script doesn't
     // have to know which provider the agent's model: string points

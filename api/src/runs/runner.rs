@@ -6,7 +6,7 @@
 //! tool — see the per-framework modules for the wire details.
 
 use anyhow::{anyhow, Context};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -107,14 +107,15 @@ pub async fn execute_run(state: &AppState, ctx: RunContext, cancel: Cancellation
 }
 
 async fn execute_run_inner(state: &AppState, ctx: RunContext, cancel: &CancellationToken) {
-    if let Err(e) = mark_running(state, ctx.run_id).await {
+    let run_started_at = Utc::now();
+    if let Err(e) = mark_running(state, ctx.run_id, run_started_at).await {
         tracing::error!(run_id = %ctx.run_id, ?e, "mark_running failed");
         // Best-effort write the failure to the run row so the UI sees it.
         let _ = mark_failed(state, ctx.run_id, &format!("internal: {e}")).await;
         return;
     }
 
-    let (result, tool_calls, steps) = run_inner(state, &ctx, cancel).await;
+    let (result, tool_calls, steps) = run_inner(state, &ctx, run_started_at, cancel).await;
     // Persist per-step usage + what the agent called (success or failure)
     // before we mark the terminal state. Best-effort — a logging hiccup must
     // not fail the run.
@@ -175,6 +176,7 @@ async fn execute_run_inner(state: &AppState, ctx: RunContext, cancel: &Cancellat
 async fn run_inner(
     state: &AppState,
     ctx: &RunContext,
+    run_started_at: DateTime<Utc>,
     cancel: &CancellationToken,
 ) -> (
     anyhow::Result<RunOutcome>,
@@ -206,7 +208,7 @@ async fn run_inner(
                 Vec::new(),
             )
         }
-        Framework::Pydantic => run_pydantic(state, ctx, cancel).await,
+        Framework::Pydantic => run_pydantic(state, ctx, run_started_at, cancel).await,
     }
 }
 
@@ -293,6 +295,7 @@ async fn run_cargo_ai(
 async fn run_pydantic(
     state: &AppState,
     ctx: &RunContext,
+    run_started_at: DateTime<Utc>,
     cancel: &CancellationToken,
 ) -> (
     anyhow::Result<RunOutcome>,
@@ -524,6 +527,7 @@ async fn run_pydantic(
         secrets_json: secrets_json.as_deref(),
         workspace_id: ctx.workspace_id,
         acting_user_id: ctx.acting_user_id.as_str(),
+        run_started_at,
         run_id: ctx.run_id,
         db: &state.db,
         cancel,
@@ -599,14 +603,18 @@ fn render_output(user_message: &str, text: &str) -> String {
     out
 }
 
-async fn mark_running(state: &AppState, run_id: Uuid) -> anyhow::Result<()> {
+async fn mark_running(
+    state: &AppState,
+    run_id: Uuid,
+    started_at: DateTime<Utc>,
+) -> anyhow::Result<()> {
     // Guard on 'queued': if the run was cancelled in the gap between being
     // queued and starting, leave the 'cancelled' status alone.
     sqlx::query(
         "UPDATE run SET status = 'running', started_at = $1 \
               WHERE id = $2 AND status = 'queued'",
     )
-    .bind(Utc::now())
+    .bind(started_at)
     .bind(run_id)
     .execute(&state.db)
     .await?;

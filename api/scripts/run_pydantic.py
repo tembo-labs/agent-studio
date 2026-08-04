@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import dataclasses
+from datetime import datetime, timezone
 import hashlib
 import inspect
 import json
@@ -35,6 +36,7 @@ import os
 import sys
 import tempfile
 import traceback
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 import yaml
 
@@ -74,6 +76,47 @@ TOOLS_MODULE_ENV = "TAS_TOOLS_MODULE_CONTENT"
 # load_skill / read_skill_resource / run_skill_script — all local, in-process,
 # any model. No Anthropic code-execution container involved.
 SKILLS_ENV = "TAS_SKILLS_CONTENT"
+RUN_STARTED_AT_ENV = "TAS_RUN_STARTED_AT"
+FALLBACK_RUN_STARTED_AT = datetime.now(timezone.utc)
+
+
+def get_run_datetime(timezone_name: str = "UTC") -> dict[str, str]:
+    """Return this run's stable start date and time in an IANA timezone.
+
+    Use this tool whenever a task depends on today's date, a relative date
+    window, or a date-based deduplication key. The returned instant is frozen at
+    the start of the run, so repeated calls cannot drift across a date boundary.
+    `timezone_name` accepts IANA names such as `UTC` or `America/Los_Angeles`.
+    """
+    raw_started_at = os.environ.get(RUN_STARTED_AT_ENV)
+    try:
+        started_at = (
+            datetime.fromisoformat(raw_started_at.replace("Z", "+00:00"))
+            if raw_started_at
+            else FALLBACK_RUN_STARTED_AT
+        )
+    except ValueError as e:
+        raise ValueError(f"invalid {RUN_STARTED_AT_ENV} value: {raw_started_at!r}") from e
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    started_at = started_at.astimezone(timezone.utc)
+
+    try:
+        requested_timezone = ZoneInfo(timezone_name)
+    except (ZoneInfoNotFoundError, ValueError) as e:
+        raise ValueError(
+            f"unknown IANA timezone {timezone_name!r}; use a name such as "
+            "'UTC' or 'America/Los_Angeles'"
+        ) from e
+
+    local = started_at.astimezone(requested_timezone)
+    return {
+        "run_started_at": started_at.isoformat().replace("+00:00", "Z"),
+        "timezone": timezone_name,
+        "local_datetime": local.isoformat(),
+        "local_date": local.date().isoformat(),
+        "local_time": local.time().isoformat(),
+    }
 
 
 def build_skills_toolset():
@@ -1149,8 +1192,9 @@ def build_agent(
     # coexist with MCP/Composio toolsets — pydantic-ai exposes both to
     # the model. Schemas are derived from each function's signature +
     # docstring, so well-documented functions get good tool schemas.
-    if tools:
-        kwargs["tools"] = tools
+    # Every TAS run gets a deterministic clock without requiring an external
+    # connection. Sidecar tools remain additive to this built-in surface.
+    kwargs["tools"] = [get_run_datetime, *(tools or [])]
 
     # Capabilities were built up top (before model settings); attach them here.
     if capabilities:

@@ -32,8 +32,11 @@ involved in the optional chat-to-PR *authoring* flow. The instance is
   platform usually terminates TLS. **Recommended** — you can start on the
   platform-provided URL.
 
-**Authentication** — pick at least one *(Required)*. There is no password login;
-users sign in through an identity provider.
+**Authentication** *(Optional for a quickstart)* — with no OAuth provider
+configured, the login screen offers **email + password** (sign-up still gated
+by `INSTANCE_ADMIN_EMAILS` / invites), so there's nothing to procure. For
+production SSO, pick one provider — configuring it turns email/password off
+automatically:
 
 - [ ] **Google OAuth** *(easiest)* — create an OAuth 2.0 client at
   <https://console.cloud.google.com/apis/credentials>; or

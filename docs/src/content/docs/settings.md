@@ -34,10 +34,17 @@ here.
 
 ## Tembo Coding Agent
 
-The **Tembo API key** lets TAS open pull requests via the
-[Tembo Coding Agent Platform](https://tembo.io) for new-agent chat, chat-to-edit,
-and [improvements](/agent-studio/improvements/). Agents run fine without it —
-you'd commit spec files by hand instead.
+Each member can connect **Your Tembo account** with a personal Tembo API key.
+New-agent chat, chat-to-edit, and
+[improvements](/agent-studio/improvements/) then create Tembo Coding Agent
+sessions under that member's Tembo identity. When their Tembo account has
+GitHub connected, Tembo also uses that GitHub identity to open the resulting
+pull request.
+
+The **Workspace fallback account** preserves shared setup: when a member has no
+personal key, TAS uses this workspace-level Tembo API key instead. If neither is
+connected, agents still run normally, but Tembo-backed authoring is unavailable
+and spec changes must be committed by hand.
 
 For Tembo to open PRs, the agents repo must also be authorized in Tembo under
 **Source Control** (see [Setup checklist](/agent-studio/customer-setup/)).

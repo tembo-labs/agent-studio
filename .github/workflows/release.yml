@@ -59,7 +59,7 @@ jobs:
         uses: sigstore/cosign-installer@v3
 
       - name: Log in to GHCR
-        uses: docker/login-action@v4
+        uses: docker/login-action@v4.5.2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -128,7 +128,7 @@ jobs:
         # Security on private repos; if it's unavailable the table report
         # above is still in the job log, so don't fail the release.
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4.37.3
         with:
           sarif_file: trivy-${{ matrix.image }}.sarif
           category: ${{ matrix.image }}
