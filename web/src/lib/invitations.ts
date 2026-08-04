@@ -1,6 +1,7 @@
 import "server-only";
 
 import { writeAuditEvent } from "@/lib/audit-db";
+import { emailPasswordEnabled } from "@/lib/auth-providers";
 import { db } from "@/lib/db";
 import { isWorkspaceRole, type WorkspaceRole } from "@/lib/rbac";
 
@@ -156,6 +157,29 @@ export async function hasPendingInvite(
 }
 
 /**
+ * Should a pending invite resolve into a membership for a user whose email
+ * carries this `emailVerified` flag? Honor an invite only when the IdP
+ * verified the email (#47) — better-auth stores `emailVerified` from the
+ * provider's `email_verified` claim (false when absent); Google/Microsoft
+ * verify. Without this, a user who can assert an unverified /
+ * attacker-controlled email at a permissive IdP could auto-join the invited
+ * workspace at the invited role.
+ *
+ * On an email/password instance (no OAuth provider configured — see
+ * emailPasswordEnabled) there is no IdP and `emailVerified` is always false,
+ * so requiring it would strand every invitee: the closed-instance gate lets
+ * them sign up, but the invite would never become a membership. There the
+ * sign-up gate itself is the authorization — only an invited (or instance
+ * admin) email may create an account at all — so resolve invites regardless.
+ * The IdP-permissiveness attack doesn't apply: no third-party assertion is
+ * involved, and configuring any OAuth provider turns email/password off and
+ * restores the strict check.
+ */
+export function inviteResolutionAllowed(emailVerified: boolean): boolean {
+  return emailVerified || emailPasswordEnabled();
+}
+
+/**
  * On first sign-in, turn this user's pending invites into memberships.
  * Idempotent: re-running adds nothing (membership upsert + invite marked
  * accepted). Returns how many workspaces were joined.
@@ -165,17 +189,13 @@ export async function resolvePendingInvitesForUser(
   email: string,
 ): Promise<number> {
   const e = email.trim().toLowerCase();
-  // Honor an invite only when the IdP verified the email (#47). better-auth
-  // stores `emailVerified` from the provider's `email_verified` claim (false
-  // when absent); Google/Microsoft verify. Without this, a user who can assert
-  // an unverified / attacker-controlled email at a permissive IdP could
-  // auto-join the invited workspace at the invited role. Central gate — both
-  // user-driven paths (first-sign-in hook + home-page resolve) funnel here.
+  // Central gate (see inviteResolutionAllowed) — both user-driven paths
+  // (first-sign-in hook + home-page resolve) funnel here.
   const { rows: verified } = await db.query<{ emailVerified: boolean }>(
     `SELECT "emailVerified" FROM "user" WHERE id = $1`,
     [userId],
   );
-  if (!verified[0]?.emailVerified) {
+  if (!inviteResolutionAllowed(verified[0]?.emailVerified ?? false)) {
     console.warn(
       `[invites] skipping invite resolve for ${userId}: email not verified by the IdP`,
     );
