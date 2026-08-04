@@ -4,7 +4,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from pydantic_ai import Agent
+from pydantic_ai import Agent, ModelMessagesTypeAdapter
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.usage import RequestUsage
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -216,3 +218,28 @@ def test_uncached_input_excludes_cache_halves() -> None:
         SimpleNamespace(input_tokens=100, cache_read_tokens=200)
     ) == 0
     assert run_pydantic._uncached_input(SimpleNamespace()) is None
+
+
+def test_checkpoint_round_trips_typed_messages_and_seeds_usage(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("TAS_CHECKPOINT_ACK", raising=False)
+    messages = [
+        ModelRequest(parts=[UserPromptPart("do the work")]),
+        ModelResponse(
+            parts=[TextPart("done")],
+            usage=RequestUsage(input_tokens=12, output_tokens=3),
+            model_name="test",
+        ),
+    ]
+
+    run_pydantic._emit_checkpoint(messages)
+
+    line = capsys.readouterr().out.strip()
+    payload = line.removeprefix(run_pydantic.CHECKPOINT_SENTINEL)
+    restored = ModelMessagesTypeAdapter.validate_json(payload)
+    assert restored == messages
+    usage = run_pydantic._usage_from_history(restored)
+    assert usage.requests == 1
+    assert usage.input_tokens == 12
+    assert usage.output_tokens == 3

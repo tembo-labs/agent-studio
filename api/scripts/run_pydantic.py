@@ -1,9 +1,10 @@
 """Pydantic AI runner wrapper invoked by api/src/runs/pydantic.rs.
 
-Reads a Pydantic AgentSpec (YAML or JSON) from stdin, runs the
-agent against the user message passed on the CLI, and prints the
-result to stdout. Mirrors the cargo-ai shellout shape so the Rust
-runner has parallel knobs for both frameworks.
+Reads a one-line JSON launch envelope (AgentSpec plus optional typed message
+history) from stdin, runs the agent against the user message passed on the CLI,
+and prints the result to stdout. After that first line stdin becomes the
+checkpoint acknowledgement channel. Mirrors the cargo-ai shellout shape so the
+Rust runner has parallel knobs for both frameworks.
 
 Auth: provider API keys come in via environment variables the
 caller sets before spawn (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.).
@@ -41,8 +42,8 @@ import httpx
 import yaml
 
 from anthropic import AsyncAnthropic
-from pydantic_ai import Agent, capture_run_messages
-from pydantic_ai.usage import UsageLimits
+from pydantic_ai import Agent, ModelMessagesTypeAdapter, capture_run_messages
+from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
@@ -56,6 +57,7 @@ STEPS_SENTINEL = "__TAS_STEPS__:"
 # from the final transcript (the authoritative output is printed at the end).
 DELTA_SENTINEL = "__TAS_DELTA__:"
 PROGRESS_SENTINEL = "__TAS_PROGRESS__:"
+CHECKPOINT_SENTINEL = "__TAS_CHECKPOINT__:"
 
 # Cap on a tool-call error message we persist for the run-step timeline. Long
 # enough to keep a real error useful (API bodies, validation dumps, short
@@ -374,7 +376,43 @@ def _emit_stream_line(sentinel: str, payload: dict) -> None:
         pass
 
 
-def make_stream_handler():
+def _emit_checkpoint(messages) -> None:
+    """Send a durable message-history checkpoint and wait for Postgres.
+
+    The Rust parent acknowledges only after it has handled the checkpoint line.
+    This tiny stdout/stdin handshake prevents the agent graph from advancing to
+    the next node while the only copy of the completed node is still in memory.
+    """
+    if not messages:
+        return
+    try:
+        payload = ModelMessagesTypeAdapter.dump_json(messages).decode()
+        sys.stdout.write(f"{CHECKPOINT_SENTINEL}{payload}\n")
+        sys.stdout.flush()
+        if os.environ.get("TAS_CHECKPOINT_ACK") == "1":
+            ack = sys.stdin.readline().strip()
+            if ack != "checkpoint":
+                raise RuntimeError("checkpoint acknowledgement channel closed")
+    except Exception as e:
+        # Checkpointing is part of durable execution, but serialization should
+        # never hide the agent's actual result. The parent logs DB failures.
+        sys.stderr.write(f"[tas] checkpoint failed: {e}\n")
+
+
+def _usage_from_history(messages) -> RunUsage:
+    """Seed run usage from checkpointed responses for limits and final cost."""
+    usage = RunUsage()
+    for message in messages or []:
+        if getattr(message, "kind", "") != "response":
+            continue
+        request_usage = getattr(message, "usage", None)
+        if request_usage is not None:
+            usage.incr(request_usage)
+        usage.requests += 1
+    return usage
+
+
+def make_stream_handler(message_history=None):
     """Build a pydantic-ai `event_stream_handler`. It's called once per graph
     node with an async stream of that node's events; we forward incremental
     model text (DELTA) + tool-call/result activity (PROGRESS) to stdout as they
@@ -387,9 +425,21 @@ def make_stream_handler():
 
     # Mutable across node invocations (each handler call is one node). prev_in /
     # prev_out track cumulative usage so we can emit each step's own usage delta.
-    state = {"step": -1, "prev_in": 0, "prev_out": 0}
+    previous_responses = sum(
+        1 for message in (message_history or [])
+        if getattr(message, "kind", "") == "response"
+    )
+    prior_usage = _usage_from_history(message_history)
+    state = {
+        "step": previous_responses - 1,
+        "prev_in": prior_usage.input_tokens,
+        "prev_out": prior_usage.output_tokens,
+    }
 
     async def handler(_ctx, event_stream) -> None:
+        # At handler entry, pydantic-ai has committed the previous graph node to
+        # ctx.messages. Persist it before this model/tool node is allowed to run.
+        _emit_checkpoint(getattr(_ctx, "messages", None))
         node_counted = False
         async for event in event_stream:
             try:
@@ -1520,7 +1570,7 @@ def _maybe_emit_stale_connection_marker(
     )
 
 
-async def run(spec: dict, user_message: str) -> None:
+async def run(spec: dict, user_message: str, message_history=None) -> None:
     connections = parse_connections(spec)
     toolsets: list = []
 
@@ -1597,9 +1647,12 @@ async def run(spec: dict, user_message: str) -> None:
             else 50
         )
     )
+    if message_history:
+        run_kwargs["message_history"] = message_history
+        run_kwargs["usage"] = _usage_from_history(message_history)
     try:
         if "event_stream_handler" in inspect.signature(agent.run).parameters:
-            run_kwargs["event_stream_handler"] = make_stream_handler()
+            run_kwargs["event_stream_handler"] = make_stream_handler(message_history)
     except (ValueError, TypeError):
         pass
 
@@ -1650,10 +1703,18 @@ async def run(spec: dict, user_message: str) -> None:
                             )
                     except Exception as e:
                         sys.stderr.write(f"[tas] list_tools probe failed: {e}\n")
-                    result = await agent.run(user_message, **run_kwargs)
+                    result = await agent.run(
+                        None if message_history else user_message,
+                        **run_kwargs,
+                    )
             else:
-                result = await agent.run(user_message, **run_kwargs)
+                result = await agent.run(
+                    None if message_history else user_message,
+                    **run_kwargs,
+                )
         finally:
+            # The last node has no following handler to checkpoint it at entry.
+            _emit_checkpoint(_messages)
             # Emit the tool-call list on BOTH success and failure (messages
             # were captured either way), so a failed/truncated run still
             # records the tools it did call.
@@ -1693,7 +1754,18 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    content = sys.stdin.read()
+    try:
+        envelope = json.loads(sys.stdin.readline())
+        content = envelope["spec_content"]
+        raw_history = envelope.get("message_history")
+        message_history = (
+            ModelMessagesTypeAdapter.validate_python(raw_history)
+            if raw_history
+            else None
+        )
+    except Exception as e:
+        sys.stderr.write(f"failed to parse runner input envelope: {e}\n")
+        return 2
 
     try:
         spec = parse_spec(content, args.fmt)
@@ -1714,7 +1786,7 @@ def main() -> int:
     )
 
     try:
-        asyncio.run(run(spec, prompt))
+        asyncio.run(run(spec, prompt, message_history))
     except Exception as e:
         # Print the traceback to stderr so the run row's
         # error_message has actionable context, then exit non-zero

@@ -29,6 +29,14 @@ Each run records and displays:
 - **Timing & trigger** — when it ran and what triggered it (manual, schedule, or
   event).
 
+Pydantic runs checkpoint their message history after each model/tool node. If
+the API or host restarts mid-run, TAS reconstructs the run from its last
+checkpoint instead of starting the completed steps over. The status line shows
+**Resumed** (and a count after multiple recoveries) when this happened. A tool
+that was still executing at the exact moment the process died may still need
+the provider's own idempotency protection; completed tool-result nodes are not
+replayed.
+
 ## When a run fails
 
 Failed runs keep their captured output and tool calls so you can diagnose them.
