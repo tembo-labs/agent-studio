@@ -385,6 +385,31 @@ export async function listImprovementsForAgent(
   return res.rows.map(rowToImprovement);
 }
 
+/** Latest CAP session that changed this agent, used for contextual follow-ups. */
+export async function getLatestTemboTaskForAgent(
+  workspaceId: string,
+  agentName: string,
+): Promise<{ taskId: string; htmlUrl: string } | null> {
+  const res = await db.query<{
+    tembo_task_id: string;
+    tembo_task_html_url: string;
+  }>(
+    `SELECT tembo_task_id, tembo_task_html_url
+      FROM improvement
+      WHERE workspace_id = $1
+        AND agent_name = $2
+        AND tembo_task_id IS NOT NULL
+        AND tembo_task_html_url IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [workspaceId, agentName],
+  );
+  const row = res.rows[0];
+  return row
+    ? { taskId: row.tembo_task_id, htmlUrl: row.tembo_task_html_url }
+    : null;
+}
+
 export async function listImprovementsForRun(
   runId: string,
 ): Promise<Improvement[]> {

@@ -9,11 +9,12 @@ import {
 } from "@/lib/auth-server";
 import {
   buildImprovePrompt,
-  createTemboTask,
+  dispatchTemboTask,
   type CapError,
 } from "@/lib/cap-api";
 import {
   createImprovement,
+  getLatestTemboTaskForAgent,
   improvementMarker,
   setImprovementCommitted,
   setImprovementTask,
@@ -51,6 +52,10 @@ export async function improveAgentAction(args: {
 
   const run = await getRun(args.runId, workspace.id);
   if (!run || run.workspaceId !== workspace.id) notFound();
+  const existingTask = await getLatestTemboTaskForAgent(
+    workspace.id,
+    run.agentName,
+  );
 
   const repo = await getWorkspaceRepo(workspace.id);
   if (!repo) {
@@ -94,8 +99,9 @@ export async function improveAgentAction(args: {
     defaultBranch: repo.defaultBranch,
   });
 
-  const res = await createTemboTask({
+  const res = await dispatchTemboTask({
     apiKey: temboCredential.apiKey,
+    existingTask,
     input: {
       prompt,
       repositoryUrl: `https://github.com/${repo.owner}/${repo.name}`,

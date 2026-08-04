@@ -51,6 +51,9 @@ they are no longer release versions. Phase scope now lives in
   scheduled agents a reliable basis for relative windows and date-based dedup.
 
 ### Fixed
+- **Agent changes reuse their Tembo coding session.** Later edits to the same
+  agent now continue the latest session, retaining prior change context and a
+  warm workspace. Missing old sessions fall back to creating a new one.
 - **Invitations now resolve on email/password instances.** Credential
   sign-ups always carry `emailVerified=false` (no IdP, no SMTP), and the
   invite-to-membership step required a verified email — so invitees could
