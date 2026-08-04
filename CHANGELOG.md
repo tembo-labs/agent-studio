@@ -14,11 +14,42 @@ they are no longer release versions. Phase scope now lives in
 
 ## [Unreleased]
 
+## [v2026.8.1] — Password management for email/password instances, in-app instance admins, personal Tembo identity — shipped 2026-08-04
+
 ### Added
+- **Lost / reset / change password on email/password instances.** TAS is
+  SMTP-free, so recovery is admin-driven: a workspace admin generates a
+  one-time reset link (1-hour expiry) from the member's detail page and
+  shares it out-of-band; the link lands on a new public `/reset-password`
+  page. Signed-in users change their own password under Settings →
+  Account. Both revoke other sessions. None of this renders when an OAuth
+  provider is configured — credentials live at the identity provider there.
+- **Instance admins managed in-app.** Instance Settings now lists and edits
+  instance admins (stored in the database, unioned with the
+  `INSTANCE_ADMIN_EMAILS` env bootstrap); the sign-up gate honors both
+  sources, so admin changes no longer require a redeploy.
+- **Personal Tembo identity with workspace fallback.** Chat-to-PR authoring
+  can use a per-user Tembo API key (Settings → Tembo), falling back to the
+  workspace key — PRs and sessions attribute to the person, not the shared
+  workspace identity.
 - **Built-in run date/time tool.** Every Pydantic agent can call
   `get_run_datetime` without adding a connection. It returns the stable run-start
   instant and local date/time fields for a requested IANA timezone, giving
   scheduled agents a reliable basis for relative windows and date-based dedup.
+
+### Fixed
+- **Invitations now resolve on email/password instances.** Credential
+  sign-ups always carry `emailVerified=false` (no IdP, no SMTP), and the
+  invite-to-membership step required a verified email — so invitees could
+  sign up but landed workspace-less. On email/password instances the
+  invite-gated sign-up itself is the authorization, and invites now resolve;
+  instances with an OAuth provider keep the strict IdP-verified check.
+
+### Changed
+- **Continuous deploys now cover all Tembo-managed instances.** The internal
+  pipeline that tracked `main` on the dogfood box now fans out per-instance
+  (each with its own Railway project token) — self-hosted customer
+  instances remain pinned to release tags like this one.
 
 ## [v2026.7.4] — Inbox reading view for digests, markdown context + run links, quieter Slack threads — shipped 2026-07-24
 
