@@ -18,8 +18,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@composio/core':
-        specifier: ^0.13.1
-        version: 0.13.1(zod@4.4.3)
+        specifier: ^0.14.1
+        version: 0.14.1(zod@4.4.3)
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.30.0(zod@4.4.3)
@@ -465,16 +465,16 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
-  '@composio/client@0.1.0-alpha.74':
-    resolution: {integrity: sha512-/EHJsFxCpWfRxNvXURRrGVZfJSltSpN4Gkd9M9Cl5gPOirG+NpbXf2B8d4B72H87m7cnOguMKjOH42ogQ84/Ww==}
+  '@composio/client@0.1.0-alpha.76':
+    resolution: {integrity: sha512-MXC5JGRVdiQ4EgLricy9o/mqBa1+1T7wHFZ6Q4ZJkrjzZqOMvxTgy21Zlb5J/1oGkB2bg9UDzpH8PkXCp/D4zA==}
 
-  '@composio/core@0.13.1':
-    resolution: {integrity: sha512-bC64PJG3RBeuezihfZV/9qJMd1LyzUEFN1tVHTWh32n/muUMr5I33nN6Mezhtkl4+ffBJ8IZ/mNt9tEQKFB/sw==}
+  '@composio/core@0.14.1':
+    resolution: {integrity: sha512-MumO81kU9ZwHELrN7b/ju9Ke7il/xz0d65yeSsbtp5V11LA4efLKgE4hKPxif55NK97pApBOj4UkQB+knzue9Q==}
     peerDependencies:
-      zod: ^3.25 || ^4
+      zod: '>=3.25.76 <5'
 
-  '@composio/json-schema-to-zod@0.2.0':
-    resolution: {integrity: sha512-P7ym7+1NCN2cDVlSOGTINY6KjZ/d162uc+0LChYcy3d5RAAacgHiGU7ZJF+5pUJHbIivsfAC/4PdjVdsfmHdeA==}
+  '@composio/json-schema-to-zod@0.2.1':
+    resolution: {integrity: sha512-ezIaQoXdqWJXFaI8+gTShpj8YZcRdSnLkA1hgzx1+kn2Bi1SXOtXjghoQDy2ZBYIOCefRXGmyaPl52+idjS9wA==}
     peerDependencies:
       zod: '>=3.25.76 <5'
 
@@ -2252,6 +2252,7 @@ packages:
   cron-parser@5.6.2:
     resolution: {integrity: sha512-yJ/G1LVir6CnlkLI40CsampPLKl1SprGGlUagWtGJxewytRVYezv5xVyzzbT+Pvzx+VIRvZVF7/a0eEMTxdnTA==}
     engines: {node: '>=18'}
+    deprecated: 'Published tarball was built from a stale dist/ and is missing the fixes from #414 and #415 — its contents are effectively v5.6.1. Upgrade to v5.7.0.'
 
   cronstrue@3.24.0:
     resolution: {integrity: sha512-t/Ji3Ur2c/pzhIAWNwC0ftl3JAE4dLfCjAdZoTZXmPDZwcispnS1PaMcMS4OmIIXyIVouAz+yw+mfQiE3hz5OQ==}
@@ -5339,12 +5340,12 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@composio/client@0.1.0-alpha.74': {}
+  '@composio/client@0.1.0-alpha.76': {}
 
-  '@composio/core@0.13.1(zod@4.4.3)':
+  '@composio/core@0.14.1(zod@4.4.3)':
     dependencies:
-      '@composio/client': 0.1.0-alpha.74
-      '@composio/json-schema-to-zod': 0.2.0(zod@4.4.3)
+      '@composio/client': 0.1.0-alpha.76
+      '@composio/json-schema-to-zod': 0.2.1(zod@4.4.3)
       '@types/json-schema': 7.0.15
       openai: 6.49.0(zod@4.4.3)
       picocolors: 1.1.1
@@ -5358,7 +5359,7 @@ snapshots:
       - '@smithy/signature-v4'
       - ws
 
-  '@composio/json-schema-to-zod@0.2.0(zod@4.4.3)':
+  '@composio/json-schema-to-zod@0.2.1(zod@4.4.3)':
     dependencies:
       zod: 4.4.3
 
