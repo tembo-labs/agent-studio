@@ -84,6 +84,9 @@ export type RunRecord = {
   automationId: string | null;
   agentVersionId: string | null;
   agentVersionLabel: string | null;
+  /** Number of API restarts this run recovered from. */
+  resumeCount: number;
+  resumedAt: string | null;
 };
 
 type ApiRunRecord = {
@@ -109,6 +112,8 @@ type ApiRunRecord = {
   automation_id: string | null;
   agent_version_id: string | null;
   agent_version_label: string | null;
+  resume_count: number;
+  resumed_at: string | null;
 };
 
 function fromApi(r: ApiRunRecord): RunRecord {
@@ -135,6 +140,8 @@ function fromApi(r: ApiRunRecord): RunRecord {
     automationId: r.automation_id,
     agentVersionId: r.agent_version_id,
     agentVersionLabel: r.agent_version_label,
+    resumeCount: r.resume_count,
+    resumedAt: r.resumed_at,
   };
 }
 

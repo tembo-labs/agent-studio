@@ -237,6 +237,8 @@ describe("buildMcpServer", () => {
       automationId: null,
       agentVersionId: null,
       agentVersionLabel: null,
+      resumeCount: 0,
+      resumedAt: null,
     });
     const client = await connectedClient();
     const out = parse(await client.callTool({ name: "get_run", arguments: { id: "run-1" } })) as {

@@ -66,6 +66,12 @@ pub struct RunContext {
     /// Files of the Agent Skills the agent opts into, as `{ repoPath: content }`,
     /// passed to the wrapper as TAS_SKILLS_CONTENT (JSON). Pydantic-only.
     pub skills_content: Option<std::collections::HashMap<String, String>>,
+    /// Latest acknowledged pydantic-ai message history when recovering an
+    /// interrupted run. None for a first attempt and all Cargo AI runs.
+    pub message_history: Option<serde_json::Value>,
+    /// Preserve the original running timestamp across recovery so the built-in
+    /// run clock remains stable and duration covers the interruption.
+    pub started_at: Option<DateTime<Utc>>,
 }
 
 struct RunOutcome {
@@ -85,6 +91,115 @@ struct Usage {
     /// Priced separately from input_tokens in the cost estimate.
     cache_read_tokens: i32,
     cache_write_tokens: i32,
+}
+
+#[derive(sqlx::FromRow)]
+struct OrphanedRun {
+    id: Uuid,
+    workspace_id: Uuid,
+    created_by: String,
+    model: String,
+    user_message: String,
+    execution_framework: Option<String>,
+    execution_spec_content: Option<String>,
+    execution_spec_format: Option<String>,
+    execution_tools_module_content: Option<String>,
+    execution_skills_content: Option<serde_json::Value>,
+    message_history: Option<serde_json::Value>,
+    started_at: Option<DateTime<Utc>>,
+}
+
+/// Reconstruct Pydantic runs whose in-memory task disappeared with the prior
+/// API process. Cargo AI and legacy rows have no safe replay boundary, so they
+/// retain the explicit interrupted failure behavior instead of starting over.
+pub async fn recover_orphaned_runs(state: &AppState) {
+    let rows = match sqlx::query_as::<_, OrphanedRun>(
+        "SELECT id, workspace_id, created_by, model, user_message, \
+                execution_framework, execution_spec_content, execution_spec_format, \
+                execution_tools_module_content, execution_skills_content, \
+                message_history, started_at \
+           FROM run WHERE status IN ('queued', 'running') ORDER BY created_at",
+    )
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::error!(?e, "failed to load orphaned runs on boot");
+            return;
+        }
+    };
+
+    for row in rows {
+        if row.execution_framework.as_deref() != Some("pydantic-agentspec")
+            || row.execution_spec_content.is_none()
+        {
+            let reason = if row.execution_framework.as_deref() == Some("cargo-ai") {
+                "Interrupted — Cargo AI runs do not yet have a safe replay checkpoint."
+            } else {
+                "Interrupted — this run predates durable execution and cannot be resumed."
+            };
+            if let Err(e) = mark_failed(state, row.id, reason).await {
+                tracing::error!(run_id = %row.id, ?e, "failed to finalize non-resumable orphan");
+            }
+            continue;
+        }
+
+        let updated = sqlx::query(
+            "UPDATE run SET status = 'queued', completed_at = NULL, \
+                    error_message = NULL, streamed_output = NULL, \
+                    resume_count = resume_count + 1, resumed_at = now() \
+              WHERE id = $1 AND status IN ('queued', 'running')",
+        )
+        .bind(row.id)
+        .execute(&state.db)
+        .await;
+        match updated {
+            Ok(result) if result.rows_affected() == 1 => {}
+            Ok(_) => continue,
+            Err(e) => {
+                tracing::error!(run_id = %row.id, ?e, "failed to queue orphaned run for recovery");
+                continue;
+            }
+        }
+
+        let skills_content = row
+            .execution_skills_content
+            .and_then(|value| serde_json::from_value(value).ok());
+        let cancel = CancellationToken::new();
+        state
+            .run_cancels
+            .lock()
+            .expect("run_cancels mutex poisoned")
+            .insert(row.id, cancel.clone());
+        let task_state = state.clone();
+        let run_id = row.id;
+        tokio::spawn(async move {
+            execute_run(
+                &task_state,
+                RunContext {
+                    run_id,
+                    workspace_id: row.workspace_id,
+                    acting_user_id: row.created_by,
+                    model: row.model,
+                    user_message: row.user_message,
+                    framework: Framework::Pydantic,
+                    spec_content: row.execution_spec_content,
+                    spec_format: match row.execution_spec_format.as_deref() {
+                        Some("yaml") => SpecFormat::Yaml,
+                        _ => SpecFormat::Json,
+                    },
+                    tools_module_content: row.execution_tools_module_content,
+                    skills_content,
+                    message_history: row.message_history,
+                    started_at: row.started_at,
+                },
+                cancel,
+            )
+            .await;
+        });
+        tracing::warn!(run_id = %run_id, "resuming orphaned Pydantic run from checkpoint");
+    }
 }
 
 /// Drive a single run from queued through to terminal state. Always
@@ -107,7 +222,7 @@ pub async fn execute_run(state: &AppState, ctx: RunContext, cancel: Cancellation
 }
 
 async fn execute_run_inner(state: &AppState, ctx: RunContext, cancel: &CancellationToken) {
-    let run_started_at = Utc::now();
+    let run_started_at = ctx.started_at.unwrap_or_else(Utc::now);
     if let Err(e) = mark_running(state, ctx.run_id, run_started_at).await {
         tracing::error!(run_id = %ctx.run_id, ?e, "mark_running failed");
         // Best-effort write the failure to the run row so the UI sees it.
@@ -513,6 +628,7 @@ async fn run_pydantic(
 
     let (result, tool_calls, steps) = pydantic::invoke(pydantic::PydanticArgs {
         spec_content,
+        message_history: ctx.message_history.as_ref(),
         spec_format: ctx.spec_format.as_pydantic(),
         user_message: &ctx.user_message,
         openai_api_key: openai_key.as_deref(),

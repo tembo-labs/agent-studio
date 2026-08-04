@@ -207,6 +207,11 @@ export default async function RunDetailPage({
               <span className={`${STATUS_TEXT_TONE[run.status]} font-medium`}>
                 {STATUS_LABELS[run.status]}
               </span>
+              {run.resumeCount > 0 && (
+                <span className="text-foreground-weak text-xs font-medium">
+                  Resumed{run.resumeCount > 1 ? ` ${run.resumeCount}×` : ""}
+                </span>
+              )}
               {isLive && (
                 <CancelRunButton
                   workspaceSlug={workspace.slug}
