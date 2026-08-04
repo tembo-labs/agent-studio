@@ -1,23 +1,28 @@
 name: deploy-internal
 
-# Continuous deployment of `main` to Tembo's internal dogfood instance on
-# Railway. On every push to main we: (1) run the checks gate, (2) build +
-# push `:edge` images to GHCR, then (3) point the Railway services at the
-# exact image digest just built and trigger a deploy.
+# Continuous deployment of `main` to the Tembo-managed instances on Railway:
+# the internal dogfood box plus the managed early-customer instances (faust,
+# fireroad) that opted into tracking main. On every push to main we:
+# (1) run the checks gate, (2) build + push `:edge` images to GHCR, then
+# (3) point each instance's Railway services at the exact image digests just
+# built and trigger deploys.
 #
-# Scoped to the canonical repo only (forks lack the Railway token and
-# shouldn't deploy). Customer/production instances stay pinned to explicit
-# release tags — this pipeline only moves the dogfood box, which may run
-# unreleased main.
+# Scoped to the canonical repo only (forks lack the Railway tokens and
+# shouldn't deploy). Self-hosted customer instances stay pinned to explicit
+# release tags — this pipeline only moves instances Tembo operates, which
+# may run unreleased main.
 #
-# Required repo config (Settings → Secrets and variables → Actions):
-#   secret  RAILWAY_TOKEN            — a Railway project/environment token
-#                                      (NOT an account token). Without it,
-#                                      the build still runs and the deploy
-#                                      step skips.
-#   var     RAILWAY_ENVIRONMENT_ID   — Railway environment UUID
-#   var     RAILWAY_WEB_SERVICE_ID   — web service UUID
-#   var     RAILWAY_API_SERVICE_ID   — api service UUID
+# Required repo config (Settings → Secrets and variables → Actions), one
+# trio per instance. A missing token skips that instance's deploy cleanly
+# (the build still runs), so instances can be added/removed by config only:
+#   secret  RAILWAY_TOKEN                      — dogfood project token
+#   var     RAILWAY_ENVIRONMENT_ID             — dogfood environment UUID
+#   var     RAILWAY_API_SERVICE_ID             — dogfood api service UUID
+#   var     RAILWAY_WEB_SERVICE_ID             — dogfood web service UUID
+#   secret  RAILWAY_TOKEN_FAUST                + RAILWAY_FAUST_* vars
+#   secret  RAILWAY_TOKEN_FIREROAD             + RAILWAY_FIREROAD_* vars
+# (Railway project tokens are per-project, hence one secret per instance;
+# they authenticate via the Project-Access-Token header.)
 
 on:
   push:
@@ -28,8 +33,8 @@ concurrency:
   group: deploy-internal
   cancel-in-progress: true
 
-# Least-privilege default for GITHUB_TOKEN. The build-and-deploy job widens its
-# own scope (packages: write) where it needs to; every other job inherits this
+# Least-privilege default for GITHUB_TOKEN. The build jobs widen their own
+# scope (packages: write) where they need to; every other job inherits this
 # read-only default.
 permissions:
   contents: read
@@ -39,25 +44,50 @@ jobs:
     if: github.repository == 'tembo/agent-studio'
     uses: ./.github/workflows/checks.yml
 
-  build-and-deploy:
+  # api and web build as separate jobs (not a matrix) so each can expose its
+  # image digest as a job output — matrix legs can't write distinct job
+  # outputs, and the deploy fan-out below needs both digests at once.
+  build-api:
     needs: checks
     if: github.repository == 'tembo/agent-studio'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write # push :edge to GHCR
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - image: tas-api
-            context: ./api
-            service_var: RAILWAY_API_SERVICE_ID
-          - image: tas-web
-            context: ./web
-            service_var: RAILWAY_WEB_SERVICE_ID
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push tas-api:edge
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ./api
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/tas-api:edge
+          cache-from: type=gha,scope=tas-api
+          cache-to: type=gha,mode=max,scope=tas-api
+
+  build-web:
+    needs: checks
+    if: github.repository == 'tembo/agent-studio'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push :edge to GHCR
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v7
 
@@ -75,28 +105,56 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ${{ matrix.image }}:edge
+      - name: Build and push tas-web:edge
         id: build
         uses: docker/build-push-action@v7
         with:
-          context: ${{ matrix.context }}
+          context: ./web
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:edge
+          tags: ghcr.io/${{ github.repository_owner }}/tas-web:edge
           # Baked version for the login footer / Settings → Version. Only
           # the web Dockerfile consumes TAS_VERSION; api ignores it.
           build-args: |
             TAS_VERSION=edge-${{ steps.vars.outputs.sha7 }}
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          cache-from: type=gha,scope=tas-web
+          cache-to: type=gha,mode=max,scope=tas-web
 
-      - name: Point Railway at the new digest + deploy
-        # Skips cleanly until RAILWAY_TOKEN is configured, so the first
-        # run (before the secret is added) is still green on the build.
+  deploy:
+    needs: [build-api, build-web]
+    if: github.repository == 'tembo/agent-studio'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # one instance failing must not strand the others
+      matrix:
+        include:
+          - instance: dogfood
+            token_secret: RAILWAY_TOKEN
+            env_var: RAILWAY_ENVIRONMENT_ID
+            api_service_var: RAILWAY_API_SERVICE_ID
+            web_service_var: RAILWAY_WEB_SERVICE_ID
+          - instance: faust
+            token_secret: RAILWAY_TOKEN_FAUST
+            env_var: RAILWAY_FAUST_ENVIRONMENT_ID
+            api_service_var: RAILWAY_FAUST_API_SERVICE_ID
+            web_service_var: RAILWAY_FAUST_WEB_SERVICE_ID
+          - instance: fireroad
+            token_secret: RAILWAY_TOKEN_FIREROAD
+            env_var: RAILWAY_FIREROAD_ENVIRONMENT_ID
+            api_service_var: RAILWAY_FIREROAD_API_SERVICE_ID
+            web_service_var: RAILWAY_FIREROAD_WEB_SERVICE_ID
+    env:
+      RAILWAY_TOKEN: ${{ secrets[matrix.token_secret] }}
+    steps:
+      - name: Point ${{ matrix.instance }} at the new digests + deploy
+        # Skips cleanly until the instance's token is configured, so
+        # adding a matrix entry before its secret exists stays green.
         if: ${{ env.RAILWAY_TOKEN != '' }}
         env:
-          ENV_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
-          SERVICE_ID: ${{ vars[matrix.service_var] }}
-          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          ENV_ID: ${{ vars[matrix.env_var] }}
+          API_SERVICE_ID: ${{ vars[matrix.api_service_var] }}
+          WEB_SERVICE_ID: ${{ vars[matrix.web_service_var] }}
+          API_IMAGE: ghcr.io/${{ github.repository_owner }}/tas-api@${{ needs.build-api.outputs.digest }}
+          WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/tas-web@${{ needs.build-web.outputs.digest }}
         run: |
           set -euo pipefail
           rw() {
@@ -116,14 +174,17 @@ jobs:
               return 1
             fi
           }
-          echo "Pinning $SERVICE_ID → $IMAGE"
-          # Pin to the immutable digest (not :edge) so Railway always
-          # rolls exactly what we just built — a moved tag wouldn't
-          # reliably force a re-pull.
-          rw "$(jq -nc --arg s "$SERVICE_ID" --arg e "$ENV_ID" --arg img "$IMAGE" \
-            '{query:"mutation($s:String!,$e:String!,$i:ServiceInstanceUpdateInput!){serviceInstanceUpdate(serviceId:$s,environmentId:$e,input:$i)}",variables:{s:$s,e:$e,i:{source:{image:$img}}}}')"
-          echo
-          echo "Deploying $SERVICE_ID"
-          rw "$(jq -nc --arg s "$SERVICE_ID" --arg e "$ENV_ID" \
-            '{query:"mutation($s:String!,$e:String!){serviceInstanceDeployV2(serviceId:$s,environmentId:$e)}",variables:{s:$s,e:$e}}')"
-          echo
+          for pair in "$API_SERVICE_ID $API_IMAGE" "$WEB_SERVICE_ID $WEB_IMAGE"; do
+            read -r service_id image <<<"$pair"
+            echo "Pinning $service_id → $image"
+            # Pin to the immutable digest (not :edge) so Railway always
+            # rolls exactly what we just built — a moved tag wouldn't
+            # reliably force a re-pull.
+            rw "$(jq -nc --arg s "$service_id" --arg e "$ENV_ID" --arg img "$image" \
+              '{query:"mutation($s:String!,$e:String!,$i:ServiceInstanceUpdateInput!){serviceInstanceUpdate(serviceId:$s,environmentId:$e,input:$i)}",variables:{s:$s,e:$e,i:{source:{image:$img}}}}')"
+            echo
+            echo "Deploying $service_id"
+            rw "$(jq -nc --arg s "$service_id" --arg e "$ENV_ID" \
+              '{query:"mutation($s:String!,$e:String!){serviceInstanceDeployV2(serviceId:$s,environmentId:$e)}",variables:{s:$s,e:$e}}')"
+            echo
+          done
