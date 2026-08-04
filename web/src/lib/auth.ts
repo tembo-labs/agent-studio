@@ -6,7 +6,7 @@ import { Pool } from "pg";
 import { resolveAuthSecret } from "@/lib/auth-secret";
 import { genericOAuthConfigs, emailPasswordEnabled } from "@/lib/auth-providers";
 import { writeAuditEvent } from "@/lib/audit-db";
-import { isInstanceAdminEmail } from "@/lib/config";
+import { isInstanceAdmin } from "@/lib/instance-admins";
 import {
   hasPendingInvite,
   resolvePendingInvitesForUser,
@@ -69,7 +69,7 @@ export const auth = betterAuth({
       create: {
         before: async (user) => {
           const allowed =
-            isInstanceAdminEmail(user.email) ||
+            (await isInstanceAdmin(user.email)) ||
             (await hasPendingInvite(user.email));
           if (!allowed) {
             throw new APIError("FORBIDDEN", {

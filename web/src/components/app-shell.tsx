@@ -11,7 +11,7 @@ import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { toolkitLabel } from "@/lib/composio";
 import { getMcpProvider } from "@/lib/mcp-providers";
 import { getInstanceName } from "@/lib/instance-settings";
-import { isInstanceAdminEmail } from "@/lib/instance";
+import { isInstanceAdmin as checkInstanceAdmin } from "@/lib/instance";
 import type { WorkspaceRole } from "@/lib/rbac";
 import type { Workspace } from "@/lib/workspace";
 import { IconExclamationTriangle } from "central-icons";
@@ -79,7 +79,7 @@ export async function AppShell({
   children,
 }: Props) {
   const instanceName = await getInstanceName();
-  const isInstanceAdmin = isInstanceAdminEmail(user.email);
+  const isInstanceAdmin = await checkInstanceAdmin(user.email);
   const home = `/${workspace.slug}`;
   const inboxCount = await countActiveInboxItems(workspace.id, user.id);
 

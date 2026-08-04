@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { writeAuditEvent } from "@/lib/audit-db";
-import { isInstanceAdminEmail } from "@/lib/config";
+import { isInstanceAdmin } from "@/lib/instance";
 import { getServerSession } from "@/lib/session";
 import { createWorkspace, type CreateWorkspaceError } from "@/lib/workspace";
 
@@ -30,7 +30,7 @@ export async function createWorkspaceAction(
     redirect("/");
   }
   // Only instance admins can create workspaces.
-  if (!isInstanceAdminEmail(session.user.email)) {
+  if (!(await isInstanceAdmin(session.user.email))) {
     return { error: "Only an instance admin can create workspaces." };
   }
 

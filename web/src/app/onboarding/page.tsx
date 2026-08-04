@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { isInstanceAdminEmail } from "@/lib/config";
+import { isInstanceAdmin } from "@/lib/instance";
 import { getInstanceName } from "@/lib/instance-settings";
 import { getServerSession } from "@/lib/session";
 import { listWorkspacesForUser } from "@/lib/workspace";
@@ -16,7 +17,7 @@ export default async function OnboardingPage() {
     redirect("/");
   }
 
-  const isAdmin = isInstanceAdminEmail(session.user.email);
+  const isAdmin = await isInstanceAdmin(session.user.email);
   const workspaces = await listWorkspacesForUser(session.user.id);
   const instanceName = await getInstanceName();
 
@@ -72,6 +73,16 @@ export default async function OnboardingPage() {
           </p>
         </div>
         <OnboardingForm isFirst={isFirst} />
+        <p className="text-foreground-weak text-center text-sm">
+          Handing setup to someone else?{" "}
+          <Link
+            href="/settings"
+            className="text-foreground font-medium underline underline-offset-2 hover:text-foreground-title"
+          >
+            Invite instance admins
+          </Link>{" "}
+          — they can sign in and finish from here.
+        </p>
         <SignOutLink email={session.user.email} />
       </div>
     </main>

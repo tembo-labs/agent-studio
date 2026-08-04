@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 
 import { authorizeInstance } from "@/lib/instance";
+import {
+  addInstanceAdmin,
+  removeInstanceAdmin,
+} from "@/lib/instance-admins";
 import { isFirstRun, setInstanceName } from "@/lib/instance-settings";
 
 export type InstanceSettingsState = {
@@ -63,4 +67,58 @@ export async function setupInstanceNameAction(
   await setInstanceName(name, null);
   revalidatePath("/", "layout");
   return { ok: true, saved: true };
+}
+
+export type InstanceAdminsState = {
+  ok: boolean;
+  error?: string;
+  /** Email just granted admin — the form shows a "send them the URL" hint. */
+  added?: string;
+};
+
+const ADMIN_ERRORS: Record<"bad-email" | "already-admin", string> = {
+  "bad-email": "Enter a valid email address.",
+  "already-admin": "That email is already an instance admin.",
+};
+
+export async function addInstanceAdminAction(
+  _prev: InstanceAdminsState,
+  formData: FormData,
+): Promise<InstanceAdminsState> {
+  const auth = await authorizeInstance();
+  if (!auth.ok) {
+    return { ok: false, error: "You don't have permission to manage admins." };
+  }
+
+  const result = await addInstanceAdmin(
+    String(formData.get("email") ?? ""),
+    auth.userId,
+  );
+  if (!result.ok) return { ok: false, error: ADMIN_ERRORS[result.error] };
+
+  revalidatePath("/settings");
+  return { ok: true, added: result.email };
+}
+
+export async function removeInstanceAdminAction(
+  _prev: InstanceAdminsState,
+  formData: FormData,
+): Promise<InstanceAdminsState> {
+  const auth = await authorizeInstance();
+  if (!auth.ok) {
+    return { ok: false, error: "You don't have permission to manage admins." };
+  }
+
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+  // Locking yourself out mid-setup is unrecoverable in-app; env-listed
+  // admins aren't offered removal at all (the env grant would stand).
+  if (email === auth.email.toLowerCase()) {
+    return { ok: false, error: "You can't remove your own admin access." };
+  }
+
+  await removeInstanceAdmin(email);
+  revalidatePath("/settings");
+  return { ok: true };
 }
