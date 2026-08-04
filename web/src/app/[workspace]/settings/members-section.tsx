@@ -6,7 +6,7 @@ import { type PendingInvitation } from "@/lib/invitations";
 import { ROLE_DESCRIPTIONS, type WorkspaceRole } from "@/lib/rbac";
 import { type WorkspaceMember } from "@/lib/workspace";
 
-import { revokeInvitationAction } from "./actions";
+import { revokeInvitationAction } from "./members-actions";
 import { AddMemberForm } from "./add-member-form";
 import { MemberRow } from "./member-row";
 

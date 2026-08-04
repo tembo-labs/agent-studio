@@ -116,6 +116,12 @@ export function EmailPasswordForm({
           ? "First time? Create an account"
           : "Already have an account? Sign in"}
       </button>
+
+      {mode === "signin" && (
+        <p className="text-foreground-muted text-center text-sm">
+          Forgot your password? Ask a workspace admin to generate a reset link.
+        </p>
+      )}
     </form>
   );
 }

@@ -13,7 +13,7 @@ import {
   changeMemberRoleAction,
   removeMemberAction,
   type MemberFormState,
-} from "./actions";
+} from "./members-actions";
 
 const INITIAL: MemberFormState = {};
 

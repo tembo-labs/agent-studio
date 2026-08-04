@@ -38,7 +38,14 @@ export const auth = betterAuth({
   // still governs who may sign up. No email verification — keep first-run
   // SMTP-free; configure an OAuth provider for production.
   emailAndPassword: emailPasswordEnabled()
-    ? { enabled: true, requireEmailVerification: false, autoSignIn: true }
+    ? {
+        enabled: true,
+        requireEmailVerification: false,
+        autoSignIn: true,
+        // Reset links are admin-minted (lib/password-reset.ts) and often
+        // follow a lockout or leak — kill existing sessions on reset.
+        revokeSessionsOnPasswordReset: true,
+      }
     : { enabled: false },
   socialProviders:
     googleClientId && googleClientSecret
