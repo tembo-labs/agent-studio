@@ -77,10 +77,7 @@ Open an agent and use the **chat** surface to probe its behavior against the
 live **draft** — chat always runs the draft, not stable. When something needs to
 change, submit a change request from the chat thread. TAS opens a PR via Tembo
 (same as new-agent authoring). Review and merge; the draft updates on your
-default branch. Later change requests for that agent continue its existing Tembo
-session, so the coding agent retains context from the earlier changes and can
-resume its workspace instead of starting from scratch. If that session is no
-longer available, TAS starts a new one automatically.
+default branch.
 
 This is separate from **Improve the Agent** on a run, which anchors feedback to a
 specific execution — see [Improvements](/agent-studio/improvements/).
