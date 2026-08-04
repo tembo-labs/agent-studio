@@ -24,16 +24,30 @@ const ITEMS: Item[] = [
   { slug: "danger", label: "Danger" },
 ];
 
-export function SettingsNav({ workspaceSlug }: { workspaceSlug: string }) {
+export function SettingsNav({
+  workspaceSlug,
+  showAccount = false,
+}: {
+  workspaceSlug: string;
+  /** Email/password instances get an "Account" (change password) page. */
+  showAccount?: boolean;
+}) {
   const pathname = usePathname();
   const base = `/${workspaceSlug}/settings`;
+  const items = showAccount
+    ? [
+        ...ITEMS.slice(0, ITEMS.length - 3),
+        { slug: "account", label: "Account" },
+        ...ITEMS.slice(ITEMS.length - 3),
+      ]
+    : ITEMS;
 
   return (
     <nav
       aria-label="Settings sections"
       className="flex w-full shrink-0 flex-row gap-1 overflow-x-auto sm:w-52 sm:flex-col"
     >
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const href = `${base}/${item.slug}`;
         // active when current path starts with this href, OR (for
         // the API-keys default) when the user is on bare /settings

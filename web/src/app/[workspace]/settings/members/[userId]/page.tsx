@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/local-time";
 import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
+import { emailPasswordEnabled } from "@/lib/auth-providers";
 import { listAutomations } from "@/lib/automations-api";
 import { toolkitLabel } from "@/lib/composio";
 import { listConnectionsForUser } from "@/lib/composio-connections";
@@ -17,12 +18,15 @@ import {
   listWorkspaceMembers,
 } from "@/lib/workspace";
 
+import { ResetPasswordLink } from "../../reset-password-link";
+
 export const dynamic = "force-dynamic";
 
 // Member detail — workspace-admin view of one member's footprint:
 // their per-user tool connections, the automations that "Run as" them,
-// and the runs they've triggered. Read-only; the actionable bits
-// (reassign automation owner, remove member) live elsewhere. Useful for
+// and the runs they've triggered. Mostly read-only (role change /
+// remove live on the members list); the one action here is the
+// password-reset link on email/password instances. Useful for
 // offboarding ("what does this person own before I remove them?").
 export default async function MemberDetailPage({
   params,
@@ -72,6 +76,19 @@ export default async function MemberDetailPage({
           joined <LocalTime iso={member.joinedAt.toISOString()} />
         </p>
       </div>
+
+      {emailPasswordEnabled() && (
+        <Section
+          title="Password"
+          description="Generate a one-time reset link if this member is locked out. Share it with them directly — TAS doesn't send email."
+        >
+          <ResetPasswordLink
+            workspaceSlug={slug}
+            userId={member.userId}
+            email={member.email}
+          />
+        </Section>
+      )}
 
       <Section
         title="Connections"

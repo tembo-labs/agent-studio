@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { emailPasswordEnabled } from "@/lib/auth-providers";
 import { isInstanceAdminEmail } from "@/lib/instance";
 import { getServerSession } from "@/lib/session";
 import { getWorkspaceBySlug, userIsMember } from "@/lib/workspace";
@@ -65,7 +66,10 @@ export default async function SettingsLayout({
       <hr className="border-[var(--color-border-weak)]" />
 
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-10">
-        <SettingsNav workspaceSlug={workspace.slug} />
+        <SettingsNav
+          workspaceSlug={workspace.slug}
+          showAccount={emailPasswordEnabled()}
+        />
         <div className="flex min-w-0 flex-1 flex-col gap-8">{children}</div>
       </div>
     </div>

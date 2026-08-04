@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ROLE_DESCRIPTIONS, type WorkspaceRole } from "@/lib/rbac";
 
-import { inviteMemberAction, type MemberFormState } from "./actions";
+import { inviteMemberAction, type MemberFormState } from "./members-actions";
 
 const INITIAL: MemberFormState = {};
 

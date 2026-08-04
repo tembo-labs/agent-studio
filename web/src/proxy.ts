@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Routes that don't require a signed-in session:
-//   /            — the sign-in landing
-//   /mcp         — MCP server, authed by `Authorization: Bearer tas_…`
-//   /for-agents  — native-MCP tool reference, authed by a signed bearer token
+//   /                — the sign-in landing
+//   /mcp             — MCP server, authed by `Authorization: Bearer tas_…`
+//   /for-agents      — native-MCP tool reference, authed by a signed bearer token
+//   /reset-password  — admin-minted reset links; the visitor is locked out
+//                      by definition, the token is validated on submit
 // Everything else under the matcher (/<workspace>/…, /onboarding, /settings)
 // is session-gated.
 function isPublicPath(pathname: string): boolean {
@@ -13,7 +15,8 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/" ||
     pathname === "/mcp" ||
     pathname === "/for-agents" ||
-    pathname.startsWith("/for-agents/")
+    pathname.startsWith("/for-agents/") ||
+    pathname === "/reset-password"
   );
 }
 
