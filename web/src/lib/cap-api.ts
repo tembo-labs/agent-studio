@@ -10,13 +10,15 @@ import {
 import type { Framework } from "@/lib/agent-framework";
 import type { CommitMode } from "@/lib/commit-mode-constants";
 
-// Thin client for the Tembo Coding Agent Platform task API. New sessions use
-// /public-api/session/create; later changes can continue one through its
-// /session/:id/messages endpoint. Both authenticate with the workspace's Tembo
-// API key as `Authorization: Bearer`. CAP renamed the public create mount from
-// /public-api/task to /public-api/session with no alias
-// (tembo/monorepo#9519, 2026-07-16); the old path falls through to a catch-all
-// that 400s with {"error":{"message":"invalid request path"}}.
+// Thin client for the Tembo Coding Agent Platform task API. The task
+// endpoints live under the **/public-api** namespace and authenticate
+// with the workspace's Tembo API key as `Authorization: Bearer`. POSTs
+// a free-text prompt + repo URL to POST /public-api/session/create and
+// returns a task record with an htmlUrl the user can follow; the task
+// is what opens the PR. CAP renamed the mount from /public-api/task to
+// /public-api/session with no alias (tembo/monorepo#9519, 2026-07-16);
+// the old path falls through to a catch-all that 400s with
+// {"error":{"message":"invalid request path"}}.
 
 const DEFAULT_TEMBO_API_URL = "https://api.tembo.io";
 
@@ -39,11 +41,6 @@ export interface CreateTaskResult {
   taskId: string;
   title: string;
   status: string;
-  htmlUrl: string;
-}
-
-export interface ExistingTemboTask {
-  taskId: string;
   htmlUrl: string;
 }
 
@@ -95,9 +92,7 @@ export async function validateTemboApiKey(
 export async function createTemboTask(args: {
   apiKey: string;
   input: CreateTaskInput;
-}): Promise<
-  { ok: true; result: CreateTaskResult } | { ok: false; error: CapError }
-> {
+}): Promise<{ ok: true; result: CreateTaskResult } | { ok: false; error: CapError }> {
   const baseUrl = process.env.TEMBO_API_URL ?? DEFAULT_TEMBO_API_URL;
 
   const body = {
@@ -139,10 +134,7 @@ export async function createTemboTask(args: {
     // Status only — the response body can echo submitted content (#44). The
     // full body is still returned to the caller for handling, just not logged.
     console.log("[cap] ←", res.status);
-    return {
-      ok: false,
-      error: { kind: "http", status: res.status, body: text, url },
-    };
+    return { ok: false, error: { kind: "http", status: res.status, body: text, url } };
   }
 
   const json = (await res.json()) as {
@@ -160,83 +152,6 @@ export async function createTemboTask(args: {
       htmlUrl: json.htmlUrl,
     },
   };
-}
-
-async function resumeTemboTask(args: {
-  apiKey: string;
-  prompt: string;
-  existingTask: ExistingTemboTask;
-}): Promise<
-  { ok: true; result: CreateTaskResult } | { ok: false; error: CapError }
-> {
-  const baseUrl = process.env.TEMBO_API_URL ?? DEFAULT_TEMBO_API_URL;
-  const url = `${baseUrl}/session/${args.existingTask.taskId}/messages`;
-  console.log("[cap] POST", url);
-
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${args.apiKey}`,
-      },
-      cache: "no-store",
-      body: JSON.stringify({ content: args.prompt }),
-    });
-  } catch (e) {
-    return {
-      ok: false,
-      error: {
-        kind: "network",
-        message: e instanceof Error ? e.message : String(e),
-      },
-    };
-  }
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    console.log("[cap] ←", res.status);
-    return { ok: false, error: { kind: "http", status: res.status, body: text, url } };
-  }
-
-  const json = (await res.json()) as {
-    message: { isQueued?: boolean };
-    session: { id: string; title: string };
-  };
-  return {
-    ok: true,
-    result: {
-      taskId: json.session.id,
-      title: json.session.title,
-      status: json.message.isQueued === false ? "running" : "queued",
-      htmlUrl: args.existingTask.htmlUrl,
-    },
-  };
-}
-
-/** Continue the latest CAP session for an existing agent when possible. */
-export async function dispatchTemboTask(args: {
-  apiKey: string;
-  input: CreateTaskInput;
-  existingTask?: ExistingTemboTask | null;
-}): Promise<{ ok: true; result: CreateTaskResult } | { ok: false; error: CapError }> {
-  if (args.existingTask) {
-    const resumed = await resumeTemboTask({
-      apiKey: args.apiKey,
-      prompt: args.input.prompt,
-      existingTask: args.existingTask,
-    });
-    if (
-      resumed.ok ||
-      resumed.error.kind !== "http" ||
-      resumed.error.status !== 404
-    ) {
-      return resumed;
-    }
-  }
-
-  return createTemboTask({ apiKey: args.apiKey, input: args.input });
 }
 
 // Derive framework from the agent's repo path. Both callers
