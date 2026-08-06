@@ -102,6 +102,7 @@ export async function chatSubmitAction(args: {
     improvementMarker: improvementMarker(row.id),
     commitMode: workspace.commitMode,
     defaultBranch: repo.defaultBranch,
+    repositoryUrl: `https://github.com/${repo.owner}/${repo.name}`,
     ...(await buildPromptConnectionContext(
       workspace.id,
       userId,

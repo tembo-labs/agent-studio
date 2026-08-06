@@ -361,6 +361,7 @@ export async function requestAgentChange(
       improvementMarker: improvementMarker(row.id),
       commitMode: ctx.workspace.commitMode,
       defaultBranch: repo.defaultBranch,
+      repositoryUrl,
       ...(await buildPromptConnectionContext(
         ctx.workspace.id,
         ctx.userId,
@@ -430,6 +431,7 @@ export async function requestAgentChange(
     improvementMarker: improvementMarker(row.id),
     commitMode: ctx.workspace.commitMode,
     defaultBranch: repo.defaultBranch,
+    repositoryUrl,
     ...(await buildPromptConnectionContext(
       ctx.workspace.id,
       ctx.userId,

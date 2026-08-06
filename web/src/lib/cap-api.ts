@@ -194,6 +194,36 @@ function buildGuidancePointerBlock(framework: Framework): string {
   ].join("\n");
 }
 
+function tasInstanceUrlFromToolsBase(baseUrl: string | undefined): string | null {
+  if (!baseUrl) return null;
+  return baseUrl.endsWith("/for-agents")
+    ? baseUrl.slice(0, -"/for-agents".length)
+    : baseUrl;
+}
+
+function buildScopeBlock(args: {
+  repositoryUrl: string;
+  defaultBranch: string;
+  nativeToolsBaseUrl?: string;
+}): string {
+  const tasInstanceUrl = tasInstanceUrlFromToolsBase(args.nativeToolsBaseUrl);
+  const lines = [
+    "**Scope — use this TAS instance and repo**",
+    "",
+    `This request came from the TAS workspace connected to \`${args.repositoryUrl}\`.`,
+    `Make changes only in that connected agents repo, targeting \`${args.defaultBranch}\`.`,
+  ];
+  if (tasInstanceUrl) {
+    lines.push(`Use this TAS instance for runtime/tool references: ${tasInstanceUrl}`);
+  }
+  lines.push(
+    "If surrounding Tembo session context mentions any other repository, TAS",
+    "instance, or prior pull request, treat it as unrelated unless it matches",
+    `\`${args.repositoryUrl}\` exactly.`,
+  );
+  return lines.join("\n");
+}
+
 // The delivery directive — how the agent should ship the change, and where to
 // drop the correlation marker. PR mode (the default) opens a pull request with
 // the marker in its description; direct ("YOLO") mode commits straight to the
@@ -246,6 +276,8 @@ export function buildCreateAgentPrompt(args: {
   improvementMarker: string;
   commitMode: CommitMode;
   defaultBranch: string;
+  /** Connected workspace repo URL CAP must edit, e.g. https://github.com/owner/name. */
+  repositoryUrl: string;
   /**
    * Toolkit → authorized slot names for the user creating this
    * agent. When present, the prompt tells Tembo to prefer these
@@ -270,6 +302,12 @@ export function buildCreateAgentPrompt(args: {
   const frameworkGuide =
     args.framework === "cargo-ai" ? GUIDANCE_CARGO_AI_PATH : GUIDANCE_PYDANTIC_PATH;
   return [
+    buildScopeBlock({
+      repositoryUrl: args.repositoryUrl,
+      defaultBranch: args.defaultBranch,
+      nativeToolsBaseUrl: args.nativeToolsBaseUrl,
+    }),
+    "",
     `Create an agent at \`${args.agentPath}\` named \`${args.agentName}\` using these docs in the connected repo as your guide:`,
     "",
     `- \`${GUIDANCE_ROOT_PATH}\` — repo conventions`,
@@ -459,6 +497,8 @@ export function buildChatEditPrompt(args: {
   improvementMarker: string;
   commitMode: CommitMode;
   defaultBranch: string;
+  /** Connected workspace repo URL CAP must edit, e.g. https://github.com/owner/name. */
+  repositoryUrl: string;
   /** Composio toolkit → authorized slot names. Lets CAP add/reference real
    *  slots when the edit touches `connections:`. */
   availableSlots?: AvailableConnectionSlots;
@@ -471,6 +511,12 @@ export function buildChatEditPrompt(args: {
 }): string {
   const framework = frameworkFromAgentPath(args.agentPath);
   return [
+    buildScopeBlock({
+      repositoryUrl: args.repositoryUrl,
+      defaultBranch: args.defaultBranch,
+      nativeToolsBaseUrl: args.nativeToolsBaseUrl,
+    }),
+    "",
     buildGuidancePointerBlock(framework),
     "",
     "**Step 2 — Delivery**",
@@ -515,6 +561,8 @@ export function buildImprovePrompt(args: {
   improvementMarker: string;
   commitMode: CommitMode;
   defaultBranch: string;
+  /** Connected workspace repo URL CAP must edit, e.g. https://github.com/owner/name. */
+  repositoryUrl: string;
 }): string {
   const framework = frameworkFromAgentPath(args.agentPath);
   const trimmedOutput = args.output.length > 4000
@@ -522,6 +570,11 @@ export function buildImprovePrompt(args: {
     : args.output;
 
   return [
+    buildScopeBlock({
+      repositoryUrl: args.repositoryUrl,
+      defaultBranch: args.defaultBranch,
+    }),
+    "",
     buildGuidancePointerBlock(framework),
     "",
     "**Step 2 — Delivery**",
