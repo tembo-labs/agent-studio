@@ -92,6 +92,7 @@ export async function improveAgentAction(args: {
     improvementMarker: improvementMarker(row.id),
     commitMode: workspace.commitMode,
     defaultBranch: repo.defaultBranch,
+    repositoryUrl: `https://github.com/${repo.owner}/${repo.name}`,
   });
 
   const res = await createTemboTask({
